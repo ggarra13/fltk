@@ -90,4 +90,6 @@ extern FL_EXPORT MSG fl_msg;
 extern FL_EXPORT HDC fl_GetDC(Window);
 extern FL_EXPORT HDC fl_makeDC(HBITMAP);
 
+class Fl_Vk_Window;
+
 #endif // FL_DOXYGEN

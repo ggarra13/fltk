@@ -627,6 +627,9 @@ endif(FLTK_OPTION_SVG)
 
 # FIXME: GLU libs have already been searched in resources.cmake
 
+set(HAVE_VK LIB_VK OR LIB_MoltenVK)
+set(FLTK_USE_VK FALSE)
+
 set(HAVE_GL LIB_GL OR LIB_MesaGL)
 set(FLTK_USE_GL FALSE)
 
@@ -634,6 +637,13 @@ if(HAVE_GL)
   option(FLTK_BUILD_GL "use OpenGL and build fltk_gl library" ON)
   if(FLTK_BUILD_GL)
     set(FLTK_USE_GL TRUE)
+  endif()
+endif()
+
+if(HAVE_VK)
+  option(FLTK_BUILD_VK "use Vulkan and build fltk_vulkan library" ON)
+  if(FLTK_BUILD_VK)
+    set(FLTK_USE_VK TRUE)
   endif()
 endif()
 
@@ -676,7 +686,15 @@ else(FLTK_BUILD_GL)
   set(HAVE_GLXGETPROCADDRESSARB FALSE)
 endif(FLTK_BUILD_GL)
 
+if(FLTK_BUILD_VK)
+    find_package(Vulkan REQUIRED)
+else(FLTK_BUILD_VK)
+  set(VK_FOUND FALSE)
+  set(HAVE_VK FALSE)
+endif(FLTK_BUILD_VK)
+
 mark_as_advanced(OPENGL_LIB) # internal cache variable, not relevant for users
+mark_as_advanced(VULKAN_LIB) # internal cache variable, not relevant for users
 
 # FIXME: the following is necessary because this variable may have been removed
 # from the cache above. It has been marked "advanced" before in resources.cmake.
@@ -717,6 +735,21 @@ if(OPENGL_FOUND)
   set(CMAKE_REQUIRED_LIBRARIES ${TEMP_REQUIRED_LIBRARIES})
   unset(TEMP_REQUIRED_LIBRARIES)
 endif(OPENGL_FOUND)
+
+if(VULKAN_FOUND)
+  set(FLTK_VULKAN_FOUND TRUE)
+  set(CMAKE_REQUIRED_INCLUDES ${VULKAN_INCLUDE_DIR}/vulkan ${FLTK_VULKAN_VULKANU_INCLUDE_DIR})
+
+  if(WIN32)
+    list(APPEND VULKANLIBS -lvulkan-1)
+  elseif(APPLE AND NOT FLTK_BACKEND_X11)
+    list(APPEND VULKANLIBS "-framework MoltenVK")
+  elseif(FLTK_BACKEND_WAYLAND)
+    message(FATAL_ERROR "Not implemented yet")
+  else()
+    list(APPEND VULKANLIBS)
+  endif(WIN32)
+endif(VULKAN_FOUND)
 
 #######################################################################
 option(FLTK_OPTION_LARGE_FILE "enable large file support" ON)
@@ -990,6 +1023,9 @@ if(DEBUG_OPTIONS_CMAKE)
   fl_debug_var(OPENGL_FOUND)
   fl_debug_var(OPENGL_INCLUDE_DIR)
   fl_debug_var(OPENGL_LIBRARIES)
+  fl_debug_var(VULKAN_FOUND)
+  fl_debug_var(VULKAN_INCLUDE_DIR)
+  fl_debug_var(VULKAN_LIBRARIES)
   fl_debug_var(CMAKE_MSVC_RUNTIME_LIBRARY)
   message("--- bundled libraries ---")
   fl_debug_var(FLTK_USE_SYSTEM_LIBJPEG)

@@ -163,6 +163,7 @@ extern FLWindow *fl_mac_xid(const Fl_Window *win);
 /** Returns the Fl_Window corresponding to the given macOS-specific window reference */
 extern Fl_Window *fl_mac_find(FLWindow *);
 class Fl_Gl_Window;
+class Fl_Vk_Window;
 
 /** The version number of the running Mac OS X (e.g., 100604 for 10.6.4, 101300 for 10.13, 140102 for 14.1.2).
  FLTK initializes this global variable before main() begins running. If

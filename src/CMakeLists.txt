@@ -119,6 +119,7 @@ set(CPPFILES
   Fl_Value_Input.cxx
   Fl_Value_Output.cxx
   Fl_Value_Slider.cxx
+  Fl_Vk_Window.cxx
   Fl_Widget.cxx
   Fl_Widget_Surface.cxx
   Fl_Window.cxx
@@ -488,6 +489,41 @@ set(GLCPPFILES
   ${GLCPPFILES}
   ${GL_DRIVER_FILES}
 )
+
+set(VK_DRIVER_FILES
+  drivers/Vulkan/Fl_Vulkan_Display_Device.cxx
+  # the following file doesn't contribute any code:
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver.cxx
+  
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_arci.cxx
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_color.cxx
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_font.cxx
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_line_style.cxx
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_rect.cxx
+  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_vertex.cxx
+)
+
+if(FLTK_BACKEND_WAYLAND)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/Wayland/Fl_Wayland_Vk_Window_Driver.H)
+  if(FLTK_USE_X11)
+    list(APPEND VK_DRIVER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
+    list(APPEND VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
+  endif(FLTK_USE_X11)
+elseif(APPLE)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Cocoa/Fl_Cocoa_Vk_Window_Driver.mm)
+  set(VK_DRIVER_HEADER_FILES drivers/Cocoa/Fl_Cocoa_Vk_Window_Driver.H)
+elseif(WIN32)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/WinAPI/Fl_WinAPI_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/WinAPI/Fl_WinAPI_Vk_Window_Driver.H)
+endif(FLTK_BACKEND_WAYLAND)
+
+
+set(VKCPPFILES
+  ${VKCPPFILES}
+  ${VK_DRIVER_FILES}
+)
+
 
 set(IMGCPPFILES
   fl_images_core.cxx
@@ -880,6 +916,17 @@ if(FLTK_USE_GL)
 endif(FLTK_USE_GL)
 
 #######################################################################
+
+if(FLTK_USE_VK)
+  fl_add_library(fltk_vk STATIC "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
+  target_link_libraries(fltk_vk PUBLIC ${Vulkan_LIBRARIES} fltk::fltk)
+  target_include_directories(fltk_vk PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+
+  # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
+  add_optional_libs(fltk_vk)
+endif(FLTK_USE_VK)
+
+#######################################################################
 # Build shared libraries (optional)
 #######################################################################
 # Shared libraries, part 1: everything except Visual Studio (MSVC)
@@ -940,6 +987,16 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
     endif()
   endif(FLTK_USE_GL)
 
+  if(FLTK_USE_VK)
+    fl_add_library(fltk_vk SHARED "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
+    target_link_libraries(fltk_vk-shared PUBLIC ${VULKAN_LIBRARIES} fltk::fltk-shared)
+    target_include_directories(fltk_vk-shared PUBLIC ${VULKAN_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+
+    # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
+    add_optional_libs(fltk_vk-shared)
+
+  endif(FLTK_USE_VK)
+
 endif(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
 
 #######################################################################
@@ -982,6 +1039,11 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
       target_include_directories(fltk-shared PUBLIC ${FLTK_OPENGL_GLU_INCLUDE_DIR})
     endif()
   endif(OPENGL_FOUND)
+
+  if(VULKAN_FOUND)
+    target_link_libraries(fltk-shared PUBLIC ${VULKAN_LIBRARIES})
+    target_include_directories(fltk-shared PUBLIC ${VULKAN_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+  endif(VULKAN_FOUND)
 
 endif(FLTK_BUILD_SHARED_LIBS AND MSVC)
 

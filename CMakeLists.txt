@@ -283,6 +283,7 @@ fl_summary_build("Static libraries"    lib  TRUE                     "n/a")
 fl_summary_build("Shared libraries"    lib  FLTK_BUILD_SHARED_LIBS   FLTK_BUILD_SHARED_LIBS)
 fl_summary_build("The forms library"   lib  FLTK_BUILD_FORMS         FLTK_BUILD_FORMS)
 fl_summary_build("The OpenGL library"  lib  FLTK_USE_GL              FLTK_BUILD_GL)
+fl_summary_build("The Vulkan library"  lib  FLTK_USE_VK              FLTK_BUILD_VK)
 fl_summary_build("fluid"               bin  FLTK_BUILD_FLUID         FLTK_BUILD_FLUID)
 fl_summary_build("fltk-options"        bin  FLTK_BUILD_FLTK_OPTIONS  FLTK_BUILD_FLTK_OPTIONS)
 
@@ -354,7 +355,7 @@ message(STATUS "End of Configuration Summary --\n")
 
 if(0) # debug built library and fluid targets
   message(STATUS "------------------------ TARGETS ------------------------")
-  foreach(tgt fltk fluid fluid-cmd options options-cmd images gl forms cairo jpeg png z)
+  foreach(tgt fltk fluid fluid-cmd options options-cmd images gl vk forms cairo jpeg png z)
     if(TARGET fltk::${tgt})
       message("Target: fltk::${tgt}")
       # fl_debug_target(fltk::${tgt})
