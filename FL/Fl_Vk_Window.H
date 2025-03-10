@@ -1,5 +1,5 @@
 //
-// OpenGL header file for the Fast Light Tool Kit (FLTK).
+// Vulkan header file for the Fast Light Tool Kit (FLTK).
 //
 // Copyright 1998-2023 by Bill Spitzak and others.
 //
@@ -15,54 +15,53 @@
 //
 
 /* \file
-   Fl_Vulkan_Window widget . */
+   Fl_Vk_Window widget . */
 
-#ifndef Fl_Vulkan_Window_H
-#define Fl_Vulkan_Window_H
+#ifndef Fl_Vk_Window_H
+#define Fl_Vk_Window_H
 
 #include "Fl_Window.H"
 
-#include "vulkan/vulkan.h"  // \@todo: replace with definitions/classes
+#include "vulkan/vulkan.h"
 
-//class Fl_Vulkan_Choice; // structure to hold result of glXChooseVisual
-class Fl_Vulkan_Window_Driver;
+class Fl_Vk_Choice; // structure to hold result of glXChooseVisual
+class Fl_Vk_Window_Driver;
 /**
-  The Fl_Vulkan_Window widget sets things up so OpenGL works.
+  The Fl_Vk_Window widget sets things up so Vulkan works.
 
-  It also keeps an OpenGL "context" for that window, so that changes to the
-  lighting and projection may be reused between redraws. Fl_Vulkan_Window
-  also flushes the OpenGL streams and swaps buffers after draw() returns.
+  It also keeps an Vulkan "context" for that window, so that changes to the
+  lighting and projection may be reused between redraws. Fl_Vk_Window
+  also flushes the Vulkan streams and swaps buffers after draw() returns.
 
-  OpenGL hardware typically provides some overlay bit planes, which
+  Vulkan hardware typically provides some overlay bit planes, which
   are very useful for drawing UI controls atop your 3D graphics.  If the
   overlay hardware is not provided, FLTK tries to simulate the overlay.
   This works pretty well if your graphics are double buffered, but not
   very well for single-buffered.
 
   Please note that the FLTK drawing and clipping functions
-  will not work inside an Fl_Vulkan_Window. All drawing
-  should be done using OpenGL calls exclusively.
+  will not work inside an Fl_Vk_Window. All drawing
+  should be done using Vulkan calls exclusively.
 
-  \see \ref opengl_highdpi
+  \see \ref vulkan_highdpi
 
   \note FLTK 1.4 introduces a driver system for graphic calls. It is now possible
-  to add a selection of widgets to an OpenGL window. The widgets will draw on top
-  of any OpenGL rendering. The number of supported widgets will increase as the
+  to add a selection of widgets to an Vulkan window. The widgets will draw on top
+  of any Vulkan rendering. The number of supported widgets will increase as the
   driver development improves. Program test/cube.cxx illustrates how to do that.
 
-  \note FLTK expects that when an Fl_Vulkan_Window is a child of a parent Fl_Window,
+  \note FLTK expects that when an Fl_Vk_Window is a child of a parent Fl_Window,
   the child window lies entirely inside its parent window. If that's not the case, what
   happens to the part of the GL subwindow which leaks outside its parent is undefined
   and susceptible to be platform-specific.
 */
-class FL_EXPORT Fl_Vulkan_Window : public Fl_Window {
-  friend class Fl_Vulkan_Window_Driver;
-  Fl_Vulkan_Window_Driver *pVulkanWindowDriver;
+class FL_EXPORT Fl_Vk_Window : public Fl_Window {
+  friend class Fl_Vk_Window_Driver;
+  Fl_Vk_Window_Driver *pVkWindowDriver;
 
   int mode_;
   const int *alist;
-  Fl_Vulkan_Choice *g;
-  GLContext context_;
+  Fl_Vk_Choice *g;
   char valid_f_;
   char damage1_; // damage() of back buffer
   virtual void draw_overlay();
@@ -91,7 +90,7 @@ public:
     Is turned off when FLTK creates a new context for this window or
     when the window resizes, and is turned on \e after draw() is called.
     You can use this inside your draw() method to avoid unnecessarily
-    initializing the OpenGL context. Just do this:
+    initializing the Vulkan context. Just do this:
     \code
     void mywindow::draw() {
      if (!valid()) {
@@ -113,36 +112,36 @@ public:
   */
   char valid() const {return valid_f_ & 1;}
   /**
-    See char Fl_Vulkan_Window::valid() const
+    See char Fl_Vk_Window::valid() const
   */
   void valid(char v) {if (v) valid_f_ |= 1; else valid_f_ &= 0xfe;}
   void invalidate();
 
   /**
     Will only be set if the
-    OpenGL context is created or recreated. It differs from
-    Fl_Vulkan_Window::valid() which is also set whenever the context
+    Vulkan  is created or recreated. It differs from
+    Fl_Vk_Window::valid() which is also set whenever the context
     changes size.
   */
   char context_valid() const {return valid_f_ & 2;}
   /**
-    See char Fl_Vulkan_Window::context_valid() const
+    See char Fl_Vk_Window::context_valid() const
   */
   void context_valid(char v) {if (v) valid_f_ |= 2; else valid_f_ &= 0xfd;}
 
-  /**  Returns non-zero if the hardware supports the given OpenGL mode. */
+  /**  Returns non-zero if the hardware supports the given Vulkan mode. */
   static int can_do(int m) {return can_do(m,0);}
-  /**  Returns non-zero if the hardware supports the given OpenGL mode.
-   \see Fl_Vulkan_Window::mode(const int *a) */
+  /**  Returns non-zero if the hardware supports the given Vulkan mode.
+   \see Fl_Vk_Window::mode(const int *a) */
   static int can_do(const int *m) {return can_do(0, m);}
-  /**  Returns non-zero if the hardware supports the current OpenGL mode. */
+  /**  Returns non-zero if the hardware supports the current Vulkan mode. */
   int can_do() {return can_do(mode_,alist);}
-  /** Returns the current OpenGL capabilities of the window.
-   Don't use this if capabilities were set through Fl_Vulkan_Window::mode(const int *a).
+  /** Returns the current Vulkan capabilities of the window.
+   Don't use this if capabilities were set through Fl_Vk_Window::mode(const int *a).
    */
   Fl_Mode mode() const {return (Fl_Mode)mode_;}
   /**
-   Set or change the OpenGL capabilities of the window.  The value can be
+   Set or change the Vulkan capabilities of the window.  The value can be
    any of the following OR'd together:
 
    - \c FL_RGB - RGB color (not indexed)
@@ -155,7 +154,7 @@ public:
    - \c FL_DEPTH - depth buffer
    - \c FL_STENCIL - stencil buffer
    - \c FL_MULTISAMPLE - multisample antialiasing
-   - \c FL_OPENGL3 - use OpenGL version 3.0 or more.
+   - \c FL_VULKAN3 - use Vulkan version 3.0 or more.
 
    FL_RGB and FL_SINGLE have a value of zero, so they
    are "on" unless you give FL_INDEX or FL_DOUBLE.
@@ -175,38 +174,44 @@ public:
    mode() must not be called within draw() since it
    changes the current context.
 
-   The FL_OPENGL3 flag is recommended to use OpenGL version 3 or more.
+   The FL_VULKAN3 flag is recommended to use Vulkan version 3 or more.
    This flag is required (not just recommended) if  GL ≥ 3.0 is in use
    and at least one of these conditions applies:
    - the program runs on the macOS platform;
-   - the Fl_Vulkan_Window has child widgets.
+   - the Fl_Vk_Window has child widgets.
 
-   See more details in \ref opengl3.
+   See more details in \ref vulkan3.
 
-   \version the <tt>FL_OPENGL3</tt> flag appeared in version 1.3.4
+   \version the <tt>FL_VULKAN3</tt> flag appeared in version 1.3.4
    */
   int mode(int a) {return mode(a,0);}
-  /** Set the OpenGL capabilities of the window using platform-specific data.
+  /** Set the Vulkan capabilities of the window using platform-specific data.
    \param a zero-ending array of platform-specific attributes and attribute values
    <p><b>Unix/Linux platform</b>: attributes are GLX attributes adequate for the 3rd argument of
    the <tt>glXChooseVisual()</tt> function (e.g., <tt>GLX_DOUBLEBUFFER</tt>, defined by including <GL/glx.h>).
    \note What attributes are adequate here is subject to change.
-   The preferred, stable public API is Fl_Vulkan_Window::mode(int a).
+   The preferred, stable public API is Fl_Vk_Window::mode(int a).
    <p><b>Windows platform</b>: this member function is of no use.
    <p><b>Mac OS X platform</b>: attributes belong to the <tt>CGLPixelFormatAttribute</tt> enumeration
-   (defined by including <tt><OpenGL/OpenGL.h></tt>, e.g., <tt>kCGLPFADoubleBuffer</tt>)
+   (defined by including <tt><Vulkan/Vulkan.h></tt>, e.g., <tt>kCGLPFADoubleBuffer</tt>)
    and may be followed by adequate attribute values.
    */
   int mode(const int *a) {return mode(0, a);}
 
-  /** Returns a pointer to the window's Wayland objects.
+  /** Returns a pointer to the window's Vulkan objects.
   */
   VkInstance instance();
   VkPhysicalDevice physicalDevice();
   VkDevice device();
   VkSurfaceKHR surfaceKHR();
   VkSwapchainKHR swapchainKHR();
-  VkQueue queue();
+  VkCommandPool commandPool();
+  std::vector<VkCommandBuffer> commandBuffers();
+  VkSemaphore imageAvailableSemaphore();
+  VkSemaphore renderFinishedSemaphore();
+  VkQueue graphicsQueue();
+  VkQueue presentQueue();
+  
   
   void make_current();
   void swap_buffers();
@@ -220,24 +225,24 @@ public:
   void make_overlay_current();
 
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
-  Fl_Vulkan_Window* as_vulkan_window() FL_OVERRIDE { return this; }
-  Fl_Vulkan_Window const* as_vulkan_window() const FL_OVERRIDE { return this; }
+  Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
+  Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }
 
   float pixels_per_unit();
-  /** Gives the window width in OpenGL pixels.
-   When an Fl_Vulkan_Window is mapped to a HighDPI display, the value given by Fl_Vulkan_Window::w()
+  /** Gives the window width in Vulkan pixels.
+   When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::w()
    which is expressed in FLTK units, may differ from the window width in pixels.
-   Calls to OpenGL functions expecting pixel values (\em e.g., \c glViewport) should therefore
+   Calls to Vulkan functions expecting pixel values (\em e.g., \c glViewport) should therefore
    use pixel_w() rather than w().
    Method pixel_w() detects when the GUI is rescaled or when the window has been moved
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
   int pixel_w() { return int(pixels_per_unit() * w() + 0.5f); }
-  /** Gives the window height in OpenGL pixels.
-   When an Fl_Vulkan_Window is mapped to a HighDPI display, the value given by Fl_Vulkan_Window::h()
+  /** Gives the window height in Vulkan pixels.
+   When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
    which is expressed in FLTK units, may differ from the window height in pixels.
-   Calls to OpenGL functions expecting pixel values (\em e.g., \c glViewport) should therefore
+   Calls to Vulkan functions expecting pixel values (\em e.g., \c glViewport) should therefore
    use pixel_h() rather than h().
    Method pixel_h() detects when the GUI is rescaled or when the window has been moved
    between low and high resolution displays and automatically adjusts the returned value.
@@ -245,20 +250,20 @@ public:
    */
   int pixel_h() { return int(pixels_per_unit() * h() + 0.5f); }
 
-  ~Fl_Vulkan_Window();
+  ~Fl_Vk_Window();
   /**
-    Creates a new Fl_Vulkan_Window widget using the given size, and label string.
+    Creates a new Fl_Vk_Window widget using the given size, and label string.
     The default boxtype is FL_NO_BOX. The default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
   */
-  Fl_Vulkan_Window(int W, int H, const char *l=0) : Fl_Window(W,H,l) {init();}
+  Fl_Vk_Window(int W, int H, const char *l=0) : Fl_Window(W,H,l) {init();}
   /**
-    Creates a new Fl_Vulkan_Window widget using the given position,
+    Creates a new Fl_Vk_Window widget using the given position,
     size, and label string. The default boxtype is FL_NO_BOX. The
     default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
   */
 
-  Fl_Vulkan_Window(int X, int Y, int W, int H, const char *l=0)
+  Fl_Vk_Window(int X, int Y, int W, int H, const char *l=0)
     : Fl_Window(X,Y,W,H,l) {init();}
 };
 
-#endif // Fl_Vulkan_Window_H
+#endif // Fl_Vk_Window_H

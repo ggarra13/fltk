@@ -63,6 +63,15 @@
  * OpenGL, and FLTK will be smaller.
  */
 
+#cmakedefine01 HAVE_VK
+ 
+/*
+ * HAVE_GL:
+ *
+ * Do you have OpenGL? Set this to 0 if you don't have or plan to use
+ * OpenGL, and FLTK will be smaller.
+ */
+
 #cmakedefine01 HAVE_GL
 
 /*

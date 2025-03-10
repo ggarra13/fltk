@@ -18,10 +18,10 @@
 #define FL_WINAPI_VULKAN_WINDOW_DRIVER_H
 
 #include <config.h>
-#if HAVE_VULKAN
+#if HAVE_VK
 #include <FL/platform.H>
 #include "../../Fl_Vk_Window_Driver.H"
-#include <FL/vulkan.h>
+#include <FL/vk.h>
 
 class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   friend Fl_Vk_Window_Driver* Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
@@ -34,29 +34,9 @@ class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   int swap_interval() const FL_OVERRIDE;
   void invalidate() FL_OVERRIDE {}
   int flush_begin(char& valid_f) FL_OVERRIDE;
-  // Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
-  // VULKANContext create_vulkan_context(Fl_Window* window, const Fl_Vk_Choice* g) FL_OVERRIDE;
-  // VULKANContext do_create_vulkan_context(Fl_Window* window, const Fl_Vk_Choice* g,
-  //                                int layer);
-  // void set_vulkan_context(Fl_Window* w, VULKANContext context) FL_OVERRIDE;
-  // void delete_vulkan_context(VULKANContext) FL_OVERRIDE;
-  void make_overlay_current() FL_OVERRIDE;
-  void redraw_overlay() FL_OVERRIDE;
-  // void* GetProcAddress(const char *procName) FL_OVERRIDE;
-  void draw_string_legacy(const char* str, int n) FL_OVERRIDE;
-  void vulkan_bitmap_font(Fl_Font_Descriptor *fl_fontsize) FL_OVERRIDE;
-  void get_list(Fl_Font_Descriptor *fd, int r) FL_OVERRIDE;
-  int genlistsize() FL_OVERRIDE;
-  void switch_to_VULKAN1() FL_OVERRIDE;
-  void switch_back() FL_OVERRIDE;
-// #if HAVE_VULKAN_OVERLAY
-//   void vulkan_hide_before(void *& overlay) FL_OVERRIDE;
-//   int can_do_overlay() FL_OVERRIDE;
-//   int overlay_color(Fl_Color i) FL_OVERRIDE;
-//   void make_overlay(void*&overlay) FL_OVERRIDE;
-// #endif
+  Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
 };
 
-#endif // HAVE_VULKAN
+#endif // HAVE_VK
 
 #endif // FL_WINAPI_VULKAN_WINDOW_DRIVER_H

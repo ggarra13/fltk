@@ -60,7 +60,7 @@ static char SWAP_TYPE = 0 ; // 0 = determine it from environment variable
 
 /**  Returns non-zero if the hardware supports the given or current Vulkan  mode. */
 int Fl_Vk_Window::can_do(int a, const int *b) {
-  return Fl_Vk_Window_Driver::vkobal()->find(a,b) != 0;
+  return Fl_Vk_Window_Driver::global()->find(a,b) != 0;
 }
 
 void Fl_Vk_Window::show() {
@@ -92,7 +92,6 @@ void Fl_Vk_Window::show() {
 */
 void Fl_Vk_Window::invalidate() {
   valid(0);
-  context_valid(0);
   pVkWindowDriver->invalidate();
 }
 
@@ -111,24 +110,6 @@ int Fl_Vk_Window::mode(int m, const int *a) {
 */
 
 void Fl_Vk_Window::make_current() {
-  puts("Fl_Vk_Window::make_current()");
-//  printf("make_current: context_=%p\n", context_);
-    
-  // pVkWindowDriver->make_current_before();
-  // if (!context_) {
-  //   mode_ &= ~NON_LOCAL_CONTEXT;
-  //   context_ = pVkWindowDriver->create_vk_context(this, g);
-  //   valid(0);
-  //   context_valid(0);
-  // }
-  // pVkWindowDriver->set_vk_context(this, context_);
-  // pVkWindowDriver->make_current_after();
-  // if (mode_ & FL_FAKE_SINGLE) {
-  //   vkDrawBuffer(VK_FRONT);
-  //   vkReadBuffer(VK_FRONT);
-  // }
-
-    current_ = this;
 }
 
 /**
@@ -193,7 +174,6 @@ void Fl_Vk_Window::flush() {
 
   if (mode_ & FL_DOUBLE) {
 
-    vkDrawBuffer(VK_BACK);
 
     if (!SWAP_TYPE) {
       SWAP_TYPE = pVkWindowDriver->swap_type();
@@ -225,52 +205,14 @@ void Fl_Vk_Window::flush() {
       if (overlay == this) draw_overlay();
       swap_buffers();
     } else if (SWAP_TYPE == UNDEFINED){ // SWAP_TYPE == UNDEFINED
-
-      // If we are faking the overlay, use CopyPixels to act like
-      // SWAP_TYPE == COPY.  Otherwise overlay redraw is way too slow.
-      if (overlay == this) {
-        // don't draw if only the overlay is damaged:
-        if (damage1_ || damage() != FL_DAMAGE_OVERLAY || !save_valid) draw();
-        // we use a separate context for the copy because rasterpos must be 0
-        // and depth test needs to be off:
-        static VKContext ortho_context = 0;
-        static Fl_Vk_Window* ortho_window = 0;
-        int orthoinit = !ortho_context;
-        if (orthoinit) ortho_context = pVkWindowDriver->create_vk_context(this, g);
-        pVkWindowDriver->set_vk_context(this, ortho_context);
-        if (orthoinit || !save_valid || ortho_window != this) {
-          vkDisable(VK_DEPTH_TEST);
-          vkReadBuffer(VK_BACK);
-          vkDrawBuffer(VK_FRONT);
-          vkLoadIdentity();
-          vkViewport(0, 0, pixel_w(), pixel_h());
-          vkOrtho(0, pixel_w(), 0, pixel_h(), -1, 1);
-          vkRasterPos2i(0,0);
-          ortho_window = this;
-        }
-        vkCopyPixels(0,0,pixel_w(),pixel_h(),VK_COLOR);
-        make_current(); // set current context back to draw overlay
-        damage1_ = 0;
-
-      } else {
         damage1_ = damage();
         clear_damage(0xff); draw();
         swap_buffers();
-      }
-
-    }
-    if (overlay==this && SWAP_TYPE != SWAP) { // fake overlay in front buffer
-      vkDrawBuffer(VK_FRONT);
-      draw_overlay();
-      vkDrawBuffer(VK_BACK);
-      vkFlush();
     }
 
-  } else {      // sinvke-buffered context is simpler:
+  } else {      // single-buffered context is simpler:
 
     draw();
-    if (overlay == this) draw_overlay();
-    vkFlush();
 
   }
 
@@ -337,13 +279,12 @@ void Fl_Vk_Window::init() {
   overlay  = 0;
   valid_f_ = 0;
   damage1_ = 0;
-
-#if 0 // This breaks resizing on Linux/X11
-  int H = h();
-  h(1); // Make sure we actually do something in resize()...
-  resize(x(), y(), w(), H);
-#endif // 0
 }
+
+void Fl_Vk_Window::cleanuo()
+{
+}
+
 
 /**
   You must implement this virtual function if you want to draw into the
@@ -364,58 +305,16 @@ void Fl_Vk_Window::draw_overlay() {}
 
 /**
  Supports drawing to an Fl_Vk_Window with the FLTK 2D drawing API.
- \see \ref openvk_with_fltk_widgets
+ \see \ref opengl_with_fltk_widgets
  */
 void Fl_Vk_Window::draw_begin() {
-  if (mode() & FL_OPENVK3) pVkWindowDriver->switch_to_VK1();
-  damage(FL_DAMAGE_ALL); // always redraw all VK widgets above the VK scene
-  Fl_Surface_Device::push_current( Fl_Vulkan_Display_Device::display_device() );
-  Fl_Vulkan_Graphics_Driver *drv = (Fl_Vulkan_Graphics_Driver*)Fl_Surface_Device::surface()->driver();
-  drv->pixels_per_unit_ = pixels_per_unit();
-
-  if (!valid()) {
-    vkViewport(0, 0, pixel_w(), pixel_h());
-    valid(1);
-  }
-
-  vkPushAttrib(VK_ALL_ATTRIB_BITS);
-
-  vkMatrixMode(VK_PROJECTION);
-  vkPushMatrix();
-  vkLoadIdentity();
-  vkOrtho(0.0, w(), h(), 0.0, -1.0, 1.0);
-
-  vkMatrixMode(VK_MODELVIEW);
-  vkPushMatrix();
-  vkLoadIdentity();
-
-  vkDisable(VK_DEPTH_TEST);
-  vkDisable(VK_LIGHTING);
-  vkDisable(VK_TEXTURE_2D);
-  vkEnable(VK_POINT_SMOOTH);
-
-  vkLineWidth((VKfloat)(drv->pixels_per_unit_*drv->line_width_));
-  vkPointSize((VKfloat)(drv->pixels_per_unit_));
-  vkBlendFunc(VK_SRC_ALPHA, VK_ONE_MINUS_SRC_ALPHA);
-  vkEnable(VK_BLEND);
-  if (!pVkWindowDriver->need_scissor()) vkDisable(VK_SCISSOR_TEST);
 }
 
 /**
  To be used as a match for a previous call to Fl_Vk_Window::draw_begin().
- \see \ref openvk_with_fltk_widgets
+ \see \ref opengl_with_fltk_widgets
  */
 void Fl_Vk_Window::draw_end() {
-  vkMatrixMode(VK_MODELVIEW);
-  vkPopMatrix();
-
-  vkMatrixMode(VK_PROJECTION);
-  vkPopMatrix();
-
-  vkPopAttrib(); // VK_ALL_ATTRIB_BITS
-
-  Fl_Surface_Device::pop_current();
-  if (mode() & FL_OPENVK3) pVkWindowDriver->switch_back();
 }
 
 /** Draws the Fl_Vk_Window.

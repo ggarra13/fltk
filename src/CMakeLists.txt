@@ -491,6 +491,7 @@ set(GLCPPFILES
 )
 
 set(VK_DRIVER_FILES
+    Fl_Vk_Window_Driver.cxx
   drivers/Vulkan/Fl_Vulkan_Display_Device.cxx
   # the following file doesn't contribute any code:
   # drivers/Vulkan/Fl_Vulkan_Graphics_Driver.cxx
