@@ -43,6 +43,7 @@
 #  define FL_vk_H
 
 #include <iostream>  // \@todo: remove
+#include <Fl/platform.H>
 
 #  include "Enumerations.H" // for color names
 #  ifdef _WIN32
@@ -94,6 +95,30 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
 
 
 #define VK_CHECK_RESULT(err) vk_check_result(err, __FILE__, __LINE__);
+#define VK_CHECK_HANDLE(var) vk_check_handle(var == VK_NULL_HANDLE, \
+                                             #var,  __FILE__, __LINE__);
+
+#define VK_ALLOC(x)  (void*)malloc(x)
+#define VK_ASSERT(x) assert(x)
+#define VK_UNUSED(x) (void)(x)
+#define VK_FREE(x) free(x);
+#define VK_ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#define VK_DBG() std::cerr << __FILE__ << " " << __FUNCTION__ \
+                           << " " << __LINE__ << std::endl;
+
+
+inline void vk_check_handle(bool is_null_handle,
+                            const char* var, const char* file, const int line)
+{
+    if (is_null_handle)
+    {
+        char buf[256];
+        snprintf(buf, 256, "Vulkan: VK_NULL_HANDLE for %s in %s, line %d",
+                 var, file, line);
+        Fl::fatal(buf);
+        exit(1);
+    }
+}
 
 inline void vk_check_result(VkResult err, const char* file, const int line)
 {
@@ -156,7 +181,10 @@ inline void vk_check_result(VkResult err, const char* file, const int line)
     default:
         break;
     }
-    fprintf(stderr, "Vulkan: %s at %s, line %d", errorName, file, line);
+    char buf[256];
+    snprintf(buf, 256, "Vulkan: %s at %s, line %d", errorName, file, line);
+    Fl::error(buf);
+    exit(err);
 }
 
 #endif // !FL_vk_H

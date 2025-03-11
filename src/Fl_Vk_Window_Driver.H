@@ -91,7 +91,10 @@ public:
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers();
-  virtual void resize(int /*w*/, int /*h*/, uint32_t family, uint32_t min_image_count);
+  virtual void resize(int /*is_a_resize*/, int /*w*/, int /*h*/);
+  virtual void init_vk();
+  virtual void init_vk_swapchain();
+  virtual void prepare();
   virtual char swap_type();
   virtual void swap_interval(int) { }
   virtual int swap_interval() const { return -1; }
@@ -114,17 +117,9 @@ public:
   virtual bool need_scissor() { return false; }
 
     // Vulkan specific methods.
-  void create_instance();
-  void pick_physical_device();
-  void create_logical_device();
   virtual void* GetProcAddress(const char *procName) { return nullptr; }
   virtual std::vector<std::string> get_required_extensions() = 0;
   virtual void create_surface() = 0;
-  void create_swap_chain();
-  void create_command_pool();
-  void create_command_buffers();
-  void create_semaphores();
-  void get_queues();
 };
 
 #endif /* Fl_Vk_Window_Driver_H */

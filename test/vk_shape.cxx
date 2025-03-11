@@ -71,39 +71,32 @@ void sides_cb(Fl_Widget *o, void *p) {
 
 int main(int argc, char **argv) {
 
-    try
-    {
-#if 1
-        Fl::use_high_res_GL(1);
-        Fl_Window window(300, 330);
+#if 0
+    Fl::use_high_res_VK(1);
+    Fl_Window window(300, 330);
   
 // the shape window could be it's own window, but here we make it
 // a child window:
         
-        vk_shape_window sw(10, 10, 280, 280);
+    vk_shape_window sw(10, 10, 280, 280);
 
 // // make it resize:
-        //  window.size_range(300,330,0,0,1,1,1);
+    //  window.size_range(300,330,0,0,1,1,1);
 // add a knob to control it:
-        Fl_Hor_Slider slider(50, 295, window.w()-60, 30, "Sides:");
-        slider.align(FL_ALIGN_LEFT);
-        slider.step(1);
-        slider.bounds(3,40);
+    Fl_Hor_Slider slider(50, 295, window.w()-60, 30, "Sides:");
+    slider.align(FL_ALIGN_LEFT);
+    slider.step(1);
+    slider.bounds(3,40);
 
-        window.resizable(&sw);
-        slider.value(sw.sides);
-        slider.callback(sides_cb,&sw);
-        window.end();
-        window.show(argc,argv);
+    window.resizable(&sw);
+    slider.value(sw.sides);
+    slider.callback(sides_cb,&sw);
+    window.end();
+    window.show(argc,argv);
 #else
-        vk_shape_window sw(300, 330, "VK Window");
-        sw.show();
+    vk_shape_window sw(300, 330, "VK Window");
+    sw.resizable(&sw);
+    sw.show();
 #endif
-        return Fl::run();
-    }
-    catch(const std::exception& e)
-    {
-        std::cerr << e.what() << std::endl;
-    }
-    Sleep(20000);
+    return Fl::run();
 }

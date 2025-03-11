@@ -26,12 +26,60 @@
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual
 class Fl_Vk_Window_Driver;
 
-typedef struct {
-    VkImage image;
-    VkCommandBuffer cmd;
-    VkImageView view;
-} SwapchainBuffers;
+#define DEMO_TEXTURE_COUNT 1
+#define VERTEX_BUFFER_BIND_ID 0
 
+static const uint32_t fragShaderCode[] = {
+    0x07230203,0x00010000,0x00080007,0x00000014,0x00000000,0x00020011,0x00000001,0x0006000b,
+    0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
+    0x0007000f,0x00000004,0x00000004,0x6e69616d,0x00000000,0x00000009,0x00000011,0x00030010,
+    0x00000004,0x00000007,0x00030003,0x00000002,0x00000190,0x00090004,0x415f4c47,0x735f4252,
+    0x72617065,0x5f657461,0x64616873,0x6f5f7265,0x63656a62,0x00007374,0x00090004,0x415f4c47,
+    0x735f4252,0x69646168,0x6c5f676e,0x75676e61,0x5f656761,0x70303234,0x006b6361,0x00040005,
+    0x00000004,0x6e69616d,0x00000000,0x00050005,0x00000009,0x61724675,0x6c6f4367,0x0000726f,
+    0x00030005,0x0000000d,0x00786574,0x00050005,0x00000011,0x63786574,0x64726f6f,0x00000000,
+    0x00040047,0x00000009,0x0000001e,0x00000000,0x00040047,0x0000000d,0x00000022,0x00000000,
+    0x00040047,0x0000000d,0x00000021,0x00000000,0x00040047,0x00000011,0x0000001e,0x00000000,
+    0x00020013,0x00000002,0x00030021,0x00000003,0x00000002,0x00030016,0x00000006,0x00000020,
+    0x00040017,0x00000007,0x00000006,0x00000004,0x00040020,0x00000008,0x00000003,0x00000007,
+    0x0004003b,0x00000008,0x00000009,0x00000003,0x00090019,0x0000000a,0x00000006,0x00000001,
+    0x00000000,0x00000000,0x00000000,0x00000001,0x00000000,0x0003001b,0x0000000b,0x0000000a,
+    0x00040020,0x0000000c,0x00000000,0x0000000b,0x0004003b,0x0000000c,0x0000000d,0x00000000,
+    0x00040017,0x0000000f,0x00000006,0x00000002,0x00040020,0x00000010,0x00000001,0x0000000f,
+    0x0004003b,0x00000010,0x00000011,0x00000001,0x00050036,0x00000002,0x00000004,0x00000000,
+    0x00000003,0x000200f8,0x00000005,0x0004003d,0x0000000b,0x0000000e,0x0000000d,0x0004003d,
+    0x0000000f,0x00000012,0x00000011,0x00050057,0x00000007,0x00000013,0x0000000e,0x00000012,
+    0x0003003e,0x00000009,0x00000013,0x000100fd,0x00010038
+};
+
+static const uint32_t vertShaderCode[] = {
+    0x07230203,0x00010000,0x00080007,0x00000018,0x00000000,0x00020011,0x00000001,0x0006000b,
+    0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
+    0x0009000f,0x00000000,0x00000004,0x6e69616d,0x00000000,0x00000009,0x0000000b,0x00000010,
+    0x00000014,0x00030003,0x00000002,0x00000190,0x00090004,0x415f4c47,0x735f4252,0x72617065,
+    0x5f657461,0x64616873,0x6f5f7265,0x63656a62,0x00007374,0x00090004,0x415f4c47,0x735f4252,
+    0x69646168,0x6c5f676e,0x75676e61,0x5f656761,0x70303234,0x006b6361,0x00040005,0x00000004,
+    0x6e69616d,0x00000000,0x00050005,0x00000009,0x63786574,0x64726f6f,0x00000000,0x00040005,
+    0x0000000b,0x72747461,0x00000000,0x00060005,0x0000000e,0x505f6c67,0x65567265,0x78657472,
+    0x00000000,0x00060006,0x0000000e,0x00000000,0x505f6c67,0x7469736f,0x006e6f69,0x00030005,
+    0x00000010,0x00000000,0x00030005,0x00000014,0x00736f70,0x00040047,0x00000009,0x0000001e,
+    0x00000000,0x00040047,0x0000000b,0x0000001e,0x00000001,0x00050048,0x0000000e,0x00000000,
+    0x0000000b,0x00000000,0x00030047,0x0000000e,0x00000002,0x00040047,0x00000014,0x0000001e,
+    0x00000000,0x00020013,0x00000002,0x00030021,0x00000003,0x00000002,0x00030016,0x00000006,
+    0x00000020,0x00040017,0x00000007,0x00000006,0x00000002,0x00040020,0x00000008,0x00000003,
+    0x00000007,0x0004003b,0x00000008,0x00000009,0x00000003,0x00040020,0x0000000a,0x00000001,
+    0x00000007,0x0004003b,0x0000000a,0x0000000b,0x00000001,0x00040017,0x0000000d,0x00000006,
+    0x00000004,0x0003001e,0x0000000e,0x0000000d,0x00040020,0x0000000f,0x00000003,0x0000000e,
+    0x0004003b,0x0000000f,0x00000010,0x00000003,0x00040015,0x00000011,0x00000020,0x00000001,
+    0x0004002b,0x00000011,0x00000012,0x00000000,0x00040020,0x00000013,0x00000001,0x0000000d,
+    0x0004003b,0x00000013,0x00000014,0x00000001,0x00040020,0x00000016,0x00000003,0x0000000d,
+    0x00050036,0x00000002,0x00000004,0x00000000,0x00000003,0x000200f8,0x00000005,0x0004003d,
+    0x00000007,0x0000000c,0x0000000b,0x0003003e,0x00000009,0x0000000c,0x0004003d,0x0000000d,
+    0x00000015,0x00000014,0x00050041,0x00000016,0x00000017,0x00000010,0x00000012,0x0003003e,
+    0x00000017,0x00000015,0x000100fd,0x00010038
+};
+
+//! ImGUI demo variables
 struct Fl_Vk_Frame
 {
     VkCommandPool       CommandPool;
@@ -46,6 +94,50 @@ struct Fl_Vk_FrameSemaphores
 {
     VkSemaphore         ImageAcquiredSemaphore;
     VkSemaphore         RenderCompleteSemaphore;
+};
+
+//! GLFW demo variables
+struct Fl_Vk_SwapchainBuffer {
+    VkImage image;
+    VkCommandBuffer cmd;
+    VkImageView view;
+};
+
+struct Fl_Vk_Mesh {
+    VkBuffer buf;
+    VkDeviceMemory mem;
+
+    VkPipelineVertexInputStateCreateInfo vi;
+    VkVertexInputBindingDescription vi_bindings[1];
+    VkVertexInputAttributeDescription vi_attrs[2];
+};
+
+  
+struct Fl_Vk_Texture {
+    VkSampler sampler;
+    
+    VkImage image;
+    VkImageLayout imageLayout;
+
+    VkDeviceMemory mem;
+    VkImageView view;
+    int32_t tex_width, tex_height;
+};
+
+  
+struct Fl_Vk_Depth {
+    VkFormat format;
+    
+    VkImage image;
+    VkDeviceMemory mem;
+    VkImageView view;
+
+    Fl_Vk_Depth() :
+        image(VK_NULL_HANDLE),
+        mem(VK_NULL_HANDLE),
+        view(VK_NULL_HANDLE)
+        {
+        };
 };
 
 /**
@@ -206,9 +298,12 @@ public:
    */
   int mode(const int *a) {return mode(0, a);}
 
+  bool               m_validate = false;
+  bool               m_use_staging_buffer = false;
   VkInstance         m_instance;
-  VkPhysicalDevice   m_physicalDevice;
+  VkPhysicalDevice   m_gpu;
   VkDevice           m_device;
+  int                m_width, m_height;
   
   uint32_t m_enabled_extension_count;
   uint32_t m_enabled_layer_count;
@@ -225,19 +320,52 @@ public:
   VkRenderPass       m_renderPass;
   VkPipeline         m_pipeline;  
   VkQueue            m_queue;
+  VkPhysicalDeviceProperties m_gpu_props;
+  VkPhysicalDeviceFeatures m_gpu_features;
   VkQueueFamilyProperties* m_queue_props;
   uint32_t           m_queueFamilyIndex;
+
   
-  // (Optional) Allocation, Debugging
+  //!@{ These are from triangle-vulkan GLFW demo
+
+
+
+  
+  VkPhysicalDeviceMemoryProperties m_memory_properties;
+  uint32_t                m_current_buffer;
+  uint32_t                m_queue_count;
+  uint32_t                m_graphics_queue_node_index;
+
+  Fl_Vk_Depth m_depth;
+  Fl_Vk_Mesh m_vertices;
+
+  Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
+  VkFramebuffer* m_framebuffers;
+
+  VkCommandPool m_cmd_pool;
+
+  Fl_Vk_SwapchainBuffer*       m_buffers;
+    
+  VkCommandBuffer m_setup_cmd; // Command Buffer for initialization commands
+  VkCommandBuffer m_draw_cmd;  // Command Buffer for drawing commands
+  VkPipelineLayout m_pipeline_layout;
+  VkDescriptorSetLayout m_desc_layout;
+  VkPipelineCache m_pipelineCache;
+
+  
+  // (Optional) Allocation, Debugging.
   const VkAllocationCallbacks*    m_allocator;
   void                            (*CheckVkResultFn)(VkResult err);
   VkDeviceSize                    MinAllocationSize;      // Minimum allocatio
 
+  bool               m_use_break = false;
+  VkDebugReportCallbackEXT m_msg_callback;
+
+    
   // These are in ImGui but not sure.
-  bool               m_useDynamicRendering;
-  // Clear screen?
+  bool               m_useDynamicRendering;  // static or dynamic workflow
+  // Clear screen
   bool               m_clearEnable;
-  VkClearValue       m_clearValue;
 
   uint32_t           m_curFrame;   // Current frame being rendered to (0 <= FrameIndex < FrameInFlightCount)
 
@@ -247,7 +375,6 @@ public:
   
   VkSwapchainKHR     m_swapchain;
   uint32_t           m_swapchainImageCount;
-  SwapchainBuffers*       m_buffers;
   
   uint32_t           m_semaphoreCount;         // Number of simultaneous in-flight frames + 1, to be able to use it in vkAcquireNextImageKHR
   uint32_t           m_semaphoreIndex;         // Current set of swapchain wait semaphores we're using (needs to be distinct from per frame data)
@@ -255,11 +382,13 @@ public:
   Fl_Vk_Frame*            m_frames;
   Fl_Vk_FrameSemaphores*  m_frameSemaphores;
 
-  // These are from triangle-vulkan GLFW demo
-  VkPhysicalDeviceMemoryProperties m_memory_properties;
-  uint32_t                m_current_buffer;
-  uint32_t                m_queue_count;
-  uint32_t                m_graphics_queue_node_index;
+
+  VkShaderModule m_vert_shader_module;
+  VkShaderModule m_frag_shader_module;
+
+  VkDescriptorPool m_desc_pool;
+  VkDescriptorSet m_desc_set;
+  float m_depthStencil = 1.0;
   
   void make_current();
   void swap_buffers();

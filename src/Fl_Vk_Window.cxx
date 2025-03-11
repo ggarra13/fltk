@@ -15,9 +15,11 @@
 //
 
 #include <config.h>
+
 #if HAVE_VK
 
 extern int fl_vk_load_plugin;
+
 
 #include <FL/vk.h>
 #include <FL/Fl_Vk_Window.H>  // \@done
@@ -33,6 +35,232 @@ extern int fl_vk_load_plugin;
 #    include <dlfcn.h>
 #  endif // (HAVE_DLSYM && HAVE_DLFCN_H)
 
+
+static void demo_draw_build_cmd(Fl_Vk_Window* pWindow) {
+    VkCommandBufferBeginInfo cmd_buf_info = {};
+    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_buf_info.pNext = NULL;
+    cmd_buf_info.flags = 0;
+    cmd_buf_info.pInheritanceInfo = NULL;
+    
+    VkClearValue clear_values[2];
+
+    VkClearValue color;
+    color.color = {0.2f, 0.5f, 0.2f, 0.2f};
+    
+    VkClearValue depth;
+    depth.depthStencil = {pWindow->m_depthStencil, 0}; // \@todo:
+    
+    clear_values[0] = color;
+    clear_values[1] = depth;
+    
+    VkRenderPassBeginInfo rp_begin = {};
+    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp_begin.pNext = NULL;
+    rp_begin.renderPass = pWindow->m_renderPass;
+    rp_begin.framebuffer = pWindow->m_framebuffers[pWindow->m_current_buffer];
+    rp_begin.renderArea.offset.x = 0;
+    rp_begin.renderArea.offset.y = 0;
+    rp_begin.renderArea.extent.width = pWindow->w();
+    rp_begin.renderArea.extent.height = pWindow->h();
+    rp_begin.clearValueCount = 2;
+    rp_begin.pClearValues = clear_values;
+    
+    VkResult result;
+
+    result = vkBeginCommandBuffer(pWindow->m_draw_cmd, &cmd_buf_info);
+    VK_CHECK_RESULT(result);
+
+    // We can use LAYOUT_UNDEFINED as a wildcard here because we don't care what
+    // happens to the previous contents of the image
+    VkImageMemoryBarrier image_memory_barrier = {};
+    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.pNext = NULL;
+    image_memory_barrier.srcAccessMask = 0;
+    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.image = pWindow->m_buffers[pWindow->m_current_buffer].image;
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkCmdPipelineBarrier(pWindow->m_draw_cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0,
+                         NULL, 1, &image_memory_barrier);
+    vkCmdBeginRenderPass(pWindow->m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(pWindow->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      pWindow->m_pipeline);
+    vkCmdBindDescriptorSets(pWindow->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pWindow->m_pipeline_layout, 0, 1, &pWindow->m_desc_set, 0,
+                            NULL);
+
+    VkViewport viewport;
+    memset(&viewport, 0, sizeof(viewport));
+    viewport.width = (float)pWindow->w();
+    viewport.height = (float)pWindow->h();
+    viewport.minDepth = (float)0.0f;
+    viewport.maxDepth = (float)1.0f;
+    vkCmdSetViewport(pWindow->m_draw_cmd, 0, 1, &viewport);
+
+    VkRect2D scissor;
+    memset(&scissor, 0, sizeof(scissor));
+    scissor.extent.width = pWindow->w();
+    scissor.extent.height = pWindow->h();
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    vkCmdSetScissor(pWindow->m_draw_cmd, 0, 1, &scissor);
+
+    VkDeviceSize offsets[1] = {0};
+    vkCmdBindVertexBuffers(pWindow->m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
+                           &pWindow->m_vertices.buf, offsets);
+
+    vkCmdDraw(pWindow->m_draw_cmd, 3, 1, 0, 0);
+    vkCmdEndRenderPass(pWindow->m_draw_cmd);
+
+    VkImageMemoryBarrier prePresentBarrier = {};
+    prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    prePresentBarrier.pNext = NULL;
+    prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    prePresentBarrier.image = pWindow->m_buffers[pWindow->m_current_buffer].image;
+    VkImageMemoryBarrier *pmemory_barrier = &prePresentBarrier;
+    vkCmdPipelineBarrier(pWindow->m_draw_cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0,
+                         NULL, 1, pmemory_barrier);
+
+    result = vkEndCommandBuffer(pWindow->m_draw_cmd);
+    VK_CHECK_RESULT(result);
+}
+
+static void demo_flush_init_cmd(Fl_Vk_Window* demo) {
+    VkResult err;
+
+    if (demo->m_setup_cmd == VK_NULL_HANDLE)
+        return;
+
+    err = vkEndCommandBuffer(demo->m_setup_cmd);
+    VK_CHECK_RESULT(err);
+
+    const VkCommandBuffer cmd_bufs[] = {demo->m_setup_cmd};
+    VkFence nullFence = {VK_NULL_HANDLE};
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.pNext = NULL;
+    submit_info.waitSemaphoreCount = 0;
+    submit_info.pWaitSemaphores = NULL;
+    submit_info.pWaitDstStageMask = NULL;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = cmd_bufs;
+    submit_info.signalSemaphoreCount = 0;
+    submit_info.pSignalSemaphores = NULL;
+
+    err = vkQueueSubmit(demo->m_queue, 1, &submit_info, nullFence);
+    VK_CHECK_RESULT(err);
+
+    err = vkQueueWaitIdle(demo->m_queue);
+    VK_CHECK_RESULT(err);
+
+    vkFreeCommandBuffers(demo->m_device, demo->m_cmd_pool, 1, cmd_bufs);
+    demo->m_setup_cmd = VK_NULL_HANDLE;
+}
+
+
+static void demo_draw(Fl_Vk_Window* demo) {
+    VkResult result;
+    VkSemaphore imageAcquiredSemaphore, drawCompleteSemaphore;
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreCreateInfo.pNext = NULL;
+    semaphoreCreateInfo.flags = 0;
+
+    result = vkCreateSemaphore(demo->m_device, &semaphoreCreateInfo,
+                               NULL, &imageAcquiredSemaphore);
+    VK_CHECK_RESULT(result);
+
+    result = vkCreateSemaphore(demo->m_device, &semaphoreCreateInfo,
+                               NULL, &drawCompleteSemaphore);
+    VK_CHECK_RESULT(result);
+
+    // Get the index of the next available swapchain image:
+    result = vkAcquireNextImageKHR(demo->m_device,
+                                   demo->m_swapchain, UINT64_MAX,
+                                   imageAcquiredSemaphore,
+                                   (VkFence)0, // TODO: Show use of fence
+                                   &demo->m_current_buffer);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        // demo->m_swapchain is out of date (e.g. the window was resized) and
+        // must be recreated:
+        Fl_Vk_Window_Driver::driver(demo)->resize(true, demo->w(), demo->h());
+        demo_draw(demo);
+        vkDestroySemaphore(demo->m_device, imageAcquiredSemaphore, NULL);
+        vkDestroySemaphore(demo->m_device, drawCompleteSemaphore, NULL);
+        return;
+    } else if (result == VK_SUBOPTIMAL_KHR) {
+        // pWindow->m_swapchain is not as optimal as it could be, but the platform's
+        // presentation engine will still present the image correctly.
+    } else {
+        VK_CHECK_RESULT(result);
+    }
+
+    demo_flush_init_cmd(demo);
+
+    // Wait for the present complete semaphore to be signaled to ensure
+    // that the image won't be rendered to until the presentation
+    // engine has fully released ownership to the application, and it is
+    // okay to render to the image.
+
+    demo_draw_build_cmd(demo);
+    VkFence nullFence = VK_NULL_HANDLE;
+    VkPipelineStageFlags pipe_stage_flags =
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.pNext = NULL;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &imageAcquiredSemaphore;
+    submit_info.pWaitDstStageMask = &pipe_stage_flags;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &demo->m_draw_cmd;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &drawCompleteSemaphore;
+
+    result = vkQueueSubmit(demo->m_queue, 1, &submit_info, nullFence);
+    VK_CHECK_RESULT(result);
+
+    VkPresentInfoKHR present = {};
+    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present.pNext = NULL;
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &drawCompleteSemaphore;
+    present.swapchainCount = 1;
+    present.pSwapchains = &demo->m_swapchain;
+    present.pImageIndices = &demo->m_current_buffer;
+
+    result = vkQueuePresentKHR(demo->m_queue, &present);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        // demo->m_swapchain is out of date (e.g. the window was resized) and
+        // must be recreated:
+        Fl_Vk_Window_Driver::driver(demo)->resize(true, demo->w(), demo->h());
+    } else if (result == VK_SUBOPTIMAL_KHR) {
+        // demo->m_swapchain is not as optimal as it could be, but the platform's
+        // presentation engine will still present the image correctly.
+    } else {
+        VK_CHECK_RESULT(result);
+    }
+
+    result = vkQueueWaitIdle(demo->m_queue);
+    VK_CHECK_RESULT(result);
+
+    vkDestroySemaphore(demo->m_device, imageAcquiredSemaphore, NULL);
+    vkDestroySemaphore(demo->m_device, drawCompleteSemaphore, NULL);
+}
 
 ////////////////////////////////////////////////////////////////
 
@@ -109,15 +337,15 @@ int Fl_Vk_Window::mode(int m, const int *a) {
 
 void Fl_Vk_Window::make_current() {
     pVkWindowDriver->make_current_before();
-    if (!m_surface)
+    if (m_surface == VK_NULL_HANDLE)
     {
+        std::cerr << "m_surface NULL_HANDLE" << std::endl;
+        pVkWindowDriver->init_vk();
         pVkWindowDriver->create_surface();
-        pVkWindowDriver->pick_physical_device();
-        pVkWindowDriver->create_logical_device();
-        size(w(), h());
-        
+        pVkWindowDriver->init_vk_swapchain();
+        pVkWindowDriver->prepare();
         valid(0);
-        context_valid(1);
+        context_valid(0);
     }
     pVkWindowDriver->make_current_after();
     current_ = this;
@@ -231,18 +459,15 @@ void Fl_Vk_Window::flush() {
 }
 
 void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
- printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
- printf("current: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(), w(), h());
-
- // if (X == x() && Y == y() && W == w() && H == h())
- //     return;
-
+ // printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
+ // printf("current: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(), w(), h());
+    
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
-  if (is_a_resize) valid(0);
-  // if (m_surface != VK_NULL_HANDLE && is_a_resize)
-  //     pVkWindowDriver->resize(W, H, m_queueFamilyIndex, 2);
+  if (is_a_resize) {
+      valid(0);
+  }
+  pVkWindowDriver->resize(is_a_resize, W, H);
   Fl_Window::resize(X,Y,W,H);
-  pVkWindowDriver->create_surface();
 }
 
 /**
@@ -250,50 +475,6 @@ void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
 */
 void Fl_Vk_Window::hide() {
   Fl_Window::hide();
-}
-
-/**
-  The destructor removes the widget and destroys the Vulkan context
-  associated with it.
-*/
-Fl_Vk_Window::~Fl_Vk_Window() {
-  hide();
-//  delete overlay; this is done by ~Fl_Group
-  delete pVkWindowDriver;
-}
-
-void Fl_Vk_Window::init() {
-  pVkWindowDriver = Fl_Vk_Window_Driver::newVkWindowDriver(this);
-  end(); // we probably don't want any children
-  box(FL_NO_BOX);
-
-  mode_    = FL_RGB | FL_DEPTH | FL_DOUBLE;
-  alist    = 0;
-  g        = 0;
-  valid_f_ = 0;
-  damage1_ = 0;
-
-  // Reset Vulkan Handles
-  m_device     = VK_NULL_HANDLE;
-  m_physicalDevice = VK_NULL_HANDLE;;
-  m_surface = VK_NULL_HANDLE;
-  m_swapchain = VK_NULL_HANDLE;
-  m_renderPass = VK_NULL_HANDLE;
-  m_pipeline = VK_NULL_HANDLE;
-
-  // Pointers
-  m_allocator       = nullptr;
-  m_frames          = nullptr;
-  m_frameSemaphores = nullptr;
-
-  // Enums
-  m_presentMode     = VK_PRESENT_MODE_IMMEDIATE_KHR;
-  
-
-  // Counters
-  m_swapchainImageCount = 0;
-  m_semaphoreCount = 0;
-  m_queueFamilyIndex = 0;
 }
 
 
@@ -347,17 +528,6 @@ void Fl_Vk_Window::draw_end() {
 
   \code
     void mywindow::draw() {
-     if (!valid()) {
-         vkViewport(0,0,pixel_w(),pixel_h());
-         vkFrustum(...) or vkOrtho(...)
-         ...other initialization...
-     }
-     if (!context_valid()) {
-         ...load textures, etc. ...
-     }
-     // clear screen
-     vkClearColor(...);
-     vkClear(...);
      ... draw your geometry here ...
     }
   \endcode
@@ -365,17 +535,7 @@ void Fl_Vk_Window::draw_end() {
   Actual example code to clear screen to black and draw a 2D white "X":
   \code
     void mywindow::draw() {
-        if (!valid()) {
-            vkLoadIdentity();
-            vkViewport(0,0,pixel_w(),pixel_h());
-            vkOrtho(-w(),w(),-h(),h(),-1,1);
-        }
-        // Clear screen
-        vkClear(VK_COLOR_BUFFER_BIT);
-        // Draw white 'X'
-        vkColor3f(1.0, 1.0, 1.0);
-        vkBegin(VK_LINE_STRIP); vkVertex2f(w(), h()); vkVertex2f(-w(),-h()); vkEnd();
-        vkBegin(VK_LINE_STRIP); vkVertex2f(w(),-h()); vkVertex2f(-w(), h()); vkEnd();
+    Fl_Vk_Window::draw();
     }
   \endcode
 
@@ -397,7 +557,15 @@ void Fl_Vk_Window::draw_end() {
 */
 void Fl_Vk_Window::draw()
 {
+    VK_CHECK_HANDLE(m_instance);
+    VK_CHECK_HANDLE(m_surface);
+    VK_CHECK_HANDLE(m_gpu);
+    VK_CHECK_HANDLE(m_device);
+    VK_CHECK_HANDLE(m_swapchain);
+    VK_CHECK_HANDLE(m_queue);
+    
     draw_begin();
+    demo_draw(this);
     Fl_Window::draw();
     draw_end();
 }
@@ -456,6 +624,68 @@ Fl_Font_Descriptor** Fl_Vk_Window_Driver::fontnum_to_fontdescriptor(int fnum) {
 Fl_RGB_Image* Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int h)
 {
     return nullptr;
+}
+
+/**
+  The destructor removes the widget and destroys the Vulkan context
+  associated with it.
+*/
+Fl_Vk_Window::~Fl_Vk_Window() {
+  hide();
+  delete pVkWindowDriver;
+}
+
+void Fl_Vk_Window::init() {
+  pVkWindowDriver = Fl_Vk_Window_Driver::newVkWindowDriver(this);
+  end(); // we probably don't want any children
+  box(FL_NO_BOX);
+
+  mode_    = FL_RGB | FL_DEPTH | FL_DOUBLE;
+  alist    = 0;
+  g        = 0;
+  valid_f_ = 0;
+  damage1_ = 0;
+
+  // Set up defaults
+  m_width = w();
+  m_height = h();
+  
+  // Reset Vulkan Handles
+  m_device     = VK_NULL_HANDLE;
+  m_gpu        = VK_NULL_HANDLE;;
+  m_surface    = VK_NULL_HANDLE;
+  m_swapchain  = VK_NULL_HANDLE;
+  m_renderPass = VK_NULL_HANDLE;
+  m_pipeline   = VK_NULL_HANDLE;
+
+  // These are specific to GLFW demo
+  m_setup_cmd  = VK_NULL_HANDLE;
+  m_draw_cmd   = VK_NULL_HANDLE;
+  m_cmd_pool   = VK_NULL_HANDLE;
+  m_desc_pool  = VK_NULL_HANDLE;
+  m_pipeline_layout = VK_NULL_HANDLE;
+  m_desc_layout = VK_NULL_HANDLE;
+
+  // Pointers for ImGUI (not used for now)
+  m_allocator       = nullptr;
+  m_frames          = nullptr;
+  m_frameSemaphores = nullptr;
+  m_framebuffers    = nullptr;
+
+  // These are specific to GLFW demo
+  m_buffers         = nullptr;
+
+  // Enums
+  m_presentMode     = VK_PRESENT_MODE_IMMEDIATE_KHR;
+  
+
+  // Counters
+  m_clearEnable         = true;
+  m_swapchainImageCount = 0;
+  m_semaphoreCount      = 0;
+  m_queueFamilyIndex    = 0;
+  m_curFrame            = 0;
+  m_current_buffer      = 0;
 }
 
 /**
