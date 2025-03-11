@@ -120,6 +120,7 @@ endif(FLTK_USE_BUNDLED_ZLIB)
 # remove duplicates from CMake "list" variables for fltk-config
 
 list(REMOVE_DUPLICATES GLLIBS)
+list(REMOVE_DUPLICATES VKLIBS)
 list(REMOVE_DUPLICATES FLTK_LDLIBS)
 list(REMOVE_DUPLICATES IMAGELIBS)
 list(REMOVE_DUPLICATES STATICIMAGELIBS)
@@ -127,6 +128,7 @@ list(REMOVE_DUPLICATES STATICIMAGELIBS)
 # convert CMake lists to strings with spaces for fltk-config
 
 string(REPLACE ";" " " GLLIBS           "${GLLIBS}")
+string(REPLACE ";" " " VKLIBS           "${VKLIBS}")
 string(REPLACE ";" " " LIBS             "${FLTK_LDLIBS}")
 string(REPLACE ";" " " IMAGELIBS        "${IMAGELIBS}")
 string(REPLACE ";" " " STATICIMAGELIBS  "${STATICIMAGELIBS}")
@@ -164,6 +166,7 @@ if(DEBUG_VARIABLES_CMAKE)
   fl_debug_var(FLTK_LDLIBS)
   fl_debug_var(LIBS)
   fl_debug_var(GLLIBS)
+  fl_debug_var(VKLIBS)
   fl_debug_var(IMAGELIBS)
   fl_debug_var(STATICIMAGELIBS)
   fl_debug_var(LIB_jpeg)

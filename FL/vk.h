@@ -42,6 +42,23 @@
 #ifndef FL_vk_H
 #  define FL_vk_H
 
+#include <iostream>  // \@todo: remove
+
+#  include "Enumerations.H" // for color names
+#  ifdef _WIN32
+#    include <windows.h>
+#  endif
+#  ifndef APIENTRY
+#    if defined(__CYGWIN__)
+#      define APIENTRY __attribute__ ((__stdcall__))
+#    else
+#      define APIENTRY
+#    endif
+#  endif
+
+#  ifdef _WIN32
+#    define VK_USE_PLATFORM_WIN32_KHR
+#  endif
 #include <vulkan/vulkan.h>
 
 FL_EXPORT void vk_start();
@@ -74,5 +91,72 @@ FL_EXPORT int  vk_texture_pile_height();
 FL_EXPORT void vk_texture_reset();
 
 FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, int ld=0);
+
+
+#define VK_CHECK_RESULT(err) vk_check_result(err, __FILE__, __LINE__);
+
+inline void vk_check_result(VkResult err, const char* file, const int line)
+{
+    const char* errorName = "Unknown Error";
+    switch(err)
+    {
+    case VK_SUCCESS:
+        return;
+    case VK_NOT_READY:
+        errorName = "Not Ready";
+        break;
+    case VK_TIMEOUT:
+        errorName = "Timeout";
+        break;
+    case VK_EVENT_SET:
+        errorName = "Event Set";
+        break;
+    case VK_EVENT_RESET:
+        errorName = "Event Reset";
+        break;
+    case VK_INCOMPLETE:
+        errorName = "Incomplete";
+        break;
+    case VK_ERROR_OUT_OF_HOST_MEMORY:
+        errorName = "Error - Out of Host Memory";
+        break;
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+        errorName = "Error - Out of Device Memory";
+        break;
+    case VK_ERROR_INITIALIZATION_FAILED:
+        errorName = "Error - Initialization Failed";
+        break;
+    case VK_ERROR_DEVICE_LOST:
+        errorName = "Error - Device Lost";
+        break;
+    case VK_ERROR_MEMORY_MAP_FAILED:
+        errorName = "Error - Memory Map Failed";
+        break;
+    case VK_ERROR_LAYER_NOT_PRESENT:
+        errorName = "Error - Layer Not Present";
+        break;
+    case VK_ERROR_EXTENSION_NOT_PRESENT:
+        errorName = "Error - Extension Not Present";
+        break;
+    case VK_ERROR_FEATURE_NOT_PRESENT:
+        errorName = "Error - Feature Not Present";
+        break;
+    case VK_ERROR_INCOMPATIBLE_DRIVER:
+        errorName = "Error - Incompatible Driver";
+        break;
+    case VK_ERROR_TOO_MANY_OBJECTS:
+        errorName = "Error - Too Many Objects";
+        break;
+    case VK_ERROR_FORMAT_NOT_SUPPORTED:
+        errorName = "Error - Format Not Supported";
+        break;
+    case VK_ERROR_FRAGMENTED_POOL:
+        errorName = "Error - Fragmented Pool";
+        break;
+    default:
+        break;
+    }
+    fprintf(stderr, "Vulkan: %s at %s, line %d", errorName, file, line);
+}
 
 #endif // !FL_vk_H

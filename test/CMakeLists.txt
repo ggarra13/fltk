@@ -69,6 +69,25 @@ else()
   set(GLDEMO_SHARED fltk::fltk-shared)
 endif()
 
+#######################################################################
+# Define standard libraries for those OpenGL demos that can be built
+# w/o Vulkan as well. These demos show an alternate GUI or a warning
+# when built w/o Vulkan.
+#
+# Note: use "${VKDEMO_LIBS}" for their library parameter
+#        or "${VKDEMO_SHARED}" to build with shared FLTK libraries
+if(VULKAN_FOUND)
+  set(VKDEMO_LIBS fltk::vk)
+  if(MSVC)
+    set(VKDEMO_SHARED fltk::fltk-shared)
+  else()
+    set(VKDEMO_SHARED fltk::vk-shared)
+  endif()
+else()
+  set(VKDEMO_LIBS fltk::fltk)
+  set(VKDEMO_SHARED fltk::fltk-shared)
+endif()
+
 # Similar approach for the 'forms' demo (shared lib not supported)
 
 if(FLTK_BUILD_FORMS)
@@ -217,6 +236,12 @@ if(OPENGL_FOUND)
   fl_create_example(gl_overlay gl_overlay.cxx "${GLDEMO_LIBS}")
   fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
 endif(OPENGL_FOUND)
+
+if(VULKAN_FOUND)
+  # fl_create_example(cube cube.cxx "${VKDEMO_LIBS}")
+  # fl_create_example(vk_overlay vk_overlay.cxx "${VKDEMO_LIBS}")
+  fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
+endif(VULKAN_FOUND)
 
 # Test FLTK headers for variable shadowing [-Wshadow] (STR 2728)
 #

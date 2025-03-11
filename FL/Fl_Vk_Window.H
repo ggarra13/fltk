@@ -20,12 +20,34 @@
 #ifndef Fl_Vk_Window_H
 #define Fl_Vk_Window_H
 
+#include <Fl/vk.h>
 #include "Fl_Window.H"
-
-#include "vulkan/vulkan.h"
 
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual
 class Fl_Vk_Window_Driver;
+
+typedef struct {
+    VkImage image;
+    VkCommandBuffer cmd;
+    VkImageView view;
+} SwapchainBuffers;
+
+struct Fl_Vk_Frame
+{
+    VkCommandPool       CommandPool;
+    VkCommandBuffer     CommandBuffer;
+    VkFence             Fence;
+    VkImage             Backbuffer;
+    VkImageView         BackbufferView;
+    VkFramebuffer       Framebuffer;
+};
+
+struct Fl_Vk_FrameSemaphores
+{
+    VkSemaphore         ImageAcquiredSemaphore;
+    VkSemaphore         RenderCompleteSemaphore;
+};
+
 /**
   The Fl_Vk_Window widget sets things up so Vulkan works.
 
@@ -62,17 +84,18 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode_;
   const int *alist;
   Fl_Vk_Choice *g;
+  bool context_;
   char valid_f_;
   char damage1_; // damage() of back buffer
-  virtual void draw_overlay();
   void init();
 
-  void *overlay;
-
+    
   static int can_do(int, const int *);
   int mode(int, const int *);
-  static int gl_plugin_linkage();
 protected:
+
+
+  
   void draw_begin();
   void draw() FL_OVERRIDE;
   void draw_end();
@@ -90,16 +113,10 @@ public:
     Is turned off when FLTK creates a new context for this window or
     when the window resizes, and is turned on \e after draw() is called.
     You can use this inside your draw() method to avoid unnecessarily
-    initializing the Vulkan context. Just do this:
+    initializing Vulkan. Just do this:
     \code
     void mywindow::draw() {
      if (!valid()) {
-       glViewport(0,0,pixel_w(),pixel_h());
-       glFrustum(...);
-       ...other initialization...
-     }
-     if (!context_valid()) {
-       ...load textures, etc. ...
      }
      ... draw your geometry here ...
     }
@@ -111,6 +128,7 @@ public:
     draw() returns.
   */
   char valid() const {return valid_f_ & 1;}
+    
   /**
     See char Fl_Vk_Window::valid() const
   */
@@ -119,16 +137,16 @@ public:
 
   /**
     Will only be set if the
-    Vulkan  is created or recreated. It differs from
-    Fl_Vk_Window::valid() which is also set whenever the context
+    OpenGL context is created or recreated. It differs from
+    Fl_Gl_Window::valid() which is also set whenever the context
     changes size.
   */
   char context_valid() const {return valid_f_ & 2;}
   /**
-    See char Fl_Vk_Window::context_valid() const
+    See char Fl_Gl_Window::context_valid() const
   */
   void context_valid(char v) {if (v) valid_f_ |= 2; else valid_f_ &= 0xfd;}
-
+  
   /**  Returns non-zero if the hardware supports the given Vulkan mode. */
   static int can_do(int m) {return can_do(m,0);}
   /**  Returns non-zero if the hardware supports the given Vulkan mode.
@@ -154,7 +172,6 @@ public:
    - \c FL_DEPTH - depth buffer
    - \c FL_STENCIL - stencil buffer
    - \c FL_MULTISAMPLE - multisample antialiasing
-   - \c FL_VULKAN3 - use Vulkan version 3.0 or more.
 
    FL_RGB and FL_SINGLE have a value of zero, so they
    are "on" unless you give FL_INDEX or FL_DOUBLE.
@@ -173,16 +190,7 @@ public:
 
    mode() must not be called within draw() since it
    changes the current context.
-
-   The FL_VULKAN3 flag is recommended to use Vulkan version 3 or more.
-   This flag is required (not just recommended) if  GL ≥ 3.0 is in use
-   and at least one of these conditions applies:
-   - the program runs on the macOS platform;
-   - the Fl_Vk_Window has child widgets.
-
-   See more details in \ref vulkan3.
-
-   \version the <tt>FL_VULKAN3</tt> flag appeared in version 1.3.4
+   
    */
   int mode(int a) {return mode(a,0);}
   /** Set the Vulkan capabilities of the window using platform-specific data.
@@ -198,31 +206,68 @@ public:
    */
   int mode(const int *a) {return mode(0, a);}
 
-  /** Returns a pointer to the window's Vulkan objects.
-  */
-  VkInstance instance();
-  VkPhysicalDevice physicalDevice();
-  VkDevice device();
-  VkSurfaceKHR surfaceKHR();
-  VkSwapchainKHR swapchainKHR();
-  VkCommandPool commandPool();
-  std::vector<VkCommandBuffer> commandBuffers();
-  VkSemaphore imageAvailableSemaphore();
-  VkSemaphore renderFinishedSemaphore();
-  VkQueue graphicsQueue();
-  VkQueue presentQueue();
+  VkInstance         m_instance;
+  VkPhysicalDevice   m_physicalDevice;
+  VkDevice           m_device;
   
+  uint32_t m_enabled_extension_count;
+  uint32_t m_enabled_layer_count;
+  const char* m_extension_names[64];
+  const char* m_enabled_layers[64];
+    
+  VkColorSpaceKHR    m_color_space;
+  
+    
+  VkFormat           m_format;
+  VkSurfaceKHR       m_surface;
+  VkSurfaceFormatKHR m_surfaceFormat;
+  VkPresentModeKHR   m_presentMode;
+  VkRenderPass       m_renderPass;
+  VkPipeline         m_pipeline;  
+  VkQueue            m_queue;
+  VkQueueFamilyProperties* m_queue_props;
+  uint32_t           m_queueFamilyIndex;
+  
+  // (Optional) Allocation, Debugging
+  const VkAllocationCallbacks*    m_allocator;
+  void                            (*CheckVkResultFn)(VkResult err);
+  VkDeviceSize                    MinAllocationSize;      // Minimum allocatio
+
+  // These are in ImGui but not sure.
+  bool               m_useDynamicRendering;
+  // Clear screen?
+  bool               m_clearEnable;
+  VkClearValue       m_clearValue;
+
+  uint32_t           m_curFrame;   // Current frame being rendered to (0 <= FrameIndex < FrameInFlightCount)
+
+
+  //! Number of simultaneous in-flight frames
+  //! (returned by vkGetSwapchainImagesKHR, often derived from min_image_count)
+  
+  VkSwapchainKHR     m_swapchain;
+  uint32_t           m_swapchainImageCount;
+  SwapchainBuffers*       m_buffers;
+  
+  uint32_t           m_semaphoreCount;         // Number of simultaneous in-flight frames + 1, to be able to use it in vkAcquireNextImageKHR
+  uint32_t           m_semaphoreIndex;         // Current set of swapchain wait semaphores we're using (needs to be distinct from per frame data)
+
+  Fl_Vk_Frame*            m_frames;
+  Fl_Vk_FrameSemaphores*  m_frameSemaphores;
+
+  // These are from triangle-vulkan GLFW demo
+  VkPhysicalDeviceMemoryProperties m_memory_properties;
+  uint32_t                m_current_buffer;
+  uint32_t                m_queue_count;
+  uint32_t                m_graphics_queue_node_index;
   
   void make_current();
   void swap_buffers();
-  // void swap_interval(int);
-  // int swap_interval() const;
+  void swap_interval(int);
+  int swap_interval() const;
   void ortho();
 
-  int can_do_overlay();
-  void redraw_overlay();
-  void hide_overlay();
-  void make_overlay_current();
+  int can_do_overlay() { return false; }
 
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
@@ -263,7 +308,11 @@ public:
   */
 
   Fl_Vk_Window(int X, int Y, int W, int H, const char *l=0)
-    : Fl_Window(X,Y,W,H,l) {init();}
+    : Fl_Window(X,Y,W,H,l) {
+      std::cerr << "Create " << X << ", " << Y << " WxH=" << W
+                << "x" << H << std::endl;
+      init();
+  }
 };
 
 #endif // Fl_Vk_Window_H

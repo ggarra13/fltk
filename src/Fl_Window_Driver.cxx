@@ -42,7 +42,7 @@ Fl_Window_Driver::Fl_Window_Driver(Fl_Window *win)
   : pWindow(win) {
   wait_for_expose_value = 0;
   other_xid = 0;
-  screen_num_ = 0;x
+  screen_num_ = 0;
 }
 
 

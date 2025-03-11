@@ -24,28 +24,45 @@
 #ifndef Fl_Vk_Window_Driver_H
 #define Fl_Vk_Window_Driver_H
 
+#include <string>
+#include <vector>
+
 #include <FL/Fl_Vk_Window.H>
 #include <FL/vk.h>
 
 class Fl_Vk_Choice;
 class Fl_Font_Descriptor;
 
+struct QueueFamilyIndices
+{
+    uint32_t graphicsFamily;
+    bool graphicsFamilyValid = false;
+    uint32_t presentFamily;
+    bool presentFamilyValid = false;
+
+    bool isComplete() {
+        return graphicsFamilyValid && presentFamilyValid;
+    }
+};
+
+struct SwapChainSupportDetails
+{
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> formats;
+    std::vector<VkPresentModeKHR> presentModes;
+};
 /* The constructor of each Fl_Vk_Window object creates also an object from a
- platform-specific derived class from this class.
- */
+   platform-specific derived class from this class.
+*/
 class Fl_Vk_Window_Driver {
 protected:
   Fl_Vk_Window *pWindow;
-  VkDevice device;
-  VkSwapchainKHR swapchain;
-  std::vector<VkCommandBuffer> commandBuffers;
-  VkSemaphore renderFinishedSemaphore;
-  VkQueue graphicsQueue;
-  VkQueue presentQueue;
-    
-  VkShaderModule current_prog;
 
-    
+protected:
+  bool check_device_extension_support(VkPhysicalDevice device);
+  QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
+  SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device);
+  bool is_device_suitable(VkPhysicalDevice device);
  
 public:
   static Fl_Window* cached_window;
@@ -62,19 +79,19 @@ public:
   void init_vulkan();
   void cleanup_vulkan();
 
-  Fl_Vk_Window_Driver(Fl_Vk_Window *win) : pWindow(win) {current_prog=0;}
+  Fl_Vk_Window_Driver(Fl_Vk_Window *win) : pWindow(win) {}
   virtual ~Fl_Vk_Window_Driver() {}
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
   static Fl_Vk_Window_Driver *global();
   virtual float pixels_per_unit() {return 1;}
-  virtual void before_show(int&) {}
+    virtual void before_show(int&) { init_vulkan(); }
   virtual void after_show() {}
   virtual void invalidate();
   virtual int mode_(int /*m*/, const int * /*a*/) {return 0;}
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers();
-  virtual void resize(int /*is_a_resize*/, int /*w*/, int /*h*/) {}
+  virtual void resize(int /*w*/, int /*h*/, uint32_t family, uint32_t min_image_count);
   virtual char swap_type();
   virtual void swap_interval(int) { }
   virtual int swap_interval() const { return -1; }
@@ -82,25 +99,26 @@ public:
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);
   // Return one of these structures for a given vk mode.
-  // The second argument is a vkX attribute list, and is used if mode is zero.
-  // This is not supported on Win32:
   virtual Fl_Vk_Choice *find(int /*mode*/, const int * /*alistp*/) {return NULL;}
   virtual void waitVK() {} // support for vk_finish() function
-  virtual void vk_visual(Fl_Vk_Choice*); // support for Fl::vk_visual() function
+  virtual void vk_visual(Fl_Vk_Choice*) {} // support for Fl::vk_visual() function
   virtual void vk_start() {} // support for vk_start() function
   static void draw_string_with_texture(const char* str, int n); // cross-platform
   // support for vk_draw(). The cross-platform version may be enough.
-  virtual char *alpha_mask_for_string(const char *str, int n, int w, int h, Fl_Fontsize fs);
+  virtual char *alpha_mask_for_string(const char *str, int n, int w, int h, Fl_Fontsize fs) { return nullptr; };
   virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum);
   virtual Fl_RGB_Image* capture_vk_rectangle(int x, int y, int w, int h);
   static inline Fl_Vk_Window_Driver* driver(const Fl_Vk_Window *win) {return win->pVkWindowDriver;}
   // true means the platform uses vkScissor() to make sure VK subwindows
   // don't leak outside their parent window
   virtual bool need_scissor() { return false; }
-    
+
+    // Vulkan specific methods.
   void create_instance();
   void pick_physical_device();
   void create_logical_device();
+  virtual void* GetProcAddress(const char *procName) { return nullptr; }
+  virtual std::vector<std::string> get_required_extensions() = 0;
   virtual void create_surface() = 0;
   void create_swap_chain();
   void create_command_pool();

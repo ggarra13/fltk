@@ -21,6 +21,8 @@
 // in.  Search other files for "_WIN32" or filenames ending in _win32.cxx
 // for other system-specific code.
 
+#include <iostream>
+
 /* We require Windows 2000 features (e.g. VK definitions) */
 # if !defined(WINVER) || (WINVER < 0x0500)
 #  ifdef WINVER
@@ -1201,7 +1203,7 @@ extern void fl_save_pen(void);
 extern void fl_restore_pen(void);
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-
+    
   // Copy the message to fl_msg so add_handler code can see it.
   // It is already there if this is called by DispatchMessage,
   // but not if Windows calls this directly.
@@ -1251,14 +1253,16 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
       }
 
       case WM_QUIT: // this should not happen?
-        Fl::fatal("WM_QUIT message");
+          Fl::fatal("WM_QUIT message");
 
       case WM_CLOSE: // user clicked close box
         Fl::handle(FL_CLOSE, window);
         return 0;
 
       case WM_SYNCPAINT:
+         break;
       case WM_NCPAINT:
+         break;
       case WM_ERASEBKGND:
         // Andreas Weitl - WM_SYNCPAINT needs to be passed to DefWindowProc
         // so that Windows can generate the proper paint messages...
@@ -1681,6 +1685,7 @@ content  key    keyboard layout
           } else {
             Fl::handle(FL_SHOW, window);
             resize_bug_fix = window;
+            
             window->size(int(ceil(LOWORD(lParam) / scale)), int(ceil(HIWORD(lParam) / scale)));
             // fprintf(LOG,"WM_SIZE size(%.0f,%.0f) graph(%d,%d) s=%.2f\n",
             //         ceil(LOWORD(lParam)/scale),ceil(HIWORD(lParam)/scale),
@@ -2280,6 +2285,7 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
     wlen = fl_utf8toUtf16(w->label(), (unsigned)l, (unsigned short *)lab, wlen);
     lab[wlen] = 0;
   }
+  
   x->xid = (fl_uintptr_t)CreateWindowExW(styleEx,
                            class_namew, lab, style,
                            xp, yp, wp, hp,

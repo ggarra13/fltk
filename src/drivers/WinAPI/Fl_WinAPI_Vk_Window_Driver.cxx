@@ -16,6 +16,9 @@
 
 #include <config.h>
 #if HAVE_VK
+#include <iostream>
+#include <stdexcept>
+
 #include <FL/platform.H>
 #include "../../Fl_Screen_Driver.H"
 #include <FL/vk.h>
@@ -30,54 +33,12 @@ extern void fl_save_dc(HWND, HDC);
 class Fl_WinAPI_Vk_Choice : public Fl_Vk_Choice {
   friend class Fl_WinAPI_Vk_Window_Driver;
 private:
+  int pixelformat;           // the visual to use
+  PIXELFORMATDESCRIPTOR pfd; // some wgl calls need this thing
 public:
-  Fl_WinAPI_Vk_Choice(int m, const int *alistp, Fl_Vk_Choice *n) : Fl_Vk_Choice(m, alistp, n)
-        {
-            // Get surface capabilities
-            VkPhysicalDeviceSurfaceInfo2KHR surfaceInfo = {};
-            surfaceInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR;
-            surfaceInfo.surface = surface;
-
-            VkSurfaceCapabilities2KHR surfaceCaps = {};
-            surfaceCaps.sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR;
-
-            VkPhysicalDeviceSurfaceInfo2KHR surfaceInfo2 = surfaceInfo;
-            surfaceInfo2.pNext = &surfaceCaps;
-
-            vkGetPhysicalDeviceSurfaceCapabilities2KHR(physicalDevice, &surfaceInfo2,
-                                                       &surfaceCaps);
-
-            // Get surface formats
-            uint32_t formatCount = 0;
-            vkGetPhysicalDeviceSurfaceFormats2KHR(physicalDevice, &surfaceInfo,
-                                                  &formatCount, nullptr);
-            std::vector<VkSurfaceFormat2KHR> surfaceFormats(formatCount);
-
-            vkGetPhysicalDeviceSurfaceFormats2KHR(physicalDevice, &surfaceInfo,
-                                                  &formatCount, surfaceFormats.data());
-
-            // Get present modes
-            uint32_t presentModeCount = 0;
-            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface,
-                                                      &presentModeCount, nullptr);
-            std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface,
-                                                      &presentModeCount, presentModes.data());
-
-            // Filter formats and present modes
-            for (const auto& format : surfaceFormats) {
-                if (format.surfaceFormat.format == VK_FORMAT_B8G8R8A8_UNORM)
-                {
-                    // Found a suitable format
-                }
-            }
-
-            for (const auto& presentMode : presentModes) {
-                if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                    // Found a suitable present mode
-                }
-            }
-        }
+  Fl_WinAPI_Vk_Choice(int m, const int *alistp, Fl_Vk_Choice *n) : Fl_Vk_Choice(m, alistp, n) {
+    pixelformat = 0;
+  }
 };
 
 
@@ -89,18 +50,79 @@ Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w)
 
 Fl_Vk_Choice *Fl_WinAPI_Vk_Window_Driver::find(int m, const int *alistp)
 {
-    Fl_WinAPI_Vk_Choice *g = (Fl_WinAPI_Vk_Choice*)Fl_Vk_Window_Driver::find_begin(m, alistp);
-    if (g) return g;
+  Fl_WinAPI_Vk_Choice *g = (Fl_WinAPI_Vk_Choice*)Fl_Vk_Window_Driver::find_begin(m, alistp);
+  if (g) return g;
+  // Replacement for ChoosePixelFormat() that finds one with an overlay if possible:
+  HDC gc = (HDC)(fl_graphics_driver ? fl_graphics_driver->gc() : 0);
+  if (!gc) gc = fl_GetDC(0);
 
-    // Replacement for ChoosePixelFormat() that finds one with an overlay if possible:
-    HDC gc = (HDC)(fl_graphics_driver ? fl_graphics_driver->gc() : 0);
-    if (!gc) gc = fl_GetDC(0);
+  int pixelformat = 0;
+  PIXELFORMATDESCRIPTOR chosen_pfd = {};
 
+  /*
+  for (int i = 1; ; i++) {
+    PIXELFORMATDESCRIPTOR pfd;
+    if (!DescribePixelFormat(gc, i, sizeof(pfd), &pfd)) break;
 
-    g = new Fl_WinAPI_Vk_Choice(m, alistp, first);
-    first = g;
+    if (~pfd.dwFlags & (PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL)) continue;
+    if (pfd.iPixelType != ((m&FL_INDEX)?PFD_TYPE_COLORINDEX:PFD_TYPE_RGBA)) continue;
+    if ((m & FL_ALPHA) && !pfd.cAlphaBits) continue;
+    if ((m & FL_ACCUM) && !pfd.cAccumBits) continue;
+    if ((!(m & FL_DOUBLE)) != (!(pfd.dwFlags & PFD_DOUBLEBUFFER))) continue;
+    if ((!(m & FL_STEREO)) != (!(pfd.dwFlags & PFD_STEREO))) continue;
+    if ((m & FL_DEPTH) && !pfd.cDepthBits) continue;
+    if ((m & FL_STENCIL) && !pfd.cStencilBits) continue;
 
-    return g;
+#if DEBUG_PFD
+    printf("pfd #%d supports composition: %s\n", i, (pfd.dwFlags & PFD_SUPPORT_COMPOSITION) ? "yes" : "no");
+    printf("    ... & PFD_GENERIC_FORMAT: %s\n", (pfd.dwFlags & PFD_GENERIC_FORMAT) ? "generic" : "accelerated");
+    printf("    ... Overlay Planes      : %d\n", pfd.bReserved & 15);
+    printf("    ... Color & Depth       : %d, %d\n", pfd.cColorBits, pfd.cDepthBits);
+    if (pixelformat)
+      printf("        current pixelformat : %d\n", pixelformat);
+    fflush(stdout);
+#endif // DEBUG_PFD
+
+    // see if better than the one we have already:
+    if (pixelformat) {
+      // offering non-generic rendering is better (read: hardware acceleration)
+      if (!(chosen_pfd.dwFlags & PFD_GENERIC_FORMAT) &&
+          (pfd.dwFlags & PFD_GENERIC_FORMAT)) continue;
+      // offering overlay is better:
+      else if (!(chosen_pfd.bReserved & 15) && (pfd.bReserved & 15)) {}
+      // otherwise prefer a format that supports composition (STR #3119)
+      else if ((chosen_pfd.dwFlags & PFD_SUPPORT_COMPOSITION) &&
+               !(pfd.dwFlags & PFD_SUPPORT_COMPOSITION)) continue;
+      // otherwise more bit planes is better, but no more than 32 (8 bits per channel):
+      else if (pfd.cColorBits > 32 || chosen_pfd.cColorBits > pfd.cColorBits) continue;
+      else if (chosen_pfd.cDepthBits > pfd.cDepthBits) continue;
+    }
+    pixelformat = i;
+    chosen_pfd = pfd;
+  }
+
+#if DEBUG_PFD
+  static int bb = 0;
+  if (!bb) {
+    bb = 1;
+    printf("PFD_SUPPORT_COMPOSITION = 0x%x\n", PFD_SUPPORT_COMPOSITION);
+  }
+  printf("Chosen pixel format is %d\n", pixelformat);
+  printf("Color bits = %d, Depth bits = %d\n", chosen_pfd.cColorBits, chosen_pfd.cDepthBits);
+  printf("Pixel format supports composition: %s\n", (chosen_pfd.dwFlags & PFD_SUPPORT_COMPOSITION) ? "yes" : "no");
+  fflush(stdout);
+#endif // DEBUG_PFD
+
+  if (!pixelformat) return 0;
+  */
+  
+  g = new Fl_WinAPI_Vk_Choice(m, alistp, first);
+  first = g;
+
+  g->pixelformat = pixelformat;
+  g->pfd = chosen_pfd;
+
+  return g;
 }
 
 
@@ -126,6 +148,26 @@ int Fl_WinAPI_Vk_Window_Driver::mode_(int m, const int *a) {
     return 1;
 }
 
+void* Fl_WinAPI_Vk_Window_Driver::GetProcAddress(const char* name)
+{
+    return (void*) ::GetProcAddress(module, name);
+}
+
+void Fl_WinAPI_Vk_Window_Driver::create_surface()
+{
+    VkWin32SurfaceCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+    createInfo.hwnd = (HWND)fl_win32_xid(pWindow); // Get the HWND from FLTK
+    createInfo.hinstance = GetModuleHandle(nullptr); // Get the instance handle
+
+
+    
+    if (vkCreateWin32SurfaceKHR(pWindow->m_instance, &createInfo, nullptr,
+                                &pWindow->m_surface) != VK_SUCCESS) {
+        Fl::fatal("Win32 Vulkan: failed to create window surface!");
+    }
+}
+
 void Fl_WinAPI_Vk_Window_Driver::make_current_after() {
 }
 
@@ -135,6 +177,14 @@ static signed char swap_interval_type = -1;
 static void init_swap_interval() {
   if (swap_interval_type != -1)
     return;
+}
+
+std::vector<std::string> Fl_WinAPI_Vk_Window_Driver::get_required_extensions()
+{
+    std::vector<std::string> out;
+    out.push_back("VK_KHR_surface");
+    out.push_back("VK_KHR_win32_surface");
+    return out;
 }
 
 void Fl_WinAPI_Vk_Window_Driver::swap_interval(int interval) {
@@ -149,6 +199,21 @@ int Fl_WinAPI_Vk_Window_Driver::flush_begin(char& valid_f_) {
   return 0;
 }
 
+Fl_WinAPI_Vk_Window_Driver::Fl_WinAPI_Vk_Window_Driver(Fl_Vk_Window *win) :
+    Fl_Vk_Window_Driver(win)
+{
+    module = LoadLibraryA("vulkan-1.dll");
+    if (!module)
+    {
+        Fl::fatal("Failed to load vulkan-1.dll\n\n"
+                  "Do you have Vulkan installed?");
+    }
+}
+
+Fl_WinAPI_Vk_Window_Driver::~Fl_WinAPI_Vk_Window_Driver()
+{
+    FreeLibrary(module);
+}
 
 
 #endif // HAVE_VK

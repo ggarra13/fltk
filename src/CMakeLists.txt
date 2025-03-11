@@ -119,7 +119,6 @@ set(CPPFILES
   Fl_Value_Input.cxx
   Fl_Value_Output.cxx
   Fl_Value_Slider.cxx
-  Fl_Vk_Window.cxx
   Fl_Widget.cxx
   Fl_Widget_Surface.cxx
   Fl_Window.cxx
@@ -488,6 +487,15 @@ source_group("Driver Source Files" FILES ${GL_DRIVER_FILES})
 set(GLCPPFILES
   ${GLCPPFILES}
   ${GL_DRIVER_FILES}
+)
+
+set(VKCPPFILES
+  Fl_Vk_Choice.cxx
+  # Fl_Vk_Device_Plugin.cxx
+  # Fl Vk_Overlay.cxx
+  Fl_Vk_Window.cxx
+  # vk_draw.cxx
+  # vk_start.cxx
 )
 
 set(VK_DRIVER_FILES
@@ -1018,6 +1026,10 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
     list(APPEND SOURCES ${GLCPPFILES} ${GL_HEADER_FILES} ${GL_DRIVER_HEADER_FILES})
   endif(OPENGL_FOUND)
 
+  if(VULKAN_FOUND)
+    list(APPEND SOURCES ${VKCPPFILES} ${VK_HEADER_FILES} ${VK_DRIVER_HEADER_FILES})
+  endif(VULKAN_FOUND)
+
   fl_add_library(fltk SHARED "${SOURCES}")
   add_optional_libs(fltk-shared)
 
@@ -1043,7 +1055,7 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
 
   if(VULKAN_FOUND)
     target_link_libraries(fltk-shared PUBLIC ${VULKAN_LIBRARIES})
-    target_include_directories(fltk-shared PUBLIC ${VULKAN_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+    target_include_directories(fltk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
   endif(VULKAN_FOUND)
 
 endif(FLTK_BUILD_SHARED_LIBS AND MSVC)

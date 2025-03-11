@@ -15,11 +15,11 @@
 //
 
 #include <config.h>
-#if HAVE_VULKAN
+#if HAVE_VK
 
 extern int fl_vk_load_plugin;
 
-// #include <FL/vk.h>  // should it be FL/gl.h?
+#include <FL/vk.h>
 #include <FL/Fl_Vk_Window.H>  // \@done
 #include "Fl_Vk_Window_Driver.H"
 #include "Fl_Window_Driver.H"  // \@done
@@ -69,13 +69,13 @@ void Fl_Vk_Window::show() {
     Fl_Window::default_size_range();
     if (!g) {
       g = pVkWindowDriver->find(mode_,alist);
-      if (!g && (mode_ & FL_DOUBLE) == FL_SINVKE) {
+      if (!g && (mode_ & FL_DOUBLE) == FL_SINGLE) {
         g = pVkWindowDriver->find(mode_ | FL_DOUBLE,alist);
-        if (g) mode_ |= FL_FAKE_SINVKE;
+        if (g) mode_ |= FL_FAKE_SINGLE;
       }
 
       if (!g) {
-        Fl::error("Insufficient VK support");
+        Fl::error("Insufficient Vulkan support");
         return;
       }
     }
@@ -100,8 +100,6 @@ int Fl_Vk_Window::mode(int m, const int *a) {
   return pVkWindowDriver->mode_(m, a);
 }
 
-#define NON_LOCAL_CONTEXT 0x80000000
-
 /**
   The make_current() method selects the Vulkan context for the
   widget.  It is called automatically prior to the draw() method
@@ -110,6 +108,19 @@ int Fl_Vk_Window::mode(int m, const int *a) {
 */
 
 void Fl_Vk_Window::make_current() {
+    pVkWindowDriver->make_current_before();
+    if (!m_surface)
+    {
+        pVkWindowDriver->create_surface();
+        pVkWindowDriver->pick_physical_device();
+        pVkWindowDriver->create_logical_device();
+        size(w(), h());
+        
+        valid(0);
+        context_valid(1);
+    }
+    pVkWindowDriver->make_current_after();
+    current_ = this;
 }
 
 /**
@@ -170,6 +181,7 @@ void Fl_Vk_Window::flush() {
   if (!shown()) return;
   uchar save_valid = valid_f_ & 1;
   if (pVkWindowDriver->flush_begin(valid_f_) ) return;
+  
   make_current();
 
   if (mode_ & FL_DOUBLE) {
@@ -202,7 +214,6 @@ void Fl_Vk_Window::flush() {
     } else if (SWAP_TYPE == SWAP){
       damage(FL_DAMAGE_ALL);
       draw();
-      if (overlay == this) draw_overlay();
       swap_buffers();
     } else if (SWAP_TYPE == UNDEFINED){ // SWAP_TYPE == UNDEFINED
         damage1_ = damage();
@@ -217,43 +228,27 @@ void Fl_Vk_Window::flush() {
   }
 
   valid(1);
-  context_valid(1);
 }
 
 void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
-//  printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
-//  printf("current: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(), w(), h());
+ printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
+ printf("current: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(), w(), h());
+
+ // if (X == x() && Y == y() && W == w() && H == h())
+ //     return;
 
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
   if (is_a_resize) valid(0);
-  pVkWindowDriver->resize(is_a_resize, W, H);
+  // if (m_surface != VK_NULL_HANDLE && is_a_resize)
+  //     pVkWindowDriver->resize(W, H, m_queueFamilyIndex, 2);
   Fl_Window::resize(X,Y,W,H);
-}
-
-/**
-  Sets a pointer to the VKContext that this window is using.
-  This is a system-dependent structure, but it is portable to copy
-  the context from one window to another. You can also set it to NULL,
-  which will force FLTK to recreate the context the next time make_current()
-  is called, this is useful for getting around bugs in Vulkan implementations.
-
-  If <i>destroy_flag</i> is true the context will be destroyed by
-  fltk when the window is destroyed, or when the mode() is changed,
-  or the next time context(x) is called.
-*/
-void Fl_Vk_Window::context(VKContext v, int destroy_flag) {
-  if (context_ && !(mode_&NON_LOCAL_CONTEXT)) pVkWindowDriver->delete_vk_context(context_);
-  context_ = v;
-  if (destroy_flag) mode_ &= ~NON_LOCAL_CONTEXT;
-  else mode_ |= NON_LOCAL_CONTEXT;
+  pVkWindowDriver->create_surface();
 }
 
 /**
   Hides the window and destroys the Vulkan context.
 */
 void Fl_Vk_Window::hide() {
-  context(0);
-  pVkWindowDriver->vk_hide_before(overlay);
   Fl_Window::hide();
 }
 
@@ -274,15 +269,31 @@ void Fl_Vk_Window::init() {
 
   mode_    = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist    = 0;
-  context_ = 0;
   g        = 0;
-  overlay  = 0;
   valid_f_ = 0;
   damage1_ = 0;
-}
 
-void Fl_Vk_Window::cleanuo()
-{
+  // Reset Vulkan Handles
+  m_device     = VK_NULL_HANDLE;
+  m_physicalDevice = VK_NULL_HANDLE;;
+  m_surface = VK_NULL_HANDLE;
+  m_swapchain = VK_NULL_HANDLE;
+  m_renderPass = VK_NULL_HANDLE;
+  m_pipeline = VK_NULL_HANDLE;
+
+  // Pointers
+  m_allocator       = nullptr;
+  m_frames          = nullptr;
+  m_frameSemaphores = nullptr;
+
+  // Enums
+  m_presentMode     = VK_PRESENT_MODE_IMMEDIATE_KHR;
+  
+
+  // Counters
+  m_swapchainImageCount = 0;
+  m_semaphoreCount = 0;
+  m_queueFamilyIndex = 0;
 }
 
 
@@ -301,7 +312,6 @@ void Fl_Vk_Window::cleanuo()
   and on whether overlays are real or simulated, the Vulkan context may
   be the same or different between the overlay and main window.
 */
-void Fl_Vk_Window::draw_overlay() {}
 
 /**
  Supports drawing to an Fl_Vk_Window with the FLTK 2D drawing API.
@@ -385,10 +395,11 @@ void Fl_Vk_Window::draw_end() {
   \endcode
 
 */
-void Fl_Vk_Window::draw() {
-  draw_begin();
-  Fl_Window::draw();
-  draw_end();
+void Fl_Vk_Window::draw()
+{
+    draw_begin();
+    Fl_Window::draw();
+    draw_end();
 }
 
 /**
@@ -397,11 +408,6 @@ void Fl_Vk_Window::draw() {
 int Fl_Vk_Window::handle(int event)
 {
   return Fl_Window::handle(event);
-}
-
-// don't remove me! this serves only to force linking of Fl_Vk_Device_Plugin.o
-int Fl_Vk_Window::vk_plugin_linkage() {
-  return fl_vk_load_plugin;
 }
 
 /** The number of pixels per FLTK unit of length for the window.
@@ -433,30 +439,23 @@ Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::global() {
 }
 
 void Fl_Vk_Window_Driver::invalidate() {
-  if (pWindow->overlay) {
-    ((Fl_Vk_Window*)pWindow->overlay)->valid(0);
-    ((Fl_Vk_Window*)pWindow->overlay)->context_valid(0);
-  }
 }
 
 
 char Fl_Vk_Window_Driver::swap_type() {return UNDEFINED;}
 
 
-void* Fl_Vk_Window_Driver::GetProcAddress(const char *procName) {
-  return NULL;
-}
-
 Fl_Font_Descriptor** Fl_Vk_Window_Driver::fontnum_to_fontdescriptor(int fnum) {
   extern FL_EXPORT Fl_Fontdesc *fl_fonts;
   return &(fl_fonts[fnum].first);
 }
 
-/* Captures a rectanvke of a Fl_Vk_Window and returns it as an RGB image.
+/* Captures a rectangle of a Fl_Vk_Window and returns it as an RGB image.
  This is the platform-independent version. Some platforms may override it.
  */
-Fl_RGB_Image* Fl_Vk_Window_Driver::capture_vk_rectanvke(int x, int y, int w, int h)
+Fl_RGB_Image* Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int h)
 {
+    return nullptr;
 }
 
 /**
