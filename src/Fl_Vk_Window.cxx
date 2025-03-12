@@ -150,6 +150,7 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     VK_CHECK_RESULT(result);
 
     const VkCommandBuffer cmd_bufs[] = {pWindow->m_setup_cmd};
+    VkFence nullFence = {VK_NULL_HANDLE};
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.pNext = NULL;
@@ -161,8 +162,7 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     submit_info.signalSemaphoreCount = 0;
     submit_info.pSignalSemaphores = NULL;
 
-    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info,
-                        pWindow->m_renderFence);
+    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info, nullFence);
     VK_CHECK_RESULT(result);
 
     result = vkQueueWaitIdle(pWindow->m_queue);
