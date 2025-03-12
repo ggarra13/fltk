@@ -565,6 +565,7 @@ void Fl_Vk_Window::draw()
     VK_CHECK_HANDLE(m_queue);
     
     draw_begin();
+    demo_draw(this);
     Fl_Window::draw();
     draw_end();
 }
