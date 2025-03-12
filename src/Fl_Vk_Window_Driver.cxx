@@ -1631,8 +1631,8 @@ Fl_Vk_Window_Driver::resize(int is_a_resize, int W, int H)
     VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
 
     // Wait for previous rendering to complete
-    vkWaitForFences(device, 1, &pWindow->m_renderFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device, 1, &pWindow->m_renderFence);
+    // vkWaitForFences(device, 1, &pWindow->m_renderFence, VK_TRUE, UINT64_MAX);
+    // vkResetFences(device, 1, &pWindow->m_renderFence);
 
     // Ensure all GPU operations are completed before resizing
     // result = vkDeviceWaitIdle(device);
