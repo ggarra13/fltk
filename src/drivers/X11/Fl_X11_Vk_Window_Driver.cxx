@@ -25,6 +25,9 @@
 #include "Fl_X11_Vk_Window_Driver.H"
 #include "../../Fl_Vk_Choice.H"
 #include "Fl_X11_Window_Driver.H"
+#if ! (USE_XFT || FLTK_USE_CAIRO)
+#  include "../Xlib/Fl_Font.H"
+#endif
 
 
 // Describes crap needed to create a VKContext.
@@ -38,12 +41,49 @@ public:
   }
 };
 
-
+#ifndef FLTK_USE_WAYLAND
 Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w)
 {
   return new Fl_X11_Vk_Window_Driver(w);
 }
+#endif
 
+int Fl_X11_Vk_Window_Driver::genlistsize() {
+#if USE_XFT || FLTK_USE_CAIRO
+  return 256;
+#else
+  return 0x10000;
+#endif
+}
+
+void Fl_X11_Vk_Window_Driver::get_list(Fl_Font_Descriptor *fd, int r) {
+# if USE_XFT || FLTK_USE_CAIRO
+  /* We hope not to come here: We hope that any system using XFT will also
+   * have sufficient Vulkan capability to support our font texture pile
+   * mechansim, allowing XFT to render the face directly. */
+  (void)fd; (void)r;
+# else
+  // @todo:
+  // Fl_Xlib_Font_Descriptor *gl_fd = (Fl_Xlib_Font_Descriptor*)fd;
+  // if (gl_fd->vkok[r]) return;
+  // gl_fd->vkok[r] = 1;
+  // unsigned int ii = r * 0x400;
+  // for (int i = 0; i < 0x400; i++) {
+  //   XFontStruct *font = NULL;
+  //   unsigned short id;
+  //   fl_XGetUtf8FontAndGlyph(gl_fd->font, ii, &font, &id);
+  //   // if (font) glXUseXFont(font->fid, id, 1, gl_fd->listbase+ii);
+  //   ii++;
+  // }
+# endif
+}
+
+#if !(USE_XFT || FLTK_USE_CAIRO)
+Fl_Font_Descriptor** Fl_X11_Vk_Window_Driver::fontnum_to_fontdescriptor(int fnum) {
+  Fl_Xlib_Fontdesc *s = ((Fl_Xlib_Fontdesc*)fl_fonts) + fnum;
+  return &(s->first);
+}
+#endif
 
 Fl_Vk_Choice *Fl_X11_Vk_Window_Driver::find(int m, const int *alistp)
 {
@@ -130,11 +170,6 @@ int Fl_X11_Vk_Window_Driver::swap_interval() const {
 
 int Fl_X11_Vk_Window_Driver::flush_begin(char& valid_f_) {
   return 0;
-}
-
-Fl_X11_Vk_Window_Driver::Fl_X11_Vk_Window_Driver(Fl_Vk_Window *win) :
-    Fl_Vk_Window_Driver(win)
-{
 }
 
 Fl_X11_Vk_Window_Driver::~Fl_X11_Vk_Window_Driver()

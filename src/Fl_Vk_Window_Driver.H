@@ -84,7 +84,7 @@ public:
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
   static Fl_Vk_Window_Driver *global();
   virtual float pixels_per_unit() {return 1;}
-    virtual void before_show(int&) { init_vulkan(); }
+  virtual void before_show(int&) {}
   virtual void after_show() {}
   virtual void invalidate();
   virtual int mode_(int /*m*/, const int * /*a*/) {return 0;}
@@ -106,9 +106,12 @@ public:
   virtual void waitVK() {} // support for vk_finish() function
   virtual void vk_visual(Fl_Vk_Choice*) {} // support for Fl::vk_visual() function
   virtual void vk_start() {} // support for vk_start() function
+  virtual void* GetProcAddress(const char *procName) { return nullptr; }
+  virtual void get_list(Fl_Font_Descriptor*, int) {} // support for gl_draw() without textures
   static void draw_string_with_texture(const char* str, int n); // cross-platform
   // support for vk_draw(). The cross-platform version may be enough.
-  virtual char *alpha_mask_for_string(const char *str, int n, int w, int h, Fl_Fontsize fs) { return nullptr; };
+  virtual char *alpha_mask_for_string(const char *str, int n, int w, int h, Fl_Fontsize fs);
+  virtual int genlistsize() { return 0; } // support for gl_draw()
   virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum);
   virtual Fl_RGB_Image* capture_vk_rectangle(int x, int y, int w, int h);
   static inline Fl_Vk_Window_Driver* driver(const Fl_Vk_Window *win) {return win->pVkWindowDriver;}
@@ -117,7 +120,6 @@ public:
   virtual bool need_scissor() { return false; }
 
     // Vulkan specific methods.
-  virtual void* GetProcAddress(const char *procName) { return nullptr; }
   virtual std::vector<std::string> get_required_extensions() = 0;
   virtual void create_surface() = 0;
 };

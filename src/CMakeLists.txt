@@ -494,15 +494,15 @@ set(VKCPPFILES
   # Fl_Vk_Device_Plugin.cxx
   # Fl Vk_Overlay.cxx
   Fl_Vk_Window.cxx
-  # vk_draw.cxx
+  vk_draw.cxx
   # vk_start.cxx
 )
 
 set(VK_DRIVER_FILES
-    Fl_Vk_Window_Driver.cxx
-  drivers/Vulkan/Fl_Vulkan_Display_Device.cxx
+  Fl_Vk_Window_Driver.cxx
+  #drivers/Vulkan/Fl_Vulkan_Display_Device.cxx
   # the following file doesn't contribute any code:
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver.cxx
+  #drivers/Vulkan/Fl_Vulkan_Graphics_Driver.cxx
   
   # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_arci.cxx
   # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_color.cxx
@@ -520,6 +520,9 @@ if(FLTK_BACKEND_WAYLAND)
     list(APPEND VK_DRIVER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
     list(APPEND VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
   endif(FLTK_USE_X11)
+elseif(FLTK_USE_X11)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
 elseif(APPLE)
   set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Cocoa/Fl_Cocoa_Vk_Window_Driver.mm)
   set(VK_DRIVER_HEADER_FILES drivers/Cocoa/Fl_Cocoa_Vk_Window_Driver.H)

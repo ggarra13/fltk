@@ -27,8 +27,8 @@ extern int fl_vk_load_plugin;
 #include "Fl_Window_Driver.H"  // \@done
 #include <FL/Fl_Graphics_Driver.H> // \@done
 #include <FL/fl_utf8.h>            // \@done
-#include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
-#include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
+// #include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
+// #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
 #include <stdlib.h>
 #  if (HAVE_DLSYM && HAVE_DLFCN_H)

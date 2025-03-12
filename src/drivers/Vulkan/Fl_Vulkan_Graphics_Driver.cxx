@@ -23,5 +23,5 @@
 //      named Fl_Vulkan_Graphics_Driver_*.cxx.
 //      This may be changed in the future.
 
-//#include <FL/gl.h>
+#include <FL/vk.h>
 #include "Fl_Vulkan_Graphics_Driver.H"

@@ -42,7 +42,7 @@ public:
 };
 
 
-Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w)
+Fl_Vk_Window_Driver *Fl_WinAPI_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w)
 {
   return new Fl_WinAPI_Vk_Window_Driver(w);
 }
