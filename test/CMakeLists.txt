@@ -225,24 +225,6 @@ if(extra_tests)
   endforeach()
 endif()
 
-# OpenGL demos. These programs can't be built w/o OpenGL
-
-if(OPENGL_FOUND)
-  fl_create_example(CubeView "CubeMain.cxx;CubeView.cxx;CubeViewUI.fl" "${GLDEMO_LIBS}")
-  fl_create_example(cube cube.cxx "${GLDEMO_LIBS}")
-  fl_create_example(fractals "fractals.cxx;fracviewer.cxx" "${GLDEMO_LIBS}")
-  fl_create_example(glut_test glut_test.cxx "${GLDEMO_LIBS}")
-  fl_create_example(glpuzzle glpuzzle.cxx "${GLDEMO_LIBS}")
-  fl_create_example(gl_overlay gl_overlay.cxx "${GLDEMO_LIBS}")
-  fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
-endif(OPENGL_FOUND)
-
-if(VULKAN_FOUND)
-  # fl_create_example(cube cube.cxx "${VKDEMO_LIBS}")
-  # fl_create_example(vk_overlay vk_overlay.cxx "${VKDEMO_LIBS}")
-  fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
-endif(VULKAN_FOUND)
-
 # Test FLTK headers for variable shadowing [-Wshadow] (STR 2728)
 #
 # The following test program is added only for GNU or Clang compilers which
@@ -271,7 +253,7 @@ if(CMAKE_CXX_COMPILER_ID IN_LIST _compilers)
   foreach(hd ${all_headers})
     get_filename_component(hd "${hd}" NAME)
     # skip headers that must not be included directly and fl_config.h if it exists
-    string(REGEX MATCH "^(mac|win32|x11|wayland|fl_config|gl[a-z_0-9]*)\.[hH]$" skip "${hd}")
+    string(REGEX MATCH "^(mac|win32|x11|wayland|vk|Fl_Vk_Window|fl_config|gl[a-z_0-9]*)\.[hH]$" skip "${hd}")
     if(skip STREQUAL "")
       file(APPEND ${include_all} "#include <FL/${hd}>\n")
     endif()
@@ -350,8 +332,30 @@ if(FLTK_BUILD_SHARED_LIBS)
       fl_create_example(shape-shared shape.cxx "${GLDEMO_SHARED}")
     endif(OPENGL_FOUND)
 
+    if(VULKAN_FOUND)
+	fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
+    endif(VULKAN_FOUND)
 
   endif(MSVC) # (not MSVC)
+else() # not FLTK_BUILD_SHARED_LIBS
+    
+
+    # OpenGL demos. These programs can't be built w/o OpenGL
+
+    if(OPENGL_FOUND)
+	fl_create_example(CubeView "CubeMain.cxx;CubeView.cxx;CubeViewUI.fl" "${GLDEMO_LIBS}")
+	fl_create_example(cube cube.cxx "${GLDEMO_LIBS}")
+	fl_create_example(fractals "fractals.cxx;fracviewer.cxx" "${GLDEMO_LIBS}")
+	fl_create_example(glut_test glut_test.cxx "${GLDEMO_LIBS}")
+	fl_create_example(glpuzzle glpuzzle.cxx "${GLDEMO_LIBS}")
+	fl_create_example(gl_overlay gl_overlay.cxx "${GLDEMO_LIBS}")
+	fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
+    endif(OPENGL_FOUND)
+
+    # Vulkan demos. These programs can't be built w/o Vulkan
+    if(VULKAN_FOUND)
+	fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
+    endif(VULKAN_FOUND)
 
 endif(FLTK_BUILD_SHARED_LIBS)
 

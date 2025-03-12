@@ -70,9 +70,9 @@ void sides_cb(Fl_Widget *o, void *p) {
 }
 
 int main(int argc, char **argv) {
-
-#if 0
     Fl::use_high_res_VK(1);
+    
+#if 0
     Fl_Window window(300, 330);
   
 // the shape window could be it's own window, but here we make it

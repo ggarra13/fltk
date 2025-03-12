@@ -513,8 +513,9 @@ set(VK_DRIVER_FILES
 )
 
 if(FLTK_BACKEND_WAYLAND)
-  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
-  set(VK_DRIVER_HEADER_FILES drivers/Wayland/Fl_Wayland_Vk_Window_Driver.H)
+  # \@todo:
+  #set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
+  #set(VK_DRIVER_HEADER_FILES drivers/Wayland/Fl_Wayland_Vk_Window_Driver.H)
   if(FLTK_USE_X11)
     list(APPEND VK_DRIVER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
     list(APPEND VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
@@ -998,8 +999,8 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
 
   if(FLTK_USE_VK)
     fl_add_library(fltk_vk SHARED "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
-    target_link_libraries(fltk_vk-shared PUBLIC ${VULKAN_LIBRARIES} fltk::fltk-shared)
-    target_include_directories(fltk_vk-shared PUBLIC ${VULKAN_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+    target_link_libraries(fltk_vk-shared PUBLIC ${Vulkan_LIBRARIES} fltk::fltk-shared)
+    target_include_directories(fltk_vk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
 
     # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
     add_optional_libs(fltk_vk-shared)

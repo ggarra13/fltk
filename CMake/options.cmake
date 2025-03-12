@@ -627,7 +627,6 @@ endif(FLTK_OPTION_SVG)
 
 # FIXME: GLU libs have already been searched in resources.cmake
 
-set(HAVE_VK LIB_VK OR LIB_MoltenVK)
 set(FLTK_USE_VK FALSE)
 
 set(HAVE_GL LIB_GL OR LIB_MesaGL)
@@ -640,11 +639,12 @@ if(HAVE_GL)
   endif()
 endif()
 
-if(HAVE_VK)
-  option(FLTK_BUILD_VK "use Vulkan and build fltk_vulkan library" ON)
-  if(FLTK_BUILD_VK)
+# VK is often built from a non system directory, so we don't
+# enclose this in HAVE_VK like HAVE_GL
+option(FLTK_BUILD_VK "use Vulkan and build fltk_vulkan library" OFF)
+if(FLTK_BUILD_VK)
+    set(HAVE_VK TRUE)
     set(FLTK_USE_VK TRUE)
-  endif()
 endif()
 
 if(FLTK_BUILD_GL)
@@ -745,9 +745,12 @@ if(VULKAN_FOUND)
   elseif(APPLE AND NOT FLTK_BACKEND_X11)
     list(APPEND VULKANLIBS "-framework MoltenVK")
   elseif(FLTK_BACKEND_WAYLAND)
-    message(FATAL_ERROR "Not implemented yet")
+    # \@todo: Vulkan not yet available on Wayland
+    if(FLTK_USE_X11)
+	list(APPEND VULKANLIBS -lvulkan)
+    endif()
   else()
-    list(APPEND VULKANLIBS)
+    list(APPEND VULKANLIBS -lvulkan)
   endif(WIN32)
 endif(VULKAN_FOUND)
 

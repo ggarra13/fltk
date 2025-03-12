@@ -1,5 +1,10 @@
 
+#include "FL/vk.h"
 #include "Fl_Vk_Window_Driver.H"
+
+#ifndef _WIN32
+#  include <signal.h>
+#endif
 
 #include <cassert>
 #include <set>
@@ -199,6 +204,10 @@ static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
 
     VkImageMemoryBarrier image_memory_barrier = {};
     image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.oldLayout = old_image_layout;
+    image_memory_barrier.newLayout = new_image_layout;    
+    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_memory_barrier.pNext = NULL;
     image_memory_barrier.srcAccessMask = srcAccessMask;
     image_memory_barrier.dstAccessMask = 0;
@@ -641,7 +650,7 @@ static void demo_prepare_textures(Fl_Vk_Window *pWindow) {
             demo_destroy_texture_image(pWindow, &staging_texture);
         } else {
             /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
-            assert(!"No support for B8G8R8A8_UNORM as texture image format");
+            Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");
         }
 
         VkSamplerCreateInfo sampler = {};
@@ -1198,12 +1207,14 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
     pWindow->m_enabled_extension_count = 0;
     pWindow->m_enabled_layer_count = 0;
 
-    char *instance_validation_layers_alt1[] = {
-        "VK_LAYER_LUNARG_standard_validation"
+    const char *instance_validation_layers_alt1[] = {
+        //"VK_LAYER_LUNARG_standard_validation",  // Not found on windows
+        "VK_LAYER_KHRONOS_validation",
     };
 
-    char *instance_validation_layers_alt2[] = {
-        "VK_LAYER_GOOGLE_threading",       "VK_LAYER_LUNARG_parameter_validation",
+    const char *instance_validation_layers_alt2[] = {
+        //"VK_LAYER_GOOGLE_threading",  // Not found on windows
+        "VK_LAYER_LUNARG_parameter_validation",  // windows only
         "VK_LAYER_LUNARG_object_tracker",  "VK_LAYER_LUNARG_image",
         "VK_LAYER_LUNARG_core_validation", "VK_LAYER_LUNARG_swapchain",
         "VK_LAYER_GOOGLE_unique_objects"
@@ -1543,8 +1554,6 @@ static void demo_init_vk_swapchain(Fl_Vk_Window* pWindow)
     }
     pWindow->m_color_space = surfFormats[0].colorSpace;
 
-    pWindow->m_curFrame = 0;
-
     // Get Memory information and properties
     vkGetPhysicalDeviceMemoryProperties(pWindow->m_gpu,
                                         &pWindow->m_memory_properties);
@@ -1613,17 +1622,25 @@ Fl_Vk_Window_Driver::prepare()
 void
 Fl_Vk_Window_Driver::resize(int is_a_resize, int W, int H)
 {
-    if (!is_a_resize)
+    if (!pWindow || !pWindow->m_device || !is_a_resize)
         return;
 
+    uint32_t i;
     VkResult result;
-    result = vkDeviceWaitIdle(pWindow->m_device);
-    VK_CHECK_RESULT(result);
+    VkDevice device = pWindow->m_device;
+    VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
+
+    // Wait for previous rendering to complete
+    vkWaitForFences(device, 1, &pWindow->m_renderFence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device, 1, &pWindow->m_renderFence);
+
+    // Ensure all GPU operations are completed before resizing
+    // result = vkDeviceWaitIdle(device);
+    // VK_CHECK_RESULT(result);
 
     pWindow->m_width  = W;
     pWindow->m_height = H;
     
-    uint32_t i;
 
     // In order to properly resize the window, we must re-create the swapchain
     // AND redo the command buffers, etc.
@@ -1657,14 +1674,14 @@ Fl_Vk_Window_Driver::resize(int is_a_resize, int W, int H)
         vkDestroySampler(pWindow->m_device, pWindow->m_textures[i].sampler, NULL);
     }
 
-    for (i = 0; i < pWindow->m_swapchainImageCount; i++) {
-        vkDestroyImageView(pWindow->m_device, pWindow->m_buffers[i].view, NULL);
-    }
+    // for (i = 0; i < pWindow->m_swapchainImageCount; i++) {
+    //     vkDestroyImageView(pWindow->m_device, pWindow->m_buffers[i].view, NULL);
+    // }
+    // free(pWindow->m_buffers);
 
     vkDestroyImageView(pWindow->m_device, pWindow->m_depth.view, NULL);
     vkDestroyImage(pWindow->m_device, pWindow->m_depth.image, NULL);
     vkFreeMemory(pWindow->m_device, pWindow->m_depth.mem, NULL);
-    free(pWindow->m_buffers);
 
     // Second, re-perform the demo_prepare() function, which will re-create the
     // swapchain:
@@ -1679,60 +1696,61 @@ Fl_Vk_Window_Driver::query_swap_chain_support(VkPhysicalDevice physicalDevice)
 {
     SwapChainSupportDetails details;
 
-    // 1. Get Surface Capabilities
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,
-                                              pWindow->m_surface,
-                                              &details.capabilities);
+    // // 1. Get Surface Capabilities
+    // vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,
+    //                                           pWindow->m_surface,
+    //                                           &details.capabilities);
 
-    // 2. Get Surface Formats
-    uint32_t formatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
-                                         pWindow->m_surface,
-                                         &formatCount, nullptr);
+    // // 2. Get Surface Formats
+    // uint32_t formatCount;
+    // vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
+    //                                      pWindow->m_surface,
+    //                                      &formatCount, nullptr);
 
-    if (formatCount != 0) {
-        details.formats.resize(formatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
-                                             pWindow->m_surface,
-                                             &formatCount,
-                                             details.formats.data());
-    }
+    // if (formatCount != 0) {
+    //     details.formats.resize(formatCount);
+    //     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
+    //                                          pWindow->m_surface,
+    //                                          &formatCount,
+    //                                          details.formats.data());
+    // }
 
-    // 3. Get Present Modes
-    uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
-                                              pWindow->m_surface,
-                                              &presentModeCount, nullptr);
+    // // 3. Get Present Modes
+    // uint32_t presentModeCount;
+    // vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
+    //                                           pWindow->m_surface,
+    //                                           &presentModeCount, nullptr);
 
-    if (presentModeCount != 0) {
-        details.presentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
-                                                  pWindow->m_surface, &presentModeCount, details.presentModes.data());
-    }
+    // if (presentModeCount != 0) {
+    //     details.presentModes.resize(presentModeCount);
+    //     vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
+    //                                               pWindow->m_surface, &presentModeCount, details.presentModes.data());
+    // }
 
     return details;
 }
 
 bool Fl_Vk_Window_Driver::is_device_suitable(VkPhysicalDevice physicalDevice)
 {
-    VkPhysicalDeviceProperties deviceProperties;
-    vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
+    // VkPhysicalDeviceProperties deviceProperties;
+    // vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
 
-    VkPhysicalDeviceFeatures deviceFeatures;
-    vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
+    // VkPhysicalDeviceFeatures deviceFeatures;
+    // vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
 
-    QueueFamilyIndices indices = find_queue_families(physicalDevice);
+    // QueueFamilyIndices indices = find_queue_families(physicalDevice);
 
-    bool extensionsSupported = check_device_extension_support(physicalDevice);
+    // bool extensionsSupported = check_device_extension_support(physicalDevice);
 
-    bool swapChainAdequate = false;
-    if (extensionsSupported)
-    {
-        SwapChainSupportDetails swapChainSupport = query_swap_chain_support(physicalDevice);
-        swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-    }
+    // bool swapChainAdequate = false;
+    // if (extensionsSupported)
+    // {
+    //     SwapChainSupportDetails swapChainSupport = query_swap_chain_support(physicalDevice);
+    //     swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+    // }
 
-    return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    // return indices.isComplete() && extensionsSupported && swapChainAdequate;
+    return false;
 }
 
 void Fl_Vk_Window_Driver::init_vulkan()

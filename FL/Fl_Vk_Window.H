@@ -20,10 +20,10 @@
 #ifndef Fl_Vk_Window_H
 #define Fl_Vk_Window_H
 
-#include <Fl/vk.h>
+#include "FL/vk.h"
 #include "Fl_Window.H"
 
-class Fl_Vk_Choice; // structure to hold result of glXChooseVisual
+class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
 #define DEMO_TEXTURE_COUNT 1
@@ -298,28 +298,24 @@ public:
    */
   int mode(const int *a) {return mode(0, a);}
 
-  bool               m_validate = false;
+  bool               m_validate = false;  // true: Windows only so far
   bool               m_use_staging_buffer = false;
   VkInstance         m_instance;
   VkPhysicalDevice   m_gpu;
   VkDevice           m_device;
   int                m_width, m_height;
   
-  uint32_t m_enabled_extension_count;
-  uint32_t m_enabled_layer_count;
-  const char* m_extension_names[64];
-  const char* m_enabled_layers[64];
-    
-  VkColorSpaceKHR    m_color_space;
-  
     
   VkFormat           m_format;
   VkSurfaceKHR       m_surface;
   VkSurfaceFormatKHR m_surfaceFormat;
-  VkPresentModeKHR   m_presentMode;
+  VkSwapchainKHR     m_swapchain;
+  uint32_t           m_swapchainImageCount;
+  // VkPresentModeKHR   m_presentMode;
   VkRenderPass       m_renderPass;
   VkPipeline         m_pipeline;  
   VkQueue            m_queue;
+  VkFence            m_renderFence;
   VkPhysicalDeviceProperties m_gpu_props;
   VkPhysicalDeviceFeatures m_gpu_features;
   VkQueueFamilyProperties* m_queue_props;
@@ -328,8 +324,13 @@ public:
   
   //!@{ These are from triangle-vulkan GLFW demo
 
-
-
+  
+  uint32_t m_enabled_extension_count;
+  uint32_t m_enabled_layer_count;
+  const char* m_extension_names[64];
+  const char* m_enabled_layers[64];
+    
+  VkColorSpaceKHR    m_color_space;
   
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;
@@ -346,12 +347,42 @@ public:
 
   Fl_Vk_SwapchainBuffer*       m_buffers;
     
+  // Clear screen
+  bool               m_clearEnable;
+
+  VkShaderModule m_vert_shader_module;
+  VkShaderModule m_frag_shader_module;
+
+  VkDescriptorPool m_desc_pool;
+  VkDescriptorSet m_desc_set;
+  float m_depthStencil = 1.0;
+    
   VkCommandBuffer m_setup_cmd; // Command Buffer for initialization commands
   VkCommandBuffer m_draw_cmd;  // Command Buffer for drawing commands
   VkPipelineLayout m_pipeline_layout;
   VkDescriptorSetLayout m_desc_layout;
   VkPipelineCache m_pipelineCache;
 
+  //! @}
+  
+
+    
+  //! @{ These are in ImGui but not sure.
+  // uint32_t           m_curFrame;   // Current frame being rendered to (0 <= FrameIndex < FrameInFlightCount)
+
+
+  //! Number of simultaneous in-flight frames
+  //! (returned by vkGetSwapchainImagesKHR, often derived from min_image_count)
+  
+  
+  // uint32_t           m_semaphoreCount;         // Number of simultaneous in-flight frames + 1, to be able to use it in vkAcquireNextImageKHR
+  // uint32_t           m_semaphoreIndex;         // Current set of swapchain wait semaphores we're using (needs to be distinct from per frame data)
+
+  // bool               m_useDynamicRendering;  // static or dynamic workflow
+  // Fl_Vk_Frame*            m_frames;
+  // Fl_Vk_FrameSemaphores*  m_frameSemaphores;
+
+  //! @}
   
   // (Optional) Allocation, Debugging.
   const VkAllocationCallbacks*    m_allocator;
@@ -360,35 +391,6 @@ public:
 
   bool               m_use_break = false;
   VkDebugReportCallbackEXT m_msg_callback;
-
-    
-  // These are in ImGui but not sure.
-  bool               m_useDynamicRendering;  // static or dynamic workflow
-  // Clear screen
-  bool               m_clearEnable;
-
-  uint32_t           m_curFrame;   // Current frame being rendered to (0 <= FrameIndex < FrameInFlightCount)
-
-
-  //! Number of simultaneous in-flight frames
-  //! (returned by vkGetSwapchainImagesKHR, often derived from min_image_count)
-  
-  VkSwapchainKHR     m_swapchain;
-  uint32_t           m_swapchainImageCount;
-  
-  uint32_t           m_semaphoreCount;         // Number of simultaneous in-flight frames + 1, to be able to use it in vkAcquireNextImageKHR
-  uint32_t           m_semaphoreIndex;         // Current set of swapchain wait semaphores we're using (needs to be distinct from per frame data)
-
-  Fl_Vk_Frame*            m_frames;
-  Fl_Vk_FrameSemaphores*  m_frameSemaphores;
-
-
-  VkShaderModule m_vert_shader_module;
-  VkShaderModule m_frag_shader_module;
-
-  VkDescriptorPool m_desc_pool;
-  VkDescriptorSet m_desc_set;
-  float m_depthStencil = 1.0;
   
   void make_current();
   void swap_buffers();
@@ -430,6 +432,7 @@ public:
     The default boxtype is FL_NO_BOX. The default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
   */
   Fl_Vk_Window(int W, int H, const char *l=0) : Fl_Window(W,H,l) {init();}
+  
   /**
     Creates a new Fl_Vk_Window widget using the given position,
     size, and label string. The default boxtype is FL_NO_BOX. The
@@ -437,11 +440,7 @@ public:
   */
 
   Fl_Vk_Window(int X, int Y, int W, int H, const char *l=0)
-    : Fl_Window(X,Y,W,H,l) {
-      std::cerr << "Create " << X << ", " << Y << " WxH=" << W
-                << "x" << H << std::endl;
-      init();
-  }
+    : Fl_Window(X,Y,W,H,l) { init(); }
 };
 
 #endif // Fl_Vk_Window_H

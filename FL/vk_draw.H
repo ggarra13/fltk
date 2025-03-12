@@ -14,6 +14,4 @@
 //     https://www.fltk.org/bugs.php
 //
 
-#include "vk.h"
-
 extern FL_EXPORT void vk_remove_displaylist_fonts();

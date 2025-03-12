@@ -139,17 +139,17 @@ static void demo_draw_build_cmd(Fl_Vk_Window* pWindow) {
     VK_CHECK_RESULT(result);
 }
 
-static void demo_flush_init_cmd(Fl_Vk_Window* demo) {
-    VkResult err;
+static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
 
-    if (demo->m_setup_cmd == VK_NULL_HANDLE)
+    VkResult result;
+    
+    if (pWindow->m_setup_cmd == VK_NULL_HANDLE)
         return;
 
-    err = vkEndCommandBuffer(demo->m_setup_cmd);
-    VK_CHECK_RESULT(err);
+    result = vkEndCommandBuffer(pWindow->m_setup_cmd);
+    VK_CHECK_RESULT(result);
 
-    const VkCommandBuffer cmd_bufs[] = {demo->m_setup_cmd};
-    VkFence nullFence = {VK_NULL_HANDLE};
+    const VkCommandBuffer cmd_bufs[] = {pWindow->m_setup_cmd};
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.pNext = NULL;
@@ -161,18 +161,19 @@ static void demo_flush_init_cmd(Fl_Vk_Window* demo) {
     submit_info.signalSemaphoreCount = 0;
     submit_info.pSignalSemaphores = NULL;
 
-    err = vkQueueSubmit(demo->m_queue, 1, &submit_info, nullFence);
-    VK_CHECK_RESULT(err);
+    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info,
+                        pWindow->m_renderFence);
+    VK_CHECK_RESULT(result);
 
-    err = vkQueueWaitIdle(demo->m_queue);
-    VK_CHECK_RESULT(err);
+    result = vkQueueWaitIdle(pWindow->m_queue);
+    VK_CHECK_RESULT(result);
 
-    vkFreeCommandBuffers(demo->m_device, demo->m_cmd_pool, 1, cmd_bufs);
-    demo->m_setup_cmd = VK_NULL_HANDLE;
+    vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, cmd_bufs);
+    pWindow->m_setup_cmd = VK_NULL_HANDLE;
 }
 
 
-static void demo_draw(Fl_Vk_Window* demo) {
+static void demo_draw(Fl_Vk_Window* pWindow) {
     VkResult result;
     VkSemaphore imageAcquiredSemaphore, drawCompleteSemaphore;
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
@@ -180,27 +181,27 @@ static void demo_draw(Fl_Vk_Window* demo) {
     semaphoreCreateInfo.pNext = NULL;
     semaphoreCreateInfo.flags = 0;
 
-    result = vkCreateSemaphore(demo->m_device, &semaphoreCreateInfo,
+    result = vkCreateSemaphore(pWindow->m_device, &semaphoreCreateInfo,
                                NULL, &imageAcquiredSemaphore);
     VK_CHECK_RESULT(result);
 
-    result = vkCreateSemaphore(demo->m_device, &semaphoreCreateInfo,
+    result = vkCreateSemaphore(pWindow->m_device, &semaphoreCreateInfo,
                                NULL, &drawCompleteSemaphore);
     VK_CHECK_RESULT(result);
 
     // Get the index of the next available swapchain image:
-    result = vkAcquireNextImageKHR(demo->m_device,
-                                   demo->m_swapchain, UINT64_MAX,
+    result = vkAcquireNextImageKHR(pWindow->m_device,
+                                   pWindow->m_swapchain, UINT64_MAX,
                                    imageAcquiredSemaphore,
                                    (VkFence)0, // TODO: Show use of fence
-                                   &demo->m_current_buffer);
+                                   &pWindow->m_current_buffer);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // demo->m_swapchain is out of date (e.g. the window was resized) and
+        // pWindow->m_swapchain is out of date (e.g. the window was resized) and
         // must be recreated:
-        Fl_Vk_Window_Driver::driver(demo)->resize(true, demo->w(), demo->h());
-        demo_draw(demo);
-        vkDestroySemaphore(demo->m_device, imageAcquiredSemaphore, NULL);
-        vkDestroySemaphore(demo->m_device, drawCompleteSemaphore, NULL);
+        Fl_Vk_Window_Driver::driver(pWindow)->resize(true, pWindow->w(), pWindow->h());
+        demo_draw(pWindow);
+        vkDestroySemaphore(pWindow->m_device, imageAcquiredSemaphore, NULL);
+        vkDestroySemaphore(pWindow->m_device, drawCompleteSemaphore, NULL);
         return;
     } else if (result == VK_SUBOPTIMAL_KHR) {
         // pWindow->m_swapchain is not as optimal as it could be, but the platform's
@@ -209,14 +210,14 @@ static void demo_draw(Fl_Vk_Window* demo) {
         VK_CHECK_RESULT(result);
     }
 
-    demo_flush_init_cmd(demo);
+    demo_flush_init_cmd(pWindow);
 
     // Wait for the present complete semaphore to be signaled to ensure
     // that the image won't be rendered to until the presentation
     // engine has fully released ownership to the application, and it is
     // okay to render to the image.
 
-    demo_draw_build_cmd(demo);
+    demo_draw_build_cmd(pWindow);
     VkFence nullFence = VK_NULL_HANDLE;
     VkPipelineStageFlags pipe_stage_flags =
         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -227,11 +228,11 @@ static void demo_draw(Fl_Vk_Window* demo) {
     submit_info.pWaitSemaphores = &imageAcquiredSemaphore;
     submit_info.pWaitDstStageMask = &pipe_stage_flags;
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &demo->m_draw_cmd;
+    submit_info.pCommandBuffers = &pWindow->m_draw_cmd;
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &drawCompleteSemaphore;
 
-    result = vkQueueSubmit(demo->m_queue, 1, &submit_info, nullFence);
+    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info, nullFence);
     VK_CHECK_RESULT(result);
 
     VkPresentInfoKHR present = {};
@@ -240,26 +241,26 @@ static void demo_draw(Fl_Vk_Window* demo) {
     present.waitSemaphoreCount = 1;
     present.pWaitSemaphores = &drawCompleteSemaphore;
     present.swapchainCount = 1;
-    present.pSwapchains = &demo->m_swapchain;
-    present.pImageIndices = &demo->m_current_buffer;
+    present.pSwapchains = &pWindow->m_swapchain;
+    present.pImageIndices = &pWindow->m_current_buffer;
 
-    result = vkQueuePresentKHR(demo->m_queue, &present);
+    result = vkQueuePresentKHR(pWindow->m_queue, &present);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // demo->m_swapchain is out of date (e.g. the window was resized) and
+        // pWindow->m_swapchain is out of date (e.g. the window was resized) and
         // must be recreated:
-        Fl_Vk_Window_Driver::driver(demo)->resize(true, demo->w(), demo->h());
+        Fl_Vk_Window_Driver::driver(pWindow)->resize(true, pWindow->w(), pWindow->h());
     } else if (result == VK_SUBOPTIMAL_KHR) {
-        // demo->m_swapchain is not as optimal as it could be, but the platform's
+        // pWindow->m_swapchain is not as optimal as it could be, but the platform's
         // presentation engine will still present the image correctly.
     } else {
         VK_CHECK_RESULT(result);
     }
 
-    result = vkQueueWaitIdle(demo->m_queue);
+    result = vkQueueWaitIdle(pWindow->m_queue);
     VK_CHECK_RESULT(result);
 
-    vkDestroySemaphore(demo->m_device, imageAcquiredSemaphore, NULL);
-    vkDestroySemaphore(demo->m_device, drawCompleteSemaphore, NULL);
+    vkDestroySemaphore(pWindow->m_device, imageAcquiredSemaphore, NULL);
+    vkDestroySemaphore(pWindow->m_device, drawCompleteSemaphore, NULL);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -300,7 +301,7 @@ void Fl_Vk_Window::show() {
       if (!g && (mode_ & FL_DOUBLE) == FL_SINGLE) {
         g = pVkWindowDriver->find(mode_ | FL_DOUBLE,alist);
         if (g) mode_ |= FL_FAKE_SINGLE;
-      }
+       }
 
       if (!g) {
         Fl::error("Insufficient Vulkan support");
@@ -339,7 +340,6 @@ void Fl_Vk_Window::make_current() {
     pVkWindowDriver->make_current_before();
     if (m_surface == VK_NULL_HANDLE)
     {
-        std::cerr << "m_surface NULL_HANDLE" << std::endl;
         pVkWindowDriver->init_vk();
         pVkWindowDriver->create_surface();
         pVkWindowDriver->init_vk_swapchain();
@@ -565,7 +565,6 @@ void Fl_Vk_Window::draw()
     VK_CHECK_HANDLE(m_queue);
     
     draw_begin();
-    demo_draw(this);
     Fl_Window::draw();
     draw_end();
 }
@@ -657,6 +656,7 @@ void Fl_Vk_Window::init() {
   m_swapchain  = VK_NULL_HANDLE;
   m_renderPass = VK_NULL_HANDLE;
   m_pipeline   = VK_NULL_HANDLE;
+  m_allocator  = nullptr;
 
   // These are specific to GLFW demo
   m_setup_cmd  = VK_NULL_HANDLE;
@@ -667,24 +667,23 @@ void Fl_Vk_Window::init() {
   m_desc_layout = VK_NULL_HANDLE;
 
   // Pointers for ImGUI (not used for now)
-  m_allocator       = nullptr;
-  m_frames          = nullptr;
-  m_frameSemaphores = nullptr;
-  m_framebuffers    = nullptr;
+  // m_frames          = nullptr;
+  // m_frameSemaphores = nullptr;
+  // m_framebuffers    = nullptr;
+  // m_semaphoreCount  = 0;
 
   // These are specific to GLFW demo
   m_buffers         = nullptr;
 
   // Enums
-  m_presentMode     = VK_PRESENT_MODE_IMMEDIATE_KHR;
+  // m_presentMode     = VK_PRESENT_MODE_IMMEDIATE_KHR;
+  // m_curFrame            = 0;
   
 
   // Counters
   m_clearEnable         = true;
   m_swapchainImageCount = 0;
-  m_semaphoreCount      = 0;
   m_queueFamilyIndex    = 0;
-  m_curFrame            = 0;
   m_current_buffer      = 0;
 }
 
