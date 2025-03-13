@@ -1142,7 +1142,7 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
 
     const char *instance_validation_layers_alt1[] = {
         //"VK_LAYER_LUNARG_standard_validation",  // Not found on windows
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
         "VK_LAYER_KHRONOS_validation",  // Not found on X11
 #endif
     };

@@ -184,14 +184,14 @@ fl_create_example(sudoku "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "fltk::
 fl_create_example(symbols symbols.cxx fltk::fltk)
 fl_create_example(tabs tabs.fl fltk::fltk)
 fl_create_example(table table.cxx fltk::fltk)
-fl_create_example(terminal terminal.fl fltk::fltk)
+#fl_create_example(terminal terminal.fl fltk::fltk)  # not building on macOS
 fl_create_example(threads threads.cxx fltk::fltk)
 fl_create_example(tile tile.cxx fltk::fltk)
 fl_create_example(tiled_image tiled_image.cxx fltk::fltk)
-fl_create_example(tree tree.fl fltk::fltk)
+# fl_create_example(tree tree.fl fltk::fltk) # not building on macOS
 fl_create_example(twowin twowin.cxx fltk::fltk)
 fl_create_example(utf8 utf8.cxx fltk::fltk)
-fl_create_example(valuators valuators.fl fltk::fltk)
+# fl_create_example(valuators valuators.fl fltk::fltk) # not building on macOS
 fl_create_example(windowfocus windowfocus.cxx fltk::fltk)
 fl_create_example(wizard wizard.cxx fltk::fltk)
 

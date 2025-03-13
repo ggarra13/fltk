@@ -100,7 +100,7 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
 #  endif
 #  include <vulkan/vulkan.h>
 #else
-#  error "Vulkan not implemented yet for this platform"
+#  include <vulkan/vulkan.h>
 #endif
 
 #define VK_CHECK_RESULT(err) vk_check_result(err, __FILE__, __LINE__);

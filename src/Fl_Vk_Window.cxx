@@ -296,10 +296,10 @@ void Fl_Vk_Window::show() {
         if (g) mode_ |= FL_FAKE_SINGLE;
        }
 
-      if (!g) {
-        Fl::error("Insufficient Vulkan support");
-        return;
-      }
+      // if (!g) {
+      //   Fl::error("Insufficient Vulkan support");
+      //   return;
+      // }
     }
     pVkWindowDriver->before_show(need_after);
   }

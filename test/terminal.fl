@@ -245,7 +245,7 @@ Fl::repeat_timeout(.10, ring_debug_timer_callback, (void*)this);} {}
     code {MyTerminal *o = (MyTerminal*)userdata;
 o->ring_debug_timer_callback2();} {}
   }
-  Function {handle(int e) FL_OVERRIDE} {
+  Function {handle(int e)} {
     comment {Event handler} return_type int
   } {
     code {switch (e) {
@@ -1461,7 +1461,7 @@ scrollbarsize_input->value( G_tty->scrollbar_size() );
 showunknown_radio->value( G_tty->show_unknown() ? 1 : 0 );
 
 // ansi() enable/disable
-ansi_radio->value(tty ->ansi() ? 1 : 0 );
+ansi_radio->value(G_tty->ansi() ? 1 : 0 );
 
 // box() choice
 switch ( G_tty->box() ) {

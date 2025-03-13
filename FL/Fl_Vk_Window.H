@@ -225,7 +225,7 @@ public:
   **/
   int mode(const int *a) {return mode(0, a);}
 
-  bool               m_validate = true;  // true: Windows only so far
+  bool               m_validate = false;  // true: Windows only so far
   
   VkInstance         m_instance; // needed
   VkPhysicalDevice   m_gpu;      // needed
