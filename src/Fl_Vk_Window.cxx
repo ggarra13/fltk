@@ -35,8 +35,7 @@ extern int fl_vk_load_plugin;
 #    include <dlfcn.h>
 #  endif // (HAVE_DLSYM && HAVE_DLFCN_H)
 
-
-static void demo_draw_build_cmd(Fl_Vk_Window* pWindow) {
+static void demo_draw_build_cmd(Fl_Vk_Window* demo) {
     VkCommandBufferBeginInfo cmd_buf_info = {};
     cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     cmd_buf_info.pNext = NULL;
@@ -44,80 +43,80 @@ static void demo_draw_build_cmd(Fl_Vk_Window* pWindow) {
     cmd_buf_info.pInheritanceInfo = NULL;
     
     VkClearValue clear_values[2];
-
-    VkClearValue color;
-    color.color = {0.2f, 0.5f, 0.2f, 0.2f};
-    
-    VkClearValue depth;
-    depth.depthStencil = {pWindow->m_depthStencil, 0}; // \@todo:
-    
-    clear_values[0] = color;
-    clear_values[1] = depth;
+    clear_values[0].color = {0.2f, 0.2f, 0.2f, 0.2f};
+    clear_values[1].depthStencil = {demo->m_depthStencil, 0};
     
     VkRenderPassBeginInfo rp_begin = {};
     rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     rp_begin.pNext = NULL;
-    rp_begin.renderPass = pWindow->m_renderPass;
-    rp_begin.framebuffer = pWindow->m_framebuffers[pWindow->m_current_buffer];
+    rp_begin.renderPass = demo->m_renderPass;
+    rp_begin.framebuffer = demo->m_framebuffers[demo->m_current_buffer];
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
-    rp_begin.renderArea.extent.width = pWindow->w();
-    rp_begin.renderArea.extent.height = pWindow->h();
+    rp_begin.renderArea.extent.width = demo->m_width;
+    rp_begin.renderArea.extent.height = demo->m_height;
     rp_begin.clearValueCount = 2;
     rp_begin.pClearValues = clear_values;
     
-    VkResult result;
+    VkResult err;
 
-    result = vkBeginCommandBuffer(pWindow->m_draw_cmd, &cmd_buf_info);
-    VK_CHECK_RESULT(result);
+    // Reset the command buffer to ensure it’s reusable
+    err = vkResetCommandBuffer(demo->m_draw_cmd, 0);
+    VK_CHECK_RESULT(err);
 
-    // We can use LAYOUT_UNDEFINED as a wildcard here because we don't care what
-    // happens to the previous contents of the image
+    err = vkBeginCommandBuffer(demo->m_draw_cmd, &cmd_buf_info);
+    VK_CHECK_RESULT(err);
+
+    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for rendering
     VkImageMemoryBarrier image_memory_barrier = {};
     image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     image_memory_barrier.pNext = NULL;
-    image_memory_barrier.srcAccessMask = 0;
+    image_memory_barrier.srcAccessMask = 0; // No prior access (undefined)
     image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.image = pWindow->m_buffers[pWindow->m_current_buffer].image;
+    image_memory_barrier.image = demo->m_buffers[demo->m_current_buffer].image;
     image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    vkCmdPipelineBarrier(pWindow->m_draw_cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0,
-                         NULL, 1, &image_memory_barrier);
-    vkCmdBeginRenderPass(pWindow->m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(pWindow->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      pWindow->m_pipeline);
-    vkCmdBindDescriptorSets(pWindow->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pWindow->m_pipeline_layout, 0, 1, &pWindow->m_desc_set, 0,
-                            NULL);
+    vkCmdPipelineBarrier(demo->m_draw_cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // No prior work
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
+                         0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
 
-    VkViewport viewport;
-    memset(&viewport, 0, sizeof(viewport));
-    viewport.width = (float)pWindow->w();
-    viewport.height = (float)pWindow->h();
-    viewport.minDepth = (float)0.0f;
-    viewport.maxDepth = (float)1.0f;
-    vkCmdSetViewport(pWindow->m_draw_cmd, 0, 1, &viewport);
+    // Begin rendering
+    vkCmdBeginRenderPass(demo->m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(demo->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, demo->m_pipeline);
+    vkCmdBindDescriptorSets(demo->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            demo->m_pipeline_layout, 0, 1, &demo->m_desc_set, 0, NULL);
 
-    VkRect2D scissor;
-    memset(&scissor, 0, sizeof(scissor));
-    scissor.extent.width = pWindow->w();
-    scissor.extent.height = pWindow->h();
+    VkViewport viewport = {};
+    viewport.height = (float)demo->m_height;
+    viewport.width = (float)demo->m_width;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    viewport.x = 0;
+    viewport.y = 0;
+    
+    vkCmdSetViewport(demo->m_draw_cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.extent.width = demo->m_width;
+    scissor.extent.height = demo->m_height;
     scissor.offset.x = 0;
     scissor.offset.y = 0;
-    vkCmdSetScissor(pWindow->m_draw_cmd, 0, 1, &scissor);
+    
+    vkCmdSetScissor(demo->m_draw_cmd, 0, 1, &scissor);
 
     VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(pWindow->m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
-                           &pWindow->m_vertices.buf, offsets);
+    vkCmdBindVertexBuffers(demo->m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
+                           &demo->m_vertices.buf, offsets);
 
-    vkCmdDraw(pWindow->m_draw_cmd, 3, 1, 0, 0);
-    vkCmdEndRenderPass(pWindow->m_draw_cmd);
+    vkCmdDraw(demo->m_draw_cmd, 3, 1, 0, 0);
+    vkCmdEndRenderPass(demo->m_draw_cmd);
 
+    // Transition swapchain image to PRESENT_SRC_KHR for presentation
     VkImageMemoryBarrier prePresentBarrier = {};
     prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     prePresentBarrier.pNext = NULL;
@@ -127,16 +126,16 @@ static void demo_draw_build_cmd(Fl_Vk_Window* pWindow) {
     prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.image = demo->m_buffers[demo->m_current_buffer].image;
     prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
-    prePresentBarrier.image = pWindow->m_buffers[pWindow->m_current_buffer].image;
-    VkImageMemoryBarrier *pmemory_barrier = &prePresentBarrier;
-    vkCmdPipelineBarrier(pWindow->m_draw_cmd, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, NULL, 0,
-                         NULL, 1, pmemory_barrier);
+    vkCmdPipelineBarrier(demo->m_draw_cmd,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // After color writes
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // Before presentation
+                         0, 0, NULL, 0, NULL, 1, &prePresentBarrier);
 
-    result = vkEndCommandBuffer(pWindow->m_draw_cmd);
-    VK_CHECK_RESULT(result);
+    err = vkEndCommandBuffer(demo->m_draw_cmd);
+    VK_CHECK_RESULT(err);
 }
 
 static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
@@ -195,17 +194,16 @@ static void demo_draw(Fl_Vk_Window* pWindow) {
                                    imageAcquiredSemaphore,
                                    (VkFence)0, // TODO: Show use of fence
                                    &pWindow->m_current_buffer);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         // pWindow->m_swapchain is out of date (e.g. the window was resized) and
         // must be recreated:
-        Fl_Vk_Window_Driver::driver(pWindow)->resize(true, pWindow->w(), pWindow->h());
-        demo_draw(pWindow);
+        pWindow->swapchain_needs_recreation = true;
         vkDestroySemaphore(pWindow->m_device, imageAcquiredSemaphore, NULL);
         vkDestroySemaphore(pWindow->m_device, drawCompleteSemaphore, NULL);
         return;
-    } else if (result == VK_SUBOPTIMAL_KHR) {
-        // pWindow->m_swapchain is not as optimal as it could be, but the platform's
-        // presentation engine will still present the image correctly.
+    } else if (result == VK_TIMEOUT) {
+        // Timeout occurred, try again next frame
+        return;
     } else {
         VK_CHECK_RESULT(result);
     }
@@ -245,13 +243,8 @@ static void demo_draw(Fl_Vk_Window* pWindow) {
     present.pImageIndices = &pWindow->m_current_buffer;
 
     result = vkQueuePresentKHR(pWindow->m_queue, &present);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // pWindow->m_swapchain is out of date (e.g. the window was resized) and
-        // must be recreated:
-        Fl_Vk_Window_Driver::driver(pWindow)->resize(true, pWindow->w(), pWindow->h());
-    } else if (result == VK_SUBOPTIMAL_KHR) {
-        // pWindow->m_swapchain is not as optimal as it could be, but the platform's
-        // presentation engine will still present the image correctly.
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        pWindow->swapchain_needs_recreation = true;
     } else {
         VK_CHECK_RESULT(result);
     }
@@ -340,6 +333,7 @@ void Fl_Vk_Window::make_current() {
     pVkWindowDriver->make_current_before();
     if (m_surface == VK_NULL_HANDLE)
     {
+        printf("m_surface is VK_NULL_HANDLE.  Re-initing Vulkan!!!\n");
         pVkWindowDriver->init_vk();
         pVkWindowDriver->create_surface();
         pVkWindowDriver->init_vk_swapchain();
@@ -465,8 +459,10 @@ void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
   if (is_a_resize) {
       valid(0);
+      m_width = W;
+      m_height = H;
+      swapchain_needs_recreation = true;
   }
-  pVkWindowDriver->resize(is_a_resize, W, H);
   Fl_Window::resize(X,Y,W,H);
 }
 
@@ -527,16 +523,16 @@ void Fl_Vk_Window::draw_end() {
   to initialize the viewport:
 
   \code
-    void mywindow::draw() {
-     ... draw your geometry here ...
-    }
+  void mywindow::draw() {
+  ... draw your geometry here ...
+  }
   \endcode
 
   Actual example code to clear screen to black and draw a 2D white "X":
   \code
-    void mywindow::draw() {
-    Fl_Vk_Window::draw();
-    }
+  void mywindow::draw() {
+  Fl_Vk_Window::draw();
+  }
   \endcode
 
   Regular FLTK widgets can be added as children to the Fl_Vk_Window. To
@@ -544,32 +540,36 @@ void Fl_Vk_Window::draw_end() {
   rendering the main scene.
   \code
   void mywindow::draw() {
-    // draw 3d graphics scene
-    Fl_Vk_Window::draw();
-    // -- or --
-    draw_begin();
-    Fl_Window::draw();
-    // other 2d drawing calls, overlays, etc.
-    draw_end();
+  // draw 3d graphics scene
+  Fl_Vk_Window::draw();
+  // -- or --
+  draw_begin();
+  Fl_Window::draw();
+  // other 2d drawing calls, overlays, etc.
+  draw_end();
   }
   \endcode
 
 */
 void Fl_Vk_Window::draw()
 {
-    VK_CHECK_HANDLE(m_instance);
-    VK_CHECK_HANDLE(m_surface);
-    VK_CHECK_HANDLE(m_gpu);
-    VK_CHECK_HANDLE(m_device);
-    VK_CHECK_HANDLE(m_swapchain);
-    VK_CHECK_HANDLE(m_queue);
-    
-    draw_begin();
-    demo_draw(this);
-    Fl_Window::draw();
-    draw_end();
-}
+    printf("Fl_Vk_Window::draw called\n");
+    if (!shown() || m_width <= 0 || m_height <= 0) return;
 
+    // Recreate swapchain if needed
+    if (swapchain_needs_recreation) {
+        vkDeviceWaitIdle(m_device);
+        pVkWindowDriver->resize(); // Now just prepares resources
+        swapchain_needs_recreation = false; // Reset only if successful
+    }
+
+    if (m_swapchain != VK_NULL_HANDLE) {
+        draw_begin();
+        demo_draw(this);
+        Fl_Window::draw();
+        draw_end();
+    }
+}
 /**
  Handle some FLTK events as needed.
  */
@@ -649,6 +649,7 @@ void Fl_Vk_Window::init() {
   // Set up defaults
   m_width = w();
   m_height = h();
+  swapchain_needs_recreation = true;
   
   // Reset Vulkan Handles
   m_device     = VK_NULL_HANDLE;

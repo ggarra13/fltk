@@ -71,8 +71,21 @@ void sides_cb(Fl_Widget *o, void *p) {
 
 int main(int argc, char **argv) {
     Fl::use_high_res_VK(1);
-    
-#if 0
+
+#ifdef _WIN32
+    char* term = fl_getenv("TERM");
+    if (!term || strlen(term) == 0)
+    {
+        BOOL ok = AttachConsole(ATTACH_PARENT_PROCESS);
+        if (ok)
+        {
+            freopen("conout$", "w", stdout);
+            freopen("conout$", "w", stderr);
+        }
+    }
+#endif
+  
+#if 1
     Fl_Window window(300, 330);
   
 // the shape window could be it's own window, but here we make it

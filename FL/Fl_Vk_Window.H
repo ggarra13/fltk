@@ -298,7 +298,7 @@ public:
    */
   int mode(const int *a) {return mode(0, a);}
 
-  bool               m_validate = false;  // true: Windows only so far
+  bool               m_validate = true;  // true: Windows only so far
   bool               m_use_staging_buffer = false;
   VkInstance         m_instance;
   VkPhysicalDevice   m_gpu;
@@ -309,6 +309,7 @@ public:
   VkFormat           m_format;
   VkSurfaceKHR       m_surface;
   VkSurfaceFormatKHR m_surfaceFormat;
+  bool               swapchain_needs_recreation;
   VkSwapchainKHR     m_swapchain;
   uint32_t           m_swapchainImageCount;
   // VkPresentModeKHR   m_presentMode;

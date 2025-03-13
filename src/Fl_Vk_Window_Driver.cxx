@@ -15,6 +15,7 @@
 // demo macros
 #define DEMO_TEXTURE_COUNT 1
 #define VERTEX_BUFFER_BIND_ID 0
+#define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
 
 struct Fl_Vk_Frame;
 
@@ -118,28 +119,6 @@ static bool memory_type_from_properties(Fl_Vk_Window* pWindow, uint32_t typeBits
 }
 
 
-void ImGui_ImplVulkanH_DestroyFrame(VkDevice device, Fl_Vk_Frame* fd, const VkAllocationCallbacks* allocator)
-{
-    vkDestroyFence(device, fd->Fence, allocator);
-    vkFreeCommandBuffers(device, fd->CommandPool, 1, &fd->CommandBuffer);
-    vkDestroyCommandPool(device, fd->CommandPool, allocator);
-    fd->Fence = VK_NULL_HANDLE;
-    fd->CommandBuffer = VK_NULL_HANDLE;
-    fd->CommandPool = VK_NULL_HANDLE;
-
-    vkDestroyImageView(device, fd->BackbufferView, allocator);
-    vkDestroyFramebuffer(device, fd->Framebuffer, allocator);
-}
-
-void ImGui_ImplVulkanH_DestroyFrameSemaphores(VkDevice device, Fl_Vk_FrameSemaphores* fsd, const VkAllocationCallbacks* allocator)
-{
-    vkDestroySemaphore(device, fsd->ImageAcquiredSemaphore, allocator);
-    vkDestroySemaphore(device, fsd->RenderCompleteSemaphore, allocator);
-    fsd->ImageAcquiredSemaphore = fsd->RenderCompleteSemaphore = VK_NULL_HANDLE;
-}
-
-
-
 static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     VkResult result;
 
@@ -171,43 +150,38 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, cmd_bufs);
     pWindow->m_setup_cmd = VK_NULL_HANDLE;
 }
-
-static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
+static void demo_set_image_layout(Fl_Vk_Window* demo, VkImage image,
                                   VkImageAspectFlags aspectMask,
                                   VkImageLayout old_image_layout,
                                   VkImageLayout new_image_layout,
-                                  uint32_t srcAccessMaskBits) {
+                                  int srcAccessMaskInt) {
+    VkResult err;
 
-    VkResult result;
-    VkAccessFlagBits srcAccessMask =
-        static_cast<VkAccessFlagBits>(srcAccessMaskBits);
-    if (pWindow->m_setup_cmd == VK_NULL_HANDLE) {
+    VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
+    if (demo->m_setup_cmd == VK_NULL_HANDLE) {
         VkCommandBufferAllocateInfo cmd = {};
         cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         cmd.pNext = NULL;
-        cmd.commandPool = pWindow->m_cmd_pool;
+        cmd.commandPool = demo->m_cmd_pool;
         cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         cmd.commandBufferCount = 1;
-
-        result = vkAllocateCommandBuffers(pWindow->m_device, &cmd, &pWindow->m_setup_cmd);
-        VK_CHECK_RESULT(result);
+        
+        err = vkAllocateCommandBuffers(demo->m_device, &cmd,
+                                       &demo->m_setup_cmd);
+        assert(!err);
 
         VkCommandBufferBeginInfo cmd_buf_info = {};
         cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         cmd_buf_info.pNext = NULL;
         cmd_buf_info.flags = 0;
         cmd_buf_info.pInheritanceInfo = NULL;
-            
-        result = vkBeginCommandBuffer(pWindow->m_setup_cmd, &cmd_buf_info);
-        VK_CHECK_RESULT(result);
+        
+        err = vkBeginCommandBuffer(demo->m_setup_cmd, &cmd_buf_info);
+        assert(!err);
     }
 
     VkImageMemoryBarrier image_memory_barrier = {};
     image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    image_memory_barrier.oldLayout = old_image_layout;
-    image_memory_barrier.newLayout = new_image_layout;    
-    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_memory_barrier.pNext = NULL;
     image_memory_barrier.srcAccessMask = srcAccessMask;
     image_memory_barrier.dstAccessMask = 0;
@@ -216,187 +190,142 @@ static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
     image_memory_barrier.image = image;
     image_memory_barrier.subresourceRange = {aspectMask, 0, 1, 0, 1};
 
+    VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT; // Default for host writes
+    VkPipelineStageFlags dest_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT; // Default
+
+    // Adjust source and destination stages based on access and layout
+    if (srcAccessMask & VK_ACCESS_HOST_WRITE_BIT) {
+        src_stages = VK_PIPELINE_STAGE_HOST_BIT;
+    } else if (srcAccessMask & VK_ACCESS_TRANSFER_WRITE_BIT) {
+        src_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+
     if (new_image_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        /* Make sure anything that was copying from this image has completed */
-        image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        dest_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (new_image_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dest_stages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    } else if (new_image_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
+        image_memory_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        dest_stages = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    } else if (new_image_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        dest_stages = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
 
-    if (new_image_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-        image_memory_barrier.dstAccessMask =
-            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    }
-
-    if (new_image_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-        image_memory_barrier.dstAccessMask =
-            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    }
-
-    if (new_image_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-        /* Make sure any Copy or CPU writes to image are flushed */
-        image_memory_barrier.dstAccessMask =
-            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    }
-
-    VkImageMemoryBarrier *pmemory_barrier = &image_memory_barrier;
-
-    VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    VkPipelineStageFlags dest_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-
-    vkCmdPipelineBarrier(pWindow->m_setup_cmd, src_stages, dest_stages, 0, 0, NULL,
-                         0, NULL, 1, pmemory_barrier);
+    vkCmdPipelineBarrier(demo->m_setup_cmd, src_stages, dest_stages, 0, 0, NULL,
+                         0, NULL, 1, &image_memory_barrier);
 }
 
 static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     VkResult result;
     VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
     pWindow->m_swapchain = VK_NULL_HANDLE;
+    
+    printf("swapchain creation failed and returned NULL HANDLE\n");
 
-    // Check the surface capabilities and formats
+    // Get surface capabilities
     VkSurfaceCapabilitiesKHR surfCapabilities;
     result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
         pWindow->m_gpu, pWindow->m_surface, &surfCapabilities);
     VK_CHECK_RESULT(result);
+
+    // Log surface capabilities for debugging
+    printf("Surface capabilities: min=%ux%u, max=%ux%u, current=%ux%u\n",
+           surfCapabilities.minImageExtent.width, surfCapabilities.minImageExtent.height,
+           surfCapabilities.maxImageExtent.width, surfCapabilities.maxImageExtent.height,
+           surfCapabilities.currentExtent.width, surfCapabilities.currentExtent.height);
+    printf("Requested size: %ux%u\n", pWindow->m_width, pWindow->m_height);
+
+    // Set swapchain extent to match window size, clamped to capabilities
+    VkExtent2D swapchainExtent = {(uint32_t)pWindow->m_width,
+        (uint32_t)pWindow->m_height};
+    printf("Wanted swapchain extent: %ux%u\n", swapchainExtent.width, swapchainExtent.height);
+    swapchainExtent.width = CLAMP(swapchainExtent.width,
+                                  surfCapabilities.minImageExtent.width,
+                                  surfCapabilities.maxImageExtent.width);
+    swapchainExtent.height = CLAMP(swapchainExtent.height,
+                                   surfCapabilities.minImageExtent.height,
+                                   surfCapabilities.maxImageExtent.height);
+
+    // Log the final swapchain extent
+    printf("Final swapchain extent: %ux%u\n", swapchainExtent.width, swapchainExtent.height);
+
+    // Check if extent matches request; if not, delay recreation
+    if (swapchainExtent.width != pWindow->m_width ||
+        swapchainExtent.height != pWindow->m_height)
+    {
+        printf("Surface not ready for requested size; deferring swapchain recreation\n");
+        pWindow->m_swapchain = oldSwapchain; // Restore old swapchain
+        return;
+    }
     
-    uint32_t presentModeCount;
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        pWindow->m_gpu, pWindow->m_surface, &presentModeCount, NULL);
-    VK_CHECK_RESULT(result);
-    
-    VkPresentModeKHR *presentModes =
-        (VkPresentModeKHR *)VK_ALLOC(presentModeCount * sizeof(VkPresentModeKHR));
-    assert(presentModes);
-    result = vkGetPhysicalDeviceSurfacePresentModesKHR(
-        pWindow->m_gpu, pWindow->m_surface, &presentModeCount, presentModes);
-    VK_CHECK_RESULT(result);
-
-    VkExtent2D swapchainExtent;
-    // width and height are either both 0xFFFFFFFF, or both not 0xFFFFFFFF.
-    if (surfCapabilities.currentExtent.width == 0xFFFFFFFF) {
-        // If the surface size is undefined, the size is set to the size
-        // of the images requested, which must fit within the minimum and
-        // maximum values.
-        swapchainExtent.width = pWindow->m_width;
-        swapchainExtent.height = pWindow->m_height;
-
-        if (swapchainExtent.width < surfCapabilities.minImageExtent.width) {
-            swapchainExtent.width = surfCapabilities.minImageExtent.width;
-        } else if (swapchainExtent.width > surfCapabilities.maxImageExtent.width) {
-            swapchainExtent.width = surfCapabilities.maxImageExtent.width;
-        }
-
-        if (swapchainExtent.height < surfCapabilities.minImageExtent.height) {
-            swapchainExtent.height = surfCapabilities.minImageExtent.height;
-        } else if (swapchainExtent.height > surfCapabilities.maxImageExtent.height) {
-            swapchainExtent.height = surfCapabilities.maxImageExtent.height;
-        }
-    } else {
-        // If the surface size is defined, the swap chain size must match
-        swapchainExtent = surfCapabilities.currentExtent;
-    }
-
-    VkPresentModeKHR swapchainPresentMode = VK_PRESENT_MODE_FIFO_KHR;
-
-    // Determine the number of VkImage's to use in the swap chain.
-    // Application desires to only acquire 1 image at a time (which is
-    // "surfCapabilities.minImageCount").
-    uint32_t desiredNumOfSwapchainImages = surfCapabilities.minImageCount;
-    // If maxImageCount is 0, we can ask for as many images as we want;
-    // otherwise we're limited to maxImageCount
-    if ((surfCapabilities.maxImageCount > 0) &&
-        (desiredNumOfSwapchainImages > surfCapabilities.maxImageCount)) {
-        // Application must settle for fewer images than desired:
-        desiredNumOfSwapchainImages = surfCapabilities.maxImageCount;
-    }
-
-    VkSurfaceTransformFlagBitsKHR preTransform;
-    if (surfCapabilities.supportedTransforms &
-        VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR) {
-        preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    } else {
-        preTransform = surfCapabilities.currentTransform;
-    }
-
     VkSwapchainCreateInfoKHR swapchain = {};
     swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    swapchain.pNext = NULL;
     swapchain.surface = pWindow->m_surface;
-    swapchain.minImageCount = desiredNumOfSwapchainImages;
+    swapchain.minImageCount = 2;  // Ensure double bvuffering
     swapchain.imageFormat = pWindow->m_format;
     swapchain.imageColorSpace = pWindow->m_color_space;
-    swapchain.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    swapchain.preTransform = preTransform;
-    swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapchain.imageExtent = swapchainExtent;
     swapchain.imageArrayLayers = 1;
+    swapchain.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    swapchain.queueFamilyIndexCount = 0;
-    swapchain.pQueueFamilyIndices = NULL;
-    swapchain.presentMode = swapchainPresentMode;
+    swapchain.preTransform = surfCapabilities.currentTransform;
+    swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     swapchain.oldSwapchain = oldSwapchain;
-    swapchain.clipped = true;
-    swapchain.imageExtent.width = swapchainExtent.width;
-    swapchain.imageExtent.height = swapchainExtent.height;
-    
-    uint32_t i;
+    swapchain.clipped = VK_TRUE;
 
+    // Destroy old buffers
+    if (pWindow->m_buffers) {
+        for (uint32_t i = 0; i < pWindow->m_swapchainImageCount; i++) {
+            vkDestroyImageView(pWindow->m_device, pWindow->m_buffers[i].view, NULL);
+        }
+        free(pWindow->m_buffers);
+        pWindow->m_buffers = NULL;
+    }
+
+    // Create new swapchain
     result = vkCreateSwapchainKHR(pWindow->m_device, &swapchain, NULL, &pWindow->m_swapchain);
     VK_CHECK_RESULT(result);
+    if (pWindow->m_swapchain == VK_NULL_HANDLE)
+    {
+        printf("swapchain creation failed and returned NULL HANDLE\n");
+    }
 
-    // If we just re-created an existing swapchain, we should destroy the old
-    // swapchain at this point.
-    // Note: destroying the swapchain also cleans up all its associated
-    // presentable images once the platform is done with them.
     if (oldSwapchain != VK_NULL_HANDLE) {
         vkDestroySwapchainKHR(pWindow->m_device, oldSwapchain, NULL);
     }
 
+    // Get new swapchain images
     result = vkGetSwapchainImagesKHR(pWindow->m_device, pWindow->m_swapchain,
-                                  &pWindow->m_swapchainImageCount, NULL);
+                                     &pWindow->m_swapchainImageCount, NULL);
     VK_CHECK_RESULT(result);
-
-    VkImage *swapchainImages =
-        (VkImage *)VK_ALLOC(pWindow->m_swapchainImageCount * sizeof(VkImage));
+    VkImage *swapchainImages = (VkImage *)malloc(pWindow->m_swapchainImageCount * sizeof(VkImage));
     assert(swapchainImages);
     result = vkGetSwapchainImagesKHR(pWindow->m_device, pWindow->m_swapchain,
-                                  &pWindow->m_swapchainImageCount,
-                                  swapchainImages);
+                                     &pWindow->m_swapchainImageCount, swapchainImages);
     VK_CHECK_RESULT(result);
 
-    pWindow->m_buffers = (Fl_Vk_SwapchainBuffer*)
-                         VK_ALLOC(sizeof(Fl_Vk_SwapchainBuffer) *
-                                    pWindow->m_swapchainImageCount);
+    // Recreate buffers
+    pWindow->m_buffers = (Fl_Vk_SwapchainBuffer *)malloc(pWindow->m_swapchainImageCount * sizeof(Fl_Vk_SwapchainBuffer));
     assert(pWindow->m_buffers);
-
-    for (i = 0; i < pWindow->m_swapchainImageCount; i++) {
-        VkImageViewCreateInfo color_attachment_view = {};
-        color_attachment_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        color_attachment_view.pNext = NULL;
-        color_attachment_view.format = pWindow->m_format;
-        color_attachment_view.components.r = VK_COMPONENT_SWIZZLE_R;
-        color_attachment_view.components.g = VK_COMPONENT_SWIZZLE_G;
-        color_attachment_view.components.b = VK_COMPONENT_SWIZZLE_B;
-        color_attachment_view.components.a = VK_COMPONENT_SWIZZLE_A;
-        color_attachment_view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        color_attachment_view.subresourceRange.baseMipLevel = 0;
-        color_attachment_view.subresourceRange.levelCount = 1;
-        color_attachment_view.subresourceRange.baseArrayLayer = 0;
-        color_attachment_view.subresourceRange.layerCount = 1;
-        color_attachment_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        color_attachment_view.flags = 0;
-
-        pWindow->m_buffers[i].image = swapchainImages[i];
-
-        color_attachment_view.image = pWindow->m_buffers[i].image;
-
-        result = vkCreateImageView(pWindow->m_device, &color_attachment_view, NULL,
-                                &pWindow->m_buffers[i].view);
+    for (uint32_t i = 0; i < pWindow->m_swapchainImageCount; i++) {
+        VkImageViewCreateInfo view_info = {};
+        view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view_info.image = swapchainImages[i];
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.format = pWindow->m_format;
+        view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.layerCount = 1;
+        result = vkCreateImageView(pWindow->m_device, &view_info, NULL, &pWindow->m_buffers[i].view);
         VK_CHECK_RESULT(result);
+        pWindow->m_buffers[i].image = swapchainImages[i];
     }
 
-    pWindow->m_current_buffer = 0;
-
-    if (NULL != presentModes) {
-        free(presentModes);
-    }
+    free(swapchainImages);
 }
 
 static void demo_prepare_depth(Fl_Vk_Window* pWindow) {
@@ -1062,7 +991,7 @@ static void demo_prepare_descriptor_set(Fl_Vk_Window* pWindow) {
     for (i = 0; i < DEMO_TEXTURE_COUNT; i++) {
         tex_descs[i].sampler = pWindow->m_textures[i].sampler;
         tex_descs[i].imageView = pWindow->m_textures[i].view;
-        tex_descs[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+        tex_descs[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
 
     VkWriteDescriptorSet write = {};
@@ -1587,6 +1516,10 @@ static void demo_prepare(Fl_Vk_Window* pWindow)
     VK_CHECK_RESULT(result);
     
     demo_prepare_buffers(pWindow);
+    if (pWindow->m_swapchain == VK_NULL_HANDLE) {
+        printf("Swapchain recreation failed in resize\n");
+        return; // Skip further setup if swapchain fails
+    }
     demo_prepare_depth(pWindow);
     demo_prepare_textures(pWindow);
     demo_prepare_vertices(pWindow);
@@ -1620,26 +1553,19 @@ Fl_Vk_Window_Driver::prepare()
 }
 
 void
-Fl_Vk_Window_Driver::resize(int is_a_resize, int W, int H)
+Fl_Vk_Window_Driver::resize()
 {
-    if (!pWindow || !pWindow->m_device || !is_a_resize)
+    if (!pWindow || !pWindow->m_device)
         return;
 
     uint32_t i;
     VkResult result;
     VkDevice device = pWindow->m_device;
     VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
-
-    // Wait for previous rendering to complete
-    // vkWaitForFences(device, 1, &pWindow->m_renderFence, VK_TRUE, UINT64_MAX);
-    // vkResetFences(device, 1, &pWindow->m_renderFence);
-
-    // Ensure all GPU operations are completed before resizing
-    // result = vkDeviceWaitIdle(device);
-    // VK_CHECK_RESULT(result);
-
-    pWindow->m_width  = W;
-    pWindow->m_height = H;
+    
+    // Wait for all GPU operations to complete before resizing
+    result = vkDeviceWaitIdle(device);
+    VK_CHECK_RESULT(result);
     
 
     // In order to properly resize the window, we must re-create the swapchain
@@ -1650,19 +1576,33 @@ Fl_Vk_Window_Driver::resize(int is_a_resize, int W, int H)
         vkDestroyFramebuffer(pWindow->m_device, pWindow->m_framebuffers[i], NULL);
     }
     free(pWindow->m_framebuffers);
+    pWindow->m_framebuffers = nullptr;
+    
     vkDestroyDescriptorPool(pWindow->m_device, pWindow->m_desc_pool, NULL);
+    pWindow->m_desc_pool = VK_NULL_HANDLE;
 
     if (pWindow->m_setup_cmd) {
         vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, &pWindow->m_setup_cmd);
         pWindow->m_setup_cmd = VK_NULL_HANDLE;
     }
     vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, &pWindow->m_draw_cmd);
+    pWindow->m_draw_cmd = VK_NULL_HANDLE;
+    
     vkDestroyCommandPool(pWindow->m_device, pWindow->m_cmd_pool, NULL);
+    pWindow->m_cmd_pool = VK_NULL_HANDLE;
 
     vkDestroyPipeline(pWindow->m_device, pWindow->m_pipeline, NULL);
+    pWindow->m_pipeline = VK_NULL_HANDLE;
+    
     vkDestroyRenderPass(pWindow->m_device, pWindow->m_renderPass, NULL);
+    pWindow->m_renderPass = VK_NULL_HANDLE;
+
     vkDestroyPipelineLayout(pWindow->m_device, pWindow->m_pipeline_layout, NULL);
+    pWindow->m_pipeline_layout = VK_NULL_HANDLE;
+    
     vkDestroyDescriptorSetLayout(pWindow->m_device, pWindow->m_desc_layout, NULL);
+    pWindow->m_desc_layout = VK_NULL_HANDLE;
+    
 
     vkDestroyBuffer(pWindow->m_device, pWindow->m_vertices.buf, NULL);
     vkFreeMemory(pWindow->m_device, pWindow->m_vertices.mem, NULL);
@@ -1674,21 +1614,18 @@ Fl_Vk_Window_Driver::resize(int is_a_resize, int W, int H)
         vkDestroySampler(pWindow->m_device, pWindow->m_textures[i].sampler, NULL);
     }
 
-    // for (i = 0; i < pWindow->m_swapchainImageCount; i++) {
-    //     vkDestroyImageView(pWindow->m_device, pWindow->m_buffers[i].view, NULL);
-    // }
-    // free(pWindow->m_buffers);
+    for (i = 0; i < pWindow->m_swapchainImageCount; i++) {
+        vkDestroyImageView(pWindow->m_device, pWindow->m_buffers[i].view, NULL);
+    }
+    free(pWindow->m_buffers);
+    pWindow->m_buffers = nullptr;
 
     vkDestroyImageView(pWindow->m_device, pWindow->m_depth.view, NULL);
     vkDestroyImage(pWindow->m_device, pWindow->m_depth.image, NULL);
     vkFreeMemory(pWindow->m_device, pWindow->m_depth.mem, NULL);
 
-    // Second, re-perform the demo_prepare() function, which will re-create the
-    // swapchain:
-    demo_prepare(pWindow);
-
-    
-    // demo_resize(pWindow);
+    // Recreate resources with new size
+    prepare();
 }
 
 SwapChainSupportDetails
