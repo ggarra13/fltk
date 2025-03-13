@@ -98,7 +98,9 @@ static VkBool32 demo_check_layers(uint32_t check_count,
     return 1;
 }
 
-static bool memory_type_from_properties(Fl_Vk_Window* pWindow, uint32_t typeBits,
+// needed
+static bool memory_type_from_properties(Fl_Vk_Window* pWindow,
+                                        uint32_t typeBits,
                                         VkFlags requirements_mask,
                                         uint32_t *typeIndex) {
     uint32_t i;
@@ -150,7 +152,8 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, cmd_bufs);
     pWindow->m_setup_cmd = VK_NULL_HANDLE;
 }
-static void demo_set_image_layout(Fl_Vk_Window* demo, VkImage image,
+
+static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
                                   VkImageAspectFlags aspectMask,
                                   VkImageLayout old_image_layout,
                                   VkImageLayout new_image_layout,
@@ -158,16 +161,16 @@ static void demo_set_image_layout(Fl_Vk_Window* demo, VkImage image,
     VkResult err;
 
     VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
-    if (demo->m_setup_cmd == VK_NULL_HANDLE) {
+    if (pWindow->m_setup_cmd == VK_NULL_HANDLE) {
         VkCommandBufferAllocateInfo cmd = {};
         cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         cmd.pNext = NULL;
-        cmd.commandPool = demo->m_cmd_pool;
+        cmd.commandPool = pWindow->m_cmd_pool;
         cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         cmd.commandBufferCount = 1;
         
-        err = vkAllocateCommandBuffers(demo->m_device, &cmd,
-                                       &demo->m_setup_cmd);
+        err = vkAllocateCommandBuffers(pWindow->m_device, &cmd,
+                                       &pWindow->m_setup_cmd);
         assert(!err);
 
         VkCommandBufferBeginInfo cmd_buf_info = {};
@@ -176,7 +179,7 @@ static void demo_set_image_layout(Fl_Vk_Window* demo, VkImage image,
         cmd_buf_info.flags = 0;
         cmd_buf_info.pInheritanceInfo = NULL;
         
-        err = vkBeginCommandBuffer(demo->m_setup_cmd, &cmd_buf_info);
+        err = vkBeginCommandBuffer(pWindow->m_setup_cmd, &cmd_buf_info);
         assert(!err);
     }
 
@@ -214,7 +217,8 @@ static void demo_set_image_layout(Fl_Vk_Window* demo, VkImage image,
         dest_stages = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
 
-    vkCmdPipelineBarrier(demo->m_setup_cmd, src_stages, dest_stages, 0, 0, NULL,
+    vkCmdPipelineBarrier(pWindow->m_setup_cmd,
+                         src_stages, dest_stages, 0, 0, NULL,
                          0, NULL, 1, &image_memory_barrier);
 }
 
@@ -1669,29 +1673,6 @@ Fl_Vk_Window_Driver::query_swap_chain_support(VkPhysicalDevice physicalDevice)
     // }
 
     return details;
-}
-
-bool Fl_Vk_Window_Driver::is_device_suitable(VkPhysicalDevice physicalDevice)
-{
-    // VkPhysicalDeviceProperties deviceProperties;
-    // vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-
-    // VkPhysicalDeviceFeatures deviceFeatures;
-    // vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
-
-    // QueueFamilyIndices indices = find_queue_families(physicalDevice);
-
-    // bool extensionsSupported = check_device_extension_support(physicalDevice);
-
-    // bool swapChainAdequate = false;
-    // if (extensionsSupported)
-    // {
-    //     SwapChainSupportDetails swapChainSupport = query_swap_chain_support(physicalDevice);
-    //     swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
-    // }
-
-    // return indices.isComplete() && extensionsSupported && swapChainAdequate;
-    return false;
 }
 
 void Fl_Vk_Window_Driver::init_vulkan()

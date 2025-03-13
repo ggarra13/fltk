@@ -92,7 +92,12 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
 #  define VK_USE_PLATFORM_WIN32_KHR
 #  include <vulkan/vulkan.h>
 #elif defined(__linux__)
-#  define VK_USE_PLATFORM_XLIB_KHR
+#  ifdef FLTK_USE_X11
+#    define VK_USE_PLATFORM_XLIB_KHR
+#  endif
+#  ifdef FLTK_USE_WAYLAND
+#    define VK_USE_PLATFORM_WAYLAND_KHR
+#  endif
 #  include <vulkan/vulkan.h>
 #else
 #  error "Vulkan not implemented yet for this platform"

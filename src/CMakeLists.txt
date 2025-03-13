@@ -513,9 +513,8 @@ set(VK_DRIVER_FILES
 )
 
 if(FLTK_BACKEND_WAYLAND)
-  # \@todo:
-  #set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
-  #set(VK_DRIVER_HEADER_FILES drivers/Wayland/Fl_Wayland_Vk_Window_Driver.H)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/Wayland/Fl_Wayland_Vk_Window_Driver.H)
   if(FLTK_USE_X11)
     list(APPEND VK_DRIVER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
     list(APPEND VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
