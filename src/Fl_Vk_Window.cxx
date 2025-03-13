@@ -683,7 +683,6 @@ void Fl_Vk_Window::init() {
   
 
   // Counters
-  m_clearEnable         = true;
   m_swapchainImageCount = 0;
   m_queueFamilyIndex    = 0;
   m_current_buffer      = 0;

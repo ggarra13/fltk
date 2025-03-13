@@ -79,23 +79,6 @@ static const uint32_t vertShaderCode[] = {
     0x00000017,0x00000015,0x000100fd,0x00010038
 };
 
-//! ImGUI demo variables
-struct Fl_Vk_Frame
-{
-    VkCommandPool       CommandPool;
-    VkCommandBuffer     CommandBuffer;
-    VkFence             Fence;
-    VkImage             Backbuffer;
-    VkImageView         BackbufferView;
-    VkFramebuffer       Framebuffer;
-};
-
-struct Fl_Vk_FrameSemaphores
-{
-    VkSemaphore         ImageAcquiredSemaphore;
-    VkSemaphore         RenderCompleteSemaphore;
-};
-
 //! GLFW demo variables
 struct Fl_Vk_SwapchainBuffer {
     VkImage image;
@@ -312,11 +295,10 @@ public:
   bool               swapchain_needs_recreation;
   VkSwapchainKHR     m_swapchain;
   uint32_t           m_swapchainImageCount;
-  // VkPresentModeKHR   m_presentMode;
   VkRenderPass       m_renderPass;
   VkPipeline         m_pipeline;  
   VkQueue            m_queue;
-  VkFence            m_renderFence;
+
   VkPhysicalDeviceProperties m_gpu_props;
   VkPhysicalDeviceFeatures m_gpu_features;
   VkQueueFamilyProperties* m_queue_props;
@@ -349,8 +331,6 @@ public:
   Fl_Vk_SwapchainBuffer*       m_buffers;
     
   // Clear screen
-  bool               m_clearEnable;
-
   VkShaderModule m_vert_shader_module;
   VkShaderModule m_frag_shader_module;
 
@@ -363,25 +343,6 @@ public:
   VkPipelineLayout m_pipeline_layout;
   VkDescriptorSetLayout m_desc_layout;
   VkPipelineCache m_pipelineCache;
-
-  //! @}
-  
-
-    
-  //! @{ These are in ImGui but not sure.
-  // uint32_t           m_curFrame;   // Current frame being rendered to (0 <= FrameIndex < FrameInFlightCount)
-
-
-  //! Number of simultaneous in-flight frames
-  //! (returned by vkGetSwapchainImagesKHR, often derived from min_image_count)
-  
-  
-  // uint32_t           m_semaphoreCount;         // Number of simultaneous in-flight frames + 1, to be able to use it in vkAcquireNextImageKHR
-  // uint32_t           m_semaphoreIndex;         // Current set of swapchain wait semaphores we're using (needs to be distinct from per frame data)
-
-  // bool               m_useDynamicRendering;  // static or dynamic workflow
-  // Fl_Vk_Frame*            m_frames;
-  // Fl_Vk_FrameSemaphores*  m_frameSemaphores;
 
   //! @}
   
