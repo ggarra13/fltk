@@ -55,3 +55,6 @@ etc/FLTKConfig.cmake
 # /misc/
 
 /misc/doxystar
+
+# Build directories
+build_*

@@ -33,7 +33,7 @@ class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   void swap_interval(int) FL_OVERRIDE;
   int swap_interval() const FL_OVERRIDE;
   void invalidate() FL_OVERRIDE {}
-  int flush_begin(char& valid_f) FL_OVERRIDE;
+  int flush_begin() FL_OVERRIDE;
   Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
   void get_list(Fl_Font_Descriptor *fd, int r) FL_OVERRIDE;
   int genlistsize() FL_OVERRIDE;

@@ -197,7 +197,7 @@ static void demo_draw(Fl_Vk_Window* pWindow) {
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         // pWindow->m_swapchain is out of date (e.g. the window was resized) and
         // must be recreated:
-        pWindow->swapchain_needs_recreation = true;
+        pWindow->m_swapchain_needs_recreation = true;
         vkDestroySemaphore(pWindow->m_device, imageAcquiredSemaphore, NULL);
         vkDestroySemaphore(pWindow->m_device, drawCompleteSemaphore, NULL);
         return;
@@ -244,7 +244,7 @@ static void demo_draw(Fl_Vk_Window* pWindow) {
 
     result = vkQueuePresentKHR(pWindow->m_queue, &present);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        pWindow->swapchain_needs_recreation = true;
+        pWindow->m_swapchain_needs_recreation = true;
     } else {
         VK_CHECK_RESULT(result);
     }
@@ -307,16 +307,6 @@ void Fl_Vk_Window::show() {
   if (need_after) pVkWindowDriver->after_show();
 }
 
-
-/**
-  The invalidate() method turns off valid() and is
-  equivalent to calling value(0).
-*/
-void Fl_Vk_Window::invalidate() {
-  valid(0);
-  pVkWindowDriver->invalidate();
-}
-
 int Fl_Vk_Window::mode(int m, const int *a) {
   if (m == mode_ && a == alist) return 0;
   return pVkWindowDriver->mode_(m, a);
@@ -333,26 +323,15 @@ void Fl_Vk_Window::make_current() {
     pVkWindowDriver->make_current_before();
     if (m_surface == VK_NULL_HANDLE)
     {
-        printf("m_surface is VK_NULL_HANDLE.  Re-initing Vulkan!!!\n");
         pVkWindowDriver->init_vk();
         pVkWindowDriver->create_surface();
         pVkWindowDriver->init_vk_swapchain();
         pVkWindowDriver->prepare();
-        valid(0);
-        context_valid(0);
     }
     pVkWindowDriver->make_current_after();
     current_ = this;
 }
 
-/**
-  Sets the projection so 0,0 is in the lower left of the window and each
-  pixel is 1 unit wide/tall.  If you are drawing 2D images, your
-  draw() method may want to call this if valid() is false.
-*/
-void Fl_Vk_Window::ortho()
-{
-}
 
 /**
   The swap_buffers() method swaps the back and front buffers.
@@ -401,8 +380,7 @@ int Fl_Vk_Window::swap_interval() const {
 
 void Fl_Vk_Window::flush() {
   if (!shown()) return;
-  uchar save_valid = valid_f_ & 1;
-  if (pVkWindowDriver->flush_begin(valid_f_) ) return;
+  if (pVkWindowDriver->flush_begin() ) return;
   
   make_current();
 
@@ -423,14 +401,14 @@ void Fl_Vk_Window::flush() {
     if (SWAP_TYPE == NODAMAGE) {
 
       // don't draw if only overlay damage or expose events:
-      if ((damage()&~(FL_DAMAGE_OVERLAY|FL_DAMAGE_EXPOSE)) || !save_valid)
+      if ((damage()&~(FL_DAMAGE_OVERLAY|FL_DAMAGE_EXPOSE)))
         draw();
       swap_buffers();
 
     } else if (SWAP_TYPE == COPY) {
 
       // don't draw if only the overlay is damaged:
-      if (damage() != FL_DAMAGE_OVERLAY || !save_valid) draw();
+      if (damage() != FL_DAMAGE_OVERLAY) draw();
           swap_buffers();
 
     } else if (SWAP_TYPE == SWAP){
@@ -449,7 +427,6 @@ void Fl_Vk_Window::flush() {
 
   }
 
-  valid(1);
 }
 
 void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
@@ -458,10 +435,9 @@ void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
     
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
   if (is_a_resize) {
-      valid(0);
       m_width = W;
       m_height = H;
-      swapchain_needs_recreation = true;
+      m_swapchain_needs_recreation = true;
   }
   Fl_Window::resize(X,Y,W,H);
 }
@@ -506,21 +482,14 @@ void Fl_Vk_Window::draw_end() {
 
 /** Draws the Fl_Vk_Window.
   You \e \b must subclass Fl_Vk_Window and provide an implementation for
-  draw().  You may also provide an implementation of draw_overlay()
-  if you want to draw into the overlay planes.  You can avoid
-  reinitializing the viewport and lights and other things by checking
-  valid() at the start of draw() and only doing the
-  initialization if it is false.
-
+  draw().
+  
   The draw() method can <I>only</I> use Vulkan calls.  Do not
   attempt to call X, any of the functions in <FL/fl_draw.H>, or vkX
   directly.  Do not call vk_start() or vk_finish().
 
   If double-buffering is enabled in the window, the back and front
   buffers are swapped after this function is completed.
-
-  The following pseudo-code shows how to use "if (!valid())"
-  to initialize the viewport:
 
   \code
   void mywindow::draw() {
@@ -553,14 +522,14 @@ void Fl_Vk_Window::draw_end() {
 */
 void Fl_Vk_Window::draw()
 {
-    printf("Fl_Vk_Window::draw called\n");
     if (!shown() || m_width <= 0 || m_height <= 0) return;
+    // printf("Fl_Vk_Window::draw called\n");
 
     // Recreate swapchain if needed
-    if (swapchain_needs_recreation) {
+    if (m_swapchain_needs_recreation) {
         vkDeviceWaitIdle(m_device);
         pVkWindowDriver->resize(); // Now just prepares resources
-        swapchain_needs_recreation = false; // Reset only if successful
+        m_swapchain_needs_recreation = false; // Reset only if successful
     }
 
     if (m_swapchain != VK_NULL_HANDLE) {
@@ -643,13 +612,12 @@ void Fl_Vk_Window::init() {
   mode_    = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist    = 0;
   g        = 0;
-  valid_f_ = 0;
   damage1_ = 0;
 
   // Set up defaults
   m_width = w();
   m_height = h();
-  swapchain_needs_recreation = true;
+  m_swapchain_needs_recreation = true;
   
   // Reset Vulkan Handles
   m_device     = VK_NULL_HANDLE;
@@ -660,7 +628,7 @@ void Fl_Vk_Window::init() {
   m_pipeline   = VK_NULL_HANDLE;
   m_allocator  = nullptr;
 
-  // These are specific to GLFW demo
+  // These are specific to GLFW demo ?
   m_setup_cmd  = VK_NULL_HANDLE;
   m_draw_cmd   = VK_NULL_HANDLE;
   m_cmd_pool   = VK_NULL_HANDLE;
@@ -668,23 +636,13 @@ void Fl_Vk_Window::init() {
   m_pipeline_layout = VK_NULL_HANDLE;
   m_desc_layout = VK_NULL_HANDLE;
 
-  // Pointers for ImGUI (not used for now)
-  // m_frames          = nullptr;
-  // m_frameSemaphores = nullptr;
-  // m_framebuffers    = nullptr;
-  // m_semaphoreCount  = 0;
-
+  m_framebuffers    = nullptr;
+  
   // These are specific to GLFW demo
   m_buffers         = nullptr;
 
-  // Enums
-  // m_presentMode     = VK_PRESENT_MODE_IMMEDIATE_KHR;
-  // m_curFrame            = 0;
-  
-
   // Counters
   m_swapchainImageCount = 0;
-  m_queueFamilyIndex    = 0;
   m_current_buffer      = 0;
 }
 

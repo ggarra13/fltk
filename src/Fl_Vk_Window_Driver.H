@@ -97,7 +97,7 @@ public:
   virtual char swap_type();
   virtual void swap_interval(int) { }
   virtual int swap_interval() const { return -1; }
-  virtual int flush_begin(char&) {return 0;}
+  virtual int flush_begin() {return 0;}
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);
   // Return one of these structures for a given vk mode.
@@ -114,6 +114,7 @@ public:
   virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum);
   virtual Fl_RGB_Image* capture_vk_rectangle(int x, int y, int w, int h);
   static inline Fl_Vk_Window_Driver* driver(const Fl_Vk_Window *win) {return win->pVkWindowDriver;}
+
   // true means the platform uses vkScissor() to make sure VK subwindows
   // don't leak outside their parent window
   virtual bool need_scissor() { return false; }

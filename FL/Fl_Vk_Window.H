@@ -130,12 +130,6 @@ struct Fl_Vk_Depth {
   lighting and projection may be reused between redraws. Fl_Vk_Window
   also flushes the Vulkan streams and swaps buffers after draw() returns.
 
-  Vulkan hardware typically provides some overlay bit planes, which
-  are very useful for drawing UI controls atop your 3D graphics.  If the
-  overlay hardware is not provided, FLTK tries to simulate the overlay.
-  This works pretty well if your graphics are double buffered, but not
-  very well for single-buffered.
-
   Please note that the FLTK drawing and clipping functions
   will not work inside an Fl_Vk_Window. All drawing
   should be done using Vulkan calls exclusively.
@@ -149,7 +143,7 @@ struct Fl_Vk_Depth {
 
   \note FLTK expects that when an Fl_Vk_Window is a child of a parent Fl_Window,
   the child window lies entirely inside its parent window. If that's not the case, what
-  happens to the part of the GL subwindow which leaks outside its parent is undefined
+  happens to the part of the Vulkan subwindow which leaks outside its parent is undefined
   and susceptible to be platform-specific.
 */
 class FL_EXPORT Fl_Vk_Window : public Fl_Window {
@@ -158,10 +152,8 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
 
   int mode_;
   const int *alist;
-  Fl_Vk_Choice *g;
-  bool context_;
-  char valid_f_;
-  char damage1_; // damage() of back buffer
+  Fl_Vk_Choice *g; // needed ?  we may need to use it translate
+  char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
     
@@ -169,8 +161,6 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
 
-
-  
   void draw_begin();
   void draw() FL_OVERRIDE;
   void draw_end();
@@ -184,44 +174,6 @@ public:
   void resize(int,int,int,int) FL_OVERRIDE;
   int handle(int) FL_OVERRIDE;
 
-  /**
-    Is turned off when FLTK creates a new context for this window or
-    when the window resizes, and is turned on \e after draw() is called.
-    You can use this inside your draw() method to avoid unnecessarily
-    initializing Vulkan. Just do this:
-    \code
-    void mywindow::draw() {
-     if (!valid()) {
-     }
-     ... draw your geometry here ...
-    }
-    \endcode
-
-    You can turn valid() on by calling valid(1).  You
-    should only do this after fixing the transformation inside a draw()
-    or after make_current().  This is done automatically after
-    draw() returns.
-  */
-  char valid() const {return valid_f_ & 1;}
-    
-  /**
-    See char Fl_Vk_Window::valid() const
-  */
-  void valid(char v) {if (v) valid_f_ |= 1; else valid_f_ &= 0xfe;}
-  void invalidate();
-
-  /**
-    Will only be set if the
-    OpenGL context is created or recreated. It differs from
-    Fl_Gl_Window::valid() which is also set whenever the context
-    changes size.
-  */
-  char context_valid() const {return valid_f_ & 2;}
-  /**
-    See char Fl_Gl_Window::context_valid() const
-  */
-  void context_valid(char v) {if (v) valid_f_ |= 2; else valid_f_ &= 0xfd;}
-  
   /**  Returns non-zero if the hardware supports the given Vulkan mode. */
   static int can_do(int m) {return can_do(m,0);}
   /**  Returns non-zero if the hardware supports the given Vulkan mode.
@@ -269,74 +221,78 @@ public:
    */
   int mode(int a) {return mode(a,0);}
   /** Set the Vulkan capabilities of the window using platform-specific data.
-   \param a zero-ending array of platform-specific attributes and attribute values
-   <p><b>Unix/Linux platform</b>: attributes are GLX attributes adequate for the 3rd argument of
-   the <tt>glXChooseVisual()</tt> function (e.g., <tt>GLX_DOUBLEBUFFER</tt>, defined by including <GL/glx.h>).
-   \note What attributes are adequate here is subject to change.
-   The preferred, stable public API is Fl_Vk_Window::mode(int a).
-   <p><b>Windows platform</b>: this member function is of no use.
-   <p><b>Mac OS X platform</b>: attributes belong to the <tt>CGLPixelFormatAttribute</tt> enumeration
-   (defined by including <tt><Vulkan/Vulkan.h></tt>, e.g., <tt>kCGLPFADoubleBuffer</tt>)
-   and may be followed by adequate attribute values.
-   */
+      \param a zero-ending array of platform-specific attributes and attribute values
+  **/
   int mode(const int *a) {return mode(0, a);}
 
   bool               m_validate = true;  // true: Windows only so far
-  bool               m_use_staging_buffer = false;
-  VkInstance         m_instance;
-  VkPhysicalDevice   m_gpu;
-  VkDevice           m_device;
-  int                m_width, m_height;
   
-    
-  VkFormat           m_format;
-  VkSurfaceKHR       m_surface;
-  VkSurfaceFormatKHR m_surfaceFormat;
-  bool               swapchain_needs_recreation;
-  VkSwapchainKHR     m_swapchain;
-  uint32_t           m_swapchainImageCount;
-  VkRenderPass       m_renderPass;
-  VkPipeline         m_pipeline;  
-  VkQueue            m_queue;
+  VkInstance         m_instance; // needed
+  VkPhysicalDevice   m_gpu;      // needed
+  VkDevice           m_device;   // needed
+  VkSurfaceKHR       m_surface;  // needed
+  VkSurfaceFormatKHR m_surfaceFormat; //needed
 
-  VkPhysicalDeviceProperties m_gpu_props;
-  VkPhysicalDeviceFeatures m_gpu_features;
-  VkQueueFamilyProperties* m_queue_props;
-  uint32_t           m_queueFamilyIndex;
-
-  
-  //!@{ These are from triangle-vulkan GLFW demo
-
-  
+  // These should be moved somewhere else
   uint32_t m_enabled_extension_count;
   uint32_t m_enabled_layer_count;
   const char* m_extension_names[64];
   const char* m_enabled_layers[64];
+
+  
+  VkFormat           m_format;
+  VkRenderPass       m_renderPass;
+  VkPipeline         m_pipeline;  
+  VkQueue            m_queue;
+  
+  bool               m_swapchain_needs_recreation; // needed
+  
+  VkSwapchainKHR     m_swapchain;
+  uint32_t           m_swapchainImageCount;
+
+  int                m_width, m_height;
+  
+  bool               m_use_staging_buffer = false;
     
+
+  // Not sure what these are for
+  VkPhysicalDeviceProperties m_gpu_props;
+  VkPhysicalDeviceFeatures m_gpu_features;
+  VkQueueFamilyProperties* m_queue_props;
+
+  
+  //!@{ These are from triangle-vulkan GLFW demo
   VkColorSpaceKHR    m_color_space;
+  float m_depthStencil = 1.0;
+  
+  //! Shaders used in GLFW demo
+  VkShaderModule m_vert_shader_module;
+  VkShaderModule m_frag_shader_module;
   
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;
   uint32_t                m_queue_count;
   uint32_t                m_graphics_queue_node_index;
 
+  //! This is for holding a depth buffer (should be optional on mode setting)
   Fl_Vk_Depth m_depth;
+
+  //! This is for holding a mesh
   Fl_Vk_Mesh m_vertices;
 
+  // This is for holding a texture
   Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
+
   VkFramebuffer* m_framebuffers;
 
+  
   VkCommandPool m_cmd_pool;
+  VkDescriptorPool m_desc_pool;
+  VkDescriptorSet m_desc_set;
 
   Fl_Vk_SwapchainBuffer*       m_buffers;
     
-  // Clear screen
-  VkShaderModule m_vert_shader_module;
-  VkShaderModule m_frag_shader_module;
 
-  VkDescriptorPool m_desc_pool;
-  VkDescriptorSet m_desc_set;
-  float m_depthStencil = 1.0;
     
   VkCommandBuffer m_setup_cmd; // Command Buffer for initialization commands
   VkCommandBuffer m_draw_cmd;  // Command Buffer for drawing commands
@@ -358,7 +314,6 @@ public:
   void swap_buffers();
   void swap_interval(int);
   int swap_interval() const;
-  void ortho();
 
   int can_do_overlay() { return false; }
 

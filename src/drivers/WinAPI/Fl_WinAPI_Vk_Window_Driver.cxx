@@ -195,7 +195,7 @@ int Fl_WinAPI_Vk_Window_Driver::swap_interval() const {
 }
 
 
-int Fl_WinAPI_Vk_Window_Driver::flush_begin(char& valid_f_) {
+int Fl_WinAPI_Vk_Window_Driver::flush_begin() {
   return 0;
 }
 
