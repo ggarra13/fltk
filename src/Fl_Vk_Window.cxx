@@ -34,6 +34,85 @@ extern int fl_vk_load_plugin;
 #  if (HAVE_DLSYM && HAVE_DLFCN_H)
 #    include <dlfcn.h>
 #  endif // (HAVE_DLSYM && HAVE_DLFCN_H)
+void Fl_Vk_Window::draw_begin() {
+    
+    VkCommandBufferBeginInfo cmd_buf_info = {};
+    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_buf_info.pNext = NULL;
+    cmd_buf_info.flags = 0;
+    cmd_buf_info.pInheritanceInfo = NULL;
+    
+    VkResult err;
+
+    // Reset the command buffer to ensure it’s reusable
+    err = vkResetCommandBuffer(m_draw_cmd, 0);
+    VK_CHECK_RESULT(err);
+
+    err = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
+    VK_CHECK_RESULT(err);
+
+    // glClearColor / glClearStencil equivalents
+    VkClearValue clear_values[2];
+    clear_values[0].color = m_clearColor;
+    clear_values[1].depthStencil = {m_depthStencil, 0};
+    
+    VkRenderPassBeginInfo rp_begin = {};
+    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp_begin.pNext = NULL;
+    rp_begin.renderPass = m_renderPass;
+    rp_begin.framebuffer = m_framebuffers[m_current_buffer];
+    rp_begin.renderArea.offset.x = 0;
+    rp_begin.renderArea.offset.y = 0;
+    rp_begin.renderArea.extent.width = m_width;
+    rp_begin.renderArea.extent.height = m_height;
+    rp_begin.clearValueCount = 2;
+    rp_begin.pClearValues = clear_values;
+
+    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for rendering
+    VkImageMemoryBarrier image_memory_barrier = {};
+    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.pNext = NULL;
+    image_memory_barrier.srcAccessMask = 0; // No prior access (undefined)
+    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.image = m_buffers[m_current_buffer].image;
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkCmdPipelineBarrier(m_draw_cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // No prior work
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
+                         0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
+
+    // Begin rendering
+    vkCmdBeginRenderPass(m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline_layout, 0, 1, &m_desc_set, 0, NULL);
+
+    // The equivalent of glViewport
+    VkViewport viewport = {};
+    viewport.height = (float)m_height;
+    viewport.width = (float)m_width;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    viewport.x = 0;
+    viewport.y = 0;
+    
+    vkCmdSetViewport(m_draw_cmd, 0, 1, &viewport);
+
+    // The equvalent of glScissor
+    VkRect2D scissor = {};
+    scissor.extent.width = m_width;
+    scissor.extent.height = m_height;
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    
+    vkCmdSetScissor(m_draw_cmd, 0, 1, &scissor);
+}
+
 
 static void demo_draw_build_cmd(Fl_Vk_Window* demo) {
 
@@ -44,6 +123,62 @@ static void demo_draw_build_cmd(Fl_Vk_Window* demo) {
 
     vkCmdDraw(demo->m_draw_cmd, 3, 1, 0, 0);
 
+}
+
+
+/**
+  You must implement this virtual function if you want to draw into the
+  overlay.  The overlay is cleared before this is called.  You should
+  draw anything that is not clear using Vulkan.  You must use
+  vk_color(i) to choose colors (it allocates them from the colormap
+  using system-specific calls), and remember that you are in an indexed
+  Vulkan mode and drawing anything other than flat-shaded will probably
+  not work.
+
+  Both this function and Fl_Vk_Window::draw() should check
+  Fl_Vk_Window::valid() and set the same transformation.  If you
+  don't your code may not work on other systems.  Depending on the OS,
+  and on whether overlays are real or simulated, the Vulkan context may
+  be the same or different between the overlay and main window.
+*/
+
+/**
+ Supports drawing to an Fl_Vk_Window with the FLTK 2D drawing API.
+ \see \ref opengl_with_fltk_widgets
+ */
+
+/**
+ To be used as a match for a previous call to Fl_Vk_Window::draw_begin().
+ \see \ref opengl_with_fltk_widgets
+ */
+void Fl_Vk_Window::draw_end()
+{
+    VkResult result;
+    
+    // Move to draw_end()
+    vkCmdEndRenderPass(m_draw_cmd);
+
+    // Transition swapchain image to PRESENT_SRC_KHR for presentation
+    // (is this gl's swap_buffer()?)
+    VkImageMemoryBarrier prePresentBarrier = {};
+    prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    prePresentBarrier.pNext = NULL;
+    prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.image = m_buffers[m_current_buffer].image;
+    prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkCmdPipelineBarrier(m_draw_cmd,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // After color writes
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // Before presentation
+                         0, 0, NULL, 0, NULL, 1, &prePresentBarrier);
+
+    result = vkEndCommandBuffer(m_draw_cmd);
+    VK_CHECK_RESULT(result);
 }
 
 VkResult Fl_Vk_Window::begin_setup()
@@ -86,93 +221,6 @@ VkResult Fl_Vk_Window::end_setup()
 {
     VkResult result;
     return result;
-}
-
-// Move to vk_shape
-static void demo_draw(Fl_Vk_Window* pWindow) {
-    VkResult result;
-    VkSemaphore imageAcquiredSemaphore, drawCompleteSemaphore;
-    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    semaphoreCreateInfo.pNext = NULL;
-    semaphoreCreateInfo.flags = 0;
-
-    result = vkCreateSemaphore(pWindow->m_device, &semaphoreCreateInfo,
-                               NULL, &imageAcquiredSemaphore);
-    VK_CHECK_RESULT(result);
-
-    result = vkCreateSemaphore(pWindow->m_device, &semaphoreCreateInfo,
-                               NULL, &drawCompleteSemaphore);
-    VK_CHECK_RESULT(result);
-
-    // Get the index of the next available swapchain image:
-    result = vkAcquireNextImageKHR(pWindow->m_device,
-                                   pWindow->m_swapchain, UINT64_MAX,
-                                   imageAcquiredSemaphore,
-                                   (VkFence)0, // TODO: Show use of fence
-                                   &pWindow->m_current_buffer);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        // pWindow->m_swapchain is out of date (e.g. the window was resized) and
-        // must be recreated:
-        pWindow->m_swapchain_needs_recreation = true;
-        vkDestroySemaphore(pWindow->m_device, imageAcquiredSemaphore, NULL);
-        vkDestroySemaphore(pWindow->m_device, drawCompleteSemaphore, NULL);
-        return;
-    } else if (result == VK_TIMEOUT) {
-        // Timeout occurred, try again next frame
-        return;
-    } else {
-        VK_CHECK_RESULT(result);
-    }
-
-    pWindow->begin_setup();
-    pWindow->setup();
-    pWindow->end_setup();
-    
-    // Wait for the present complete semaphore to be signaled to ensure
-    // that the image won't be rendered to until the presentation
-    // engine has fully released ownership to the application, and it is
-    // okay to render to the image.
-
-    demo_draw_build_cmd(pWindow);
-    VkFence nullFence = VK_NULL_HANDLE;
-    VkPipelineStageFlags pipe_stage_flags =
-        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.pNext = NULL;
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &imageAcquiredSemaphore;
-    submit_info.pWaitDstStageMask = &pipe_stage_flags;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &pWindow->m_draw_cmd;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &drawCompleteSemaphore;
-
-    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info, nullFence);
-    VK_CHECK_RESULT(result);
-
-    VkPresentInfoKHR present = {};
-    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present.pNext = NULL;
-    present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &drawCompleteSemaphore;
-    present.swapchainCount = 1;
-    present.pSwapchains = &pWindow->m_swapchain;
-    present.pImageIndices = &pWindow->m_current_buffer;
-
-    result = vkQueuePresentKHR(pWindow->m_queue, &present);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        pWindow->m_swapchain_needs_recreation = true;
-    } else {
-        VK_CHECK_RESULT(result);
-    }
-
-    result = vkQueueWaitIdle(pWindow->m_queue);
-    VK_CHECK_RESULT(result);
-
-    vkDestroySemaphore(pWindow->m_device, imageAcquiredSemaphore, NULL);
-    vkDestroySemaphore(pWindow->m_device, drawCompleteSemaphore, NULL);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -369,139 +417,6 @@ void Fl_Vk_Window::hide() {
 }
 
 
-/**
-  You must implement this virtual function if you want to draw into the
-  overlay.  The overlay is cleared before this is called.  You should
-  draw anything that is not clear using Vulkan.  You must use
-  vk_color(i) to choose colors (it allocates them from the colormap
-  using system-specific calls), and remember that you are in an indexed
-  Vulkan mode and drawing anything other than flat-shaded will probably
-  not work.
-
-  Both this function and Fl_Vk_Window::draw() should check
-  Fl_Vk_Window::valid() and set the same transformation.  If you
-  don't your code may not work on other systems.  Depending on the OS,
-  and on whether overlays are real or simulated, the Vulkan context may
-  be the same or different between the overlay and main window.
-*/
-
-/**
- Supports drawing to an Fl_Vk_Window with the FLTK 2D drawing API.
- \see \ref opengl_with_fltk_widgets
- */
-void Fl_Vk_Window::draw_begin() {
-    
-    VkCommandBufferBeginInfo cmd_buf_info = {};
-    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_buf_info.pNext = NULL;
-    cmd_buf_info.flags = 0;
-    cmd_buf_info.pInheritanceInfo = NULL;
-    
-    VkResult err;
-
-    // Reset the command buffer to ensure it’s reusable
-    err = vkResetCommandBuffer(m_draw_cmd, 0);
-    VK_CHECK_RESULT(err);
-
-    err = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
-    VK_CHECK_RESULT(err);
-
-    // glClearColor / glClearStencil equivalents
-    VkClearValue clear_values[2];
-    clear_values[0].color = m_clearColor;
-    clear_values[1].depthStencil = {m_depthStencil, 0};
-    
-    VkRenderPassBeginInfo rp_begin = {};
-    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rp_begin.pNext = NULL;
-    rp_begin.renderPass = m_renderPass;
-    rp_begin.framebuffer = m_framebuffers[m_current_buffer];
-    rp_begin.renderArea.offset.x = 0;
-    rp_begin.renderArea.offset.y = 0;
-    rp_begin.renderArea.extent.width = m_width;
-    rp_begin.renderArea.extent.height = m_height;
-    rp_begin.clearValueCount = 2;
-    rp_begin.pClearValues = clear_values;
-
-    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for rendering
-    VkImageMemoryBarrier image_memory_barrier = {};
-    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    image_memory_barrier.pNext = NULL;
-    image_memory_barrier.srcAccessMask = 0; // No prior access (undefined)
-    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.image = m_buffers[m_current_buffer].image;
-    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-    vkCmdPipelineBarrier(m_draw_cmd,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // No prior work
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
-                         0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
-
-    // Begin rendering
-    vkCmdBeginRenderPass(m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-    vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            m_pipeline_layout, 0, 1, &m_desc_set, 0, NULL);
-
-    // The equivalent of glViewport
-    VkViewport viewport = {};
-    viewport.height = (float)m_height;
-    viewport.width = (float)m_width;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    viewport.x = 0;
-    viewport.y = 0;
-    
-    vkCmdSetViewport(m_draw_cmd, 0, 1, &viewport);
-
-    // The equvalent of glScissor
-    VkRect2D scissor = {};
-    scissor.extent.width = m_width;
-    scissor.extent.height = m_height;
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    
-    vkCmdSetScissor(m_draw_cmd, 0, 1, &scissor);
-}
-
-/**
- To be used as a match for a previous call to Fl_Vk_Window::draw_begin().
- \see \ref opengl_with_fltk_widgets
- */
-void Fl_Vk_Window::draw_end()
-{
-    VkResult result;
-    
-    // Move to draw_end()
-    vkCmdEndRenderPass(m_draw_cmd);
-
-    // Transition swapchain image to PRESENT_SRC_KHR for presentation
-    // (is this gl's swap_buffer()?)
-    VkImageMemoryBarrier prePresentBarrier = {};
-    prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prePresentBarrier.pNext = NULL;
-    prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prePresentBarrier.image = m_buffers[m_current_buffer].image;
-    prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-    vkCmdPipelineBarrier(m_draw_cmd,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // After color writes
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // Before presentation
-                         0, 0, NULL, 0, NULL, 1, &prePresentBarrier);
-
-    result = vkEndCommandBuffer(m_draw_cmd);
-    VK_CHECK_RESULT(result);
-}
-
 /** Draws the Fl_Vk_Window.
   You \e \b must subclass Fl_Vk_Window and provide an implementation for
   draw().
@@ -555,10 +470,93 @@ void Fl_Vk_Window::draw()
     }
 
     if (m_swapchain != VK_NULL_HANDLE) {
+        VkResult result;
+        VkSemaphore imageAcquiredSemaphore, drawCompleteSemaphore;
+        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        semaphoreCreateInfo.pNext = NULL;
+        semaphoreCreateInfo.flags = 0;
+
+        result = vkCreateSemaphore(m_device, &semaphoreCreateInfo,
+                                   NULL, &imageAcquiredSemaphore);
+        VK_CHECK_RESULT(result);
+
+        result = vkCreateSemaphore(m_device, &semaphoreCreateInfo,
+                                   NULL, &drawCompleteSemaphore);
+        VK_CHECK_RESULT(result);
+
+        // Get the index of the next available swapchain image:
+        result = vkAcquireNextImageKHR(m_device,
+                                       m_swapchain, UINT64_MAX,
+                                       imageAcquiredSemaphore,
+                                       (VkFence)0, // TODO: Show use of fence
+                                       &m_current_buffer);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            // m_swapchain is out of date (e.g. the window was resized) and
+            // must be recreated:
+            m_swapchain_needs_recreation = true;
+            vkDestroySemaphore(m_device, imageAcquiredSemaphore, NULL);
+            vkDestroySemaphore(m_device, drawCompleteSemaphore, NULL);
+            return;
+        } else if (result == VK_TIMEOUT) {
+            // Timeout occurred, try again next frame
+            return;
+        } else {
+            VK_CHECK_RESULT(result);
+        }
+
+        begin_setup();
+        setup();     // empty
+        end_setup(); // empty
+    
+        // Wait for the present complete semaphore to be signaled to ensure
+        // that the image won't be rendered to until the presentation
+        // engine has fully released ownership to the application, and it is
+        // okay to render to the image.
+
         draw_begin();
-        demo_draw(this);
+        demo_draw_build_cmd(this);
         Fl_Window::draw();
         draw_end();
+    
+        VkFence nullFence = VK_NULL_HANDLE;
+        VkPipelineStageFlags pipe_stage_flags =
+            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        VkSubmitInfo submit_info = {};
+        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit_info.pNext = NULL;
+        submit_info.waitSemaphoreCount = 1;
+        submit_info.pWaitSemaphores = &imageAcquiredSemaphore;
+        submit_info.pWaitDstStageMask = &pipe_stage_flags;
+        submit_info.commandBufferCount = 1;
+        submit_info.pCommandBuffers = &m_draw_cmd;
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = &drawCompleteSemaphore;
+
+        result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
+        VK_CHECK_RESULT(result);
+
+        VkPresentInfoKHR present = {};
+        present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present.pNext = NULL;
+        present.waitSemaphoreCount = 1;
+        present.pWaitSemaphores = &drawCompleteSemaphore;
+        present.swapchainCount = 1;
+        present.pSwapchains = &m_swapchain;
+        present.pImageIndices = &m_current_buffer;
+
+        result = vkQueuePresentKHR(m_queue, &present);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            m_swapchain_needs_recreation = true;
+        } else {
+            VK_CHECK_RESULT(result);
+        }
+
+        result = vkQueueWaitIdle(m_queue);
+        VK_CHECK_RESULT(result);
+
+        vkDestroySemaphore(m_device, imageAcquiredSemaphore, NULL);
+        vkDestroySemaphore(m_device, drawCompleteSemaphore, NULL);
     }
 }
 /**
