@@ -265,7 +265,10 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     VkSwapchainCreateInfoKHR swapchain = {};
     swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     swapchain.surface = pWindow->m_surface;
-    swapchain.minImageCount = 2;  // Ensure double bvuffering
+    swapchain.minImageCount = (pWindow->mode() & FL_SINGLE) ? 1 : 2;
+    if (swapchain.minImageCount < surfCapabilities.minImageCount) {
+        swapchain.minImageCount = surfCapabilities.minImageCount;
+    }
     swapchain.imageFormat = pWindow->m_format;
     swapchain.imageColorSpace = pWindow->m_color_space;
     swapchain.imageExtent = swapchainExtent;
@@ -274,7 +277,9 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     swapchain.preTransform = surfCapabilities.currentTransform;
     swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    swapchain.presentMode = (swapchain.minImageCount == 1) ?
+                            VK_PRESENT_MODE_IMMEDIATE_KHR :
+                            VK_PRESENT_MODE_FIFO_KHR;
     swapchain.oldSwapchain = oldSwapchain;
     swapchain.clipped = VK_TRUE;
 
@@ -303,6 +308,8 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     result = vkGetSwapchainImagesKHR(pWindow->m_device, pWindow->m_swapchain,
                                      &pWindow->m_swapchainImageCount, NULL);
     VK_CHECK_RESULT(result);
+    printf("Swapchain created with %u images\n", pWindow->m_swapchainImageCount);
+    
     VkImage *swapchainImages = (VkImage *)malloc(pWindow->m_swapchainImageCount * sizeof(VkImage));
     assert(swapchainImages);
     result = vkGetSwapchainImagesKHR(pWindow->m_device, pWindow->m_swapchain,
@@ -850,7 +857,7 @@ static void demo_prepare_pipeline(Fl_Vk_Window* pWindow) {
     VkPipelineDynamicStateCreateInfo dynamicState;
 
     VkResult result;
-
+    
     memset(dynamicStateEnables, 0, sizeof dynamicStateEnables);
     memset(&dynamicState, 0, sizeof dynamicState);
     dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -894,16 +901,19 @@ static void demo_prepare_pipeline(Fl_Vk_Window* pWindow) {
     dynamicStateEnables[dynamicState.dynamicStateCount++] =
         VK_DYNAMIC_STATE_SCISSOR;
 
+    bool has_depth = pWindow->mode() & FL_DEPTH;
+    bool has_stencil = pWindow->mode() & FL_STENCIL;
+    
     memset(&ds, 0, sizeof(ds));
     ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    ds.depthTestEnable = VK_TRUE;
-    ds.depthWriteEnable = VK_TRUE;
+    ds.depthTestEnable = has_depth ? VK_TRUE : VK_FALSE;
+    ds.depthWriteEnable = has_depth ? VK_TRUE : VK_FALSE;
     ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     ds.depthBoundsTestEnable = VK_FALSE;
+    ds.stencilTestEnable = has_stencil ? VK_TRUE : VK_FALSE;
     ds.back.failOp = VK_STENCIL_OP_KEEP;
     ds.back.passOp = VK_STENCIL_OP_KEEP;
     ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
-    ds.stencilTestEnable = VK_FALSE;
     ds.front = ds.back;
 
     memset(&ms, 0, sizeof(ms));
