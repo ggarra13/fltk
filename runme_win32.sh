@@ -3,9 +3,12 @@
 mkdir -p build_win32/
 cd build_win32
 
+SDK_VERSION=1.4.304.1
+
 cmake .. \
       -G Ninja \
       -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
       -D FLTK_BUILD_FORMS=OFF \
@@ -41,8 +44,8 @@ cmake .. \
       -D LIB_MesaGL="" \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" \
-      -D Vulkan_LIBRARY=/C/VulkanSDK/1.4.304.1/Lib/vulkan-1.lib \
-      -D Vulkan_INCLUDE_DIR=/C/VulkanSDK/1.4.304.1/Include
+      -D Vulkan_LIBRARY=/C/VulkanSDK/$SDK_VERSION/Lib/vulkan-1.lib \
+      -D Vulkan_INCLUDE_DIR=/C/VulkanSDK/$SDK_VERSION/Include
 
 ninja
 

@@ -3,9 +3,12 @@
 mkdir -p build_x11/
 cd build_x11
 
+VULKAN_HEADERS_DIR=~/code/lib/Vulkan-Headers/
+
 cmake .. \
       -G Ninja \
       -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
       -D FLTK_BUILD_FORMS=OFF \
@@ -42,7 +45,7 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" \
       -D Vulkan_LIBRARY=/usr/lib/x86_64-linux-gnu/libvulkan.so.1 \
-      -D Vulkan_INCLUDE_DIR=~/code/lib/Vulkan-Headers/include
+      -D Vulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include
 
 ninja
 

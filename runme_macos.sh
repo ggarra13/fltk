@@ -3,9 +3,12 @@
 mkdir -p build_macos/
 cd build_macos
 
+SDK_VERSION=1.4.309.0
+
 cmake .. \
       -G Ninja \
       -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
       -D FLTK_BUILD_FORMS=OFF \
@@ -42,7 +45,7 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" \
       -D Vulkan_LIBRARY=/usr/local/lib/libvulkan.1.dylib \
-      -D Vulkan_INCLUDE_DIR=~/VulkanSDK/1.4.309.0/macOS/include
+      -D Vulkan_INCLUDE_DIR=~/VulkanSDK/$SDK_VERSION/macOS/include
 
 ninja 
 

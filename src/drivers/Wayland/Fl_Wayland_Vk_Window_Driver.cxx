@@ -16,8 +16,8 @@
 
 #include <config.h>
 #if HAVE_VK
-#include <iostream>
 #include <stdexcept>
+#include <dlfcn.h>
 
 #include <FL/platform.H>
 #include "../../Fl_Screen_Driver.H"
@@ -125,8 +125,7 @@ int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
 
 void* Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char* name)
 {
-    //! \@todo: implement dlsym
-    return nullptr;
+  return dlsym(RTLD_DEFAULT, procName);
 }
 
 void Fl_Wayland_Vk_Window_Driver::create_surface()
