@@ -1106,7 +1106,7 @@ static void demo_init_device(Fl_Vk_Window* pWindow) {
     VkDeviceQueueCreateInfo queue = {};                                 
     queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queue.pNext = NULL;
-    queue.queueFamilyIndex = pWindow->m_graphics_queue_node_index;
+    queue.queueFamilyIndex = pWindow->m_queueFamilyIndex;
     queue.queueCount = 1;
     queue.pQueuePriorities = queue_priorities;
     
@@ -1460,11 +1460,11 @@ static void demo_init_vk_swapchain(Fl_Vk_Window* pWindow)
                   "Swapchain Initialization Failure");
     }
 
-    pWindow->m_graphics_queue_node_index = graphicsQueueNodeIndex;
+    pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
 
     demo_init_device(pWindow);
 
-    vkGetDeviceQueue(pWindow->m_device, pWindow->m_graphics_queue_node_index, 0,
+    vkGetDeviceQueue(pWindow->m_device, pWindow->m_queueFamilyIndex, 0,
                      &pWindow->m_queue);
 
     // Get the list of VkFormat's that are supported:
@@ -1502,7 +1502,7 @@ static void demo_prepare(Fl_Vk_Window* pWindow)
     VkCommandPoolCreateInfo cmd_pool_info = {};
     cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmd_pool_info.pNext = NULL;
-    cmd_pool_info.queueFamilyIndex = pWindow->m_graphics_queue_node_index;
+    cmd_pool_info.queueFamilyIndex = pWindow->m_queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     
     result = vkCreateCommandPool(pWindow->m_device, &cmd_pool_info, NULL,

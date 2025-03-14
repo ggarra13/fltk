@@ -293,7 +293,7 @@ public:
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;
   uint32_t                m_queue_count;
-  uint32_t                m_graphics_queue_node_index;
+  uint32_t                m_queueFamilyIndex;
 
   //! This is for holding a depth buffer (should be optional on mode setting)
   Fl_Vk_Depth m_depth;
