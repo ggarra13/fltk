@@ -258,6 +258,8 @@ public:
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
   VkCommandBuffer    m_setup_cmd; // Command Buffer for resources
   VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands  
+  VkSemaphore        m_imageAcquiredSemaphore;
+  VkSemaphore        m_drawCompleteSemaphore;
 
   // For clearing the background
   VkClearColorValue  m_clearColor;
@@ -300,7 +302,7 @@ public:
 
   //! This is for holding a mesh
   Fl_Vk_Mesh m_vertices;
-
+    
   // This is for holding a texture
   Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
 

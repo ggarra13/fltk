@@ -31,6 +31,44 @@ extern int fl_vk_load_plugin;
 // #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
 void Fl_Vk_Window::draw_begin() {
+    VkResult result;
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreCreateInfo.pNext = NULL;
+    semaphoreCreateInfo.flags = 0;
+
+    result = vkCreateSemaphore(m_device, &semaphoreCreateInfo,
+                               NULL, &m_imageAcquiredSemaphore);
+    VK_CHECK_RESULT(result);
+
+    result = vkCreateSemaphore(m_device, &semaphoreCreateInfo,
+                               NULL, &m_drawCompleteSemaphore);
+    VK_CHECK_RESULT(result);
+
+    // Get the index of the next available swapchain image:
+    result = vkAcquireNextImageKHR(m_device,
+                                   m_swapchain, UINT64_MAX,
+                                   m_imageAcquiredSemaphore,
+                                   (VkFence)0, // TODO: Show use of fence
+                                   &m_current_buffer);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        // m_swapchain is out of date (e.g. the window was resized) and
+        // must be recreated:
+        m_swapchain_needs_recreation = true;
+        vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
+        vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
+        return;
+    } else if (result == VK_TIMEOUT) {
+        // Timeout occurred, try again next frame
+        return;
+    } else {
+        VK_CHECK_RESULT(result);
+    }
+
+    begin_setup();
+    setup();     // empty
+    end_setup(); // empty
+        
     
     VkCommandBufferBeginInfo cmd_buf_info = {};
     cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -38,14 +76,13 @@ void Fl_Vk_Window::draw_begin() {
     cmd_buf_info.flags = 0;
     cmd_buf_info.pInheritanceInfo = NULL;
     
-    VkResult err;
 
     // Reset the command buffer to ensure it’s reusable
-    err = vkResetCommandBuffer(m_draw_cmd, 0);
-    VK_CHECK_RESULT(err);
+    result = vkResetCommandBuffer(m_draw_cmd, 0);
+    VK_CHECK_RESULT(result);
 
-    err = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
-    VK_CHECK_RESULT(err);
+    result = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
+    VK_CHECK_RESULT(result);
 
     // glClearColor / glClearStencil equivalents
     VkClearValue clear_values[2];
@@ -175,6 +212,8 @@ void Fl_Vk_Window::draw_end()
 
     result = vkEndCommandBuffer(m_draw_cmd);
     VK_CHECK_RESULT(result);
+
+
 }
 
 VkResult Fl_Vk_Window::begin_setup()
@@ -259,6 +298,7 @@ void Fl_Vk_Window::show() {
         if (g) mode_ |= FL_FAKE_SINGLE;
        }
 
+      // \@bug: fails on macOS
       // if (!g) {
       //   Fl::error("Insufficient Vulkan support");
       //   return;
@@ -301,6 +341,47 @@ void Fl_Vk_Window::make_current() {
   It is called automatically after the draw() method is called.
 */
 void Fl_Vk_Window::swap_buffers() {
+    VkResult result;
+    
+    VkFence nullFence = VK_NULL_HANDLE;
+    VkPipelineStageFlags pipe_stage_flags =
+        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.pNext = NULL;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &m_imageAcquiredSemaphore;
+    submit_info.pWaitDstStageMask = &pipe_stage_flags;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_draw_cmd;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &m_drawCompleteSemaphore;
+
+    result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
+    VK_CHECK_RESULT(result);
+
+    VkPresentInfoKHR present = {};
+    present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present.pNext = NULL;
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &m_drawCompleteSemaphore;
+    present.swapchainCount = 1;
+    present.pSwapchains = &m_swapchain;
+    present.pImageIndices = &m_current_buffer;
+
+    result = vkQueuePresentKHR(m_queue, &present);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        m_swapchain_needs_recreation = true;
+    } else {
+        VK_CHECK_RESULT(result);
+    }
+
+    result = vkQueueWaitIdle(m_queue);
+    VK_CHECK_RESULT(result);
+
+    vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
+    vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
+
   pVkWindowDriver->swap_buffers();
 }
 
@@ -466,45 +547,6 @@ void Fl_Vk_Window::draw()
     }
 
     if (m_swapchain != VK_NULL_HANDLE) {
-        VkResult result;
-        VkSemaphore imageAcquiredSemaphore, drawCompleteSemaphore;
-        VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-        semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-        semaphoreCreateInfo.pNext = NULL;
-        semaphoreCreateInfo.flags = 0;
-
-        result = vkCreateSemaphore(m_device, &semaphoreCreateInfo,
-                                   NULL, &imageAcquiredSemaphore);
-        VK_CHECK_RESULT(result);
-
-        result = vkCreateSemaphore(m_device, &semaphoreCreateInfo,
-                                   NULL, &drawCompleteSemaphore);
-        VK_CHECK_RESULT(result);
-
-        // Get the index of the next available swapchain image:
-        result = vkAcquireNextImageKHR(m_device,
-                                       m_swapchain, UINT64_MAX,
-                                       imageAcquiredSemaphore,
-                                       (VkFence)0, // TODO: Show use of fence
-                                       &m_current_buffer);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            // m_swapchain is out of date (e.g. the window was resized) and
-            // must be recreated:
-            m_swapchain_needs_recreation = true;
-            vkDestroySemaphore(m_device, imageAcquiredSemaphore, NULL);
-            vkDestroySemaphore(m_device, drawCompleteSemaphore, NULL);
-            return;
-        } else if (result == VK_TIMEOUT) {
-            // Timeout occurred, try again next frame
-            return;
-        } else {
-            VK_CHECK_RESULT(result);
-        }
-
-        begin_setup();
-        setup();     // empty
-        end_setup(); // empty
-    
         // Wait for the present complete semaphore to be signaled to ensure
         // that the image won't be rendered to until the presentation
         // engine has fully released ownership to the application, and it is
@@ -513,46 +555,7 @@ void Fl_Vk_Window::draw()
         draw_begin();
         demo_draw_build_cmd(this);
         Fl_Window::draw();
-        draw_end();
-    
-        VkFence nullFence = VK_NULL_HANDLE;
-        VkPipelineStageFlags pipe_stage_flags =
-            VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        VkSubmitInfo submit_info = {};
-        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submit_info.pNext = NULL;
-        submit_info.waitSemaphoreCount = 1;
-        submit_info.pWaitSemaphores = &imageAcquiredSemaphore;
-        submit_info.pWaitDstStageMask = &pipe_stage_flags;
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &m_draw_cmd;
-        submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = &drawCompleteSemaphore;
-
-        result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
-        VK_CHECK_RESULT(result);
-
-        VkPresentInfoKHR present = {};
-        present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        present.pNext = NULL;
-        present.waitSemaphoreCount = 1;
-        present.pWaitSemaphores = &drawCompleteSemaphore;
-        present.swapchainCount = 1;
-        present.pSwapchains = &m_swapchain;
-        present.pImageIndices = &m_current_buffer;
-
-        result = vkQueuePresentKHR(m_queue, &present);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            m_swapchain_needs_recreation = true;
-        } else {
-            VK_CHECK_RESULT(result);
-        }
-
-        result = vkQueueWaitIdle(m_queue);
-        VK_CHECK_RESULT(result);
-
-        vkDestroySemaphore(m_device, imageAcquiredSemaphore, NULL);
-        vkDestroySemaphore(m_device, drawCompleteSemaphore, NULL);
+        draw_end();    
     }
 }
 /**
@@ -573,6 +576,7 @@ int Fl_Vk_Window::handle(int event)
 float Fl_Vk_Window::pixels_per_unit() {
   return pVkWindowDriver->pixels_per_unit();
 }
+
 
 /**
  \cond DriverDev
