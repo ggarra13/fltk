@@ -45,7 +45,24 @@ Fl_Vk_Window(w,h,l) {
 }
 
 void vk_shape_window::draw() {
-    Fl_Vk_Window::draw();
+    if (!shown() || w() <= 0 || h() <= 0) return;
+    printf("Fl_Vk_Window::draw called\n");
+
+    // Background color
+    m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
+    
+    draw_begin();
+
+    // Draw the triangle
+    VkDeviceSize offsets[1] = {0};
+    vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
+                           &m_vertices.buf, offsets);
+
+    vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
+
+    Fl_Window::draw();
+    
+    draw_end();
 }
 
 #else

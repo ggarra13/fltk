@@ -32,6 +32,14 @@ extern int fl_vk_load_plugin;
 
 void Fl_Vk_Window::draw_begin() {
     VkResult result;
+
+    // Recreate swapchain if needed
+    if (m_swapchain_needs_recreation) {
+        vkDeviceWaitIdle(m_device);
+        pVkWindowDriver->resize(); // Now just prepares resources
+        m_swapchain_needs_recreation = false; // Reset only if successful
+    }
+    
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semaphoreCreateInfo.pNext = NULL;
@@ -146,17 +154,6 @@ void Fl_Vk_Window::draw_begin() {
     vkCmdSetScissor(m_draw_cmd, 0, 1, &scissor);
 }
 
-
-static void demo_draw_build_cmd(Fl_Vk_Window* demo) {
-
-    // Draw the mesh (move to vk_shape.cxx)
-    VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(demo->m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
-                           &demo->m_vertices.buf, offsets);
-
-    vkCmdDraw(demo->m_draw_cmd, 3, 1, 0, 0);
-
-}
 
 
 /**
@@ -537,26 +534,22 @@ void Fl_Vk_Window::hide() {
 void Fl_Vk_Window::draw()
 {
     if (!shown() || w() <= 0 || h() <= 0) return;
-    // printf("Fl_Vk_Window::draw called\n");
+    printf("Fl_Vk_Window::draw called\n");
 
-    // Recreate swapchain if needed
-    if (m_swapchain_needs_recreation) {
-        vkDeviceWaitIdle(m_device);
-        pVkWindowDriver->resize(); // Now just prepares resources
-        m_swapchain_needs_recreation = false; // Reset only if successful
-    }
+    
+    printf("Fl_Vk_Window::draw PASSED\n");
 
-    if (m_swapchain != VK_NULL_HANDLE) {
-        // Wait for the present complete semaphore to be signaled to ensure
-        // that the image won't be rendered to until the presentation
-        // engine has fully released ownership to the application, and it is
-        // okay to render to the image.
+    draw_begin();
 
-        draw_begin();
-        demo_draw_build_cmd(this);
-        Fl_Window::draw();
-        draw_end();    
-    }
+    // Draw the triangle
+    VkDeviceSize offsets[1] = {0};
+    vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
+                           &m_vertices.buf, offsets);
+
+    vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
+
+    Fl_Window::draw();
+    draw_end();
 }
 /**
  Handle some FLTK events as needed.
