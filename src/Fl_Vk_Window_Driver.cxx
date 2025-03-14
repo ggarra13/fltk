@@ -789,6 +789,9 @@ static void demo_prepare_render_pass(Fl_Vk_Window* pWindow)
     attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    attachments[1] = VkAttachmentDescription();
+
+
     VkAttachmentReference color_reference = {};
     color_reference.attachment = 0;
     color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -805,10 +808,34 @@ static void demo_prepare_render_pass(Fl_Vk_Window* pWindow)
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &color_reference;
     subpass.pResolveAttachments = NULL;
-    subpass.pDepthStencilAttachment = &depth_reference;
-    subpass.preserveAttachmentCount = 0;
-    subpass.pPreserveAttachments = NULL;
-                             
+
+    if (has_depth || has_stencil)
+    {
+        attachments[1].format = pWindow->m_depth.format;
+        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        if (has_stencil)
+        {
+            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        }
+        else
+        {
+            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        }
+        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].initialLayout =
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[1].finalLayout =
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
+        subpass.pDepthStencilAttachment = &depth_reference;
+        subpass.preserveAttachmentCount = 0;
+        subpass.pPreserveAttachments = NULL;
+    }
+    
+    
+    
     VkRenderPassCreateInfo rp_info = {};
     rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     rp_info.pNext = NULL;

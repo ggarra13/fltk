@@ -36,6 +36,7 @@ public:
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
+    mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
   sides = 3;
 }
 
