@@ -1211,7 +1211,7 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
     /* Look for instance extensions */
     auto required_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_required_extensions();
     if (required_extensions.empty()) {
-        Fl::fatal("glfwGetRequiredInstanceExtensions failed to find the "
+        Fl::fatal("FLTK get_required_extensions failed to find the "
                  "platform surface extensions.\n\nDo you have a compatible "
                  "Vulkan installable client driver (ICD) installed?\nPlease "
                  "look at the Getting Started guide for additional "
