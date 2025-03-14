@@ -225,30 +225,53 @@ public:
   **/
   int mode(const int *a) {return mode(0, a);}
 
-  bool               m_validate = false;  // true: Windows only so far
+  VkResult begin_setup();
+  virtual void setup() {}; 
+  VkResult end_setup();
   
+  bool               m_validate = false;  // true: Windows only so far
+
+  // Application
   VkInstance         m_instance; // needed
   VkPhysicalDevice   m_gpu;      // needed
-  VkDevice           m_device;   // needed
-  VkSurfaceKHR       m_surface;  // needed
-  VkSurfaceFormatKHR m_surfaceFormat; //needed
-
+  VkPipelineCache m_pipelineCache;     // per application
+  
+  uint32_t m_enabled_layer_count;
+  const char* m_enabled_layers[64];
   // These should be moved somewhere else
   uint32_t m_enabled_extension_count;
-  uint32_t m_enabled_layer_count;
   const char* m_extension_names[64];
-  const char* m_enabled_layers[64];
+
+  // Per Window
+  VkSurfaceKHR       m_surface;  // needed
+  VkSurfaceFormatKHR m_surfaceFormat; //needed
+  VkDevice           m_device;   // needed
+  VkFormat           m_format;   // for depth and color formats
+  VkRenderPass       m_renderPass; // needed
+  VkSwapchainKHR     m_swapchain;
+  uint32_t           m_swapchainImageCount;
+
+  // For drawing
+  VkQueue            m_queue;
+  VkPipeline         m_pipeline;  
+  VkCommandPool      m_cmd_pool;  // memory for command buffers
+  VkDescriptorPool   m_desc_pool; // memory for descriptor sets
+  VkCommandBuffer    m_setup_cmd; // Command Buffer for resources
+  VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands  
+
+  // For clearing the background
+  VkClearColorValue  m_clearColor;
+  float m_depthStencil = 1.0;
 
   
-  VkFormat           m_format;
-  VkRenderPass       m_renderPass;
-  VkPipeline         m_pipeline;  
-  VkQueue            m_queue;
+  VkPipelineLayout m_pipeline_layout;  // interface between shaders and desc.sets
+  VkDescriptorSetLayout m_desc_layout; // describe bindings whithin desc. set
+  VkDescriptorSet m_desc_set; // actual data bound to shaders like texture or
+                              // uniform buffers
+  
   
   bool               m_swapchain_needs_recreation; // needed
   
-  VkSwapchainKHR     m_swapchain;
-  uint32_t           m_swapchainImageCount;
 
   int                m_width, m_height;
   
@@ -263,7 +286,6 @@ public:
   
   //!@{ These are from triangle-vulkan GLFW demo
   VkColorSpaceKHR    m_color_space;
-  float m_depthStencil = 1.0;
   
   //! Shaders used in GLFW demo
   VkShaderModule m_vert_shader_module;
@@ -286,19 +308,9 @@ public:
   VkFramebuffer* m_framebuffers;
 
   
-  VkCommandPool m_cmd_pool;
-  VkDescriptorPool m_desc_pool;
-  VkDescriptorSet m_desc_set;
 
   Fl_Vk_SwapchainBuffer*       m_buffers;
     
-
-    
-  VkCommandBuffer m_setup_cmd; // Command Buffer for initialization commands
-  VkCommandBuffer m_draw_cmd;  // Command Buffer for drawing commands
-  VkPipelineLayout m_pipeline_layout;
-  VkDescriptorSetLayout m_desc_layout;
-  VkPipelineCache m_pipelineCache;
 
   //! @}
   

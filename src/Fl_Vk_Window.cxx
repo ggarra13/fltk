@@ -36,119 +36,27 @@ extern int fl_vk_load_plugin;
 #  endif // (HAVE_DLSYM && HAVE_DLFCN_H)
 
 static void demo_draw_build_cmd(Fl_Vk_Window* demo) {
-    VkCommandBufferBeginInfo cmd_buf_info = {};
-    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_buf_info.pNext = NULL;
-    cmd_buf_info.flags = 0;
-    cmd_buf_info.pInheritanceInfo = NULL;
-    
-    VkClearValue clear_values[2];
-    clear_values[0].color = {0.2f, 0.2f, 0.2f, 0.2f};
-    clear_values[1].depthStencil = {demo->m_depthStencil, 0};
-    
-    VkRenderPassBeginInfo rp_begin = {};
-    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rp_begin.pNext = NULL;
-    rp_begin.renderPass = demo->m_renderPass;
-    rp_begin.framebuffer = demo->m_framebuffers[demo->m_current_buffer];
-    rp_begin.renderArea.offset.x = 0;
-    rp_begin.renderArea.offset.y = 0;
-    rp_begin.renderArea.extent.width = demo->m_width;
-    rp_begin.renderArea.extent.height = demo->m_height;
-    rp_begin.clearValueCount = 2;
-    rp_begin.pClearValues = clear_values;
-    
-    VkResult err;
 
-    // Reset the command buffer to ensure it’s reusable
-    err = vkResetCommandBuffer(demo->m_draw_cmd, 0);
-    VK_CHECK_RESULT(err);
-
-    err = vkBeginCommandBuffer(demo->m_draw_cmd, &cmd_buf_info);
-    VK_CHECK_RESULT(err);
-
-    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for rendering
-    VkImageMemoryBarrier image_memory_barrier = {};
-    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    image_memory_barrier.pNext = NULL;
-    image_memory_barrier.srcAccessMask = 0; // No prior access (undefined)
-    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.image = demo->m_buffers[demo->m_current_buffer].image;
-    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-    vkCmdPipelineBarrier(demo->m_draw_cmd,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // No prior work
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
-                         0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
-
-    // Begin rendering
-    vkCmdBeginRenderPass(demo->m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(demo->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, demo->m_pipeline);
-    vkCmdBindDescriptorSets(demo->m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            demo->m_pipeline_layout, 0, 1, &demo->m_desc_set, 0, NULL);
-
-    VkViewport viewport = {};
-    viewport.height = (float)demo->m_height;
-    viewport.width = (float)demo->m_width;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    viewport.x = 0;
-    viewport.y = 0;
-    
-    vkCmdSetViewport(demo->m_draw_cmd, 0, 1, &viewport);
-
-    VkRect2D scissor = {};
-    scissor.extent.width = demo->m_width;
-    scissor.extent.height = demo->m_height;
-    scissor.offset.x = 0;
-    scissor.offset.y = 0;
-    
-    vkCmdSetScissor(demo->m_draw_cmd, 0, 1, &scissor);
-
+    // Draw the mesh (move to vk_shape.cxx)
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(demo->m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
                            &demo->m_vertices.buf, offsets);
 
     vkCmdDraw(demo->m_draw_cmd, 3, 1, 0, 0);
-    vkCmdEndRenderPass(demo->m_draw_cmd);
 
-    // Transition swapchain image to PRESENT_SRC_KHR for presentation
-    VkImageMemoryBarrier prePresentBarrier = {};
-    prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prePresentBarrier.pNext = NULL;
-    prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prePresentBarrier.image = demo->m_buffers[demo->m_current_buffer].image;
-    prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-    vkCmdPipelineBarrier(demo->m_draw_cmd,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // After color writes
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // Before presentation
-                         0, 0, NULL, 0, NULL, 1, &prePresentBarrier);
-
-    err = vkEndCommandBuffer(demo->m_draw_cmd);
-    VK_CHECK_RESULT(err);
 }
 
-static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
-
+VkResult Fl_Vk_Window::begin_setup()
+{
     VkResult result;
     
-    if (pWindow->m_setup_cmd == VK_NULL_HANDLE)
-        return;
+    if (m_setup_cmd == VK_NULL_HANDLE)
+        return result;
 
-    result = vkEndCommandBuffer(pWindow->m_setup_cmd);
+    result = vkEndCommandBuffer(m_setup_cmd);
     VK_CHECK_RESULT(result);
 
-    const VkCommandBuffer cmd_bufs[] = {pWindow->m_setup_cmd};
+    const VkCommandBuffer cmd_bufs[] = {m_setup_cmd};
     VkFence nullFence = {VK_NULL_HANDLE};
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -161,17 +69,26 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     submit_info.signalSemaphoreCount = 0;
     submit_info.pSignalSemaphores = NULL;
 
-    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info, nullFence);
+    result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
     VK_CHECK_RESULT(result);
 
-    result = vkQueueWaitIdle(pWindow->m_queue);
+    result = vkQueueWaitIdle(m_queue);
     VK_CHECK_RESULT(result);
 
-    vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, cmd_bufs);
-    pWindow->m_setup_cmd = VK_NULL_HANDLE;
+    vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
+    m_setup_cmd = VK_NULL_HANDLE;
+
+    return result;
 }
 
 
+VkResult Fl_Vk_Window::end_setup()
+{
+    VkResult result;
+    return result;
+}
+
+// Move to vk_shape
 static void demo_draw(Fl_Vk_Window* pWindow) {
     VkResult result;
     VkSemaphore imageAcquiredSemaphore, drawCompleteSemaphore;
@@ -208,8 +125,10 @@ static void demo_draw(Fl_Vk_Window* pWindow) {
         VK_CHECK_RESULT(result);
     }
 
-    demo_flush_init_cmd(pWindow);
-
+    pWindow->begin_setup();
+    pWindow->setup();
+    pWindow->end_setup();
+    
     // Wait for the present complete semaphore to be signaled to ensure
     // that the image won't be rendered to until the presentation
     // engine has fully released ownership to the application, and it is
@@ -471,13 +390,116 @@ void Fl_Vk_Window::hide() {
  \see \ref opengl_with_fltk_widgets
  */
 void Fl_Vk_Window::draw_begin() {
+    
+    VkCommandBufferBeginInfo cmd_buf_info = {};
+    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_buf_info.pNext = NULL;
+    cmd_buf_info.flags = 0;
+    cmd_buf_info.pInheritanceInfo = NULL;
+    
+    VkResult err;
+
+    // Reset the command buffer to ensure it’s reusable
+    err = vkResetCommandBuffer(m_draw_cmd, 0);
+    VK_CHECK_RESULT(err);
+
+    err = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
+    VK_CHECK_RESULT(err);
+
+    // glClearColor / glClearStencil equivalents
+    VkClearValue clear_values[2];
+    clear_values[0].color = m_clearColor;
+    clear_values[1].depthStencil = {m_depthStencil, 0};
+    
+    VkRenderPassBeginInfo rp_begin = {};
+    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp_begin.pNext = NULL;
+    rp_begin.renderPass = m_renderPass;
+    rp_begin.framebuffer = m_framebuffers[m_current_buffer];
+    rp_begin.renderArea.offset.x = 0;
+    rp_begin.renderArea.offset.y = 0;
+    rp_begin.renderArea.extent.width = m_width;
+    rp_begin.renderArea.extent.height = m_height;
+    rp_begin.clearValueCount = 2;
+    rp_begin.pClearValues = clear_values;
+
+    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for rendering
+    VkImageMemoryBarrier image_memory_barrier = {};
+    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.pNext = NULL;
+    image_memory_barrier.srcAccessMask = 0; // No prior access (undefined)
+    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.image = m_buffers[m_current_buffer].image;
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkCmdPipelineBarrier(m_draw_cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // No prior work
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
+                         0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
+
+    // Begin rendering
+    vkCmdBeginRenderPass(m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline_layout, 0, 1, &m_desc_set, 0, NULL);
+
+    // The equivalent of glViewport
+    VkViewport viewport = {};
+    viewport.height = (float)m_height;
+    viewport.width = (float)m_width;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    viewport.x = 0;
+    viewport.y = 0;
+    
+    vkCmdSetViewport(m_draw_cmd, 0, 1, &viewport);
+
+    // The equvalent of glScissor
+    VkRect2D scissor = {};
+    scissor.extent.width = m_width;
+    scissor.extent.height = m_height;
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    
+    vkCmdSetScissor(m_draw_cmd, 0, 1, &scissor);
 }
 
 /**
  To be used as a match for a previous call to Fl_Vk_Window::draw_begin().
  \see \ref opengl_with_fltk_widgets
  */
-void Fl_Vk_Window::draw_end() {
+void Fl_Vk_Window::draw_end()
+{
+    VkResult result;
+    
+    // Move to draw_end()
+    vkCmdEndRenderPass(m_draw_cmd);
+
+    // Transition swapchain image to PRESENT_SRC_KHR for presentation
+    // (is this gl's swap_buffer()?)
+    VkImageMemoryBarrier prePresentBarrier = {};
+    prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    prePresentBarrier.pNext = NULL;
+    prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    prePresentBarrier.image = m_buffers[m_current_buffer].image;
+    prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+
+    vkCmdPipelineBarrier(m_draw_cmd,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // After color writes
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, // Before presentation
+                         0, 0, NULL, 0, NULL, 1, &prePresentBarrier);
+
+    result = vkEndCommandBuffer(m_draw_cmd);
+    VK_CHECK_RESULT(result);
 }
 
 /** Draws the Fl_Vk_Window.
