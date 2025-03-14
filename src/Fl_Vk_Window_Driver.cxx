@@ -1196,21 +1196,9 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
     pWindow->m_enabled_layer_count = 0;
 
     const char *instance_validation_layers_alt1[] = {
-        //"VK_LAYER_LUNARG_standard_validation",  // Not found on windows
-#if defined(_WIN32) || defined(__APPLE__)
-        "VK_LAYER_KHRONOS_validation",  // Not found on X11
-#endif
+        "VK_LAYER_KHRONOS_validation",
     };
 
-    const char *instance_validation_layers_alt2[] = {
-        //"VK_LAYER_GOOGLE_threading",  // Not found on windows
-#ifdef _WIN32
-        "VK_LAYER_LUNARG_parameter_validation",  // windows only
-#endif
-        "VK_LAYER_LUNARG_object_tracker",  "VK_LAYER_LUNARG_image",
-        "VK_LAYER_LUNARG_core_validation", "VK_LAYER_LUNARG_swapchain",
-        "VK_LAYER_GOOGLE_unique_objects"
-    };
 
     /* Look for validation layers */
     VkBool32 validation_found = 0;
@@ -1236,20 +1224,6 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
                 pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers_alt1);
                 pWindow->m_enabled_layers[0] = "VK_LAYER_LUNARG_standard_validation";
                 validation_layer_count = 1;
-            } else {
-                // use alternative set of validation layers
-                instance_validation_layers =
-                    (const char**) instance_validation_layers_alt2;
-                pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers_alt2);
-                validation_found = demo_check_layers(
-                    VK_ARRAY_SIZE(instance_validation_layers_alt2),
-                    instance_validation_layers, instance_layer_count,
-                    instance_layers);
-                validation_layer_count =
-                    VK_ARRAY_SIZE(instance_validation_layers_alt2);
-                for (i = 0; i < validation_layer_count; i++) {
-                    pWindow->m_enabled_layers[i] = instance_validation_layers[i];
-                }
             }
             free(instance_layers);
         }
@@ -1375,8 +1349,6 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
                  "vkEnumeratePhysicalDevices Failure");
     }
 
-    // gladLoadVulkanUserPtr(pWindow->m_gpu, (GLADuserptrloadfunc) glfwGetInstanceProcAddress, pWindow->m_instance);
-
     // Look for device extensions
     uint32_t device_extension_count = 0;
     VkBool32 swapchainExtFound = 0;
@@ -1417,27 +1389,6 @@ static void demo_init_vk(Fl_Vk_Window* pWindow)
     }
 
     if (pWindow->m_validate) {
-        // VkDebugReportCallbackCreateInfoEXT dbgCreateInfo;
-        // dbgCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
-        // dbgCreateInfo.flags =
-        //     VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-        // dbgCreateInfo.pfnCallback = pWindow->m_use_break ? BreakCallback : dbgFunc;
-        // dbgCreateInfo.pUserData = demo;
-        // dbgCreateInfo.pNext = NULL;
-        // err = vkCreateDebugReportCallbackEXT(pWindow->m_instance, &dbgCreateInfo, NULL,
-        //                                      &pWindow->m_msg_callback);
-        // switch (err) {
-        // case VK_SUCCESS:
-        //     break;
-        // case VK_ERROR_OUT_OF_HOST_MEMORY:
-        //     Fl::fatal("CreateDebugReportCallback: out of host memory\n",
-        //              "CreateDebugReportCallback Failure");
-        //     break;
-        // default:
-        //     Fl::fatal("CreateDebugReportCallback: unknown failure\n",
-        //              "CreateDebugReportCallback Failure");
-        //     break;
-        // }
     }
 
     vkGetPhysicalDeviceProperties(pWindow->m_gpu, &pWindow->m_gpu_props);

@@ -215,7 +215,7 @@ void Fl_Vk_Window::draw_end()
 
 VkResult Fl_Vk_Window::begin_setup()
 {
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     
     if (m_setup_cmd == VK_NULL_HANDLE)
         return result;
@@ -251,7 +251,7 @@ VkResult Fl_Vk_Window::begin_setup()
 
 VkResult Fl_Vk_Window::end_setup()
 {
-    VkResult result;
+    VkResult result = VK_SUCCESS;
     return result;
 }
 

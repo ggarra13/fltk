@@ -234,7 +234,7 @@ public:
   // Application
   VkInstance         m_instance; // needed
   VkPhysicalDevice   m_gpu;      // needed
-  VkPipelineCache m_pipelineCache;     // per application
+  VkPipelineCache    m_pipelineCache; // per application
   
   uint32_t m_enabled_layer_count;
   const char* m_enabled_layers[64];
@@ -321,7 +321,7 @@ public:
   VkDeviceSize                    MinAllocationSize;      // Minimum allocatio
 
   bool               m_use_break = false;
-  VkDebugReportCallbackEXT m_msg_callback;
+  VkDebugUtilsMessengerEXT  m_debug_messenger;
   
   void make_current();
   void swap_buffers();
