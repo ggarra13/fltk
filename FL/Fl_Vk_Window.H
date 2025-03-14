@@ -269,12 +269,11 @@ public:
   VkDescriptorSet m_desc_set; // actual data bound to shaders like texture or
                               // uniform buffers
   
-  
-  bool               m_swapchain_needs_recreation; // needed
-  
 
-  int                m_width, m_height;
-  
+  //! Flag used to handle resizes (swapchain and other resources recreation)
+  bool               m_swapchain_needs_recreation;
+
+  // Not sure what this one is for
   bool               m_use_staging_buffer = false;
     
 

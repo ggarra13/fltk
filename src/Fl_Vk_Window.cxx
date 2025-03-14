@@ -22,18 +22,14 @@ extern int fl_vk_load_plugin;
 
 
 #include <FL/vk.h>
-#include <FL/Fl_Vk_Window.H>  // \@done
+#include <FL/Fl_Vk_Window.H> 
 #include "Fl_Vk_Window_Driver.H"
-#include "Fl_Window_Driver.H"  // \@done
-#include <FL/Fl_Graphics_Driver.H> // \@done
-#include <FL/fl_utf8.h>            // \@done
+#include "Fl_Window_Driver.H"
+#include <FL/Fl_Graphics_Driver.H>
+#include <FL/fl_utf8.h>  
 // #include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
 // #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
-#include <stdlib.h>
-#  if (HAVE_DLSYM && HAVE_DLFCN_H)
-#    include <dlfcn.h>
-#  endif // (HAVE_DLSYM && HAVE_DLFCN_H)
 void Fl_Vk_Window::draw_begin() {
     
     VkCommandBufferBeginInfo cmd_buf_info = {};
@@ -63,8 +59,8 @@ void Fl_Vk_Window::draw_begin() {
     rp_begin.framebuffer = m_framebuffers[m_current_buffer];
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
-    rp_begin.renderArea.extent.width = m_width;
-    rp_begin.renderArea.extent.height = m_height;
+    rp_begin.renderArea.extent.width = w();
+    rp_begin.renderArea.extent.height = h();
     rp_begin.clearValueCount = 2;
     rp_begin.pClearValues = clear_values;
 
@@ -94,8 +90,8 @@ void Fl_Vk_Window::draw_begin() {
 
     // The equivalent of glViewport
     VkViewport viewport = {};
-    viewport.height = (float)m_height;
-    viewport.width = (float)m_width;
+    viewport.width = (float)w();
+    viewport.height = (float)h();
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     viewport.x = 0;
@@ -105,8 +101,8 @@ void Fl_Vk_Window::draw_begin() {
 
     // The equvalent of glScissor
     VkRect2D scissor = {};
-    scissor.extent.width = m_width;
-    scissor.extent.height = m_height;
+    scissor.extent.width = w();
+    scissor.extent.height = h();
     scissor.offset.x = 0;
     scissor.offset.y = 0;
     
@@ -401,12 +397,12 @@ void Fl_Vk_Window::resize(int X,int Y,int W,int H) {
  // printf("current: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(), w(), h());
     
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
+
+  Fl_Window::resize(X,Y,W,H);
+  
   if (is_a_resize) {
-      m_width = W;
-      m_height = H;
       m_swapchain_needs_recreation = true;
   }
-  Fl_Window::resize(X,Y,W,H);
 }
 
 /**
@@ -422,10 +418,10 @@ void Fl_Vk_Window::hide() {
   draw().
   
   The draw() method can <I>only</I> use Vulkan calls.  Do not
-  attempt to call X, any of the functions in <FL/fl_draw.H>, or vkX
+  attempt to call X, any of the functions in <FL/fl_draw.H>, OpenGL or vk
   directly.  Do not call vk_start() or vk_finish().
 
-  If double-buffering is enabled in the window, the back and front
+  Double-buffering is enabled by default in the window, the back and front
   buffers are swapped after this function is completed.
 
   \code
@@ -434,7 +430,7 @@ void Fl_Vk_Window::hide() {
   }
   \endcode
 
-  Actual example code to clear screen to black and draw a 2D white "X":
+  Actual example code to clear screen to blue:
   \code
   void mywindow::draw() {
   Fl_Vk_Window::draw();
@@ -459,7 +455,7 @@ void Fl_Vk_Window::hide() {
 */
 void Fl_Vk_Window::draw()
 {
-    if (!shown() || m_width <= 0 || m_height <= 0) return;
+    if (!shown() || w() <= 0 || h() <= 0) return;
     // printf("Fl_Vk_Window::draw called\n");
 
     // Recreate swapchain if needed
@@ -635,14 +631,12 @@ void Fl_Vk_Window::init() {
   damage1_ = 0;
 
   // Set up defaults
-  m_width = w();
-  m_height = h();
   m_swapchain_needs_recreation = true;
   
   // Reset Vulkan Handles
   m_device     = VK_NULL_HANDLE;
-  m_gpu        = VK_NULL_HANDLE;;
-  m_surface    = VK_NULL_HANDLE;
+  m_gpu        = VK_NULL_HANDLE;
+  m_surface    = VK_NULL_HANDLE;  // not needed to keep in class
   m_swapchain  = VK_NULL_HANDLE;
   m_renderPass = VK_NULL_HANDLE;
   m_pipeline   = VK_NULL_HANDLE;

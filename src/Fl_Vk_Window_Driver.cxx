@@ -226,8 +226,6 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     VkResult result;
     VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
     pWindow->m_swapchain = VK_NULL_HANDLE;
-    
-    printf("swapchain creation failed and returned NULL HANDLE\n");
 
     // Get surface capabilities
     VkSurfaceCapabilitiesKHR surfCapabilities;
@@ -240,11 +238,11 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
            surfCapabilities.minImageExtent.width, surfCapabilities.minImageExtent.height,
            surfCapabilities.maxImageExtent.width, surfCapabilities.maxImageExtent.height,
            surfCapabilities.currentExtent.width, surfCapabilities.currentExtent.height);
-    printf("Requested size: %ux%u\n", pWindow->m_width, pWindow->m_height);
+    printf("Requested size: %ux%u\n", pWindow->w(), pWindow->h());
 
     // Set swapchain extent to match window size, clamped to capabilities
-    VkExtent2D swapchainExtent = {(uint32_t)pWindow->m_width,
-        (uint32_t)pWindow->m_height};
+    VkExtent2D swapchainExtent = {(uint32_t)pWindow->w(),
+        (uint32_t)pWindow->h()};
     printf("Wanted swapchain extent: %ux%u\n", swapchainExtent.width, swapchainExtent.height);
     swapchainExtent.width = CLAMP(swapchainExtent.width,
                                   surfCapabilities.minImageExtent.width,
@@ -257,8 +255,7 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     printf("Final swapchain extent: %ux%u\n", swapchainExtent.width, swapchainExtent.height);
 
     // Check if extent matches request; if not, delay recreation
-    if (swapchainExtent.width != pWindow->m_width ||
-        swapchainExtent.height != pWindow->m_height)
+    if (swapchainExtent.width != pWindow->w() || swapchainExtent.height != pWindow->h())
     {
         printf("Surface not ready for requested size; deferring swapchain recreation\n");
         pWindow->m_swapchain = oldSwapchain; // Restore old swapchain
@@ -340,7 +337,7 @@ static void demo_prepare_depth(Fl_Vk_Window* pWindow) {
     image.pNext = NULL;
     image.imageType = VK_IMAGE_TYPE_2D;
     image.format = depth_format;
-    image.extent = {(uint32_t)pWindow->m_width, (uint32_t)pWindow->m_height, 1};
+    image.extent = {(uint32_t)pWindow->w(), (uint32_t)pWindow->h(), 1};
     image.mipLevels = 1;
     image.arrayLayers = 1;
     image.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1018,8 +1015,8 @@ static void demo_prepare_framebuffers(Fl_Vk_Window* pWindow) {
     fb_info.renderPass = pWindow->m_renderPass;
     fb_info.attachmentCount = 2;
     fb_info.pAttachments = attachments;
-    fb_info.width = pWindow->m_width;
-    fb_info.height = pWindow->m_height;
+    fb_info.width = pWindow->w();
+    fb_info.height = pWindow->h();
     fb_info.layers = 1;
     
     VkResult result;
