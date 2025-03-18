@@ -123,7 +123,7 @@ int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
     return 1;
 }
 
-void* Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char* name)
+void* Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char* procName)
 {
   return dlsym(RTLD_DEFAULT, procName);
 }
