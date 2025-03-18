@@ -33,10 +33,6 @@ extern int fl_vk_load_plugin;
 void Fl_Vk_Window::destroy_resources()
 {
     VkResult result;
-    
-    // Wait for all GPU operations to complete before destroying resources
-    result = vkDeviceWaitIdle(m_device);
-    VK_CHECK_RESULT(result);
 
     if (m_framebuffers) {
         for (uint32_t i = 0; i < m_swapchainImageCount; i++) {
@@ -593,20 +589,7 @@ void Fl_Vk_Window::hide() {
 void Fl_Vk_Window::draw()
 {
     if (!shown() || w() <= 0 || h() <= 0) return;
-    printf("Fl_Vk_Window::draw called\n");
-
-    
-    printf("Fl_Vk_Window::draw PASSED\n");
-
     draw_begin();
-
-    // Draw the triangle
-    VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
-                           &m_vertices.buf, offsets);
-
-    vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
-
     Fl_Window::draw();
     draw_end();
 }
@@ -694,6 +677,8 @@ void Fl_Vk_Window::init() {
   m_device     = VK_NULL_HANDLE;
   m_gpu        = VK_NULL_HANDLE;
   m_surface    = VK_NULL_HANDLE;  // not needed to keep in class
+
+  
   m_swapchain  = VK_NULL_HANDLE;
   m_renderPass = VK_NULL_HANDLE;
   m_pipeline   = VK_NULL_HANDLE;
