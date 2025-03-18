@@ -23,6 +23,7 @@
 
 #if HAVE_VK
 
+#include <cassert>
 #include <FL/Fl_Vk_Window.H>
 
 class vk_shape_window : public Fl_Vk_Window {
@@ -36,6 +37,7 @@ public:
 
 protected:
     void prepare_textures();
+    void prepare_mesh();
 
 private:
     void prepare_texture_image(const uint32_t *tex_colors,
@@ -346,10 +348,91 @@ void vk_shape_window::prepare_textures()
     }
 }
 
+void vk_shape_window::prepare_mesh()
+{
+    // clang-format off
+    const float vb[3][5] = {
+        /*      position             texcoord */
+        { -1.0f, -1.0f,  0.25f,     0.0f, 0.0f },
+        {  1.0f, -1.0f,  0.25f,     1.0f, 0.0f },
+        {  0.0f,  1.0f,  1.0f,      0.5f, 1.0f },
+    };
+    // clang-format on
+    VkBufferCreateInfo buf_info = {};
+    buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buf_info.pNext = NULL;
+    buf_info.size = sizeof(vb);
+    buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buf_info.flags = 0;
+    
+    VkMemoryAllocateInfo mem_alloc = {};
+    mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    mem_alloc.pNext = NULL;
+    mem_alloc.allocationSize = 0;
+    mem_alloc.memoryTypeIndex = 0;
+    
+    VkMemoryRequirements mem_reqs;
+    VkResult result;
+    bool pass;
+    void *data;
+
+    memset(&m_vertices, 0, sizeof(m_vertices));
+
+    result = vkCreateBuffer(m_device, &buf_info, NULL, &m_vertices.buf);
+    VK_CHECK_RESULT(result);
+
+    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &mem_reqs);
+    VK_CHECK_RESULT(result);
+
+    mem_alloc.allocationSize = mem_reqs.size;
+    pass = memory_type_from_properties(mem_reqs.memoryTypeBits,
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                       &mem_alloc.memoryTypeIndex);
+    assert(pass);
+
+    result = vkAllocateMemory(m_device, &mem_alloc, NULL, &m_vertices.mem);
+    VK_CHECK_RESULT(result);
+
+    result = vkMapMemory(m_device, m_vertices.mem, 0,
+                      mem_alloc.allocationSize, 0, &data);
+    VK_CHECK_RESULT(result);
+
+    memcpy(data, vb, sizeof(vb));
+
+    vkUnmapMemory(m_device, m_vertices.mem);
+
+    result = vkBindBufferMemory(m_device, m_vertices.buf,
+                             m_vertices.mem, 0);
+    VK_CHECK_RESULT(result);
+
+    m_vertices.vi.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    m_vertices.vi.pNext = NULL;
+    m_vertices.vi.vertexBindingDescriptionCount = 1;
+    m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
+    m_vertices.vi.vertexAttributeDescriptionCount = 2;
+    m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
+
+    m_vertices.vi_bindings[0].binding = VERTEX_BUFFER_BIND_ID;
+    m_vertices.vi_bindings[0].stride = sizeof(vb[0]);
+    m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    m_vertices.vi_attrs[0].binding = VERTEX_BUFFER_BIND_ID;
+    m_vertices.vi_attrs[0].location = 0;
+    m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    m_vertices.vi_attrs[0].offset = 0;
+
+    m_vertices.vi_attrs[1].binding = VERTEX_BUFFER_BIND_ID;
+    m_vertices.vi_attrs[1].location = 1;
+    m_vertices.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+    m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
+}
+
 void vk_shape_window::prepare()
 {
-    prepare_textures();  // must refactor to window
-    // demo_prepare_vertices(this);  // must refactor to window
+    prepare_textures();
+    prepare_mesh();  // must refactor to window
     // demo_prepare_descriptor_layout(this);  // uses texture count
     // demo_prepare_render_pass(this);  // can be kept in driver
     // demo_prepare_pipeline(this);     // must go into Fl_Vk_Window
