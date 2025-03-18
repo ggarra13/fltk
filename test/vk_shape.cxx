@@ -42,6 +42,8 @@ protected:
     void prepare_textures();
     void prepare_vertices();
     void prepare_descriptor_layout();
+    void prepare_descriptor_pool();
+    void prepare_descriptor_set();
     void prepare_pipeline();
     
 private:
@@ -448,7 +450,7 @@ void vk_shape_window::prepare_vertices()
 }
 
 static VkShaderModule
-demo_prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t size) {
+prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t size) {
     VkShaderModuleCreateInfo moduleCreateInfo;
     VkShaderModule module;
     VkResult result;
@@ -465,20 +467,20 @@ demo_prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t s
     return module;
 }
 
-static VkShaderModule demo_prepare_vs(Fl_Vk_Window* pWindow) {
+static VkShaderModule prepare_vs(Fl_Vk_Window* pWindow) {
     size_t size = sizeof(vertShaderCode);
 
     pWindow->m_vert_shader_module =
-        demo_prepare_shader_module(pWindow, vertShaderCode, size);
+        prepare_shader_module(pWindow, vertShaderCode, size);
 
     return pWindow->m_vert_shader_module;
 }
 
-static VkShaderModule demo_prepare_fs(Fl_Vk_Window* pWindow) {
+static VkShaderModule prepare_fs(Fl_Vk_Window* pWindow) {
     size_t size = sizeof(fragShaderCode);
 
     pWindow->m_frag_shader_module =
-        demo_prepare_shader_module(pWindow, fragShaderCode, size);
+        prepare_shader_module(pWindow, fragShaderCode, size);
 
     return pWindow->m_frag_shader_module;
 }
@@ -569,12 +571,12 @@ void vk_shape_window::prepare_pipeline() {
 
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    shaderStages[0].module = demo_prepare_vs(this);
+    shaderStages[0].module = prepare_vs(this);
     shaderStages[0].pName = "main";
 
     shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStages[1].module = demo_prepare_fs(this);
+    shaderStages[1].module = prepare_fs(this);
     shaderStages[1].pName = "main";
 
     pipeline.pVertexInputState = &vi;
@@ -605,10 +607,10 @@ void vk_shape_window::prepare_pipeline() {
 }
 
 
-static void demo_prepare_descriptor_pool(Fl_Vk_Window* pWindow) {
+void vk_shape_window::prepare_descriptor_pool() {
     VkDescriptorPoolSize type_count = {};
     type_count.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    type_count.descriptorCount = DEMO_TEXTURE_COUNT;
+    type_count.descriptorCount = TEXTURE_COUNT;
     
     VkDescriptorPoolCreateInfo descriptor_pool = {};
     descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -619,12 +621,12 @@ static void demo_prepare_descriptor_pool(Fl_Vk_Window* pWindow) {
 
     VkResult result;
              
-    result = vkCreateDescriptorPool(pWindow->m_device, &descriptor_pool, NULL,
-                                 &pWindow->m_desc_pool);
+    result = vkCreateDescriptorPool(m_device, &descriptor_pool, NULL,
+                                    &m_desc_pool);
     VK_CHECK_RESULT(result);
 }
 
-static void demo_prepare_descriptor_set(Fl_Vk_Window* pWindow) {
+void vk_shape_window::prepare_descriptor_set() {
     VkDescriptorImageInfo tex_descs[DEMO_TEXTURE_COUNT];
     VkResult result;
     uint32_t i;
@@ -632,29 +634,28 @@ static void demo_prepare_descriptor_set(Fl_Vk_Window* pWindow) {
     VkDescriptorSetAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.pNext = NULL;
-    alloc_info.descriptorPool = pWindow->m_desc_pool;
+    alloc_info.descriptorPool = m_desc_pool;
     alloc_info.descriptorSetCount = 1;
-    alloc_info.pSetLayouts = &pWindow->m_desc_layout;
+    alloc_info.pSetLayouts = &m_desc_layout;
         
-    result = vkAllocateDescriptorSets(pWindow->m_device, &alloc_info,
-                                      &pWindow->m_desc_set);
+    result = vkAllocateDescriptorSets(m_device, &alloc_info, &m_desc_set);
     VK_CHECK_RESULT(result);
 
     memset(&tex_descs, 0, sizeof(tex_descs));
     for (i = 0; i < DEMO_TEXTURE_COUNT; i++) {
-        tex_descs[i].sampler = pWindow->m_textures[i].sampler;
-        tex_descs[i].imageView = pWindow->m_textures[i].view;
+        tex_descs[i].sampler = m_textures[i].sampler;
+        tex_descs[i].imageView = m_textures[i].view;
         tex_descs[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
 
     VkWriteDescriptorSet write = {};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = pWindow->m_desc_set;
+    write.dstSet = m_desc_set;
     write.descriptorCount = DEMO_TEXTURE_COUNT;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = tex_descs;
 
-    vkUpdateDescriptorSets(pWindow->m_device, 1, &write, 0, NULL);
+    vkUpdateDescriptorSets(m_device, 1, &write, 0, NULL);
 }
 
 void vk_shape_window::prepare()
@@ -665,8 +666,8 @@ void vk_shape_window::prepare()
     // demo_prepare_render_pass(this);  // can be kept in driver?
                                         // prepare_pipeline references it 
     prepare_pipeline();     // must go into Fl_Vk_Window
-    demo_prepare_descriptor_pool(this);
-    demo_prepare_descriptor_set(this);
+    demo_prepare_descriptor_pool();
+    demo_prepare_descriptor_set();
     // demo_prepare_framebuffers(pWindow);
 }
 
