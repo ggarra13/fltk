@@ -141,7 +141,7 @@ void Fl_Wayland_Vk_Window_Driver::create_surface()
     }
 }
 
-void Fl_Wayland_Vk_Window_Driver::make_current_after() {
+void Fl_Wayland_Vk_Window_Driver::make_current_before() {
 }
 
 

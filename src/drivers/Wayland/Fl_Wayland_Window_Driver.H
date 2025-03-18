@@ -49,6 +49,7 @@ class Fl_Wayland_Plugin;
 class Fl_Wayland_Window_Driver : public Fl_Window_Driver
 {
   friend class Fl_Wayland_Gl_Window_Driver;
+  friend class Fl_Wayland_Vk_Window_Driver;
 private:
   struct shape_data_type {
     int lw_; ///<  width of shape image

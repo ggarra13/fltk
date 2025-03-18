@@ -172,6 +172,8 @@ static void copy_region(struct wld_window *window, cairo_region_t *r) {
 
 void Fl_Wayland_Graphics_Driver::buffer_commit(struct wld_window *window, cairo_region_t *r)
 {
+    if (!window->buffer)
+        return;
   if (!window->buffer->wl_buffer) create_shm_buffer(window->buffer);
   cairo_surface_t *surf = cairo_get_target(window->buffer->draw_buffer.cairo_);
   cairo_surface_flush(surf);
