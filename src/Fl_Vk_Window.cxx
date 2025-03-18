@@ -588,10 +588,7 @@ void Fl_Vk_Window::hide() {
 */
 void Fl_Vk_Window::draw()
 {
-    if (!shown() || w() <= 0 || h() <= 0) return;
-    draw_begin();
     Fl_Window::draw();
-    draw_end();
 }
 /**
  Handle some FLTK events as needed.
