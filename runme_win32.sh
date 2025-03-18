@@ -4,7 +4,6 @@ mkdir -p build_win32/
 cd build_win32
 
 SDK_VERSION=1.4.304.1
-export VULKAN_SDK==/C/VulkanSDK/$SDK_VERSION
 
 cmake .. \
       -G Ninja \
@@ -45,8 +44,8 @@ cmake .. \
       -D LIB_MesaGL="" \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" \
-      -D Vulkan_LIBRARY=${VULKAN_SDK}/Lib/vulkan-1.lib \
-      -D Vulkan_INCLUDE_DIR=${VULKAN_SDK}/Include
+      -D Vulkan_LIBRARY=/C/VulkanSDK/$SDK_VERSION/Lib/vulkan-1.lib \
+      -D Vulkan_INCLUDE_DIR=/C/VulkanSDK/$SDK_VERSION/Include
 
 ninja
 

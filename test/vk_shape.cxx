@@ -610,7 +610,7 @@ void vk_shape_window::prepare_pipeline() {
 void vk_shape_window::prepare_descriptor_pool() {
     VkDescriptorPoolSize type_count = {};
     type_count.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    type_count.descriptorCount = TEXTURE_COUNT;
+    type_count.descriptorCount = DEMO_TEXTURE_COUNT;
     
     VkDescriptorPoolCreateInfo descriptor_pool = {};
     descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -666,9 +666,9 @@ void vk_shape_window::prepare()
     // demo_prepare_render_pass(this);  // can be kept in driver?
                                         // prepare_pipeline references it 
     prepare_pipeline();     // must go into Fl_Vk_Window
-    demo_prepare_descriptor_pool();
-    demo_prepare_descriptor_set();
-    // demo_prepare_framebuffers(pWindow);
+    prepare_descriptor_pool();
+    prepare_descriptor_set();
+    // demo_prepare_framebuffers(pWindow);  // can be kept in driver.
 }
 
 void vk_shape_window::draw() {
