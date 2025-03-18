@@ -1541,7 +1541,8 @@ static void demo_prepare(Fl_Vk_Window* pWindow)
         return; // Skip further setup if swapchain fails
     }
     demo_prepare_depth(pWindow);
-    demo_prepare_textures(pWindow);  // must refactor to window
+    pWindow->prepare();
+    //demo_prepare_textures(pWindow);  // must refactor to window
     demo_prepare_vertices(pWindow);  // must refactor to window
     demo_prepare_descriptor_layout(pWindow);  // uses texture count
     demo_prepare_render_pass(pWindow);  // can be kept in driver
