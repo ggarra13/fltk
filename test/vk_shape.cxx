@@ -33,6 +33,9 @@ public:
     vk_shape_window(int w,int h,const char *l=0);
 
     void prepare() FL_OVERRIDE;
+
+protected:
+    void demo_prepare_textures();
 };
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
@@ -263,7 +266,8 @@ demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
 }
 
 
-static void demo_prepare_textures(Fl_Vk_Window *pWindow) {
+void vk_shape_window::demo_prepare_textures()
+{
     const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
     VkFormatProperties props;
     const uint32_t tex_colors[DEMO_TEXTURE_COUNT][2] = {
@@ -272,15 +276,15 @@ static void demo_prepare_textures(Fl_Vk_Window *pWindow) {
     uint32_t i;
     VkResult result;
 
-    vkGetPhysicalDeviceFormatProperties(pWindow->m_gpu, tex_format, &props);
+    vkGetPhysicalDeviceFormatProperties(m_gpu, tex_format, &props);
 
     for (i = 0; i < DEMO_TEXTURE_COUNT; i++) {
         if ((props.linearTilingFeatures &
              VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) &&
-            !pWindow->m_use_staging_buffer) {
+            !m_use_staging_buffer) {
             /* Device can texture using linear textures */
             demo_prepare_texture_image(
-                pWindow, tex_colors[i], &pWindow->m_textures[i], VK_IMAGE_TILING_LINEAR,
+                this, tex_colors[i], &m_textures[i], VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -291,27 +295,27 @@ static void demo_prepare_textures(Fl_Vk_Window *pWindow) {
 
             memset(&staging_texture, 0, sizeof(staging_texture));
             demo_prepare_texture_image(
-                pWindow, tex_colors[i], &staging_texture,
+                this, tex_colors[i], &staging_texture,
                 VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
             demo_prepare_texture_image(
-                pWindow, tex_colors[i], &pWindow->m_textures[i],
+                this, tex_colors[i], &m_textures[i],
                 VK_IMAGE_TILING_OPTIMAL,
                 (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-            demo_set_image_layout(pWindow, staging_texture.image,
+            demo_set_image_layout(this, staging_texture.image,
                                   VK_IMAGE_ASPECT_COLOR_BIT,
                                   staging_texture.imageLayout,
                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                                   0);
 
-            demo_set_image_layout(pWindow, pWindow->m_textures[i].image,
+            demo_set_image_layout(this, m_textures[i].image,
                                   VK_IMAGE_ASPECT_COLOR_BIT,
-                                  pWindow->m_textures[i].imageLayout,
+                                  m_textures[i].imageLayout,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                   0);
 
@@ -324,19 +328,19 @@ static void demo_prepare_textures(Fl_Vk_Window *pWindow) {
                 (uint32_t)staging_texture.tex_width,
                 (uint32_t)staging_texture.tex_height, 1};
             vkCmdCopyImage(
-                pWindow->m_setup_cmd, staging_texture.image,
-                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, pWindow->m_textures[i].image,
+                m_setup_cmd, staging_texture.image,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_textures[i].image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
 
-            demo_set_image_layout(pWindow, pWindow->m_textures[i].image,
+            demo_set_image_layout(this, m_textures[i].image,
                                   VK_IMAGE_ASPECT_COLOR_BIT,
                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  pWindow->m_textures[i].imageLayout,
+                                  m_textures[i].imageLayout,
                                   0);
 
-            demo_flush_init_cmd(pWindow);
+            demo_flush_init_cmd(this);
 
-            demo_destroy_texture_image(pWindow, &staging_texture);
+            demo_destroy_texture_image(this, &staging_texture);
         } else {
             /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
             Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");
@@ -375,21 +379,21 @@ static void demo_prepare_textures(Fl_Vk_Window *pWindow) {
         view.flags = 0;
 
         /* create sampler */
-        result = vkCreateSampler(pWindow->m_device, &sampler, NULL,
-                              &pWindow->m_textures[i].sampler);
+        result = vkCreateSampler(m_device, &sampler, NULL,
+                              &m_textures[i].sampler);
         VK_CHECK_RESULT(result);
 
         /* create image view */
-        view.image = pWindow->m_textures[i].image;
-        result = vkCreateImageView(pWindow->m_device, &view, NULL,
-                                &pWindow->m_textures[i].view);
+        view.image = m_textures[i].image;
+        result = vkCreateImageView(m_device, &view, NULL,
+                                &m_textures[i].view);
         VK_CHECK_RESULT(result);
     }
 }
 
 void vk_shape_window::prepare()
 {
-    demo_prepare_textures(this);  // must refactor to window
+    demo_prepare_textures();  // must refactor to window
     // demo_prepare_vertices(this);  // must refactor to window
     // demo_prepare_descriptor_layout(this);  // uses texture count
     // demo_prepare_render_pass(this);  // can be kept in driver
