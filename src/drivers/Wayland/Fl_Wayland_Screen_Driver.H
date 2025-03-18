@@ -67,8 +67,10 @@ public:
   struct output { // one record for each screen
     uint32_t id;
     int x, y; // logical position of screen
-    int width; // in pixels
-    int height; // in pixels
+    int pixel_width; // in pixels
+    int pixel_height; // in pixels
+    int width; // in pixels, account for fractional scaling
+    int height; // in pixels, account for fractional scaling
     float dpi;
     struct wl_output *wl_output;
     int wld_scale; // Wayland scale factor
@@ -164,6 +166,7 @@ public:
 
 // Wayland-specific member functions
   void screen_count_set(int count) {num_screens = count;}
+  int screen_count_get() {return num_screens;}
   void reset_cursor();
   // this one is in fl_wayland_clipboard_dnd.cxx
   void copy_image(const unsigned char* data, int W, int H);

@@ -29,7 +29,7 @@
 # which can be applied to particular targets and source files only.
 #
 # This could remove some of these potential build conflicts, for
-# instance # if the bundled image libs and Cairo or Pango are used
+# instance if the bundled image libs and Cairo or Pango are used
 # together (Pango depends on Cairo and Cairo depends on libpng).
 # However, this is not a proper solution!
 #
@@ -403,7 +403,7 @@ set(FLTK_USE_STD 1) # always ON since FLTK 1.5.0, option will be
 
 # find X11 libraries and headers
 set(PATH_TO_XLIBS)
-if((NOT APPLE OR FLTK_BACKEND_X11) AND NOT WIN32 AND NOT FLTK_BACKEND_WAYLAND)
+if(FLTK_BACKEND_X11)
   include(FindX11)
   if(X11_FOUND)
     set(FLTK_USE_X11 1)
