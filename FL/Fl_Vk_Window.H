@@ -229,6 +229,7 @@ public:
   virtual void setup() {}; 
   VkResult end_setup();
 
+  virtual void prepare() = 0;
   virtual void destroy_resources();
   
   bool               m_validate = false;  // true: Windows only so far
