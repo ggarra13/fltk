@@ -151,12 +151,6 @@ void vk_shape_window::set_image_layout(VkImage image,
                          0, NULL, 1, &image_memory_barrier);
 }
 
-static void demo_destroy_texture_image(Fl_Vk_Window *pWindow,
-                                       Fl_Vk_Texture *tex_obj) {
-    // /* clean up staging resources */
-    vkDestroyImage(pWindow->m_device, tex_obj->image, NULL);
-    vkFreeMemory(pWindow->m_device, tex_obj->mem, NULL);
-}
 
 // Uses m_device, m_setup_cmd, m_queue, m_cmd_pool
 static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
@@ -354,7 +348,7 @@ void vk_shape_window::prepare_textures()
 
             demo_flush_init_cmd(this);
 
-            demo_destroy_texture_image(this, &staging_texture);
+            destroy_texture_image(&staging_texture);
         } else {
             /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
             Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");

@@ -161,6 +161,7 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
 
+  void destroy_texture_image(Fl_Vk_Texture *tex_obj);
   void draw_begin();
   void draw() FL_OVERRIDE;
   void draw_end();
