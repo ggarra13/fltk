@@ -42,6 +42,7 @@ protected:
     void prepare_textures();
     void prepare_vertices();
     void prepare_descriptor_layout();
+    void prepare_pipeline();
     
 private:
     void prepare_texture_image(const uint32_t *tex_colors,
@@ -446,18 +447,178 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
+static VkShaderModule
+demo_prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t size) {
+    VkShaderModuleCreateInfo moduleCreateInfo;
+    VkShaderModule module;
+    VkResult result;
+
+    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    moduleCreateInfo.pNext = NULL;
+
+    moduleCreateInfo.codeSize = size;
+    moduleCreateInfo.pCode = code;
+    moduleCreateInfo.flags = 0;
+    result = vkCreateShaderModule(pWindow->m_device, &moduleCreateInfo, NULL, &module);
+    VK_CHECK_RESULT(result);
+
+    return module;
+}
+
+static VkShaderModule demo_prepare_vs(Fl_Vk_Window* pWindow) {
+    size_t size = sizeof(vertShaderCode);
+
+    pWindow->m_vert_shader_module =
+        demo_prepare_shader_module(pWindow, vertShaderCode, size);
+
+    return pWindow->m_vert_shader_module;
+}
+
+static VkShaderModule demo_prepare_fs(Fl_Vk_Window* pWindow) {
+    size_t size = sizeof(fragShaderCode);
+
+    pWindow->m_frag_shader_module =
+        demo_prepare_shader_module(pWindow, fragShaderCode, size);
+
+    return pWindow->m_frag_shader_module;
+}
+
+static void demo_prepare_pipeline(Fl_Vk_Window* pWindow) {
+    VkGraphicsPipelineCreateInfo pipeline;
+    VkPipelineCacheCreateInfo pipelineCache;
+
+    VkPipelineVertexInputStateCreateInfo vi;
+    VkPipelineInputAssemblyStateCreateInfo ia;
+    VkPipelineRasterizationStateCreateInfo rs;
+    VkPipelineColorBlendStateCreateInfo cb;
+    VkPipelineDepthStencilStateCreateInfo ds;
+    VkPipelineViewportStateCreateInfo vp;
+    VkPipelineMultisampleStateCreateInfo ms;
+    VkDynamicState dynamicStateEnables[(VK_DYNAMIC_STATE_STENCIL_REFERENCE - VK_DYNAMIC_STATE_VIEWPORT + 1)];
+    VkPipelineDynamicStateCreateInfo dynamicState;
+
+    VkResult result;
+    
+    memset(dynamicStateEnables, 0, sizeof dynamicStateEnables);
+    memset(&dynamicState, 0, sizeof dynamicState);
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.pDynamicStates = dynamicStateEnables;
+
+    memset(&pipeline, 0, sizeof(pipeline));
+    pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipeline.layout = pWindow->m_pipeline_layout;
+
+    vi = pWindow->m_vertices.vi;
+
+    memset(&ia, 0, sizeof(ia));
+    ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    memset(&rs, 0, sizeof(rs));
+    rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rs.polygonMode = VK_POLYGON_MODE_FILL;
+    rs.cullMode = VK_CULL_MODE_BACK_BIT;
+    rs.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rs.depthClampEnable = VK_FALSE;
+    rs.rasterizerDiscardEnable = VK_FALSE;
+    rs.depthBiasEnable = VK_FALSE;
+    rs.lineWidth = 1.0f;
+
+    memset(&cb, 0, sizeof(cb));
+    cb.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    VkPipelineColorBlendAttachmentState att_state[1];
+    memset(att_state, 0, sizeof(att_state));
+    att_state[0].colorWriteMask = 0xf;
+    att_state[0].blendEnable = VK_FALSE;
+    cb.attachmentCount = 1;
+    cb.pAttachments = att_state;
+
+    memset(&vp, 0, sizeof(vp));
+    vp.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    vp.viewportCount = 1;
+    dynamicStateEnables[dynamicState.dynamicStateCount++] =
+        VK_DYNAMIC_STATE_VIEWPORT;
+    vp.scissorCount = 1;
+    dynamicStateEnables[dynamicState.dynamicStateCount++] =
+        VK_DYNAMIC_STATE_SCISSOR;
+
+    bool has_depth = pWindow->mode() & FL_DEPTH;
+    bool has_stencil = pWindow->mode() & FL_STENCIL;
+    
+    memset(&ds, 0, sizeof(ds));
+    ds.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    ds.depthTestEnable = has_depth ? VK_TRUE : VK_FALSE;
+    ds.depthWriteEnable = has_depth ? VK_TRUE : VK_FALSE;
+    ds.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    ds.depthBoundsTestEnable = VK_FALSE;
+    ds.stencilTestEnable = has_stencil ? VK_TRUE : VK_FALSE;
+    ds.back.failOp = VK_STENCIL_OP_KEEP;
+    ds.back.passOp = VK_STENCIL_OP_KEEP;
+    ds.back.compareOp = VK_COMPARE_OP_ALWAYS;
+    ds.front = ds.back;
+
+    memset(&ms, 0, sizeof(ms));
+    ms.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    ms.pSampleMask = NULL;
+    ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    // Two stages: vs and fs
+    pipeline.stageCount = 2;
+    VkPipelineShaderStageCreateInfo shaderStages[2];
+    memset(&shaderStages, 0, 2 * sizeof(VkPipelineShaderStageCreateInfo));
+
+    shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    shaderStages[0].module = demo_prepare_vs(pWindow);
+    shaderStages[0].pName = "main";
+
+    shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shaderStages[1].module = demo_prepare_fs(pWindow);
+    shaderStages[1].pName = "main";
+
+    pipeline.pVertexInputState = &vi;
+    pipeline.pInputAssemblyState = &ia;
+    pipeline.pRasterizationState = &rs;
+    pipeline.pColorBlendState = &cb;
+    pipeline.pMultisampleState = &ms;
+    pipeline.pViewportState = &vp;
+    pipeline.pDepthStencilState = &ds;
+    pipeline.pStages = shaderStages;
+    pipeline.renderPass = pWindow->m_renderPass;
+    pipeline.pDynamicState = &dynamicState;
+
+    memset(&pipelineCache, 0, sizeof(pipelineCache));
+    pipelineCache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+
+    result = vkCreatePipelineCache(pWindow->m_device, &pipelineCache, NULL,
+                                &pWindow->m_pipelineCache);
+    VK_CHECK_RESULT(result);
+    result = vkCreateGraphicsPipelines(pWindow->m_device, pWindow->m_pipelineCache, 1,
+                                    &pipeline, NULL, &pWindow->m_pipeline);
+    VK_CHECK_RESULT(result);
+
+    vkDestroyPipelineCache(pWindow->m_device, pWindow->m_pipelineCache, NULL);
+
+    vkDestroyShaderModule(pWindow->m_device, pWindow->m_frag_shader_module, NULL);
+    vkDestroyShaderModule(pWindow->m_device, pWindow->m_vert_shader_module, NULL);
+}
+
+
 void vk_shape_window::prepare()
 {
     prepare_textures();
     prepare_vertices();  // must refactor to window
     prepare_descriptor_layout();  // uses texture count
     // demo_prepare_render_pass(this);  // can be kept in driver
-    // demo_prepare_pipeline(this);     // must go into Fl_Vk_Window
+    demo_prepare_pipeline(this);     // must go into Fl_Vk_Window
+    // demo_prepare_descriptor_pool(pWindow);
+    // demo_prepare_descriptor_set(pWindow);
+    // demo_prepare_framebuffers(pWindow);
 }
 
 void vk_shape_window::draw() {
     if (!shown() || w() <= 0 || h() <= 0) return;
-    printf("Fl_Vk_Window::draw called\n");
 
     // Background color
     m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
