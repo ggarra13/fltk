@@ -43,6 +43,11 @@ private:
                                VkImageTiling tiling,
                                VkImageUsageFlags usage,
                                VkFlags required_props);
+    void set_image_layout(VkImage image,
+                          VkImageAspectFlags aspectMask,
+                          VkImageLayout old_image_layout,
+                          VkImageLayout new_image_layout,
+                          int srcAccessMaskInt);
 };
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
@@ -79,31 +84,32 @@ static bool memory_type_from_properties(Fl_Vk_Window* pWindow,
 }
 
 // Uses m_cmd_pool, m_setup_cmd
-static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
-                                  VkImageAspectFlags aspectMask,
-                                  VkImageLayout old_image_layout,
-                                  VkImageLayout new_image_layout,
-                                  int srcAccessMaskInt) {
+void vk_shape_window::set_image_layout(VkImage image,
+                                       VkImageAspectFlags aspectMask,
+                                       VkImageLayout old_image_layout,
+                                       VkImageLayout new_image_layout,
+                                       int srcAccessMaskInt)
+{
     VkResult err;
 
     VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
-    if (pWindow->m_setup_cmd == VK_NULL_HANDLE) {
+    if (m_setup_cmd == VK_NULL_HANDLE) {
         VkCommandBufferAllocateInfo cmd = {};
         cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         cmd.pNext = NULL;
-        cmd.commandPool = pWindow->m_cmd_pool;
+        cmd.commandPool = m_cmd_pool;
         cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         cmd.commandBufferCount = 1;
         
-        err = vkAllocateCommandBuffers(pWindow->m_device, &cmd,
-                                       &pWindow->m_setup_cmd);
+        err = vkAllocateCommandBuffers(m_device, &cmd,
+                                       &m_setup_cmd);
         VkCommandBufferBeginInfo cmd_buf_info = {};
         cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         cmd_buf_info.pNext = NULL;
         cmd_buf_info.flags = 0;
         cmd_buf_info.pInheritanceInfo = NULL;
         
-        err = vkBeginCommandBuffer(pWindow->m_setup_cmd, &cmd_buf_info);
+        err = vkBeginCommandBuffer(m_setup_cmd, &cmd_buf_info);
     }
 
     VkImageMemoryBarrier image_memory_barrier = {};
@@ -140,7 +146,7 @@ static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
         dest_stages = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     }
 
-    vkCmdPipelineBarrier(pWindow->m_setup_cmd,
+    vkCmdPipelineBarrier(m_setup_cmd,
                          src_stages, dest_stages, 0, 0, NULL,
                          0, NULL, 1, &image_memory_barrier);
 }
@@ -266,9 +272,9 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
     }
 
     tex_obj->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    demo_set_image_layout(this, tex_obj->image, VK_IMAGE_ASPECT_COLOR_BIT,
-                          VK_IMAGE_LAYOUT_PREINITIALIZED, tex_obj->imageLayout,
-                          VK_ACCESS_HOST_WRITE_BIT);
+    set_image_layout(tex_obj->image, VK_IMAGE_ASPECT_COLOR_BIT,
+                     VK_IMAGE_LAYOUT_PREINITIALIZED, tex_obj->imageLayout,
+                     VK_ACCESS_HOST_WRITE_BIT);
     /* setting the image layout does not reference the actual memory so no need
      * to add a mem ref */
 }
@@ -315,17 +321,17 @@ void vk_shape_window::prepare_textures()
                 (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-            demo_set_image_layout(this, staging_texture.image,
-                                  VK_IMAGE_ASPECT_COLOR_BIT,
-                                  staging_texture.imageLayout,
-                                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                  0);
+            set_image_layout(staging_texture.image,
+                             VK_IMAGE_ASPECT_COLOR_BIT,
+                             staging_texture.imageLayout,
+                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             0);
 
-            demo_set_image_layout(this, m_textures[i].image,
-                                  VK_IMAGE_ASPECT_COLOR_BIT,
-                                  m_textures[i].imageLayout,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  0);
+            set_image_layout(m_textures[i].image,
+                             VK_IMAGE_ASPECT_COLOR_BIT,
+                             m_textures[i].imageLayout,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             0);
 
             VkImageCopy copy_region = {};
             copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
@@ -340,11 +346,11 @@ void vk_shape_window::prepare_textures()
                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_textures[i].image,
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
 
-            demo_set_image_layout(this, m_textures[i].image,
-                                  VK_IMAGE_ASPECT_COLOR_BIT,
-                                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                  m_textures[i].imageLayout,
-                                  0);
+            set_image_layout(m_textures[i].image,
+                             VK_IMAGE_ASPECT_COLOR_BIT,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             m_textures[i].imageLayout,
+                             0);
 
             demo_flush_init_cmd(this);
 
