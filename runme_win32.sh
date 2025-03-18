@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-rm -rf build_win32
+#rm -rf build_win32
 mkdir -p build_win32/
 cd build_win32
 
