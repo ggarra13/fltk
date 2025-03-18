@@ -35,7 +35,14 @@ public:
     void prepare() FL_OVERRIDE;
 
 protected:
-    void demo_prepare_textures();
+    void prepare_textures();
+
+private:
+    void prepare_texture_image(const uint32_t *tex_colors,
+                               Fl_Vk_Texture* tex_obj,
+                               VkImageTiling tiling,
+                               VkImageUsageFlags usage,
+                               VkFlags required_props);
 };
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
@@ -178,10 +185,11 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     pWindow->m_setup_cmd = VK_NULL_HANDLE;
 }
 
-static void
-demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
-                           Fl_Vk_Texture* tex_obj, VkImageTiling tiling,
-                           VkImageUsageFlags usage, VkFlags required_props) {
+void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
+                                            Fl_Vk_Texture* tex_obj,
+                                            VkImageTiling tiling,
+                                            VkImageUsageFlags usage,
+                                            VkFlags required_props) {
     const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
     const int32_t tex_width = 2;
     const int32_t tex_height = 2;
@@ -214,22 +222,22 @@ demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
     VkMemoryRequirements mem_reqs;
 
     result =
-        vkCreateImage(pWindow->m_device, &image_create_info, NULL, &tex_obj->image);
+        vkCreateImage(m_device, &image_create_info, NULL, &tex_obj->image);
     VK_CHECK_RESULT(result);
 
-    vkGetImageMemoryRequirements(pWindow->m_device, tex_obj->image, &mem_reqs);
+    vkGetImageMemoryRequirements(m_device, tex_obj->image, &mem_reqs);
 
     mem_alloc.allocationSize = mem_reqs.size;
     pass =
-        memory_type_from_properties(pWindow, mem_reqs.memoryTypeBits,
+        memory_type_from_properties(this, mem_reqs.memoryTypeBits,
                                     required_props, &mem_alloc.memoryTypeIndex);
 
     /* allocate memory */
-    result = vkAllocateMemory(pWindow->m_device, &mem_alloc, NULL, &tex_obj->mem);
+    result = vkAllocateMemory(m_device, &mem_alloc, NULL, &tex_obj->mem);
     VK_CHECK_RESULT(result);
 
     /* bind memory */
-    result = vkBindImageMemory(pWindow->m_device, tex_obj->image, tex_obj->mem, 0);
+    result = vkBindImageMemory(m_device, tex_obj->image, tex_obj->mem, 0);
     VK_CHECK_RESULT(result);
 
     if (required_props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
@@ -241,10 +249,10 @@ demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
         void *data;
         int32_t x, y;
 
-        vkGetImageSubresourceLayout(pWindow->m_device, tex_obj->image, &subres,
+        vkGetImageSubresourceLayout(m_device, tex_obj->image, &subres,
                                     &layout);
 
-        result = vkMapMemory(pWindow->m_device, tex_obj->mem, 0,
+        result = vkMapMemory(m_device, tex_obj->mem, 0,
                              mem_alloc.allocationSize, 0, &data);
         VK_CHECK_RESULT(result);
 
@@ -254,11 +262,11 @@ demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
                 row[x] = tex_colors[(x & 1) ^ (y & 1)];
         }
 
-        vkUnmapMemory(pWindow->m_device, tex_obj->mem);
+        vkUnmapMemory(m_device, tex_obj->mem);
     }
 
     tex_obj->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    demo_set_image_layout(pWindow, tex_obj->image, VK_IMAGE_ASPECT_COLOR_BIT,
+    demo_set_image_layout(this, tex_obj->image, VK_IMAGE_ASPECT_COLOR_BIT,
                           VK_IMAGE_LAYOUT_PREINITIALIZED, tex_obj->imageLayout,
                           VK_ACCESS_HOST_WRITE_BIT);
     /* setting the image layout does not reference the actual memory so no need
@@ -266,7 +274,7 @@ demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
 }
 
 
-void vk_shape_window::demo_prepare_textures()
+void vk_shape_window::prepare_textures()
 {
     const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
     VkFormatProperties props;
@@ -283,8 +291,8 @@ void vk_shape_window::demo_prepare_textures()
              VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) &&
             !m_use_staging_buffer) {
             /* Device can texture using linear textures */
-            demo_prepare_texture_image(
-                this, tex_colors[i], &m_textures[i], VK_IMAGE_TILING_LINEAR,
+            prepare_texture_image(
+                tex_colors[i], &m_textures[i], VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_SAMPLED_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -294,15 +302,15 @@ void vk_shape_window::demo_prepare_textures()
             Fl_Vk_Texture staging_texture;
 
             memset(&staging_texture, 0, sizeof(staging_texture));
-            demo_prepare_texture_image(
-                this, tex_colors[i], &staging_texture,
+            prepare_texture_image(
+                tex_colors[i], &staging_texture,
                 VK_IMAGE_TILING_LINEAR,
                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
-            demo_prepare_texture_image(
-                this, tex_colors[i], &m_textures[i],
+            prepare_texture_image(
+                tex_colors[i], &m_textures[i],
                 VK_IMAGE_TILING_OPTIMAL,
                 (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -393,7 +401,7 @@ void vk_shape_window::demo_prepare_textures()
 
 void vk_shape_window::prepare()
 {
-    demo_prepare_textures();  // must refactor to window
+    prepare_textures();  // must refactor to window
     // demo_prepare_vertices(this);  // must refactor to window
     // demo_prepare_descriptor_layout(this);  // uses texture count
     // demo_prepare_render_pass(this);  // can be kept in driver
