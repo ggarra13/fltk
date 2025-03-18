@@ -161,10 +161,15 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
 
+  bool memory_type_from_properties(uint32_t typeBits,
+                                   VkFlags requirements_mask,
+                                   uint32_t *typeIndex);
   void destroy_texture_image(Fl_Vk_Texture *tex_obj);
   void draw_begin();
   void draw() FL_OVERRIDE;
   void draw_end();
+
+  void flush_init_cmd();
 
 public:
   void show() FL_OVERRIDE;

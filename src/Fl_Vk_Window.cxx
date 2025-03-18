@@ -638,6 +638,40 @@ void Fl_Vk_Window_Driver::invalidate() {
 }
 
 
+// Uses m_device, m_setup_cmd, m_queue, m_cmd_pool
+void Fl_Vk_Window::flush_init_cmd()
+{
+    VkResult result;
+
+    if (m_setup_cmd == VK_NULL_HANDLE)
+        return;
+
+    result = vkEndCommandBuffer(m_setup_cmd);
+    VK_CHECK_RESULT(result);
+
+    const VkCommandBuffer cmd_bufs[] = {m_setup_cmd};
+    VkFence nullFence = {VK_NULL_HANDLE};
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.pNext = NULL;
+    submit_info.waitSemaphoreCount = 0;
+    submit_info.pWaitSemaphores = NULL;
+    submit_info.pWaitDstStageMask = NULL;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = cmd_bufs;
+    submit_info.signalSemaphoreCount = 0;
+    submit_info.pSignalSemaphores = NULL;
+
+    result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
+    VK_CHECK_RESULT(result);
+
+    result = vkQueueWaitIdle(m_queue);
+    VK_CHECK_RESULT(result);
+
+    vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
+    m_setup_cmd = VK_NULL_HANDLE;
+}
+
 char Fl_Vk_Window_Driver::swap_type() {return UNDEFINED;}
 
 
@@ -662,6 +696,26 @@ Fl_Vk_Window::~Fl_Vk_Window() {
   hide();
   destroy_resources();
   delete pVkWindowDriver;
+}
+
+bool Fl_Vk_Window::memory_type_from_properties(uint32_t typeBits,
+                                               VkFlags requirements_mask,
+                                               uint32_t *typeIndex) {
+    uint32_t i;
+    // Search memtypes to find first index with those properties
+    for (i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
+        if ((typeBits & 1) == 1) {
+            // Type is available, does it match user properties?
+            if ((m_memory_properties.memoryTypes[i].propertyFlags &
+                 requirements_mask) == requirements_mask) {
+                *typeIndex = i;
+                return true;
+            }
+        }
+        typeBits >>= 1;
+    }
+    // No memory types matched, return failure
+    return false;
 }
 
 void Fl_Vk_Window::init() {

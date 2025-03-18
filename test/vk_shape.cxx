@@ -62,26 +62,6 @@ Fl_Vk_Window(w,h,l) {
 }
 
 // needed
-static bool memory_type_from_properties(Fl_Vk_Window* pWindow,
-                                        uint32_t typeBits,
-                                        VkFlags requirements_mask,
-                                        uint32_t *typeIndex) {
-    uint32_t i;
-    // Search memtypes to find first index with those properties
-    for (i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
-        if ((typeBits & 1) == 1) {
-            // Type is available, does it match user properties?
-            if ((pWindow->m_memory_properties.memoryTypes[i].propertyFlags &
-                 requirements_mask) == requirements_mask) {
-                *typeIndex = i;
-                return true;
-            }
-        }
-        typeBits >>= 1;
-    }
-    // No memory types matched, return failure
-    return false;
-}
 
 // Uses m_cmd_pool, m_setup_cmd
 void vk_shape_window::set_image_layout(VkImage image,
@@ -152,39 +132,6 @@ void vk_shape_window::set_image_layout(VkImage image,
 }
 
 
-// Uses m_device, m_setup_cmd, m_queue, m_cmd_pool
-static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
-    VkResult result;
-
-    if (pWindow->m_setup_cmd == VK_NULL_HANDLE)
-        return;
-
-    result = vkEndCommandBuffer(pWindow->m_setup_cmd);
-    VK_CHECK_RESULT(result);
-
-    const VkCommandBuffer cmd_bufs[] = {pWindow->m_setup_cmd};
-    VkFence nullFence = {VK_NULL_HANDLE};
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.pNext = NULL;
-    submit_info.waitSemaphoreCount = 0;
-    submit_info.pWaitSemaphores = NULL;
-    submit_info.pWaitDstStageMask = NULL;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = cmd_bufs;
-    submit_info.signalSemaphoreCount = 0;
-    submit_info.pSignalSemaphores = NULL;
-
-    result = vkQueueSubmit(pWindow->m_queue, 1, &submit_info, nullFence);
-    VK_CHECK_RESULT(result);
-
-    result = vkQueueWaitIdle(pWindow->m_queue);
-    VK_CHECK_RESULT(result);
-
-    vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, cmd_bufs);
-    pWindow->m_setup_cmd = VK_NULL_HANDLE;
-}
-
 void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
                                             Fl_Vk_Texture* tex_obj,
                                             VkImageTiling tiling,
@@ -228,9 +175,9 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
     vkGetImageMemoryRequirements(m_device, tex_obj->image, &mem_reqs);
 
     mem_alloc.allocationSize = mem_reqs.size;
-    pass =
-        memory_type_from_properties(this, mem_reqs.memoryTypeBits,
-                                    required_props, &mem_alloc.memoryTypeIndex);
+    pass = memory_type_from_properties(mem_reqs.memoryTypeBits,
+                                       required_props,
+                                       &mem_alloc.memoryTypeIndex);
 
     /* allocate memory */
     result = vkAllocateMemory(m_device, &mem_alloc, NULL, &tex_obj->mem);
@@ -346,7 +293,7 @@ void vk_shape_window::prepare_textures()
                              m_textures[i].imageLayout,
                              0);
 
-            demo_flush_init_cmd(this);
+            flush_init_cmd();
 
             destroy_texture_image(&staging_texture);
         } else {
