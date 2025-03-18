@@ -33,6 +33,8 @@ public:
     vk_shape_window(int x,int y,int w,int h,const char *l=0);
     vk_shape_window(int w,int h,const char *l=0);
 
+    float depthIncrement = -0.01f;
+    
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
     
@@ -54,15 +56,28 @@ private:
                           int srcAccessMaskInt);
 };
 
+static void timeout_cb(vk_shape_window* w)
+{
+    if (w->m_depthStencil > 0.99f)
+        w->depthIncrement = -0.001f;
+    if (w->m_depthStencil < 0.8f)
+        w->depthIncrement = 0.001f;
+
+    w->m_depthStencil += w->depthIncrement;
+    w->redraw();
+    Fl::repeat_timeout(0.001, (Fl_Timeout_Handler) timeout_cb, w);
+}
+
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
-    mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
-  sides = 3;
+    mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
+    sides = 3;
 }
 
 vk_shape_window::vk_shape_window(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
-  sides = 3;
+    mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
+    sides = 3;
 }
 
 // needed
@@ -587,5 +602,8 @@ int main(int argc, char **argv) {
     sw.resizable(&sw);
     sw.show();
 #endif
+    
+    Fl::add_timeout(0.05, (Fl_Timeout_Handler)timeout_cb, &sw);
+        
     return Fl::run();
 }
