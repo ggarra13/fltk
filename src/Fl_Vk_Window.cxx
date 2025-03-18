@@ -30,13 +30,72 @@ extern int fl_vk_load_plugin;
 // #include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
 // #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
+void Fl_Vk_Window::destroy_resources()
+{
+    VkResult result;
+    
+    // Wait for all GPU operations to complete before destroying resources
+    result = vkDeviceWaitIdle(m_device);
+    VK_CHECK_RESULT(result);
+
+    if (m_framebuffers) {
+        for (uint32_t i = 0; i < m_swapchainImageCount; i++) {
+            vkDestroyFramebuffer(m_device, m_framebuffers[i], NULL);
+        }
+        free(m_framebuffers);
+        m_framebuffers = NULL;
+    }
+
+    if (m_desc_pool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(m_device, m_desc_pool, NULL);
+        m_desc_pool = VK_NULL_HANDLE;
+    }
+
+    if (m_setup_cmd != VK_NULL_HANDLE) {
+        vkFreeCommandBuffers(m_device, m_cmd_pool, 1, &m_setup_cmd);
+        m_setup_cmd = VK_NULL_HANDLE;
+    }
+
+    if (m_draw_cmd != VK_NULL_HANDLE) {
+        vkFreeCommandBuffers(m_device, m_cmd_pool, 1, &m_draw_cmd);
+        m_draw_cmd = VK_NULL_HANDLE;
+    }
+
+    if (m_cmd_pool != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(m_device, m_cmd_pool, NULL);
+        m_cmd_pool = VK_NULL_HANDLE;
+    }
+
+    if (m_pipeline_layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(m_device, m_pipeline_layout, NULL);
+        m_pipeline_layout = VK_NULL_HANDLE;
+    }
+    
+    if (m_desc_layout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(m_device, m_desc_layout, NULL);
+        m_desc_layout = VK_NULL_HANDLE;
+    }    
+
+    if (m_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(m_device, m_pipeline, NULL);
+        m_pipeline = VK_NULL_HANDLE;
+    }
+
+    if (m_renderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(m_device, m_renderPass, NULL);
+        m_renderPass = VK_NULL_HANDLE;
+    }
+
+}
+
 void Fl_Vk_Window::draw_begin() {
     VkResult result;
 
     // Recreate swapchain if needed
     if (m_swapchain_needs_recreation) {
         vkDeviceWaitIdle(m_device);
-        pVkWindowDriver->resize(); // Now just prepares resources
+        destroy_resources();
+        pVkWindowDriver->destroy_resources(); // Now just prepares resources
         m_swapchain_needs_recreation = false; // Reset only if successful
     }
     
@@ -614,6 +673,7 @@ Fl_RGB_Image* Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int
 */
 Fl_Vk_Window::~Fl_Vk_Window() {
   hide();
+  destroy_resources();
   delete pVkWindowDriver;
 }
 

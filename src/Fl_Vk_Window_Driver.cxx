@@ -120,7 +120,7 @@ static bool memory_type_from_properties(Fl_Vk_Window* pWindow,
     return false;
 }
 
-
+// Uses m_device, m_setup_cmd, m_queue, m_cmd_pool
 static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     VkResult result;
 
@@ -153,6 +153,7 @@ static void demo_flush_init_cmd(Fl_Vk_Window* pWindow) {
     pWindow->m_setup_cmd = VK_NULL_HANDLE;
 }
 
+// Uses m_cmd_pool, m_setup_cmd
 static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
                                   VkImageAspectFlags aspectMask,
                                   VkImageLayout old_image_layout,
@@ -222,6 +223,7 @@ static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
                          0, NULL, 1, &image_memory_barrier);
 }
 
+// Uses m_swapchain, m_swapchainImageCount, m_gpu, m_surface, m_format, m_color_space, m_buffers
 static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     VkResult result;
     VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
@@ -352,6 +354,7 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
     free(swapchainImages);
 }
 
+// Uses m_depth, m_device
 static void demo_prepare_depth(Fl_Vk_Window* pWindow) {
     bool has_depth = pWindow->mode() & FL_DEPTH;
     bool has_stencil = pWindow->mode() & FL_STENCIL;
@@ -442,6 +445,7 @@ static void demo_prepare_depth(Fl_Vk_Window* pWindow) {
     result = vkCreateImageView(pWindow->m_device, &view, NULL, &pWindow->m_depth.view);
     VK_CHECK_RESULT(result);
 }
+
 
 static void
 demo_prepare_texture_image(Fl_Vk_Window* pWindow, const uint32_t *tex_colors,
@@ -773,6 +777,7 @@ static void demo_prepare_descriptor_layout(Fl_Vk_Window* pWindow) {
     VK_CHECK_RESULT(result);
 }
 
+// m_format, m_depth (optionally) -> creates m_renderPass
 static void demo_prepare_render_pass(Fl_Vk_Window* pWindow) 
 {
     bool has_depth = pWindow->mode() & FL_DEPTH;
@@ -1060,6 +1065,7 @@ static void demo_prepare_descriptor_set(Fl_Vk_Window* pWindow) {
     vkUpdateDescriptorSets(pWindow->m_device, 1, &write, 0, NULL);
 }
 
+// Uses m_framebuffers, m_renderPass, m_swapChainImageCount
 static void demo_prepare_framebuffers(Fl_Vk_Window* pWindow) {
     VkImageView attachments[2];
     attachments[0] = VK_NULL_HANDLE;  // Color attachment
@@ -1535,11 +1541,11 @@ static void demo_prepare(Fl_Vk_Window* pWindow)
         return; // Skip further setup if swapchain fails
     }
     demo_prepare_depth(pWindow);
-    demo_prepare_textures(pWindow);
-    demo_prepare_vertices(pWindow);
-    demo_prepare_descriptor_layout(pWindow);
-    demo_prepare_render_pass(pWindow);
-    demo_prepare_pipeline(pWindow);
+    demo_prepare_textures(pWindow);  // must refactor to window
+    demo_prepare_vertices(pWindow);  // must refactor to window
+    demo_prepare_descriptor_layout(pWindow);  // uses texture count
+    demo_prepare_render_pass(pWindow);  // can be kept in driver
+    demo_prepare_pipeline(pWindow);     // must go into Fl_Vk_Window
     
     demo_prepare_descriptor_pool(pWindow);
     demo_prepare_descriptor_set(pWindow);
@@ -1566,7 +1572,10 @@ Fl_Vk_Window_Driver::prepare()
     demo_prepare(pWindow);
 }
 
-void Fl_Vk_Window_Driver::resize()
+// m_device, m_swapchainImageCount, m_framebuffers, m_desc_pool,
+// m_setup_cmd, m_draw_cmd, m_cmd_pool, m_pipeline_layout, m_desc_layout,
+// m_pipeline, m_renderPass, m_vertices, m_textures, m_buffers, m_depth
+void Fl_Vk_Window_Driver::destroy_resources()
 {
     if (!pWindow || !pWindow->m_device)
         return;
@@ -1579,54 +1588,8 @@ void Fl_Vk_Window_Driver::resize()
     VK_CHECK_RESULT(result);
 
     // Destroy resources in reverse creation order
-    if (pWindow->m_framebuffers) {
-        for (uint32_t i = 0; i < pWindow->m_swapchainImageCount; i++) {
-            vkDestroyFramebuffer(pWindow->m_device, pWindow->m_framebuffers[i], NULL);
-        }
-        free(pWindow->m_framebuffers);
-        pWindow->m_framebuffers = NULL;
-    }
 
-    if (pWindow->m_desc_pool != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(pWindow->m_device, pWindow->m_desc_pool, NULL);
-        pWindow->m_desc_pool = VK_NULL_HANDLE;
-    }
-
-    if (pWindow->m_setup_cmd != VK_NULL_HANDLE) {
-        vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, &pWindow->m_setup_cmd);
-        pWindow->m_setup_cmd = VK_NULL_HANDLE;
-    }
-
-    if (pWindow->m_draw_cmd != VK_NULL_HANDLE) {
-        vkFreeCommandBuffers(pWindow->m_device, pWindow->m_cmd_pool, 1, &pWindow->m_draw_cmd);
-        pWindow->m_draw_cmd = VK_NULL_HANDLE;
-    }
-
-    if (pWindow->m_cmd_pool != VK_NULL_HANDLE) {
-        vkDestroyCommandPool(pWindow->m_device, pWindow->m_cmd_pool, NULL);
-        pWindow->m_cmd_pool = VK_NULL_HANDLE;
-    }
-
-    if (pWindow->m_pipeline_layout != VK_NULL_HANDLE) {
-        vkDestroyPipelineLayout(pWindow->m_device, pWindow->m_pipeline_layout, NULL);
-        pWindow->m_pipeline_layout = VK_NULL_HANDLE;
-    }
-    
-    if (pWindow->m_desc_layout != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(pWindow->m_device, pWindow->m_desc_layout, NULL);
-        pWindow->m_desc_layout = VK_NULL_HANDLE;
-    }    
-
-    if (pWindow->m_pipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(pWindow->m_device, pWindow->m_pipeline, NULL);
-        pWindow->m_pipeline = VK_NULL_HANDLE;
-    }
-
-    if (pWindow->m_renderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(pWindow->m_device, pWindow->m_renderPass, NULL);
-        pWindow->m_renderPass = VK_NULL_HANDLE;
-    }
-
+    // This is in vk_sample
     if (pWindow->m_vertices.buf != VK_NULL_HANDLE) {
         vkDestroyBuffer(pWindow->m_device, pWindow->m_vertices.buf, NULL);
         pWindow->m_vertices.buf = VK_NULL_HANDLE;

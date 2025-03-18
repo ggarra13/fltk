@@ -228,6 +228,8 @@ public:
   VkResult begin_setup();
   virtual void setup() {}; 
   VkResult end_setup();
+
+  virtual void destroy_resources();
   
   bool               m_validate = false;  // true: Windows only so far
 
@@ -250,9 +252,13 @@ public:
   VkRenderPass       m_renderPass; // needed
   VkSwapchainKHR     m_swapchain;
   uint32_t           m_swapchainImageCount;
+  VkQueue            m_queue;
+  Fl_Vk_SwapchainBuffer*       m_buffers;
+  uint32_t           m_queueFamilyIndex;
+  Fl_Vk_Depth m_depth;
+  VkFramebuffer* m_framebuffers;
 
   // For drawing
-  VkQueue            m_queue;
   VkPipeline         m_pipeline;  
   VkCommandPool      m_cmd_pool;  // memory for command buffers
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
@@ -295,10 +301,6 @@ public:
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;
   uint32_t                m_queue_count;
-  uint32_t                m_queueFamilyIndex;
-
-  //! This is for holding a depth buffer (should be optional on mode setting)
-  Fl_Vk_Depth m_depth;
 
   //! This is for holding a mesh
   Fl_Vk_Mesh m_vertices;
@@ -306,11 +308,8 @@ public:
   // This is for holding a texture
   Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
 
-  VkFramebuffer* m_framebuffers;
-
   
 
-  Fl_Vk_SwapchainBuffer*       m_buffers;
     
 
   //! @}
@@ -356,7 +355,7 @@ public:
    */
   int pixel_h() { return int(pixels_per_unit() * h() + 0.5f); }
 
-  ~Fl_Vk_Window();
+  virtual ~Fl_Vk_Window();
   /**
     Creates a new Fl_Vk_Window widget using the given size, and label string.
     The default boxtype is FL_NO_BOX. The default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.

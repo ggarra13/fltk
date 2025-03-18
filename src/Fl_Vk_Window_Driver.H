@@ -90,7 +90,7 @@ public:
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers();
-  virtual void resize();
+  virtual void destroy_resources();
   virtual void init_vk();
   virtual void init_vk_swapchain();
   virtual void prepare();
