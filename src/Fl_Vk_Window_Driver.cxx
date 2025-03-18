@@ -1589,36 +1589,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
     VK_CHECK_RESULT(result);
 
     // Destroy resources in reverse creation order
-
-    // This is in vk_sample
-    if (pWindow->m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(pWindow->m_device, pWindow->m_vertices.buf, NULL);
-        pWindow->m_vertices.buf = VK_NULL_HANDLE;
-    }
-
-    if (pWindow->m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(pWindow->m_device, pWindow->m_vertices.mem, NULL);
-        pWindow->m_vertices.mem = VK_NULL_HANDLE;
-    }
-    
-    for (uint32_t i = 0; i < DEMO_TEXTURE_COUNT; i++) {
-        if (pWindow->m_textures[i].view != VK_NULL_HANDLE) {
-            vkDestroyImageView(pWindow->m_device, pWindow->m_textures[i].view, NULL);
-            pWindow->m_textures[i].view = VK_NULL_HANDLE;
-        }
-        if (pWindow->m_textures[i].image != VK_NULL_HANDLE) {
-            vkDestroyImage(pWindow->m_device, pWindow->m_textures[i].image, NULL);
-            pWindow->m_textures[i].image = VK_NULL_HANDLE;
-        }
-        if (pWindow->m_textures[i].mem != VK_NULL_HANDLE) {
-            vkFreeMemory(pWindow->m_device, pWindow->m_textures[i].mem, NULL);
-            pWindow->m_textures[i].mem = VK_NULL_HANDLE;
-        }
-        if (pWindow->m_textures[i].sampler != VK_NULL_HANDLE) {
-            vkDestroySampler(pWindow->m_device, pWindow->m_textures[i].sampler, NULL);
-            pWindow->m_textures[i].sampler = VK_NULL_HANDLE;
-        }
-    }
+    pWindow->destroy_resources();    
 
     if (pWindow->m_buffers) {
         for (uint32_t i = 0; i < pWindow->m_swapchainImageCount; i++) {

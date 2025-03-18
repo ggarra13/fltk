@@ -45,7 +45,8 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" \
       -D Vulkan_LIBRARY=/usr/lib/x86_64-linux-gnu/libvulkan.so.1 \
-      -D Vulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include
+      -D Vulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include \
+      -D Vulkan_shaderc_combined_LIBRARY=/usr/lib/x86_64-linux-gnu/libshaderc_combined.a
 
 ninja
 

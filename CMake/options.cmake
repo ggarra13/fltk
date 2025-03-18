@@ -747,7 +747,7 @@ if(VULKAN_FOUND)
   elseif(FLTK_BACKEND_WAYLAND)
       list(APPEND VULKANLIBS -lvulkan)
   else()
-    list(APPEND VULKANLIBS -lvulkan)
+    list(APPEND VULKANLIBS -lvulkan Vulkan::shaderc)
   endif(WIN32)
 endif(VULKAN_FOUND)
 

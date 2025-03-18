@@ -34,7 +34,8 @@ public:
     vk_shape_window(int w,int h,const char *l=0);
 
     void prepare() FL_OVERRIDE;
-
+    void destroy_resources() FL_OVERRIDE;
+    
 protected:
     void prepare_textures();
     void prepare_mesh();
@@ -457,6 +458,37 @@ void vk_shape_window::draw() {
     Fl_Window::draw();
     
     draw_end();
+}
+
+void vk_shape_window::destroy_resources() {
+    if (m_vertices.buf != VK_NULL_HANDLE) {
+        vkDestroyBuffer(m_device, m_vertices.buf, NULL);
+        m_vertices.buf = VK_NULL_HANDLE;
+    }
+
+    if (m_vertices.mem != VK_NULL_HANDLE) {
+        vkFreeMemory(m_device, m_vertices.mem, NULL);
+        m_vertices.mem = VK_NULL_HANDLE;
+    }
+    
+    for (uint32_t i = 0; i < DEMO_TEXTURE_COUNT; i++) {
+        if (m_textures[i].view != VK_NULL_HANDLE) {
+            vkDestroyImageView(m_device, m_textures[i].view, NULL);
+            m_textures[i].view = VK_NULL_HANDLE;
+        }
+        if (m_textures[i].image != VK_NULL_HANDLE) {
+            vkDestroyImage(m_device, m_textures[i].image, NULL);
+            m_textures[i].image = VK_NULL_HANDLE;
+        }
+        if (m_textures[i].mem != VK_NULL_HANDLE) {
+            vkFreeMemory(m_device, m_textures[i].mem, NULL);
+            m_textures[i].mem = VK_NULL_HANDLE;
+        }
+        if (m_textures[i].sampler != VK_NULL_HANDLE) {
+            vkDestroySampler(m_device, m_textures[i].sampler, NULL);
+            m_textures[i].sampler = VK_NULL_HANDLE;
+        }
+    }
 }
 
 #else
