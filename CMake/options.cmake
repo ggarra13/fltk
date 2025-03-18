@@ -738,17 +738,22 @@ endif(OPENGL_FOUND)
 
 if(VULKAN_FOUND)
   set(FLTK_VULKAN_FOUND TRUE)
-    
+  
   if(WIN32)
     list(APPEND VULKANLIBS -lvulkan-1)
   elseif(APPLE AND NOT FLTK_BACKEND_X11)
-      list(APPEND VULKANLIBS "-L/usr/local/lib -lvulkan -framework Metal -framework QuartzCore")
-      list(APPEND FLTK_COCOA_FRAMEWORKS ${VULKANLIBS})
+    list(APPEND VULKANLIBS "-L/usr/local/lib -lvulkan -framework Metal -framework QuartzCore")
+    list(APPEND FLTK_COCOA_FRAMEWORKS ${VULKANLIBS})
   elseif(FLTK_BACKEND_WAYLAND)
-      list(APPEND VULKANLIBS -lvulkan)
+    list(APPEND VULKANLIBS Vulkan::Vulkan)
   else()
-    list(APPEND VULKANLIBS -lvulkan Vulkan::shaderc)
+    list(APPEND VULKANLIBS Vulkan::Vulkan)
   endif(WIN32)
+  if (NOT Vulkan_shaderc_combined_FOUND)
+    message(WARNINIG "shaderc_combined library not found")
+  else()
+    list(APPEND VULKANLIBS Vulkan::shaderc)
+  endif()
 endif(VULKAN_FOUND)
 
 #######################################################################
