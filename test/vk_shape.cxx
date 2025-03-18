@@ -38,8 +38,9 @@ public:
     
 protected:
     void prepare_textures();
-    void prepare_mesh();
-
+    void prepare_vertices();
+    void prepare_descriptor_layout();
+    
 private:
     void prepare_texture_image(const uint32_t *tex_colors,
                                Fl_Vk_Texture* tex_obj,
@@ -349,7 +350,7 @@ void vk_shape_window::prepare_textures()
     }
 }
 
-void vk_shape_window::prepare_mesh()
+void vk_shape_window::prepare_vertices()
 {
     // clang-format off
     const float vb[3][5] = {
@@ -433,8 +434,8 @@ void vk_shape_window::prepare_mesh()
 void vk_shape_window::prepare()
 {
     prepare_textures();
-    prepare_mesh();  // must refactor to window
-    // demo_prepare_descriptor_layout(this);  // uses texture count
+    prepare_vertices();  // must refactor to window
+    prepare_descriptor_layout();  // uses texture count
     // demo_prepare_render_pass(this);  // can be kept in driver
     // demo_prepare_pipeline(this);     // must go into Fl_Vk_Window
 }
@@ -489,6 +490,38 @@ void vk_shape_window::destroy_resources() {
             m_textures[i].sampler = VK_NULL_HANDLE;
         }
     }
+}
+
+
+void vk_shape_window::prepare_descriptor_layout() {
+    VkDescriptorSetLayoutBinding layout_binding = {};
+    layout_binding.binding = 0;
+    layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    layout_binding.descriptorCount = DEMO_TEXTURE_COUNT;
+    layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    layout_binding.pImmutableSamplers = NULL;
+  
+    VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
+    descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptor_layout.pNext = NULL;
+    descriptor_layout.bindingCount = 1;
+    descriptor_layout.pBindings = &layout_binding;
+                 
+    VkResult result;
+
+    result = vkCreateDescriptorSetLayout(m_device, &descriptor_layout, NULL,
+                                         &m_desc_layout);
+    VK_CHECK_RESULT(result);
+
+    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
+    pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pPipelineLayoutCreateInfo.pNext = NULL;
+    pPipelineLayoutCreateInfo.setLayoutCount = 1;
+    pPipelineLayoutCreateInfo.pSetLayouts = &m_desc_layout;
+
+    result = vkCreatePipelineLayout(m_device, &pPipelineLayoutCreateInfo, NULL,
+                                    &m_pipeline_layout);
+    VK_CHECK_RESULT(result);
 }
 
 #else

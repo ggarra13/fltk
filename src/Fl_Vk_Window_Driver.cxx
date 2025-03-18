@@ -1542,8 +1542,8 @@ static void demo_prepare(Fl_Vk_Window* pWindow)
     }
     demo_prepare_depth(pWindow);
     pWindow->prepare();
-    //demo_prepare_textures(pWindow);  // must refactor to window
-    //demo_prepare_vertices(pWindow);  // must refactor to window
+    //prepare_textures(pWindow);  // must refactor to window
+    //prepare_vertices(pWindow);  // must refactor to window
     demo_prepare_descriptor_layout(pWindow);  // uses texture count
     demo_prepare_render_pass(pWindow);  // can be kept in driver
     demo_prepare_pipeline(pWindow);     // must go into Fl_Vk_Window
