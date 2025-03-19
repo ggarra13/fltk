@@ -76,9 +76,6 @@ public:
   const int *alist() {return pWindow->alist;}
   void alist(const int *l) { pWindow->alist = l;}
 
-  void init_vulkan();
-  void cleanup_vulkan();
-
   Fl_Vk_Window_Driver(Fl_Vk_Window *win) : pWindow(win) {}
   virtual ~Fl_Vk_Window_Driver() {}
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
@@ -92,8 +89,9 @@ public:
   virtual void make_current_after() {}
   virtual void swap_buffers();
   virtual void destroy_resources();
-  virtual void init_vk();
-  virtual void init_vk_swapchain();
+  void demo_init_device();
+  void init_vk();
+  void init_vk_swapchain();
   virtual void prepare();
   virtual char swap_type();
   virtual void swap_interval(int) { }

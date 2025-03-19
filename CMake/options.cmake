@@ -687,7 +687,10 @@ else(FLTK_BUILD_GL)
 endif(FLTK_BUILD_GL)
 
 if(FLTK_BUILD_VK)
-    find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+    # Required components
+    find_package(Vulkan REQUIRED
+	OPTIONAL_COMPONENTS
+	glslang shaderc_combined SPIRV-Tools)
 else(FLTK_BUILD_VK)
   set(VK_FOUND FALSE)
   set(HAVE_VK FALSE)
@@ -740,15 +743,30 @@ if(VULKAN_FOUND)
   set(FLTK_VULKAN_FOUND TRUE)
   
   if(WIN32)
-    list(APPEND VULKANLIBS Vulkan)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
   elseif(APPLE AND NOT FLTK_BACKEND_X11)
-    list(APPEND VULKANLIBS Vulkan::Vulkan Vulkan::shaderc -framework Metal -framework QuartzCore)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
     list(APPEND FLTK_COCOA_FRAMEWORKS "-framework Metal -framework QuartzCore")
   elseif(FLTK_BACKEND_WAYLAND)
-    list(APPEND VULKANLIBS Vulkan::Vulkan Vulkan::shaderc)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
   else()
-    list(APPEND VULKANLIBS Vulkan::Vulkan Vulkan::shaderc)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
   endif(WIN32)
+  if (Vulkan_shaderc_combined_FOUND)
+      list(APPEND VULKAN_LIBRARIES
+	  Vulkan::shaderc_combined
+	  Vulkan::SPIRV-Tools
+	  Vulkan::glslang
+      )
+      if(UNIX AND NOT APPLE)
+	  find_library(SPIRV_Tools_opt_LIBRARY SPIRV-Tools-opt)
+	  if(SPIRV_Tools_opt_LIBRARY)
+	      list(APPEND VULKAN_LIBRARIES ${SPIRV_Tools_opt_LIBRARY})
+	  endif()
+      endif()
+  else()
+      message(FATAL_ERROR "shaderc not found!")
+  endif()
 endif(VULKAN_FOUND)
 
 #######################################################################

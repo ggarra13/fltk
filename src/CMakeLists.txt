@@ -498,6 +498,12 @@ set(VKCPPFILES
   # vk_start.cxx
 )
 
+if (Vulkan_shaderc_combined_FOUND)
+    list(APPEND VKCPPFILES
+	Fl_Vk_Utils.cxx
+	)
+endif()
+
 set(VK_DRIVER_FILES
   Fl_Vk_Window_Driver.cxx
   #drivers/Vulkan/Fl_Vulkan_Display_Device.cxx
@@ -931,7 +937,7 @@ endif(FLTK_USE_GL)
 
 if(FLTK_USE_VK)
   fl_add_library(fltk_vk STATIC "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
-  target_link_libraries(fltk_vk PUBLIC ${Vulkan_LIBRARIES} fltk::fltk ${CMAKE_DL_LIBS})
+  target_link_libraries(fltk_vk PUBLIC ${Vulkan_LIBRARIES} ${VULKAN_LIBS} fltk::fltk ${CMAKE_DL_LIBS})
   target_include_directories(fltk_vk PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
 
   # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
@@ -1000,9 +1006,15 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
   endif(FLTK_USE_GL)
 
   if(FLTK_USE_VK)
+      message(STATUS "VULKANLIBS=${VULKANLIBS}")
+      message(STATUS "Vulkan_LIBRARIES=${Vulkan_LIBRARIES}")
+      message(STATUS "VULKAN_LIBRARIES=${VULKAN_LIBRARIES}")
+      message(STATUS "Vulkan_INCLUDE_DIR=${Vulkan_INCLUDE_DIR}")
+      message(STATUS "VULKAN_INCLUDE_DIRS=${VULKAN_INCLUDE_DIRS}")
+      #message(FATAL_ERROR "-----")
     fl_add_library(fltk_vk SHARED "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
-    target_link_libraries(fltk_vk-shared PUBLIC ${Vulkan_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
-    target_include_directories(fltk_vk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+    target_link_libraries(fltk_vk-shared PUBLIC ${VULKAN_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
+    # target_include_directories(fltk_vk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
 
     # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
     add_optional_libs(fltk_vk-shared)

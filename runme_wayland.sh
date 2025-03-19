@@ -51,4 +51,4 @@ cmake .. \
 
 ninja
 
-bin/test/vk_shape-shared
+bin/test/vk_shape_shaders-shared
