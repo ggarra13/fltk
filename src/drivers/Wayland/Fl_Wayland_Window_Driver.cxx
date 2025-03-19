@@ -407,6 +407,15 @@ void Fl_Wayland_Window_Driver::flush() {
     }
     return;
   }
+  if (pWindow->as_vk_window()) {
+    int W = pWindow->w();
+    int H = pWindow->h();
+    float scale = fl_graphics_driver->scale();
+    Fl_Wayland_Window_Driver::in_flush_ = true;
+    Fl_Window_Driver::flush();
+    Fl_Wayland_Window_Driver::in_flush_ = false;
+    return;
+  }
   struct wld_window *window = fl_wl_xid(pWindow);
   if (!window || !window->configured_width) return;
 
