@@ -76,9 +76,6 @@ public:
   const int *alist() {return pWindow->alist;}
   void alist(const int *l) { pWindow->alist = l;}
 
-  void init_vulkan();
-  void cleanup_vulkan();
-
   Fl_Vk_Window_Driver(Fl_Vk_Window *win) : pWindow(win) {}
   virtual ~Fl_Vk_Window_Driver() {}
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
