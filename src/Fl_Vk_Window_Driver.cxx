@@ -20,63 +20,12 @@ struct Fl_Vk_Frame;
 
 bool g_FunctionsLoaded = true;
 
-// Helpers
-
-VKAPI_ATTR VkBool32 VKAPI_CALL
-BreakCallback(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType,
-              uint64_t srcObject, size_t location, int32_t msgCode,
-              const char *pLayerPrefix, const char *pMsg,
-              void *pUserData) {
-#ifdef _WIN32
-    DebugBreak();
-#else
-    raise(SIGTRAP);
-#endif
-
-    return false;
-}
-
 static int validation_error = 0;
-
-VKAPI_ATTR VkBool32 VKAPI_CALL
-dbgFunc(VkFlags msgFlags, VkDebugReportObjectTypeEXT objType,
-    uint64_t srcObject, size_t location, int32_t msgCode,
-    const char *pLayerPrefix, const char *pMsg, void *pUserData) {
-    char *message = (char *)malloc(strlen(pMsg) + 100);
-
-    assert(message);
-
-    validation_error = 1;
-
-    if (msgFlags & VK_DEBUG_REPORT_ERROR_BIT_EXT) {
-        sprintf(message, "ERROR: [%s] Code %d : %s", pLayerPrefix, msgCode,
-            pMsg);
-    } else if (msgFlags & VK_DEBUG_REPORT_WARNING_BIT_EXT) {
-        sprintf(message, "WARNING: [%s] Code %d : %s", pLayerPrefix, msgCode,
-            pMsg);
-    } else {
-        return false;
-    }
-
-    printf("%s\n", message);
-    fflush(stdout);
-    free(message);
-
-    /*
-    * false indicates that layer should not bail-out of an
-    * API call that had validation failures. This may mean that the
-    * app dies inside the driver due to invalid parameter(s).
-    * That's what would happen without validation layers, so we'll
-    * keep that behavior here.
-    */
-    return false;
-}
-
 /*
  * Return 1 (true) if all layer names specified in check_names
  * can be found in given layer properties.
  */
-static VkBool32 demo_check_layers(uint32_t check_count,
+static VkBool32 check_layers(uint32_t check_count,
                                   const char **check_names,
                                   uint32_t layer_count,
                                   VkLayerProperties *layers) {
@@ -555,7 +504,7 @@ Fl_Vk_Window_Driver::init_vk()
             assert(!err);
 
 
-            validation_found = demo_check_layers(
+            validation_found = check_layers(
                     VK_ARRAY_SIZE(instance_validation_layers_alt1),
                     instance_validation_layers, instance_layer_count,
                     instance_layers);

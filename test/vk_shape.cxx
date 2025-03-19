@@ -23,7 +23,7 @@
 
 #if HAVE_VK
 
-#include <cassert>
+#include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
 
@@ -33,6 +33,7 @@ public:
     int sides;
     vk_shape_window(int x,int y,int w,int h,const char *l=0);
     vk_shape_window(int w,int h,const char *l=0);
+    ~vk_shape_window();
 
     float depthIncrement = -0.01f;
     
@@ -85,6 +86,12 @@ static void timeout_cb(vk_shape_window* w)
     Fl::repeat_timeout(0.001, (Fl_Timeout_Handler) timeout_cb, w);
 }
 
+vk_shape_window::~vk_shape_window()
+{
+    vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
+    vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
+}
+
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
@@ -112,6 +119,9 @@ void vk_shape_window::set_image_layout(VkImage image,
 {
     VkResult err;
 
+    if (image == VK_NULL_HANDLE)
+        abort();
+    
     VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
     if (m_setup_cmd == VK_NULL_HANDLE) {
         VkCommandBufferAllocateInfo cmd = {};
@@ -389,17 +399,32 @@ void vk_shape_window::prepare_textures()
 void vk_shape_window::prepare_vertices()
 {
     // clang-format off
-    const float vb[3][5] = {
-        /*      position             texcoord */
-        { -1.0f, -1.0f,  0.25f,     0.0f, 0.0f },
-        {  1.0f, -1.0f,  0.25f,     1.0f, 0.0f },
-        {  0.0f,  1.0f,  1.0f,      0.5f, 1.0f },
+    struct Vertex
+    {
+        float x, y, z;  // 3D position
+        float u, v;      // UV coordinates
     };
+
+    std::vector<Vertex> vertices(sides);
+    for (int j=0; j<sides; j++) {
+        double ang = j*2*M_PI/sides;
+        float x = cos(ang);
+        float y = sin(ang);
+        vertices[j].x = x;
+        vertices[j].y = y;
+        vertices[j].z = 0.F;
+        vertices[j].u = x / 2 + 1;
+        vertices[j].v = y / 2 + 1;
+    }
+    
+            
+	VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+    
     // clang-format on
     VkBufferCreateInfo buf_info = {};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.pNext = NULL;
-    buf_info.size = sizeof(vb);
+    buf_info.size = buffer_size;
     buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     buf_info.flags = 0;
     
@@ -425,23 +450,21 @@ void vk_shape_window::prepare_vertices()
     mem_alloc.allocationSize = mem_reqs.size;
     pass = memory_type_from_properties(mem_reqs.memoryTypeBits,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
-    assert(pass);
 
     result = vkAllocateMemory(m_device, &mem_alloc, NULL, &m_vertices.mem);
     VK_CHECK_RESULT(result);
 
     result = vkMapMemory(m_device, m_vertices.mem, 0,
-                      mem_alloc.allocationSize, 0, &data);
+                         mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
-    memcpy(data, vb, sizeof(vb));
+	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
     vkUnmapMemory(m_device, m_vertices.mem);
 
-    result = vkBindBufferMemory(m_device, m_vertices.buf,
-                             m_vertices.mem, 0);
+    result = vkBindBufferMemory(m_device, m_vertices.buf, m_vertices.mem, 0);
     VK_CHECK_RESULT(result);
 
     m_vertices.vi.sType =
@@ -453,7 +476,7 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
 
     m_vertices.vi_bindings[0].binding = VERTEX_BUFFER_BIND_ID;
-    m_vertices.vi_bindings[0].stride = sizeof(vb[0]);
+    m_vertices.vi_bindings[0].stride = sizeof(vertices[0]);
     m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     m_vertices.vi_attrs[0].binding = VERTEX_BUFFER_BIND_ID;
@@ -544,37 +567,72 @@ void vk_shape_window::prepare_render_pass()
     VK_CHECK_RESULT(result);
 }
 
-static VkShaderModule
-prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t size) {
-    VkShaderModuleCreateInfo moduleCreateInfo;
-    VkShaderModule module;
-    VkResult result;
-
-    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCreateInfo.pNext = NULL;
-
-    moduleCreateInfo.codeSize = size;
-    moduleCreateInfo.pCode = code;
-    moduleCreateInfo.flags = 0;
-    result = vkCreateShaderModule(pWindow->m_device, &moduleCreateInfo, NULL, &module);
-    VK_CHECK_RESULT(result);
-
-    return module;
-}
-
 VkShaderModule vk_shape_window::prepare_vs() {
-    size_t size = sizeof(vertShaderCode);
+    if (m_vert_shader_module != VK_NULL_HANDLE)
+        return m_vert_shader_module;
+    
+    // Example GLSL vertex shader
+    std::string vertex_shader_glsl = R"(
+        #version 450
+        layout(location = 0) in vec3 inPos;
+        layout(location = 1) in vec2 inTexCoord;
+        layout(location = 0) out vec2 outTexCoord;
+        void main() {
+            gl_Position = vec4(inPos, 1.0);
+            outTexCoord = inTexCoord;
+        }
+    )";
+    
+    try {
+        std::vector<uint32_t> spirv = compile_glsl_to_spirv(
+            vertex_shader_glsl,
+            shaderc_vertex_shader,  // Shader type
+            "vertex_shader.glsl"    // Filename for error reporting
+        );
 
-    m_vert_shader_module = prepare_shader_module(this, vertShaderCode, size);
-
+        m_vert_shader_module = create_shader_module(m_device, spirv);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        m_vert_shader_module = VK_NULL_HANDLE;
+    }
     return m_vert_shader_module;
 }
 
 VkShaderModule vk_shape_window::prepare_fs() {
-    size_t size = sizeof(fragShaderCode);
+    if (m_frag_shader_module != VK_NULL_HANDLE)
+        return m_frag_shader_module;
+    
+    // Example GLSL vertex shader
+    std::string frag_shader_glsl = R"(
+        #version 450
 
-    m_frag_shader_module = prepare_shader_module(this, fragShaderCode, size);
+        // Input from vertex shader
+        layout(location = 0) in vec2 inTexCoord;
 
+        // Output color
+        layout(location = 0) out vec4 outColor;
+
+        // Texture sampler (bound via descriptor set)
+        layout(binding = 0) uniform sampler2D textureSampler;
+
+        void main() {
+            outColor = texture(textureSampler, inTexCoord);
+        }
+    )";
+    // Compile to SPIR-V
+    try {
+
+        std::vector<uint32_t> spirv = compile_glsl_to_spirv(
+            frag_shader_glsl,
+            shaderc_fragment_shader,  // Shader type
+            "frag_shader.glsl"    // Filename for error reporting
+        );
+        // Assuming you have a VkDevice 'device' already created
+        m_frag_shader_module = create_shader_module(m_device, spirv);
+    
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
     return m_frag_shader_module;
 }
 
@@ -607,12 +665,12 @@ void vk_shape_window::prepare_pipeline() {
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rs.polygonMode = VK_POLYGON_MODE_FILL;
-    rs.cullMode = VK_CULL_MODE_BACK_BIT;
+    rs.cullMode = VK_CULL_MODE_NONE;
     rs.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs.depthClampEnable = VK_FALSE;
     rs.rasterizerDiscardEnable = VK_FALSE;
@@ -695,8 +753,8 @@ void vk_shape_window::prepare_pipeline() {
 
     vkDestroyPipelineCache(m_device, m_pipelineCache, NULL);
 
-    vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
-    vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
+    // vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
+    // vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
 }
 
 
@@ -765,24 +823,23 @@ void vk_shape_window::prepare()
 void vk_shape_window::draw() {
     if (!shown() || w() <= 0 || h() <= 0) return;
 
-    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     // Background color
     m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
     
     draw_begin();
+
+    prepare_vertices();
 
     // Draw the triangle
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
                            &m_vertices.buf, offsets);
 
-    vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
+    vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
 
     Fl_Window::draw();
     
-    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     draw_end();
-    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
 }
 
 void vk_shape_window::destroy_resources() {

@@ -90,6 +90,7 @@ struct Fl_Vk_Mesh {
     VkBuffer buf;
     VkDeviceMemory mem;
 
+    std::vector<int> v;
     VkPipelineVertexInputStateCreateInfo vi;
     VkVertexInputBindingDescription vi_bindings[1];
     VkVertexInputAttributeDescription vi_attrs[2];

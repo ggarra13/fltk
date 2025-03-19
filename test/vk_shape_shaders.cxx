@@ -23,7 +23,7 @@
 
 #if HAVE_VK
 
-#include <cassert>
+#include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
 
@@ -399,17 +399,32 @@ void vk_shape_window::prepare_textures()
 void vk_shape_window::prepare_vertices()
 {
     // clang-format off
-    const float vb[3][5] = {
-        /*      position             texcoord */
-        { -1.0f, -1.0f,  0.25f,     0.0f, 0.0f },
-        {  1.0f, -1.0f,  0.25f,     1.0f, 0.0f },
-        {  0.0f,  1.0f,  1.0f,      0.5f, 1.0f },
+    struct Vertex
+    {
+        float x, y, z;  // 3D position
+        float u, v;      // UV coordinates
     };
+
+    std::vector<Vertex> vertices(sides);
+    for (int j=0; j<sides; j++) {
+        double ang = j*2*M_PI/sides;
+        float x = cos(ang);
+        float y = sin(ang);
+        vertices[j].x = x;
+        vertices[j].y = y;
+        vertices[j].z = 0.F;
+        vertices[j].u = x / 2 + 1;
+        vertices[j].v = y / 2 + 1;
+    }
+    
+            
+	VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+    
     // clang-format on
     VkBufferCreateInfo buf_info = {};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.pNext = NULL;
-    buf_info.size = sizeof(vb);
+    buf_info.size = buffer_size;
     buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     buf_info.flags = 0;
     
@@ -435,23 +450,21 @@ void vk_shape_window::prepare_vertices()
     mem_alloc.allocationSize = mem_reqs.size;
     pass = memory_type_from_properties(mem_reqs.memoryTypeBits,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
-    assert(pass);
 
     result = vkAllocateMemory(m_device, &mem_alloc, NULL, &m_vertices.mem);
     VK_CHECK_RESULT(result);
 
     result = vkMapMemory(m_device, m_vertices.mem, 0,
-                      mem_alloc.allocationSize, 0, &data);
+                         mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
-    memcpy(data, vb, sizeof(vb));
+	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
     vkUnmapMemory(m_device, m_vertices.mem);
 
-    result = vkBindBufferMemory(m_device, m_vertices.buf,
-                             m_vertices.mem, 0);
+    result = vkBindBufferMemory(m_device, m_vertices.buf, m_vertices.mem, 0);
     VK_CHECK_RESULT(result);
 
     m_vertices.vi.sType =
@@ -463,7 +476,7 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
 
     m_vertices.vi_bindings[0].binding = VERTEX_BUFFER_BIND_ID;
-    m_vertices.vi_bindings[0].stride = sizeof(vb[0]);
+    m_vertices.vi_bindings[0].stride = sizeof(vertices[0]);
     m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     m_vertices.vi_attrs[0].binding = VERTEX_BUFFER_BIND_ID;
@@ -652,12 +665,12 @@ void vk_shape_window::prepare_pipeline() {
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
 
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rs.polygonMode = VK_POLYGON_MODE_FILL;
-    rs.cullMode = VK_CULL_MODE_BACK_BIT;
+    rs.cullMode = VK_CULL_MODE_NONE;
     rs.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs.depthClampEnable = VK_FALSE;
     rs.rasterizerDiscardEnable = VK_FALSE;
@@ -815,12 +828,14 @@ void vk_shape_window::draw() {
     
     draw_begin();
 
+    prepare_vertices();
+
     // Draw the triangle
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
                            &m_vertices.buf, offsets);
 
-    vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
+    vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
 
     Fl_Window::draw();
     
