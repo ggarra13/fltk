@@ -34,17 +34,17 @@ extern unsigned fl_cmap[256]; // defined in fl_color.cxx
 
 void Fl_Vulkan_Graphics_Driver::color(Fl_Color i) {
   if (i & 0xffffff00) {
-    unsigned rgba = ((unsigned)i)^0x000000ff;
+    unsigned rgba = ((unsigned)i) ^ 0x000000ff;
     Fl_Graphics_Driver::color(i);
-    vkColor4ub(rgba>>24, rgba>>16, rgba>>8, rgba);
+    vkColor4ub(rgba >> 24, rgba >> 16, rgba >> 8, rgba);
   } else {
-    unsigned rgba = ((unsigned)fl_cmap[i])^0x000000ff;
+    unsigned rgba = ((unsigned)fl_cmap[i]) ^ 0x000000ff;
     Fl_Graphics_Driver::color(fl_cmap[i]);
-    vkColor4ub(rgba>>24, rgba>>16, rgba>>8, rgba);
+    vkColor4ub(rgba >> 24, rgba >> 16, rgba >> 8, rgba);
   }
 }
 
 void Fl_Vulkan_Graphics_Driver::color(uchar r, uchar g, uchar b) {
-  Fl_Graphics_Driver::color( fl_rgb_color(r, g, b) );
-  vkColor3ub(r,g,b);
+  Fl_Graphics_Driver::color(fl_rgb_color(r, g, b));
+  vkColor3ub(r, g, b);
 }

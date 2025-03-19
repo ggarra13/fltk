@@ -33,23 +33,19 @@
 class Fl_Vk_Choice;
 class Fl_Font_Descriptor;
 
-struct QueueFamilyIndices
-{
-    uint32_t graphicsFamily;
-    bool graphicsFamilyValid = false;
-    uint32_t presentFamily;
-    bool presentFamilyValid = false;
+struct QueueFamilyIndices {
+  uint32_t graphicsFamily;
+  bool graphicsFamilyValid = false;
+  uint32_t presentFamily;
+  bool presentFamilyValid = false;
 
-    bool isComplete() {
-        return graphicsFamilyValid && presentFamilyValid;
-    }
+  bool isComplete() { return graphicsFamilyValid && presentFamilyValid; }
 };
 
-struct SwapChainSupportDetails
-{
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
+struct SwapChainSupportDetails {
+  VkSurfaceCapabilitiesKHR capabilities;
+  std::vector<VkSurfaceFormatKHR> formats;
+  std::vector<VkPresentModeKHR> presentModes;
 };
 
 /* The constructor of each Fl_Vk_Window object creates also an object from a
@@ -63,64 +59,68 @@ protected:
   bool check_device_extension_support(VkPhysicalDevice device);
   QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
   SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device);
- 
+
 public:
-  static Fl_Window* cached_window;
+  static Fl_Window *cached_window;
   static Fl_Vk_Choice *first;
   static int copy;
   static float vk_scale;
-  Fl_Vk_Choice* g() {return pWindow->g;}
-  void g(Fl_Vk_Choice *c) {pWindow->g = c;}
-  int mode() {return pWindow->mode_;}
-  void mode(int m) { pWindow->mode_ = m;}
-  const int *alist() {return pWindow->alist;}
-  void alist(const int *l) { pWindow->alist = l;}
+  Fl_Vk_Choice *g() { return pWindow->g; }
+  void g(Fl_Vk_Choice *c) { pWindow->g = c; }
+  int mode() { return pWindow->mode_; }
+  void mode(int m) { pWindow->mode_ = m; }
+  const int *alist() { return pWindow->alist; }
+  void alist(const int *l) { pWindow->alist = l; }
 
-  Fl_Vk_Window_Driver(Fl_Vk_Window *win) : pWindow(win) {}
+  Fl_Vk_Window_Driver(Fl_Vk_Window *win)
+    : pWindow(win) {}
   virtual ~Fl_Vk_Window_Driver() {}
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
   static Fl_Vk_Window_Driver *global();
-  virtual float pixels_per_unit() {return 1;}
-  virtual void before_show(int&) {}
+  virtual float pixels_per_unit() { return 1; }
+  virtual void before_show(int &) {}
   virtual void after_show() {}
   virtual void invalidate();
-  virtual int mode_(int /*m*/, const int * /*a*/) {return 0;}
+  virtual int mode_(int /*m*/, const int * /*a*/) { return 0; }
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers();
   virtual void destroy_resources();
   virtual void prepare();
   virtual char swap_type();
-  virtual void swap_interval(int) { }
+  virtual void swap_interval(int) {}
   virtual int swap_interval() const { return -1; }
-  virtual int flush_begin() {return 0;}
+  virtual int flush_begin() { return 0; }
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);
   // Return one of these structures for a given vk mode.
-  virtual Fl_Vk_Choice *find(int /*mode*/, const int * /*alistp*/) {return NULL;}
-  virtual void waitVK() {} // support for vk_finish() function
-  virtual void vk_visual(Fl_Vk_Choice*) {} // support for Fl::vk_visual() function
-  virtual void vk_start() {} // support for vk_start() function
-  virtual void* GetProcAddress(const char *procName) { return nullptr; }
-  virtual void get_list(Fl_Font_Descriptor*, int) {} // support for gl_draw() without textures
-  static void draw_string_with_texture(const char* str, int n); // cross-platform
+  virtual Fl_Vk_Choice *find(int /*mode*/, const int * /*alistp*/) { return NULL; }
+  virtual void waitVK() {}                  // support for vk_finish() function
+  virtual void vk_visual(Fl_Vk_Choice *) {} // support for Fl::vk_visual() function
+  virtual void vk_start() {}                // support for vk_start() function
+  virtual void *GetProcAddress(const char *procName) { return nullptr; }
+  virtual void get_list(Fl_Font_Descriptor *, int) {} // support for gl_draw() without textures
+  static void draw_string_with_texture(const char *str, int n); // cross-platform
   // support for vk_draw(). The cross-platform version may be enough.
   virtual char *alpha_mask_for_string(const char *str, int n, int w, int h, Fl_Fontsize fs);
   virtual int genlistsize() { return 0; } // support for gl_draw()
-  virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum);
-  virtual Fl_RGB_Image* capture_vk_rectangle(int x, int y, int w, int h);
-  static inline Fl_Vk_Window_Driver* driver(const Fl_Vk_Window *win) {return win->pVkWindowDriver;}
+  virtual Fl_Font_Descriptor **fontnum_to_fontdescriptor(int fnum);
+  virtual Fl_RGB_Image *capture_vk_rectangle(int x, int y, int w, int h);
+  static inline Fl_Vk_Window_Driver *driver(const Fl_Vk_Window *win) {
+    return win->pVkWindowDriver;
+  }
 
   // true means the platform uses vkScissor() to make sure VK subwindows
   // don't leak outside their parent window
   virtual bool need_scissor() { return false; }
 
-    // Vulkan specific methods.
+  // Vulkan specific methods.
   virtual std::vector<std::string> get_required_extensions() = 0;
   virtual void create_surface() = 0;
 
   void init_vk();
   void init_vk_swapchain();
+
 protected:
   void init_device();
   void prepare_buffers();

@@ -35,19 +35,23 @@ class Fl_Vk_Choice {
   friend class Fl_Vk_Window_Driver;
 
 protected:
-    // Vulkan objects
+  // Vulkan objects
   VkInstance instance;
   VkPhysicalDevice physicalDevice;
   VkDevice device;
   VkSurfaceKHR surface;
   VkSwapchainKHR swapchain;
   VkQueue queue;
-    
+
   int mode;
   const int *alist;
   Fl_Vk_Choice *next;
+
 public:
-  Fl_Vk_Choice(int m, const int *alistp, Fl_Vk_Choice *n) : mode(m), alist(alistp), next(n) {}
+  Fl_Vk_Choice(int m, const int *alistp, Fl_Vk_Choice *n)
+    : mode(m)
+    , alist(alistp)
+    , next(n) {}
 };
 
 #endif // Fl_Vk_Choice_H

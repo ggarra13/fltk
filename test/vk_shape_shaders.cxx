@@ -405,13 +405,15 @@ void vk_shape_window::prepare_vertices()
     };
 
     std::vector<Vertex> vertices(sides);
+    float z = 0.5F;
     for (int j=0; j<sides; j++) {
         double ang = j*2*M_PI/sides;
         float x = cos(ang);
         float y = sin(ang);
         vertices[j].x = x;
         vertices[j].y = y;
-        vertices[j].z = 0.F;
+        vertices[j].z = z;
+        z += std::min(j / (float)(sides - 1), 1.F);
         vertices[j].u = x / 2 + 1;
         vertices[j].v = y / 2 + 1;
     }

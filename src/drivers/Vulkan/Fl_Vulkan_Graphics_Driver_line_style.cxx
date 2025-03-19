@@ -30,32 +30,33 @@
 // Vulkan implementation does not support custom patterns
 // Vulkan implementation does not support cap and join types
 
-void Fl_Vulkan_Graphics_Driver::line_style(int style, int width, char* dashes) {
-  if (width<1) width = 1;
+void Fl_Vulkan_Graphics_Driver::line_style(int style, int width, char *dashes) {
+  if (width < 1)
+    width = 1;
   line_width_ = (float)width;
 
   int stipple = style & 0x00ff;
   line_stipple_ = stipple;
-//  int cap     = style & 0x0f00;
-//  int join    = style & 0xf000;
+  //  int cap     = style & 0x0f00;
+  //  int join    = style & 0xf000;
 
-  if (stipple==FL_SOLID) {
+  if (stipple == FL_SOLID) {
     vkLineStipple(1, 0xFFFF);
     vkDisable(VK_LINE_STIPPLE);
   } else {
     char enable = 1;
     switch (stipple & 0x00ff) {
       case FL_DASH:
-        vkLineStipple(VKint(pixels_per_unit_*line_width_), 0x0F0F); // ....****....****
+        vkLineStipple(VKint(pixels_per_unit_ * line_width_), 0x0F0F); // ....****....****
         break;
       case FL_DOT:
-        vkLineStipple(VKint(pixels_per_unit_*line_width_), 0x5555); // .*.*.*.*.*.*.*.*
+        vkLineStipple(VKint(pixels_per_unit_ * line_width_), 0x5555); // .*.*.*.*.*.*.*.*
         break;
       case FL_DASHDOT:
-        vkLineStipple(VKint(pixels_per_unit_*line_width_), 0x2727); // ..*..***..*..***
+        vkLineStipple(VKint(pixels_per_unit_ * line_width_), 0x2727); // ..*..***..*..***
         break;
       case FL_DASHDOTDOT:
-        vkLineStipple(VKint(pixels_per_unit_*line_width_), 0x5757); // .*.*.***.*.*.***
+        vkLineStipple(VKint(pixels_per_unit_ * line_width_), 0x5757); // .*.*.***.*.*.***
         break;
       default:
         vkLineStipple(1, 0xFFFF);
@@ -66,6 +67,6 @@ void Fl_Vulkan_Graphics_Driver::line_style(int style, int width, char* dashes) {
     else
       vkDisable(VK_LINE_STIPPLE);
   }
-  vkLineWidth( (VKfloat)(pixels_per_unit_ * line_width_) );
-  vkPointSize( (VKfloat)(pixels_per_unit_) );
+  vkLineWidth((VKfloat)(pixels_per_unit_ * line_width_));
+  vkPointSize((VKfloat)(pixels_per_unit_));
 }

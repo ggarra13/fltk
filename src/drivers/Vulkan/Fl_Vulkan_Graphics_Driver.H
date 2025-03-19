@@ -34,10 +34,10 @@ public:
   float pixels_per_unit_;
   float line_width_;
   int line_stipple_;
-  Fl_Vulkan_Graphics_Driver() :
-  pixels_per_unit_(1.0f),
-  line_width_(1.0f),
-  line_stipple_(FL_SOLID) { }
+  Fl_Vulkan_Graphics_Driver()
+    : pixels_per_unit_(1.0f)
+    , line_width_(1.0f)
+    , line_stipple_(FL_SOLID) {}
   // --- line and polygon drawing with integer coordinates
   void point(int x, int y) FL_OVERRIDE;
   void rect(int x, int y, int w, int h) FL_OVERRIDE;
@@ -82,7 +82,7 @@ public:
   void arc(int x, int y, int w, int h, double a1, double a2) FL_OVERRIDE;
   void arc(double x, double y, double r, double start, double end) FL_OVERRIDE;
   void pie(int x, int y, int w, int h, double a1, double a2) FL_OVERRIDE;
-  void line_style(int style, int width=0, char* dashes=0) FL_OVERRIDE;
+  void line_style(int style, int width = 0, char *dashes = 0) FL_OVERRIDE;
   void color(Fl_Color c) FL_OVERRIDE;
   Fl_Color color() FL_OVERRIDE { return color_; }
   void color(uchar r, uchar g, uchar b) FL_OVERRIDE;
@@ -94,7 +94,7 @@ public:
   void draw(int angle, const char *str, int n, int x, int y) FL_OVERRIDE;
   double width(const char *str, int n) FL_OVERRIDE;
   double width(unsigned int c) FL_OVERRIDE;
-  void text_extents(const char*, int n, int& dx, int& dy, int& w, int& h) FL_OVERRIDE;
+  void text_extents(const char *, int n, int &dx, int &dy, int &w, int &h) FL_OVERRIDE;
   int height() FL_OVERRIDE;
   int descent() FL_OVERRIDE;
 };

@@ -38,10 +38,10 @@
 // It's recommended that SLOW_COMPLEX_POLY is defined, but fl_begin_polygon()
 // is used instead of fl_begin_complex_polygon() whenever possible.
 
-//#undef SLOW_COMPLEX_POLY
+// #undef SLOW_COMPLEX_POLY
 #define SLOW_COMPLEX_POLY
 #ifdef SLOW_COMPLEX_POLY
-# define GAP (1e9f)
+#define GAP (1e9f)
 #endif
 
 // Event though there are faster versions of the functions in Vulkan,
@@ -50,15 +50,16 @@
 
 // void Fl_Vulkan_Graphics_Driver::push_matrix()
 // void Fl_Vulkan_Graphics_Driver::pop_matrix()
-// void Fl_Vulkan_Graphics_Driver::mult_matrix(double a, double b, double c, double d, double x, double y)
-// void Fl_Vulkan_Graphics_Driver::rotate(double d)
-// double Fl_Vulkan_Graphics_Driver::transform_x(double x, double y)
-// double Fl_Vulkan_Graphics_Driver::transform_y(double x, double y)
-// double Fl_Vulkan_Graphics_Driver::transform_dx(double x, double y)
-// double Fl_Vulkan_Graphics_Driver::transform_dy(double x, double y)
+// void Fl_Vulkan_Graphics_Driver::mult_matrix(double a, double b, double c, double d, double x,
+// double y) void Fl_Vulkan_Graphics_Driver::rotate(double d) double
+// Fl_Vulkan_Graphics_Driver::transform_x(double x, double y) double
+// Fl_Vulkan_Graphics_Driver::transform_y(double x, double y) double
+// Fl_Vulkan_Graphics_Driver::transform_dx(double x, double y) double
+// Fl_Vulkan_Graphics_Driver::transform_dy(double x, double y)
 
 void Fl_Vulkan_Graphics_Driver::begin_points() {
-  n = 0; gap_ = 0;
+  n = 0;
+  gap_ = 0;
   what = POINTS;
   vkBegin(VK_POINTS);
 }
@@ -68,7 +69,8 @@ void Fl_Vulkan_Graphics_Driver::end_points() {
 }
 
 void Fl_Vulkan_Graphics_Driver::begin_line() {
-  n = 0; gap_ = 0;
+  n = 0;
+  gap_ = 0;
   what = LINE;
   vkBegin(VK_LINE_STRIP);
 }
@@ -78,7 +80,8 @@ void Fl_Vulkan_Graphics_Driver::end_line() {
 }
 
 void Fl_Vulkan_Graphics_Driver::begin_loop() {
-  n = 0; gap_ = 0;
+  n = 0;
+  gap_ = 0;
   what = LOOP;
   vkBegin(VK_LINE_LOOP);
 }
@@ -88,7 +91,8 @@ void Fl_Vulkan_Graphics_Driver::end_loop() {
 }
 
 void Fl_Vulkan_Graphics_Driver::begin_polygon() {
-  n = 0; gap_ = 0;
+  n = 0;
+  gap_ = 0;
   what = POLYGON;
   vkBegin(VK_POLYGON);
 }
@@ -108,10 +112,10 @@ void Fl_Vulkan_Graphics_Driver::begin_complex_polygon() {
 void Fl_Vulkan_Graphics_Driver::gap() {
 #ifdef SLOW_COMPLEX_POLY
   // drop gaps at the start or gap after gap
-  if (n==0 || n==gap_) // || pnVertex==pVertexGapStart)
+  if (n == 0 || n == gap_) // || pnVertex==pVertexGapStart)
     return;
   // create a loop
-  XPOINT& p = xpoint[gap_];
+  XPOINT &p = xpoint[gap_];
   transformed_vertex(p.x, p.y);
   transformed_vertex(GAP, 0.0);
   gap_ = n;
@@ -124,13 +128,13 @@ void Fl_Vulkan_Graphics_Driver::gap() {
 #ifdef SLOW_COMPLEX_POLY
 
 // Draw a complex polygon line by line from the top to the bottom.
-void Fl_Vulkan_Graphics_Driver::end_complex_polygon()
-{
+void Fl_Vulkan_Graphics_Driver::end_complex_polygon() {
   int i, y;
   XPOINT *v0, *v1;
 
   // don't bother if no polygon is defined
-  if (n < 2) return;
+  if (n < 2)
+    return;
 
   // make sure that we always have a closed loop by appending the first
   // coordinate again as the alst coordinate
@@ -146,15 +150,20 @@ void Fl_Vulkan_Graphics_Driver::end_complex_polygon()
     v0->y -= 0.1f;
     float v0x = v0->x;
     int v0y = (int)v0->y;
-    if (v0x == GAP) continue;
-    if (v0x <= xMin) xMin = v0x;
-    if (v0x >= xMax) xMax = v0x;
-    if (v0y <= yMin) yMin = v0y;
-    if (v0y >= yMax) yMax = v0y;
+    if (v0x == GAP)
+      continue;
+    if (v0x <= xMin)
+      xMin = v0x;
+    if (v0x >= xMax)
+      xMax = v0x;
+    if (v0y <= yMin)
+      yMin = v0y;
+    if (v0y >= yMax)
+      yMax = v0y;
   }
 
   int nNodes;
-  float *nodeX = (float*)malloc((n-1)*sizeof(float)), swap;
+  float *nodeX = (float *)malloc((n - 1) * sizeof(float)), swap;
   if (!nodeX)
     return;
 
@@ -165,56 +174,60 @@ void Fl_Vulkan_Graphics_Driver::end_complex_polygon()
     v1 = xpoint + 1;
     nNodes = 0;
     for (i = 1; i < n; i++) {
-      if (v1->x==GAP) { // skip the gap
-        i++; v0++; v1++; v0++; v1++;
+      if (v1->x == GAP) { // skip the gap
+        i++;
+        v0++;
+        v1++;
+        v0++;
+        v1++;
         continue;
       }
-      if (   (v1->y < y && v0->y >= y)
-          || (v0->y < y && v1->y >= y) )
-      {
+      if ((v1->y < y && v0->y >= y) || (v0->y < y && v1->y >= y)) {
         float dy = v0->y - v1->y;
-        if (fabsf(dy)>.0001f) {
+        if (fabsf(dy) > .0001f) {
           nodeX[nNodes++] = v1->x + ((y - v1->y) / dy) * (v0->x - v1->x);
         } else {
           nodeX[nNodes++] = v1->x;
         }
       }
-      v0++; v1++;
+      v0++;
+      v1++;
     }
 
     // sort the nodes, via a simple Bubble sort
     i = 0;
-    while (i < nNodes-1) {
-      if (nodeX[i] > nodeX[i+1]) {
+    while (i < nNodes - 1) {
+      if (nodeX[i] > nodeX[i + 1]) {
         swap = nodeX[i];
-        nodeX[i] = nodeX[i+1];
-        nodeX[i+1] = swap;
-        if (i) i--;
+        nodeX[i] = nodeX[i + 1];
+        nodeX[i + 1] = swap;
+        if (i)
+          i--;
       } else {
         i++;
       }
     }
 
     //  fill the pixels between node pairs
-//    Using lines requires additional attention to the current line width and pattern
-//    We are using vkRectf instead
-//    vkBegin(VK_LINES);
+    //    Using lines requires additional attention to the current line width and pattern
+    //    We are using vkRectf instead
+    //    vkBegin(VK_LINES);
     for (i = 0; i < nNodes; i += 2) {
       float x0 = nodeX[i];
       if (x0 >= xMax)
         break;
-      float x1 = nodeX[i+1];
+      float x1 = nodeX[i + 1];
       if (x1 > xMin) {
         if (x0 < xMin)
           x0 = xMin;
         if (x1 > xMax)
           x1 = xMax;
-        vkRectf((VKfloat)(x0-0.25f), (VKfloat)(y), (VKfloat)(x1+0.25f), (VKfloat)(y+1.0f));
-//        vkVertex2f((VKfloat)x0, (VKfloat)y);
-//        vkVertex2f((VKfloat)x1, (VKfloat)y);
+        vkRectf((VKfloat)(x0 - 0.25f), (VKfloat)(y), (VKfloat)(x1 + 0.25f), (VKfloat)(y + 1.0f));
+        //        vkVertex2f((VKfloat)x0, (VKfloat)y);
+        //        vkVertex2f((VKfloat)x1, (VKfloat)y);
       }
     }
-//    vkEnd();
+    //    vkEnd();
   }
 
   ::free(nodeX);
@@ -232,11 +245,11 @@ void Fl_Vulkan_Graphics_Driver::end_complex_polygon() {
 
 
 // remove equal points from closed path
-void Fl_Vulkan_Graphics_Driver::fixloop() { }
+void Fl_Vulkan_Graphics_Driver::fixloop() {}
 
 void Fl_Vulkan_Graphics_Driver::transformed_vertex(double xf, double yf) {
 #ifdef SLOW_COMPLEX_POLY
-  if (what==COMPLEX_POLYGON) {
+  if (what == COMPLEX_POLYGON) {
     Fl_Graphics_Driver::transformed_vertex(xf, yf);
   } else {
     vkVertex2d(xf, yf);
@@ -247,21 +260,24 @@ void Fl_Vulkan_Graphics_Driver::transformed_vertex(double xf, double yf) {
 }
 
 void Fl_Vulkan_Graphics_Driver::circle(double cx, double cy, double r) {
-  double rx = r * (m.c ? sqrt(m.a*m.a+m.c*m.c) : fabs(m.a));
-  double ry = r * (m.b ? sqrt(m.b*m.b+m.d*m.d) : fabs(m.d));
+  double rx = r * (m.c ? sqrt(m.a * m.a + m.c * m.c) : fabs(m.a));
+  double ry = r * (m.b ? sqrt(m.b * m.b + m.d * m.d) : fabs(m.d));
   double rMax;
-  if (ry>rx) rMax = ry; else rMax = rx;
+  if (ry > rx)
+    rMax = ry;
+  else
+    rMax = rx;
 
   // from http://slabode.exofire.net/circle_draw.shtml and many other places
-  int num_segments = (int)(10 * sqrt(rMax))+1;
+  int num_segments = (int)(10 * sqrt(rMax)) + 1;
   double theta = 2 * M_PI / float(num_segments);
   double tangetial_factor = tan(theta);
-  double radial_factor = cos(theta);//calculate the radial factor
-  double x = r; //we start at anvke = 0
+  double radial_factor = cos(theta); // calculate the radial factor
+  double x = r;                      // we start at anvke = 0
   double y = 0;
 
   vkBegin(VK_LINE_LOOP);
-  for(int ii = 0; ii < num_segments; ii++) {
+  for (int ii = 0; ii < num_segments; ii++) {
     vertex(x + cx, y + cy); // output vertex
     double tx = -y;
     double ty = x;
@@ -271,5 +287,4 @@ void Fl_Vulkan_Graphics_Driver::circle(double cx, double cy, double r) {
     y *= radial_factor;
   }
   vkEnd();
-
 }

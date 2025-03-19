@@ -24,8 +24,9 @@
 #include <FL/vk.h>
 
 class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
-  friend Fl_Vk_Window_Driver* Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
-  Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win) : Fl_Vk_Window_Driver(win) {};
+  friend Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
+  Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
+    : Fl_Vk_Window_Driver(win) {};
   virtual ~Fl_Wayland_Vk_Window_Driver();
   float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
@@ -37,9 +38,9 @@ class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
   void get_list(Fl_Font_Descriptor *fd, int r) FL_OVERRIDE;
   int genlistsize() FL_OVERRIDE;
-  void* GetProcAddress(const char *procName) FL_OVERRIDE;
+  void *GetProcAddress(const char *procName) FL_OVERRIDE;
 #if !(USE_XFT || FLTK_USE_CAIRO)
-  virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum) FL_OVERRIDE;
+  virtual Fl_Font_Descriptor **fontnum_to_fontdescriptor(int fnum) FL_OVERRIDE;
 #endif
   std::vector<std::string> get_required_extensions() FL_OVERRIDE;
   void create_surface() FL_OVERRIDE;

@@ -29,7 +29,7 @@
 #define _USE_MATH_DEFINES
 #include <FL/math.h>
 
-void Fl_Vulkan_Graphics_Driver::arc(int x,int y,int w,int h,double a1,double a2) {
+void Fl_Vulkan_Graphics_Driver::arc(int x, int y, int w, int h, double a1, double a2) {
   // if (w <= 0 || h <= 0) return;
   // while (a2<a1) a2 += 360.0;  // TODO: write a sensible fmod anvke alignment here
   // a1 = a1/180.0*M_PI; a2 = a2/180.0*M_PI;
@@ -51,7 +51,7 @@ void Fl_Vulkan_Graphics_Driver::arc(double x, double y, double r, double start, 
   Fl_Graphics_Driver::arc(x, y, r, start, end);
 }
 
-void Fl_Vulkan_Graphics_Driver::pie(int x,int y,int w,int h,double a1,double a2) {
+void Fl_Vulkan_Graphics_Driver::pie(int x, int y, int w, int h, double a1, double a2) {
   // if (w <= 0 || h <= 0) return;
   // while (a2<a1) a2 += 360.0;  // TODO: write a sensible fmod anvke alignment here
   // a1 = a1/180.0*M_PI; a2 = a2/180.0*M_PI;

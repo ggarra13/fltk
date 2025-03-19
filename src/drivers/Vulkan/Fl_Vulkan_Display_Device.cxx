@@ -18,11 +18,10 @@
 #include "Fl_Vulkan_Display_Device.H"
 
 Fl_Vulkan_Display_Device *Fl_Vulkan_Display_Device::display_device() {
-  static Fl_Vulkan_Display_Device *display = new Fl_Vulkan_Display_Device(new Fl_Vulkan_Graphics_Driver());
+  static Fl_Vulkan_Display_Device *display =
+      new Fl_Vulkan_Display_Device(new Fl_Vulkan_Graphics_Driver());
   return display;
 }
 
 Fl_Vulkan_Display_Device::Fl_Vulkan_Display_Device(Fl_Vulkan_Graphics_Driver *graphics_driver)
-: Fl_Surface_Device(graphics_driver)
-{
-}
+  : Fl_Surface_Device(graphics_driver) {}

@@ -24,7 +24,7 @@
 #include <FL/vk.h>
 
 class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
-  friend Fl_Vk_Window_Driver* Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
+  friend Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
   HMODULE module;
   Fl_WinAPI_Vk_Window_Driver(Fl_Vk_Window *win);
   virtual ~Fl_WinAPI_Vk_Window_Driver();
@@ -36,7 +36,7 @@ class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   void invalidate() FL_OVERRIDE {}
   int flush_begin() FL_OVERRIDE;
   Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
-  void* GetProcAddress(const char *procName) FL_OVERRIDE;
+  void *GetProcAddress(const char *procName) FL_OVERRIDE;
   std::vector<std::string> get_required_extensions() FL_OVERRIDE;
   void create_surface() FL_OVERRIDE;
 };
