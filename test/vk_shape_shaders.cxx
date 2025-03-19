@@ -119,9 +119,6 @@ void vk_shape_window::set_image_layout(VkImage image,
 {
     VkResult err;
 
-    if (image == VK_NULL_HANDLE)
-        abort();
-    
     VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
     if (m_setup_cmd == VK_NULL_HANDLE) {
         VkCommandBufferAllocateInfo cmd = {};

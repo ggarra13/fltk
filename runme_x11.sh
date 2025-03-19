@@ -49,8 +49,5 @@ cmake .. \
       -D Vulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include \
       -D Vulkan_shaderc_combined_LIBRARY=${VULKAN_LIBRARY_DIR}/libshaderc_combined.a
 
-ninja
+ninja && bin/test/vk_shape-shared
 
-bin/test/vk_shape-shared
-
-#bin/test/vk_shape_shaders-shared

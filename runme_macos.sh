@@ -47,6 +47,4 @@ cmake .. \
       -D Vulkan_LIBRARY=/usr/local/lib/libvulkan.1.dylib \
       -D Vulkan_INCLUDE_DIR=~/VulkanSDK/$SDK_VERSION/macOS/include
 
-ninja 
-
-bin/test/vk_shape_shaders-shared
+ninja && bin/test/vk_shape_shaders-shared
