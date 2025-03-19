@@ -190,7 +190,7 @@ static void demo_set_image_layout(Fl_Vk_Window* pWindow, VkImage image,
 }
 
 // Uses m_swapchain, m_swapchainImageCount, m_gpu, m_surface, m_format, m_color_space, m_buffers
-static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
+void Fl_Vk_Window_Driver::prepare_buffers() {
     VkResult result;
     VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
     pWindow->m_swapchain = VK_NULL_HANDLE;
@@ -303,7 +303,7 @@ static void demo_prepare_buffers(Fl_Vk_Window* pWindow) {
 }
 
 // Uses m_depth, m_device
-static void demo_prepare_depth(Fl_Vk_Window* pWindow) {
+void Fl_Vk_Window_Driver::prepare_depth() {
     bool has_depth = pWindow->mode() & FL_DEPTH;
     bool has_stencil = pWindow->mode() & FL_STENCIL;
     
@@ -395,88 +395,9 @@ static void demo_prepare_depth(Fl_Vk_Window* pWindow) {
 }
 
 
-// m_format, m_depth (optionally) -> creates m_renderPass
-static void demo_prepare_render_pass(Fl_Vk_Window* pWindow) 
-{
-    bool has_depth = pWindow->mode() & FL_DEPTH;
-    bool has_stencil = pWindow->mode() & FL_STENCIL;
-
-    VkAttachmentDescription attachments[2];
-    attachments[0] = VkAttachmentDescription();
-    attachments[0].format = pWindow->m_format;
-    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    attachments[1] = VkAttachmentDescription();
-
-
-    VkAttachmentReference color_reference = {};
-    color_reference.attachment = 0;
-    color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    
-    VkAttachmentReference depth_reference = {};
-    depth_reference.attachment = 1;
-    depth_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.flags = 0;
-    subpass.inputAttachmentCount = 0;
-    subpass.pInputAttachments = NULL;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_reference;
-    subpass.pResolveAttachments = NULL;
-
-    if (has_depth || has_stencil)
-    {
-        attachments[1].format = pWindow->m_depth.format;
-        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        if (has_stencil)
-        {
-            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        }
-        else
-        {
-            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        }
-        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        attachments[1].initialLayout =
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        attachments[1].finalLayout =
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    
-        subpass.pDepthStencilAttachment = &depth_reference;
-        subpass.preserveAttachmentCount = 0;
-        subpass.pPreserveAttachments = NULL;
-    }
-    
-    
-    
-    VkRenderPassCreateInfo rp_info = {};
-    rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    rp_info.pNext = NULL;
-    rp_info.attachmentCount = (has_depth || has_stencil) ? 2: 1;
-    rp_info.pAttachments = attachments;
-    rp_info.subpassCount = 1;
-    rp_info.pSubpasses = &subpass;
-    rp_info.dependencyCount = 0;
-    rp_info.pDependencies = NULL;
-                    
-    VkResult result;
-    result = vkCreateRenderPass(pWindow->m_device, &rp_info, NULL, &pWindow->m_renderPass);
-    VK_CHECK_RESULT(result);
-}
-
 
 // Uses m_framebuffers, m_renderPass, m_swapChainImageCount
-static void demo_prepare_framebuffers(Fl_Vk_Window* pWindow) {
+void Fl_Vk_Window_Driver::prepare_framebuffers() {
     VkImageView attachments[2];
     attachments[0] = VK_NULL_HANDLE;  // Color attachment
     attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
@@ -573,7 +494,7 @@ Fl_Vk_Window_Driver::find_queue_families(VkPhysicalDevice physicalDevice)
 }
 
 
-void Fl_Vk_Window_Driver::demo_init_device() {
+void Fl_Vk_Window_Driver::init_device() {
     VkResult result;
 
     float queue_priorities[1] = {0.0};
@@ -891,7 +812,7 @@ Fl_Vk_Window_Driver::init_vk_swapchain()
 
     pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
 
-    demo_init_device();
+    init_device();
 
     vkGetDeviceQueue(pWindow->m_device, pWindow->m_queueFamilyIndex, 0,
                      &pWindow->m_queue);
@@ -947,12 +868,12 @@ Fl_Vk_Window_Driver::prepare()
     result = vkAllocateCommandBuffers(pWindow->m_device, &cmd, &pWindow->m_draw_cmd);
     VK_CHECK_RESULT(result);
     
-    demo_prepare_buffers(pWindow);
+    prepare_buffers();
     if (pWindow->m_swapchain == VK_NULL_HANDLE) {
         printf("Swapchain recreation failed in resize\n");
         return; // Skip further setup if swapchain fails
     }
-    demo_prepare_depth(pWindow);
+    prepare_depth();
     pWindow->prepare();
     //prepare_textures(pWindow);  // must go into vk_shape
     //prepare_vertices(pWindow);  // must go into vk_shape
@@ -961,7 +882,7 @@ Fl_Vk_Window_Driver::prepare()
     //demo_prepare_pipeline(pWindow);     // must go into vk_shape
     //demo_prepare_descriptor_pool(pWindow);
     //demo_prepare_descriptor_set(pWindow);
-    demo_prepare_framebuffers(pWindow);  // can be kept in driver
+    prepare_framebuffers();  // can be kept in driver
 }
 
 // m_device, m_swapchainImageCount, m_framebuffers, m_desc_pool,
@@ -975,7 +896,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
     uint32_t i;
     VkResult result;
     
-    // Wait for all GPU operations to complete before resizing
+    // Wait for all GPU operations to complete before destroying resources
     result = vkDeviceWaitIdle(pWindow->m_device);
     VK_CHECK_RESULT(result);
 

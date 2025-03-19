@@ -51,9 +51,10 @@ protected:
     void prepare_textures();
     void prepare_vertices();
     void prepare_descriptor_layout();
+    void prepare_render_pass();
+    void prepare_pipeline();
     void prepare_descriptor_pool();
     void prepare_descriptor_set();
-    void prepare_pipeline();
     
 private:
     void prepare_texture_image(const uint32_t *tex_colors,
@@ -88,12 +89,16 @@ vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
+    m_vert_shader_module = VK_NULL_HANDLE;
+    m_frag_shader_module = VK_NULL_HANDLE;
 }
 
 vk_shape_window::vk_shape_window(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
+    m_vert_shader_module = VK_NULL_HANDLE;
+    m_frag_shader_module = VK_NULL_HANDLE;
 }
 
 // needed
@@ -463,14 +468,14 @@ void vk_shape_window::prepare_vertices()
 }
 
 // m_format, m_depth (optionally) -> creates m_renderPass
-static void demo_prepare_render_pass(Fl_Vk_Window* pWindow) 
+void vk_shape_window::prepare_render_pass() 
 {
-    bool has_depth = pWindow->mode() & FL_DEPTH;
-    bool has_stencil = pWindow->mode() & FL_STENCIL;
+    bool has_depth = mode() & FL_DEPTH;
+    bool has_stencil = mode() & FL_STENCIL;
 
     VkAttachmentDescription attachments[2];
     attachments[0] = VkAttachmentDescription();
-    attachments[0].format = pWindow->m_format;
+    attachments[0].format = m_format;
     attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -501,7 +506,7 @@ static void demo_prepare_render_pass(Fl_Vk_Window* pWindow)
 
     if (has_depth || has_stencil)
     {
-        attachments[1].format = pWindow->m_depth.format;
+        attachments[1].format = m_depth.format;
         attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -535,7 +540,7 @@ static void demo_prepare_render_pass(Fl_Vk_Window* pWindow)
     rp_info.pDependencies = NULL;
                     
     VkResult result;
-    result = vkCreateRenderPass(pWindow->m_device, &rp_info, NULL, &pWindow->m_renderPass);
+    result = vkCreateRenderPass(m_device, &rp_info, NULL, &m_renderPass);
     VK_CHECK_RESULT(result);
 }
 
@@ -749,19 +754,18 @@ void vk_shape_window::prepare_descriptor_set() {
 void vk_shape_window::prepare()
 {
     prepare_textures();
-    prepare_vertices();  // must refactor to window
-    prepare_descriptor_layout();  // uses texture count
-    demo_prepare_render_pass(this);  // can be kept in driver?
-                                     // prepare_pipeline references it 
-    prepare_pipeline();     // must go into Fl_Vk_Window
+    prepare_vertices();
+    prepare_descriptor_layout();
+    prepare_render_pass();
+    prepare_pipeline();
     prepare_descriptor_pool();
     prepare_descriptor_set();
-    // demo_prepare_framebuffers(pWindow);  // can be kept in driver.
 }
 
 void vk_shape_window::draw() {
     if (!shown() || w() <= 0 || h() <= 0) return;
 
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     // Background color
     m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
     
@@ -776,7 +780,9 @@ void vk_shape_window::draw() {
 
     Fl_Window::draw();
     
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     draw_end();
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
 }
 
 void vk_shape_window::destroy_resources() {

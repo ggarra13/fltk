@@ -103,12 +103,6 @@ void Fl_Vk_Window::draw_begin() {
         m_swapchain_needs_recreation = false; // Reset only if successful
     }
     
-    // Check if resources are ready
-    if (m_swapchain == VK_NULL_HANDLE || m_buffers == nullptr || m_current_buffer >= m_swapchainImageCount) {
-        std::cerr << "Vulkan resources not ready at draw_begin\n";
-        return;
-    }
-    
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     semaphoreCreateInfo.pNext = NULL;
@@ -742,7 +736,7 @@ void Fl_Vk_Window::init() {
   damage1_ = 0;
 
   // Set up defaults
-  m_swapchain_needs_recreation = true;
+  m_swapchain_needs_recreation = false;
   
   // Reset Vulkan Handles
   m_device     = VK_NULL_HANDLE;

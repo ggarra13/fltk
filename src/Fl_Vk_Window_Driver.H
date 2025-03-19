@@ -89,9 +89,6 @@ public:
   virtual void make_current_after() {}
   virtual void swap_buffers();
   virtual void destroy_resources();
-  void demo_init_device();
-  void init_vk();
-  void init_vk_swapchain();
   virtual void prepare();
   virtual char swap_type();
   virtual void swap_interval(int) { }
@@ -121,6 +118,14 @@ public:
     // Vulkan specific methods.
   virtual std::vector<std::string> get_required_extensions() = 0;
   virtual void create_surface() = 0;
+
+  void init_vk();
+  void init_vk_swapchain();
+protected:
+  void init_device();
+  void prepare_buffers();
+  void prepare_depth();
+  void prepare_framebuffers();
 };
 
 #endif /* Fl_Vk_Window_Driver_H */
