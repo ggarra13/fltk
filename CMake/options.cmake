@@ -765,7 +765,7 @@ if(VULKAN_FOUND)
 	  endif()
       endif()
   else()
-      message(FATAL_ERROR "shaderc not found!")
+      message(FATAL_ERROR "shaderc_combined not found!")
   endif()
 endif(VULKAN_FOUND)
 

@@ -3,8 +3,7 @@
 mkdir -p build_x11/
 cd build_x11
 
-VULKAN_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu/
-VULKAN_HEADERS_DIR=~/code/lib/Vulkan-Headers/
+export VULKAN_SDK=/usr/
 
 cmake .. \
       -G Ninja \
@@ -44,10 +43,7 @@ cmake .. \
       -D LIB_GL="" \
       -D LIB_MesaGL="" \
       -D OPENGL_INCLUDE_DIR="" \
-      -D X11_xcb_xcb_INCLUDE_PATH="" \
-      -D Vulkan_LIBRARY=${VULKAN_LIBRARY_DIR}/libvulkan.so.1 \
-      -D Vulkan_INCLUDE_DIR=$VULKAN_HEADERS_DIR/include \
-      -D Vulkan_shaderc_combined_LIBRARY=${VULKAN_LIBRARY_DIR}/libshaderc_combined.a
+      -D X11_xcb_xcb_INCLUDE_PATH=""
 
-ninja && bin/test/vk_shape-shared
+ninja && bin/test/vk_shape-shared && bin/test/vk_shape_shaders-shared
 

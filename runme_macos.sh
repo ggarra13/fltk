@@ -4,6 +4,7 @@ mkdir -p build_macos/
 cd build_macos
 
 SDK_VERSION=1.4.309.0
+export VULKAN_SDK=$HOME/VulkanSDK/$SDK_VERSION/macOS
 
 cmake .. \
       -G Ninja \
@@ -43,8 +44,8 @@ cmake .. \
       -D LIB_GL="" \
       -D LIB_MesaGL="" \
       -D OPENGL_INCLUDE_DIR="" \
-      -D X11_xcb_xcb_INCLUDE_PATH="" \
-      -D Vulkan_LIBRARY=/usr/local/lib/libvulkan.1.dylib \
-      -D Vulkan_INCLUDE_DIR=~/VulkanSDK/$SDK_VERSION/macOS/include
+      -D X11_xcb_xcb_INCLUDE_PATH="" #\
+      #-D Vulkan_LIBRARY=/usr/local/lib/libvulkan.1.dylib \
+      #-D Vulkan_INCLUDE_DIR=~/VulkanSDK/$SDK_VERSION/macOS/include
 
 ninja && bin/test/vk_shape_shaders-shared
