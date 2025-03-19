@@ -1304,7 +1304,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
   FLView *view = (FLView*)[nsw contentView];
   if (views_use_CA && [view did_view_resolution_change]) {
-    if (window->as_gl_window() && Fl::use_high_res_GL()) [view setNeedsDisplay:YES]; // necessary with  macOS ≥ 10.14.2; harmless before
+      if ((window->as_gl_window() || window->as_vk_window()) && Fl::use_high_res_GL()) [view setNeedsDisplay:YES]; // necessary with  macOS ≥ 10.14.2; harmless before
   }
 #endif
   if (window == starting_moved_window) {
@@ -1400,7 +1400,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
 
   Fl_Cocoa_Window_Driver::driver(window)->view_resized(1);
   if (Fl_Cocoa_Window_Driver::driver(window)->through_resize()) {
-    if (window->as_gl_window()) {
+      if (window->as_gl_window()) {
       static Fl_Cocoa_Plugin *plugin = NULL;
       if (!plugin) {
         Fl_Plugin_Manager pm("fltk:cocoa");
@@ -1416,7 +1416,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
   Fl_Cocoa_Window_Driver::driver(window)->view_resized(0);
   update_e_xy_and_e_xy_root(nsw);
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
-  if (views_use_CA && !window->as_gl_window()) {
+  if (views_use_CA && !window->as_gl_window() && !window->as_vk_window()) {
     [view reset_aux_bitmap];
     window->redraw();
   }
@@ -2390,7 +2390,8 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
     Fl_Window *window = [(FLWindow*)[self window] getFl_Window];
     Fl_Cocoa_Window_Driver *d = Fl_Cocoa_Window_Driver::driver(window);
     bool previous = d->mapped_to_retina();
-    NSView *view = (!views_use_CA && window->parent() && !window->as_gl_window()) ?
+    NSView *view = (!views_use_CA && window->parent() &&
+                    (!window->as_gl_window() && !window->as_vk_window())) ?
                       [fl_xid(window->top_window()) contentView] : self;
     if (view) {
       NSSize s = [view convertSizeToBacking:NSMakeSize(10, 10)]; // 10.7
@@ -2400,7 +2401,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
     if (retval) {
       d->changed_resolution(true);
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
-      if (views_use_CA && !window->as_gl_window() ) {
+      if (views_use_CA && !window->as_gl_window() && !window->as_vk_window() ) {
         [self reset_aux_bitmap];
         window->redraw();
       }
@@ -2469,7 +2470,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
     [self did_view_resolution_change];
     if (d->wait_for_expose_value) {
       d->wait_for_expose_value = 0;
-      if (window->as_gl_window() && views_use_CA && fl_mac_os_version < 101401) { // 1st drawing of layer-backed GL window
+      if ((window->as_gl_window() || window->as_vk_window()) && views_use_CA && fl_mac_os_version < 101401) { // 1st drawing of layer-backed GL window
         window->size(window->w(), window->h()); // sends message [GLcontext update]
       }
     }
@@ -2484,7 +2485,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   CGContextRef destination = NULL;
   if (views_use_CA) {
     destination = [[NSGraphicsContext currentContext] CGContext];
-    if (!aux_bitmap && !window->as_gl_window()) [self create_aux_bitmap:destination retina:d->mapped_to_retina()];
+    if (!aux_bitmap && (!window->as_gl_window() && !window->as_vk_window())) [self create_aux_bitmap:destination retina:d->mapped_to_retina()];
   }
 #endif
   through_drawRect = YES;
@@ -2630,7 +2631,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   cocoaKeyboardHandler(theEvent);
   in_key_event = YES;
   Fl_Widget *f = Fl::focus();
-  if (f && f->as_gl_window()) { // ignore text input methods for GL windows
+  if (f && (f->as_gl_window() || f->as_vk_window())) { // ignore text input methods for GL windows
     need_handle = YES;
     [FLView prepareEtext:[theEvent characters]];
   } else {
@@ -3049,7 +3050,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
  */
 void Fl_Cocoa_Window_Driver::flush()
 {
-  if (pWindow->as_gl_window()) {
+  if (pWindow->as_gl_window() || pWindow->as_vk_window()) {
     Fl_Window_Driver::flush();
   } else {
     through_Fl_X_flush = YES;
@@ -4583,7 +4584,7 @@ static NSBitmapImageRep* rect_to_NSBitmapImageRep(Fl_Window *win, int x, int y, 
     NSBitmapImageRep *bitmap = nil;
     NSRect rect;
     float s = Fl_Graphics_Driver::default_driver().scale();
-    if (win->as_gl_window() && y >= 0) {
+    if ((win->as_gl_window() || win->as_vk_window()) && y >= 0) {
       bitmap = GL_rect_to_nsbitmap(win, x, y, w, h);
     }
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
@@ -4655,8 +4656,9 @@ static NSBitmapImageRep* rect_to_NSBitmapImageRep_subwins(Fl_Window *win, int x,
                                                              win->h() - clip.origin.y - sub->y() - clip.size.height, clip.size.width, clip.size.height, true);
     if (childbitmap) {
       // if bitmap is high res and childbitmap is not, childbitmap must be rescaled
-      if (!win->as_gl_window() && Fl_Cocoa_Window_Driver::driver(win)->mapped_to_retina() &&
-          sub->as_gl_window() && !Fl::use_high_res_GL()) {
+        if ((!win->as_gl_window() || !win->as_vk_window()) && Fl_Cocoa_Window_Driver::driver(win)->mapped_to_retina() &&
+            (sub->as_gl_window() || sub->as_vk_window()) &&
+            !Fl::use_high_res_GL()) {
         childbitmap = scale_nsbitmapimagerep(childbitmap, 2);
       }
       float s = Fl_Graphics_Driver::default_driver().scale();

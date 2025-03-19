@@ -36,6 +36,7 @@ public:
     ~vk_shape_window();
 
     void prepare() FL_OVERRIDE;
+    void prepare_vertices();
     void destroy_resources() FL_OVERRIDE;
     
 protected:
@@ -46,7 +47,6 @@ protected:
     //! This is for holding a mesh
     Fl_Vk_Mesh m_vertices;
     
-    void prepare_vertices();
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();
@@ -432,7 +432,7 @@ void vk_shape_window::prepare_pipeline() {
 void vk_shape_window::prepare_descriptor_pool() {
     VkDescriptorPoolSize type_count = {};
     type_count.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    type_count.descriptorCount = DEMO_TEXTURE_COUNT;
+    type_count.descriptorCount = 0; //DEMO_TEXTURE_COUNT;
     
     VkDescriptorPoolCreateInfo descriptor_pool = {};
     descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -449,7 +449,6 @@ void vk_shape_window::prepare_descriptor_pool() {
 }
 
 void vk_shape_window::prepare_descriptor_set() {
-    VkDescriptorImageInfo tex_descs[DEMO_TEXTURE_COUNT];
     VkResult result;
     uint32_t i;
 
@@ -479,10 +478,8 @@ void vk_shape_window::draw() {
 
     // Background color
     m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
-    
-    draw_begin();
 
-    prepare_vertices();
+    draw_begin();
 
     // Draw the triangle
     VkDeviceSize offsets[1] = {0};
@@ -558,6 +555,7 @@ public:
 void sides_cb(Fl_Widget *o, void *p) {
   vk_shape_window *sw = (vk_shape_window *)p;
   sw->sides = int(((Fl_Slider *)o)->value());
+  sw->prepare_vertices();
   sw->redraw();
 }
 

@@ -27,6 +27,8 @@
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
 
+#define DEMO_TEXTURE_COUNT 1
+
 class vk_shape_window : public Fl_Vk_Window {
     void draw() FL_OVERRIDE;
 public:
@@ -39,6 +41,7 @@ public:
     
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
+    void prepare_vertices();
     
 protected:
     //! Shaders used in GLFW demo
@@ -50,7 +53,6 @@ protected:
     Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
     
     void prepare_textures();
-    void prepare_vertices();
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();
@@ -920,6 +922,7 @@ public:
 void sides_cb(Fl_Widget *o, void *p) {
   vk_shape_window *sw = (vk_shape_window *)p;
   sw->sides = int(((Fl_Slider *)o)->value());
+  sw->prepare_vertices();
   sw->redraw();
 }
 
