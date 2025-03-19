@@ -49,4 +49,4 @@ cmake .. \
 
 ninja
 
-bin/test/vk_shape.exe
+bin/test/vk_shape_shaders.exe

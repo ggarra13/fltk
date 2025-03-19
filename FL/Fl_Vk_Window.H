@@ -238,7 +238,7 @@ public:
   virtual void prepare() = 0;
   virtual void destroy_resources();
   
-  bool               m_validate = false;  // true: Windows only so far
+  bool               m_validate = true;
 
   // Application
   VkInstance         m_instance; // needed
@@ -262,8 +262,8 @@ public:
   VkQueue            m_queue;
   Fl_Vk_SwapchainBuffer*       m_buffers;
   uint32_t           m_queueFamilyIndex;
-  Fl_Vk_Depth m_depth;
-  VkFramebuffer* m_framebuffers;
+  Fl_Vk_Depth        m_depth;
+  VkFramebuffer*     m_framebuffers;
 
   // For drawing
   VkPipeline         m_pipeline;  
@@ -279,10 +279,10 @@ public:
   float m_depthStencil = 1.0;
 
   
-  VkPipelineLayout m_pipeline_layout;  // interface between shaders and desc.sets
-  VkDescriptorSetLayout m_desc_layout; // describe bindings whithin desc. set
-  VkDescriptorSet m_desc_set; // actual data bound to shaders like texture or
-                              // uniform buffers
+  VkPipelineLayout      m_pipeline_layout;  // interface between shaders and desc.sets
+  VkDescriptorSetLayout m_desc_layout; // describe texture bindings whithin desc. set
+  VkDescriptorSet       m_desc_set; // actual data bound to shaders like texture or
+                                    // uniform buffers
   
 
   //! Flag used to handle resizes (swapchain and other resources recreation)

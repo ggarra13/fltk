@@ -51,4 +51,8 @@ cmake .. \
 
 ninja
 
-bin/test/vk_shape-shared
+echo "RUNNING GLFW triangle sample..."
+# bin/test/vk_shape-shared
+
+# echo "RUNNING GLFW triangle shaders sample..."
+bin/test/vk_shape_shaders-shared

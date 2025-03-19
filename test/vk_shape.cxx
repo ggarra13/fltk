@@ -25,6 +25,7 @@
 
 #include <cassert>
 #include <FL/Fl_Vk_Window.H>
+#include <FL/Fl_Vk_Utils.H>
 
 class vk_shape_window : public Fl_Vk_Window {
     void draw() FL_OVERRIDE;
@@ -461,6 +462,83 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
+// m_format, m_depth (optionally) -> creates m_renderPass
+static void demo_prepare_render_pass(Fl_Vk_Window* pWindow) 
+{
+    bool has_depth = pWindow->mode() & FL_DEPTH;
+    bool has_stencil = pWindow->mode() & FL_STENCIL;
+
+    VkAttachmentDescription attachments[2];
+    attachments[0] = VkAttachmentDescription();
+    attachments[0].format = pWindow->m_format;
+    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[0].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachments[0].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    attachments[1] = VkAttachmentDescription();
+
+
+    VkAttachmentReference color_reference = {};
+    color_reference.attachment = 0;
+    color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    
+    VkAttachmentReference depth_reference = {};
+    depth_reference.attachment = 1;
+    depth_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.flags = 0;
+    subpass.inputAttachmentCount = 0;
+    subpass.pInputAttachments = NULL;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &color_reference;
+    subpass.pResolveAttachments = NULL;
+
+    if (has_depth || has_stencil)
+    {
+        attachments[1].format = pWindow->m_depth.format;
+        attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        if (has_stencil)
+        {
+            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        }
+        else
+        {
+            attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        }
+        attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[1].initialLayout =
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        attachments[1].finalLayout =
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    
+        subpass.pDepthStencilAttachment = &depth_reference;
+        subpass.preserveAttachmentCount = 0;
+        subpass.pPreserveAttachments = NULL;
+    }
+
+    VkRenderPassCreateInfo rp_info = {};
+    rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    rp_info.pNext = NULL;
+    rp_info.attachmentCount = (has_depth || has_stencil) ? 2: 1;
+    rp_info.pAttachments = attachments;
+    rp_info.subpassCount = 1;
+    rp_info.pSubpasses = &subpass;
+    rp_info.dependencyCount = 0;
+    rp_info.pDependencies = NULL;
+                    
+    VkResult result;
+    result = vkCreateRenderPass(pWindow->m_device, &rp_info, NULL, &pWindow->m_renderPass);
+    VK_CHECK_RESULT(result);
+}
+
 static VkShaderModule
 prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t size) {
     VkShaderModuleCreateInfo moduleCreateInfo;
@@ -673,8 +751,8 @@ void vk_shape_window::prepare()
     prepare_textures();
     prepare_vertices();  // must refactor to window
     prepare_descriptor_layout();  // uses texture count
-    // demo_prepare_render_pass(this);  // can be kept in driver?
-                                        // prepare_pipeline references it 
+    demo_prepare_render_pass(this);  // can be kept in driver?
+                                     // prepare_pipeline references it 
     prepare_pipeline();     // must go into Fl_Vk_Window
     prepare_descriptor_pool();
     prepare_descriptor_set();

@@ -39,18 +39,19 @@ std::vector<uint32_t> compile_glsl_to_spirv(
     return std::vector<uint32_t>(result.cbegin(), result.cend());
 }
 
-// // Example usage in your Vulkan code
-// VkShaderModule create_shader_module(VkDevice device,
-//                                     const std::vector<uint32_t>& spirv_code) {
-//     VkShaderModuleCreateInfo create_info = {};
-//     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-//     create_info.codeSize = spirv_code.size() * sizeof(uint32_t);
-//     create_info.pCode = spirv_code.data();
+// Example usage in your Vulkan code
+VkShaderModule create_shader_module(VkDevice device,
+                                    const std::vector<uint32_t>& spirv_code) {
+    VkShaderModuleCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.codeSize = spirv_code.size() * sizeof(uint32_t);
+    create_info.pCode = spirv_code.data();
 
-//     VkShaderModule shader_module;
-//     VkResult result = vkCreateShaderModule(device, &create_info, nullptr, &shader_module);
-//     if (result != VK_SUCCESS) {
-//         throw std::runtime_error("Failed to create shader module");
-//     }
-//     return shader_module;
-// }
+    VkShaderModule shader_module;
+    VkResult result = vkCreateShaderModule(device, &create_info, nullptr, &shader_module);
+    if (result != VK_SUCCESS) {
+        std::cerr << "Shader module creation failed: " << result << std::endl;
+        return VK_NULL_HANDLE;
+    }
+    return shader_module;
+}

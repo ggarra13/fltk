@@ -89,8 +89,9 @@ public:
   virtual void make_current_after() {}
   virtual void swap_buffers();
   virtual void destroy_resources();
-  virtual void init_vk();
-  virtual void init_vk_swapchain();
+  void demo_init_device();
+  void init_vk();
+  void init_vk_swapchain();
   virtual void prepare();
   virtual char swap_type();
   virtual void swap_interval(int) { }
