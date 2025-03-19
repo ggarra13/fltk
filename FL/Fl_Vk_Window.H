@@ -301,19 +301,9 @@ public:
   //!@{ These are from triangle-vulkan GLFW demo
   VkColorSpaceKHR    m_color_space;
   
-  //! Shaders used in GLFW demo
-  VkShaderModule m_vert_shader_module;
-  VkShaderModule m_frag_shader_module;
-  
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;
   uint32_t                m_queue_count;
-
-  //! This is for holding a mesh
-  Fl_Vk_Mesh m_vertices;
-    
-  // This is for holding a texture
-  Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
 
   
 

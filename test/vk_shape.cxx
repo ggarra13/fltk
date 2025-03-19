@@ -39,6 +39,14 @@ public:
     void destroy_resources() FL_OVERRIDE;
     
 protected:
+    //! Shaders used in GLFW demo
+    VkShaderModule m_vert_shader_module;
+    VkShaderModule m_frag_shader_module;
+    
+    //! This is for holding a mesh
+    Fl_Vk_Mesh m_vertices;
+    Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
+    
     void prepare_textures();
     void prepare_vertices();
     void prepare_descriptor_layout();
@@ -57,6 +65,10 @@ private:
                           VkImageLayout old_image_layout,
                           VkImageLayout new_image_layout,
                           int srcAccessMaskInt);
+    
+    VkShaderModule prepare_vs();
+    VkShaderModule prepare_fs();
+
 };
 
 static void timeout_cb(vk_shape_window* w)
@@ -467,22 +479,20 @@ prepare_shader_module(Fl_Vk_Window* pWindow, const uint32_t *code, size_t size) 
     return module;
 }
 
-static VkShaderModule prepare_vs(Fl_Vk_Window* pWindow) {
+VkShaderModule vk_shape_window::prepare_vs() {
     size_t size = sizeof(vertShaderCode);
 
-    pWindow->m_vert_shader_module =
-        prepare_shader_module(pWindow, vertShaderCode, size);
+    m_vert_shader_module = prepare_shader_module(this, vertShaderCode, size);
 
-    return pWindow->m_vert_shader_module;
+    return m_vert_shader_module;
 }
 
-static VkShaderModule prepare_fs(Fl_Vk_Window* pWindow) {
+VkShaderModule vk_shape_window::prepare_fs() {
     size_t size = sizeof(fragShaderCode);
 
-    pWindow->m_frag_shader_module =
-        prepare_shader_module(pWindow, fragShaderCode, size);
+    m_frag_shader_module = prepare_shader_module(this, fragShaderCode, size);
 
-    return pWindow->m_frag_shader_module;
+    return m_frag_shader_module;
 }
 
 void vk_shape_window::prepare_pipeline() {
@@ -571,12 +581,12 @@ void vk_shape_window::prepare_pipeline() {
 
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    shaderStages[0].module = prepare_vs(this);
+    shaderStages[0].module = prepare_vs();
     shaderStages[0].pName = "main";
 
     shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStages[1].module = prepare_fs(this);
+    shaderStages[1].module = prepare_fs();
     shaderStages[1].pName = "main";
 
     pipeline.pVertexInputState = &vi;
