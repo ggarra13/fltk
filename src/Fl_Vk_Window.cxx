@@ -96,10 +96,17 @@ void Fl_Vk_Window::draw_begin() {
 
     // Recreate swapchain if needed
     if (m_swapchain_needs_recreation) {
+        vkQueueWaitIdle(m_queue);
         vkDeviceWaitIdle(m_device);
         destroy_resources();
         pVkWindowDriver->destroy_resources(); // Now just prepares resources
         m_swapchain_needs_recreation = false; // Reset only if successful
+    }
+    
+    // Check if resources are ready
+    if (m_swapchain == VK_NULL_HANDLE || m_buffers == nullptr || m_current_buffer >= m_swapchainImageCount) {
+        std::cerr << "Vulkan resources not ready at draw_begin\n";
+        return;
     }
     
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
@@ -145,8 +152,8 @@ void Fl_Vk_Window::draw_begin() {
     cmd_buf_info.pNext = NULL;
     cmd_buf_info.flags = 0;
     cmd_buf_info.pInheritanceInfo = NULL;
-    
 
+    vkQueueWaitIdle(m_queue);
     // Reset the command buffer to ensure it’s reusable
     result = vkResetCommandBuffer(m_draw_cmd, 0);
     VK_CHECK_RESULT(result);
@@ -487,6 +494,12 @@ void Fl_Vk_Window::flush() {
   
   make_current();
 
+// Check if Vulkan resources are ready
+  if (m_swapchain == VK_NULL_HANDLE || m_buffers == nullptr || m_draw_cmd == VK_NULL_HANDLE) {
+      return; // Skip drawing until initialization completes
+  }
+
+    
   if (mode_ & FL_DOUBLE) {
 
 
