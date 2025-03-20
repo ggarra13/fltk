@@ -24,7 +24,7 @@
 #include <FL/vk.h>
 #include "Fl_Wayland_Vk_Window_Driver.H"
 #ifdef FLTK_USE_X11
-#include "../X11/Fl_X11_Gl_Window_Driver.H"
+#include "../X11/Fl_X11_Vk_Window_Driver.H"
 #endif
 #include "../../Fl_Vk_Choice.H"
 #include "Fl_Wayland_Window_Driver.H"

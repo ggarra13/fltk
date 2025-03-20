@@ -57,10 +57,10 @@
 #define BORDER_WIDTH 2
 
 /*
- * HAVE_GL:
+ * HAVE_VK:
  *
- * Do you have OpenGL? Set this to 0 if you don't have or plan to use
- * OpenGL, and FLTK will be smaller.
+ * Do you have Vulkan? Set this to 0 if you don't have or plan to use
+ * Vulkan, and FLTK will be smaller.
  */
 
 #cmakedefine01 HAVE_VK

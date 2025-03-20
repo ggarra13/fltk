@@ -108,9 +108,9 @@
 #cmakedefine01 FLTK_USE_SVG
 
 /*
- * FLTK_USE_WAYLAND
+ * FLTK_USE_VULKAN
  *
- * Do we use Wayland for the current platform?
+ * Do we use Vulkan for the current platform?
  *
  */
 

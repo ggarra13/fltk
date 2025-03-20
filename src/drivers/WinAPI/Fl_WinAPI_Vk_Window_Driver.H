@@ -14,8 +14,8 @@
 //     https://www.fltk.org/bugs.php
 //
 
-#ifndef FL_WINAPI_VULKAN_WINDOW_DRIVER_H
-#define FL_WINAPI_VULKAN_WINDOW_DRIVER_H
+#ifndef FL_WINAPI_VK_WINDOW_DRIVER_H
+#define FL_WINAPI_VK_WINDOW_DRIVER_H
 
 #include <config.h>
 #if HAVE_VK
@@ -43,4 +43,4 @@ class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
 
 #endif // HAVE_VK
 
-#endif // FL_WINAPI_VULKAN_WINDOW_DRIVER_H
+#endif // FL_WINAPI_VK_WINDOW_DRIVER_H
