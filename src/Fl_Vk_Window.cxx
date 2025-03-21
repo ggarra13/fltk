@@ -110,6 +110,18 @@ void Fl_Vk_Window::draw_begin() {
       m_swapchain_needs_recreation = false; // Reset only if successful
   }
 
+
+  VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+  semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  semaphoreCreateInfo.pNext = NULL;
+  semaphoreCreateInfo.flags = 0;
+
+  result = vkCreateSemaphore(m_device, &semaphoreCreateInfo, NULL, &m_imageAcquiredSemaphore);
+  VK_CHECK_RESULT(result);
+
+  result = vkCreateSemaphore(m_device, &semaphoreCreateInfo, NULL, &m_drawCompleteSemaphore);
+  VK_CHECK_RESULT(result);
+  
   // Get the index of the next available swapchain image:
   result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAcquiredSemaphore,
                                  (VkFence)0, // TODO: Show use of fence
@@ -118,6 +130,8 @@ void Fl_Vk_Window::draw_begin() {
     // m_swapchain is out of date (e.g. the window was resized) and
     // must be recreated:
     m_swapchain_needs_recreation = true;
+    vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
+    vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
     return;
   } else if (result == VK_TIMEOUT) {
     // Timeout occurred, try again next frame
@@ -240,7 +254,7 @@ void Fl_Vk_Window::draw_end() {
   vkCmdEndRenderPass(m_draw_cmd);
 
   // Transition swapchain image to PRESENT_SRC_KHR for presentation
-  // (is this gl's swap_buffer()?)
+  // (this is like gl's swap_buffer()?)
   VkImageMemoryBarrier prePresentBarrier = {};
   prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   prePresentBarrier.pNext = NULL;
@@ -419,6 +433,12 @@ void Fl_Vk_Window::swap_buffers() {
     VK_CHECK_RESULT(result);
   }
 
+  result = vkQueueWaitIdle(m_queue);
+  VK_CHECK_RESULT(result);
+  
+  vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
+  vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
+  
   pVkWindowDriver->swap_buffers();
 }
 
