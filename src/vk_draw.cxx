@@ -42,9 +42,6 @@
 #include <FL/Fl_Image_Surface.H>
 #include <stdlib.h>
 
-#ifndef GL_TEXTURE_RECTANGLE_ARB
-#  define GL_TEXTURE_RECTANGLE_ARB 0x84F5
-#endif
 
 
 /** Returns the current font's height */
@@ -59,7 +56,7 @@ double vk_width(const char* s, int n) {return fl_width(s,n);}
 double vk_width(uchar c) {return fl_width(c);}
 
 static Fl_Font_Descriptor *vk_fontsize;
-static int has_texture_rectangle = 0; // true means GL_EXT_texture_rectangle is available
+static int has_texture_rectangle = 0;
 
 extern float vk_start_scale; // in vk_start.cxx
 
@@ -67,11 +64,10 @@ extern float vk_start_scale; // in vk_start.cxx
   Sets the current Vulkan font to the same font as calling fl_font().
  \see Fl::draw_GL_text_with_textures(int val)
   */
-void  gl_font(int fontid, int size) {
+void  vk_font(int fontid, int size) {
   static bool once = true;
   if (once) {
     once = false;
-    //printf("gl_version_major=%d\n", gl_version_major);
     has_texture_rectangle = true;
   }
   fl_font(fontid, size);
