@@ -104,23 +104,11 @@ void Fl_Vk_Window::draw_begin() {
 
   // Recreate swapchain if needed
   if (m_swapchain_needs_recreation) {
-    vkQueueWaitIdle(m_queue);
-    vkDeviceWaitIdle(m_device);
-    destroy_resources();
-    pVkWindowDriver->destroy_resources(); // Now just prepares resources
-    m_swapchain_needs_recreation = false; // Reset only if successful
+      vkDeviceWaitIdle(m_device);  // waits for all queue on the device
+      destroy_resources();
+      pVkWindowDriver->destroy_resources(); // Now just prepares resources
+      m_swapchain_needs_recreation = false; // Reset only if successful
   }
-
-  VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-  semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  semaphoreCreateInfo.pNext = NULL;
-  semaphoreCreateInfo.flags = 0;
-
-  result = vkCreateSemaphore(m_device, &semaphoreCreateInfo, NULL, &m_imageAcquiredSemaphore);
-  VK_CHECK_RESULT(result);
-
-  result = vkCreateSemaphore(m_device, &semaphoreCreateInfo, NULL, &m_drawCompleteSemaphore);
-  VK_CHECK_RESULT(result);
 
   // Get the index of the next available swapchain image:
   result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX, m_imageAcquiredSemaphore,
@@ -130,8 +118,6 @@ void Fl_Vk_Window::draw_begin() {
     // m_swapchain is out of date (e.g. the window was resized) and
     // must be recreated:
     m_swapchain_needs_recreation = true;
-    vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
-    vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
     return;
   } else if (result == VK_TIMEOUT) {
     // Timeout occurred, try again next frame
@@ -435,9 +421,6 @@ void Fl_Vk_Window::swap_buffers() {
   result = vkQueueWaitIdle(m_queue);
   VK_CHECK_RESULT(result);
 
-  vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
-  vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
-
   pVkWindowDriver->swap_buffers();
 }
 
@@ -701,6 +684,13 @@ Fl_RGB_Image *Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int
 */
 Fl_Vk_Window::~Fl_Vk_Window() {
   hide();
+
+  // Clean up fences and semaphores
+  vkDestroyFence(m_device, m_drawFence, nullptr);
+  vkDestroyFence(m_device, m_setupFence, nullptr);
+  vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, nullptr);
+  vkDestroySemaphore(m_device, m_drawCompleteSemaphore, nullptr);
+    
   destroy_resources();
   delete pVkWindowDriver;
 }
@@ -765,7 +755,7 @@ void Fl_Vk_Window::init() {
   m_validate = false;
   m_device = VK_NULL_HANDLE;
   m_gpu = VK_NULL_HANDLE;
-  m_surface = VK_NULL_HANDLE; // not needed to keep in class
+  m_surface = VK_NULL_HANDLE; // not really needed to keep in class
 
 
   m_swapchain = VK_NULL_HANDLE;
