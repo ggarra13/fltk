@@ -126,6 +126,11 @@ protected:
   void prepare_buffers();
   void prepare_depth();
   void prepare_framebuffers();
+  void set_image_layout(VkImage image,
+                        VkImageAspectFlags aspectMask,
+                        VkImageLayout old_image_layout,
+                        VkImageLayout new_image_layout,
+                        int srcAccessMaskInt);
 };
 
 #endif /* Fl_Vk_Window_Driver_H */

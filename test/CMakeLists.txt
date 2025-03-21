@@ -315,6 +315,12 @@ if(FLTK_BUILD_SHARED_LIBS)
       list(APPEND SHARED_TARGETS glpuzzle shape)
     endif(OPENGL_FOUND)
 
+    if(VULKAN_FOUND)
+	fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
+	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
+	fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
+    endif(VULKAN_FOUND)
+    
     # apply property COMPILE_DEFINITIONS "-D FL_DLL" in a loop for all necessary source files
     foreach(tgt ${SHARED_TARGETS})
       target_compile_definitions (${tgt}-shared PRIVATE "FL_DLL")
@@ -334,7 +340,8 @@ if(FLTK_BUILD_SHARED_LIBS)
 
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
-	fl_create_example(vk_shape_shaders-shared vk_shape_shaders.cxx "${VKDEMO_SHARED}")
+	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
+	fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
     endif(VULKAN_FOUND)
 
   endif(MSVC) # (not MSVC)
@@ -356,7 +363,8 @@ else() # not FLTK_BUILD_SHARED_LIBS
     # Vulkan demos. These programs can't be built w/o Vulkan
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
-	fl_create_example(vk_shape_shaders vk_shape_shaders.cxx "${VKDEMO_LIBS}")
+	fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
+	fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
     endif(VULKAN_FOUND)
 
 endif(FLTK_BUILD_SHARED_LIBS)

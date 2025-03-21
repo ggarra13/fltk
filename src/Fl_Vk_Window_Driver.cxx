@@ -12,11 +12,8 @@
 #include <vector>
 
 
-// demo macros
-#define VERTEX_BUFFER_BIND_ID 0
+// macros
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
-
-struct Fl_Vk_Frame;
 
 bool g_FunctionsLoaded = true;
 
@@ -65,9 +62,11 @@ static bool memory_type_from_properties(Fl_Vk_Window *pWindow, uint32_t typeBits
 }
 
 // Uses m_cmd_pool, m_setup_cmd
-static void demo_set_image_layout(Fl_Vk_Window *pWindow, VkImage image,
-                                  VkImageAspectFlags aspectMask, VkImageLayout old_image_layout,
-                                  VkImageLayout new_image_layout, int srcAccessMaskInt) {
+void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
+                                           VkImageAspectFlags aspectMask,
+                                           VkImageLayout old_image_layout,
+                                           VkImageLayout new_image_layout,
+                                           int srcAccessMaskInt) {
   VkResult err;
 
   VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
@@ -126,7 +125,8 @@ static void demo_set_image_layout(Fl_Vk_Window *pWindow, VkImage image,
     dest_stages = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
   }
 
-  vkCmdPipelineBarrier(pWindow->m_setup_cmd, src_stages, dest_stages, 0, 0, NULL, 0, NULL, 1,
+  vkCmdPipelineBarrier(pWindow->m_setup_cmd, src_stages,
+                       dest_stages, 0, 0, NULL, 0, NULL, 1,
                        &image_memory_barrier);
 }
 
@@ -316,9 +316,9 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   result = vkBindImageMemory(pWindow->m_device, pWindow->m_depth.image, pWindow->m_depth.mem, 0);
   VK_CHECK_RESULT(result);
 
-  demo_set_image_layout(pWindow, pWindow->m_depth.image, VK_IMAGE_ASPECT_DEPTH_BIT,
-                        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                        0);
+  set_image_layout(pWindow->m_depth.image, VK_IMAGE_ASPECT_DEPTH_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                   0);
 
   /* create image view */
   view.image = pWindow->m_depth.image;
@@ -586,9 +586,8 @@ void Fl_Vk_Window_Driver::init_vk() {
   if (gpu_count > 0) {
     VkPhysicalDevice *physical_devices =
         (VkPhysicalDevice *)VK_ALLOC(sizeof(VkPhysicalDevice) * gpu_count);
-    err = vkEnumeratePhysicalDevices(pWindow->m_instance, &gpu_count, physical_devices);
-    assert(!err);
-    // For tri demo we just grab the first physical device
+    err = vkEnumeratePhysicalDevices(pWindow->m_instance, &gpu_count,
+                                     physical_devices);
     pWindow->m_gpu = physical_devices[0];
     free(physical_devices);
   } else {
@@ -633,9 +632,6 @@ void Fl_Vk_Window_Driver::init_vk() {
               "look at the Getting Started guide for additional "
               "information.\n",
               "vkCreateInstance Failure");
-  }
-
-  if (pWindow->m_validate) {
   }
 
   vkGetPhysicalDeviceProperties(pWindow->m_gpu, &pWindow->m_gpu_props);
@@ -714,7 +710,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
 
-  init_device();
+  if (pWindow->m_device == VK_NULL_HANDLE)
+      init_device();
 
   vkGetDeviceQueue(pWindow->m_device, pWindow->m_queueFamilyIndex, 0, &pWindow->m_queue);
 
@@ -723,6 +720,7 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   result =
       vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu, pWindow->m_surface, &formatCount, NULL);
   VK_CHECK_RESULT(result);
+  
   VkSurfaceFormatKHR *surfFormats =
       (VkSurfaceFormatKHR *)VK_ALLOC(formatCount * sizeof(VkSurfaceFormatKHR));
   result = vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu, pWindow->m_surface, &formatCount,
@@ -772,13 +770,6 @@ void Fl_Vk_Window_Driver::prepare() {
   }
   prepare_depth();
   pWindow->prepare();
-  // prepare_textures(pWindow);  // must go into vk_shape
-  // prepare_vertices(pWindow);  // must go into vk_shape
-  // demo_prepare_descriptor_layout(pWindow);  // must go into vk_shape
-  // demo_prepare_render_pass(pWindow);  // must go into vk_shape
-  // demo_prepare_pipeline(pWindow);     // must go into vk_shape
-  // demo_prepare_descriptor_pool(pWindow);
-  // demo_prepare_descriptor_set(pWindow);
   prepare_framebuffers(); // can be kept in driver
 }
 
@@ -807,17 +798,16 @@ void Fl_Vk_Window_Driver::destroy_resources() {
     pWindow->m_buffers = NULL;
   }
 
-  free(pWindow->m_buffers);
-  pWindow->m_buffers = nullptr;
-
   if (pWindow->m_depth.view != VK_NULL_HANDLE) {
     vkDestroyImageView(pWindow->m_device, pWindow->m_depth.view, NULL);
     pWindow->m_depth.view = VK_NULL_HANDLE;
   }
+
   if (pWindow->m_depth.image != VK_NULL_HANDLE) {
     vkDestroyImage(pWindow->m_device, pWindow->m_depth.image, NULL);
     pWindow->m_depth.image = VK_NULL_HANDLE;
   }
+
   if (pWindow->m_depth.mem != VK_NULL_HANDLE) {
     vkFreeMemory(pWindow->m_device, pWindow->m_depth.mem, NULL);
     pWindow->m_depth.mem = VK_NULL_HANDLE;
