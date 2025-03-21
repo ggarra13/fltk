@@ -284,11 +284,11 @@ VkResult Fl_Vk_Window::begin_setup() {
   submit_info.signalSemaphoreCount = 0;
   submit_info.pSignalSemaphores = NULL;
 
-  result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
+  result = vkQueueSubmit(m_queue, 1, &submit_info, m_setupFence);
   VK_CHECK_RESULT(result);
-
-  result = vkQueueWaitIdle(m_queue);
-  VK_CHECK_RESULT(result);
+  
+  vkWaitForFences(m_device, 1, &m_setupFence, VK_TRUE, UINT64_MAX);
+  vkResetFences(m_device, 1, &m_setupFence);
 
   vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
   m_setup_cmd = VK_NULL_HANDLE;
@@ -371,7 +371,8 @@ int Fl_Vk_Window::mode(int m, const int *a) {
 
 void Fl_Vk_Window::make_current() {
   pVkWindowDriver->make_current_before();
-  if (m_surface == VK_NULL_HANDLE) {
+  if (m_surface == VK_NULL_HANDLE)
+  {
       init_vulkan();
   }
   pVkWindowDriver->make_current_after();
@@ -417,9 +418,6 @@ void Fl_Vk_Window::swap_buffers() {
   } else {
     VK_CHECK_RESULT(result);
   }
-
-  result = vkQueueWaitIdle(m_queue);
-  VK_CHECK_RESULT(result);
 
   pVkWindowDriver->swap_buffers();
 }
@@ -651,11 +649,11 @@ void Fl_Vk_Window::flush_init_cmd() {
   submit_info.signalSemaphoreCount = 0;
   submit_info.pSignalSemaphores = NULL;
 
-  result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
+  result = vkQueueSubmit(m_queue, 1, &submit_info, m_setupFence);
   VK_CHECK_RESULT(result);
 
-  result = vkQueueWaitIdle(m_queue);
-  VK_CHECK_RESULT(result);
+  vkWaitForFences(m_device, 1, &m_setupFence, VK_TRUE, UINT64_MAX);
+  vkResetFences(m_device, 1, &m_setupFence);
 
   vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
   m_setup_cmd = VK_NULL_HANDLE;
