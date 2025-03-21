@@ -675,9 +675,7 @@ endif(FLTK_BUILD_GL)
 
 if(FLTK_BUILD_VK)
     # Required components
-    find_package(Vulkan REQUIRED
-	OPTIONAL_COMPONENTS
-	glslang shaderc_combined SPIRV-Tools)
+    find_package(Vulkan REQUIRED COMPONENTS glslang shaderc_combined SPIRV-Tools)
 else(FLTK_BUILD_VK)
   set(VK_FOUND FALSE)
   set(HAVE_VK FALSE)

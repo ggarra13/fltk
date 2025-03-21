@@ -4,12 +4,13 @@
 mkdir -p build_win32/
 cd build_win32
 
-SDK_VERSION=1.4.304.1
-export VULKAN_SDK=/C/VulkanSDK/$SDK_VERSION/
+if [[ -z "$VULKAN_SDK" ]]; then
+    export VULKAN_SDK=/C/VulkanSDK/
+fi
 
 cmake .. \
       -G Ninja \
-      -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
@@ -40,7 +41,7 @@ cmake .. \
       -D FLTK_USE_XRENDER=OFF \
       -D FLTK_USE_LIBDECOR_GTK=OFF \
       -D FLTK_BACKEND_WAYLAND=OFF \
-      -D FLTK_BACKEND_X11=ON \
+      -D FLTK_BACKEND_X11=OFF \
       -D GLU_LIB="" \
       -D LIB_GL="" \
       -D LIB_MesaGL="" \
