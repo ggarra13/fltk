@@ -30,6 +30,12 @@ extern int fl_vk_load_plugin;
 // #include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
 // #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
+
+// Statics
+VkInstance       Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
+VkPhysicalDevice Fl_Vk_Window::m_gpu = VK_NULL_HANDLE;
+VkPipelineCache  Fl_Vk_Window::m_pipelineCache = VK_NULL_HANDLE;
+
 void Fl_Vk_Window::destroy_texture_image(Fl_Vk_Texture *tex_obj) {
   // /* clean up staging resources */
   vkDestroyImage(m_device, tex_obj->image, NULL);

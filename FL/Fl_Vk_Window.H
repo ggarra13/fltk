@@ -189,18 +189,24 @@ public:
   virtual void prepare() = 0;
   virtual void destroy_resources();
   
-  bool               m_validate = false;
 
-  // Application
-  VkInstance         m_instance; // needed
-  VkPhysicalDevice   m_gpu;      // needed
-  VkPipelineCache    m_pipelineCache; // per application
-  
   uint32_t m_enabled_layer_count;
   const char* m_enabled_layers[64];
   // These should be moved somewhere else
   uint32_t m_enabled_extension_count;
   const char* m_extension_names[64];
+
+
+  
+  
+  // Application
+  bool                      m_validate = false;
+  static VkInstance         m_instance; 
+  static VkPhysicalDevice   m_gpu;
+  static VkPipelineCache    m_pipelineCache; 
+
+
+  
 
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
