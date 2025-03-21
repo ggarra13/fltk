@@ -200,10 +200,15 @@ public:
   
   
   // Application
-  bool                      m_validate = false;
+  bool                      m_validate;
   static VkInstance         m_instance; 
   static VkPhysicalDevice   m_gpu;
   static VkPipelineCache    m_pipelineCache; 
+  static VkDevice           m_device;
+  static VkPhysicalDeviceProperties m_gpu_props;
+  static VkPhysicalDeviceFeatures m_gpu_features;
+  static VkQueueFamilyProperties* m_queue_props;
+  static uint32_t         m_queue_count;
 
 
   
@@ -211,7 +216,6 @@ public:
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
   VkSurfaceFormatKHR m_surfaceFormat; //needed
-  VkDevice           m_device;   // needed
   VkFormat           m_format;   // for depth and color formats
   VkRenderPass       m_renderPass; // needed
   VkSwapchainKHR     m_swapchain;
@@ -226,8 +230,13 @@ public:
   VkPipeline         m_pipeline;  
   VkCommandPool      m_cmd_pool;  // memory for command buffers
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
+  
+  VkFence            m_setupFence;// Fence for setup commands in window
   VkCommandBuffer    m_setup_cmd; // Command Buffer for resources
+  
+  VkFence            m_drawFence; // Fence for drawing commands in window
   VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands  
+
   VkSemaphore        m_imageAcquiredSemaphore;
   VkSemaphore        m_drawCompleteSemaphore;
 
@@ -249,18 +258,12 @@ public:
   bool               m_use_staging_buffer = false;
     
 
-  // Not sure what these are for
-  VkPhysicalDeviceProperties m_gpu_props;
-  VkPhysicalDeviceFeatures m_gpu_features;
-  VkQueueFamilyProperties* m_queue_props;
-
   
   //!@{ These are from triangle-vulkan GLFW demo
   VkColorSpaceKHR    m_color_space;
   
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;
-  uint32_t                m_queue_count;
 
   
 
@@ -283,6 +286,8 @@ public:
 
   int can_do_overlay() { return false; }
 
+  void init_vulkan();
+  
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
   Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }

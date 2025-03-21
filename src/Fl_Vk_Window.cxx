@@ -32,9 +32,14 @@ extern int fl_vk_load_plugin;
 
 
 // Statics
-VkInstance       Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
-VkPhysicalDevice Fl_Vk_Window::m_gpu = VK_NULL_HANDLE;
-VkPipelineCache  Fl_Vk_Window::m_pipelineCache = VK_NULL_HANDLE;
+VkInstance                 Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
+VkPhysicalDevice           Fl_Vk_Window::m_gpu = VK_NULL_HANDLE;
+VkPipelineCache            Fl_Vk_Window::m_pipelineCache = VK_NULL_HANDLE;
+VkDevice                   Fl_Vk_Window::m_device = VK_NULL_HANDLE;
+VkPhysicalDeviceProperties Fl_Vk_Window::m_gpu_props;
+VkPhysicalDeviceFeatures   Fl_Vk_Window::m_gpu_features;
+VkQueueFamilyProperties*   Fl_Vk_Window::m_queue_props = nullptr;
+uint32_t                   Fl_Vk_Window::m_queue_count = 0;
 
 void Fl_Vk_Window::destroy_texture_image(Fl_Vk_Texture *tex_obj) {
   // /* clean up staging resources */
@@ -703,6 +708,30 @@ Fl_Vk_Window::~Fl_Vk_Window() {
   delete pVkWindowDriver;
 }
 
+void Fl_Vk_Window::init_vulkan()
+{
+    // Initialize vulkan
+    if (m_instance == VK_NULL_HANDLE)
+    {
+        pVkWindowDriver->init_vk();
+    }
+  
+    pVkWindowDriver->create_surface();
+    pVkWindowDriver->init_vk_swapchain();
+    pVkWindowDriver->prepare();
+  
+    // Initialize fences and semaphores once
+    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        nullptr, 0 };
+    vkCreateFence(m_device, &fenceInfo, nullptr, &m_drawFence);
+    vkCreateFence(m_device, &fenceInfo, nullptr, &m_setupFence);
+
+    VkSemaphoreCreateInfo semInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
+    vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAcquiredSemaphore);
+    vkCreateSemaphore(m_device, &semInfo, nullptr, &m_drawCompleteSemaphore);
+}
+
+
 bool Fl_Vk_Window::memory_type_from_properties(uint32_t typeBits, VkFlags requirements_mask,
                                                uint32_t *typeIndex) {
   uint32_t i;
@@ -736,6 +765,7 @@ void Fl_Vk_Window::init() {
   m_swapchain_needs_recreation = false;
 
   // Reset Vulkan Handles
+  m_validate = false;
   m_device = VK_NULL_HANDLE;
   m_gpu = VK_NULL_HANDLE;
   m_surface = VK_NULL_HANDLE; // not needed to keep in class
@@ -746,9 +776,12 @@ void Fl_Vk_Window::init() {
   m_pipeline = VK_NULL_HANDLE;
   m_allocator = nullptr;
 
-  // These are specific to GLFW demo ?
   m_setup_cmd = VK_NULL_HANDLE;
+  m_setupFence = VK_NULL_HANDLE;
+
   m_draw_cmd = VK_NULL_HANDLE;
+  m_drawFence = VK_NULL_HANDLE;
+  
   m_cmd_pool = VK_NULL_HANDLE;
   m_desc_pool = VK_NULL_HANDLE;
   m_pipeline_layout = VK_NULL_HANDLE;
@@ -756,7 +789,6 @@ void Fl_Vk_Window::init() {
 
   m_framebuffers = nullptr;
 
-  // These are specific to GLFW demo
   m_buffers = nullptr;
 
   // Counters
