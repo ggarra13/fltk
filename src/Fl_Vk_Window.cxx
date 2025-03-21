@@ -386,10 +386,7 @@ int Fl_Vk_Window::mode(int m, const int *a) {
 void Fl_Vk_Window::make_current() {
   pVkWindowDriver->make_current_before();
   if (m_surface == VK_NULL_HANDLE) {
-    pVkWindowDriver->init_vk();
-    pVkWindowDriver->create_surface();
-    pVkWindowDriver->init_vk_swapchain();
-    pVkWindowDriver->prepare();
+      init_vulkan();
   }
   pVkWindowDriver->make_current_after();
   current_ = this;
