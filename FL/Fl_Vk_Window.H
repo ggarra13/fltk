@@ -242,7 +242,9 @@ public:
 
   // For clearing the background
   VkClearColorValue  m_clearColor;
-  float m_depthStencil = 1.0;
+
+  // For clearing the stencil
+  float              m_depthStencil;
 
   
   VkPipelineLayout      m_pipeline_layout;  // interface between shaders and desc.sets
@@ -254,8 +256,8 @@ public:
   //! Flag used to handle resizes (swapchain and other resources recreation)
   bool               m_swapchain_needs_recreation;
 
-  // Not sure what this one is for
-  bool               m_use_staging_buffer = false;
+  // Not sure what this one is fo
+  bool               m_use_staging_buffer;
     
 
   

@@ -768,6 +768,8 @@ void Fl_Vk_Window::init() {
 
   // Set up defaults
   m_swapchain_needs_recreation = false;
+  m_depthStencil = 1.0;
+  m_use_staging_buffer = true;
 
   // Reset Vulkan Handles
   m_validate = false;
@@ -781,16 +783,22 @@ void Fl_Vk_Window::init() {
   m_pipeline = VK_NULL_HANDLE;
   m_allocator = nullptr;
 
+  // Setup command and fence
   m_setup_cmd = VK_NULL_HANDLE;
   m_setupFence = VK_NULL_HANDLE;
 
+  // Draw command and fence (currently unused)
   m_draw_cmd = VK_NULL_HANDLE;
   m_drawFence = VK_NULL_HANDLE;
-  
+
+  // Setup pool
   m_cmd_pool = VK_NULL_HANDLE;
+
+  // Texture descriptor handles
   m_desc_pool = VK_NULL_HANDLE;
-  m_pipeline_layout = VK_NULL_HANDLE;
   m_desc_layout = VK_NULL_HANDLE;
+  
+  m_pipeline_layout = VK_NULL_HANDLE;
 
   m_framebuffers = nullptr;
 
