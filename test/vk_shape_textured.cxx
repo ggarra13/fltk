@@ -99,6 +99,8 @@ vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
+    m_validate = true;
+    m_use_staging_buffer = false;
     m_vert_shader_module = VK_NULL_HANDLE;
     m_frag_shader_module = VK_NULL_HANDLE;
 }
@@ -107,6 +109,8 @@ vk_shape_window::vk_shape_window(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
+    m_validate = true;
+    m_use_staging_buffer = false;
     m_vert_shader_module = VK_NULL_HANDLE;
     m_frag_shader_module = VK_NULL_HANDLE;
 }
@@ -755,8 +759,6 @@ void vk_shape_window::prepare_pipeline() {
 
     vkDestroyPipelineCache(m_device, m_pipelineCache, NULL);
 
-    // vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
-    // vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
 }
 
 

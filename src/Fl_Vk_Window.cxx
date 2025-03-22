@@ -706,8 +706,6 @@ Fl_Vk_Window::~Fl_Vk_Window() {
   // Clean up fences and semaphores
   vkDestroyFence(m_device, m_drawFence, nullptr);
   vkDestroyFence(m_device, m_setupFence, nullptr);
-  vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, nullptr);
-  vkDestroySemaphore(m_device, m_drawCompleteSemaphore, nullptr);
     
   destroy_resources();
   delete pVkWindowDriver;
