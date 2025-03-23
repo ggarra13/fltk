@@ -493,16 +493,11 @@ set(VKCPPFILES
   Fl_Vk_Choice.cxx
   # Fl_Vk_Device_Plugin.cxx
   # Fl Vk_Overlay.cxx
+  Fl_Vk_Utils.cxx
   Fl_Vk_Window.cxx
   vk_draw.cxx
   # vk_start.cxx
 )
-
-if (Vulkan_shaderc_combined_FOUND)
-    list(APPEND VKCPPFILES
-	Fl_Vk_Utils.cxx
-	)
-endif()
 
 set(VK_DRIVER_FILES
   Fl_Vk_Window_Driver.cxx
