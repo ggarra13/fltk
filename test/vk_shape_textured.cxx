@@ -56,7 +56,6 @@ protected:
     VkShaderModule m_vert_shader_module;
     VkShaderModule m_frag_shader_module;
     uint32_t frame_counter = 0;
-    VkMemoryRequirements m_mem_reqs;
     
     //! This is for holding a mesh
     Fl_Vk_Mesh m_vertices;

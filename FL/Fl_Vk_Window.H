@@ -256,9 +256,11 @@ public:
   //! Flag used to handle resizes (swapchain and other resources recreation)
   bool               m_swapchain_needs_recreation;
 
-  // Not sure what this one is fo
+  // \@bug: this is broken and unimplemented
   bool               m_use_staging_buffer;
-    
+
+  // Auxiliary variable for multiple memory requirements use
+  VkMemoryRequirements m_mem_reqs;
 
   
   //!@{ These are from triangle-vulkan GLFW demo

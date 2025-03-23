@@ -114,7 +114,6 @@ void vk_shape_window::prepare_vertices()
     mem_alloc.allocationSize = 0;
     mem_alloc.memoryTypeIndex = 0;
     
-    VkMemoryRequirements mem_reqs;
     VkResult result;
     bool pass;
     void *data;
@@ -124,11 +123,11 @@ void vk_shape_window::prepare_vertices()
     result = vkCreateBuffer(m_device, &buf_info, NULL, &m_vertices.buf);
     VK_CHECK_RESULT(result);
 
-    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &mem_reqs);
+    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &m_mem_reqs);
     VK_CHECK_RESULT(result);
 
-    mem_alloc.allocationSize = mem_reqs.size;
-    pass = memory_type_from_properties(mem_reqs.memoryTypeBits,
+    mem_alloc.allocationSize = m_mem_reqs.size;
+    pass = memory_type_from_properties(m_mem_reqs.memoryTypeBits,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
