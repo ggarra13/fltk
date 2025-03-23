@@ -14,7 +14,18 @@ std::vector<uint32_t> compile_glsl_to_spirv(
     const std::string& filename = "shader.glsl",
     bool optimize = false);
 
+// Function to create a shader module from SPIRV byte code
 VkShaderModule create_shader_module(VkDevice device,
                                     const std::vector<uint32_t>& spirv_code);
+
+void set_image_layout(VkCommandBuffer cmd,
+                      VkImage image,
+                      VkImageAspectFlags aspectMask,
+                      VkImageLayout old_image_layout,
+                      VkImageLayout new_image_layout,
+                      VkAccessFlags srcAccessMask,
+                      VkPipelineStageFlags srcStageMask,
+                      VkAccessFlags dstAccessMask,
+                      VkPipelineStageFlags dstStageMask);
 
 #endif

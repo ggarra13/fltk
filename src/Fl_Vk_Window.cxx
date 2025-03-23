@@ -766,8 +766,8 @@ void Fl_Vk_Window::init() {
 
   // Set up defaults
   m_swapchain_needs_recreation = false;
+  m_use_staging_buffer = false;
   m_depthStencil = 1.0;
-  m_use_staging_buffer = true;
 
   // Reset Vulkan Handles
   m_validate = false;
