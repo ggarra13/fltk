@@ -48,4 +48,4 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH=""
 
-ninja && bin/test/vk_shape_shaders.exe
+ninja && bin/test/vk_shape_textured.exe
