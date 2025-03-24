@@ -397,7 +397,12 @@ void DynamicTextureWindow::update_texture()
     pixels[0] = static_cast<float>(intensity) / 255.F;        // Red
     pixels[1] = 0;         // Green
     pixels[2] = 0;              // Blue
-    pixels[3] = 1;// Inverted Red
+    pixels[3] = 1;// Alpha
+    
+    pixels[4] = 0;         // Red
+    pixels[5] = static_cast<float>(intensity) / 255.F;        // Green
+    pixels[6] = 0;              // Blue
+    pixels[7] = 1;// Alpha
     
     vkUnmapMemory(m_device, m_textures[0].mem);
 
