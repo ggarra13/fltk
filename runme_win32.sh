@@ -20,7 +20,7 @@ cmake .. \
       -D FLTK_BUILD_PDF_DOCS=OFF \
       -D FLTK_BUILD_HTML_DOCS=OFF \
       -D FLTK_BUILD_OPTIONS=OFF \
-      -D FLTK_BUILD_SHARED_LIBS=ON \
+      -D FLTK_BUILD_SHARED_LIBS=OFF \
       -D FLTK_BUILD_TEST=ON \
       -D FLTK_GRAPHICS_CAIRO=OFF \
       -D FLTK_OPTION_CAIRO_EXT=OFF \
@@ -48,4 +48,4 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH=""
 
-ninja && bin/test/vk_shape_textured.exe
+ninja && bin/test/vk_shape_hdr.exe
