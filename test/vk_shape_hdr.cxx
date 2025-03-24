@@ -69,7 +69,7 @@ protected:
     void prepare_descriptor_set();
     
 private:
-    void prepare_texture_image(const uint32_t *tex_colors,
+    void prepare_texture_image(const float *tex_colors,
                                Fl_Vk_Texture* tex_obj,
                                VkImageTiling tiling,
                                VkImageUsageFlags usage,
@@ -120,12 +120,13 @@ Fl_Vk_Window(w,h,l) {
     m_frag_shader_module = VK_NULL_HANDLE;
 }
 
-void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
+void DynamicTextureWindow::prepare_texture_image(const float *tex_colors,
                                                  Fl_Vk_Texture* tex_obj,
                                                  VkImageTiling tiling,
                                                  VkImageUsageFlags usage,
                                                  VkFlags required_props) {
-    const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
+    const VkFormat tex_format =  VK_FORMAT_R32G32B32A32_SFLOAT;
+        // was VK_FORMAT_B8G8R8A8_UNORM;
     const int32_t tex_width = 2;
     const int32_t tex_height = 2;
     VkResult result;
@@ -236,10 +237,11 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
 void DynamicTextureWindow::prepare_textures()
 {
     VkResult result;
-    const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
-    const uint32_t tex_colors[DEMO_TEXTURE_COUNT][2] = {
+    const VkFormat tex_format =  VK_FORMAT_R32G32B32A32_SFLOAT;
+    const float tex_colors[DEMO_TEXTURE_COUNT][2*4] = {
         // B G R A     B G R A
-        {0xffff0000, 0xff00ff00},  // Red, Green
+        {0.F, 0.F, 1.F, 0.F, // Red, Green
+         0.F, 1.F, 0.F, 0.F }
     };
 
     // Query if image supports texture format
@@ -390,12 +392,12 @@ void DynamicTextureWindow::update_texture()
     void* data;
     vkMapMemory(m_device, m_textures[0].mem, 0, m_mem_reqs.size, 0, &data);
     
-    uint32_t* pixels = (uint32_t*)data;
+    float* pixels = (float*)data;
     uint8_t intensity = (frame_counter++ % 255);
-    pixels[0] = (intensity << 16) | 0xFF;        // Red
-    pixels[1] = (intensity << 8) | 0xFF;         // Green
-    pixels[2] = (intensity) | 0xFF;              // Blue
-    pixels[3] = ((255 - intensity) << 16) | 0xFF;// Inverted Red
+    pixels[0] = static_cast<float>(intensity) / 255.F;        // Red
+    pixels[1] = 0;         // Green
+    pixels[2] = 0;              // Blue
+    pixels[3] = 1;// Inverted Red
     
     vkUnmapMemory(m_device, m_textures[0].mem);
 
