@@ -112,10 +112,14 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
 
+  virtual void init_vk_swapchain();
+  void init_fences();
+  
   bool memory_type_from_properties(uint32_t typeBits,
                                    VkFlags requirements_mask,
                                    uint32_t *typeIndex);
   void destroy_texture_image(Fl_Vk_Texture *tex_obj);
+
   void draw_begin();
   void draw() FL_OVERRIDE;
   void draw_end();
@@ -218,10 +222,12 @@ public:
   VkSurfaceFormatKHR m_surfaceFormat; //needed
   VkFormat           m_format;   // for depth and color formats
   VkRenderPass       m_renderPass; // needed
-  VkSwapchainKHR     m_swapchain;
-  uint32_t           m_swapchainImageCount;
+
+  uint32_t               m_swapchainImageCount;
+  VkSwapchainKHR         m_swapchain;
+  Fl_Vk_SwapchainBuffer* m_buffers;
+  
   VkQueue            m_queue;
-  Fl_Vk_SwapchainBuffer*       m_buffers;
   uint32_t           m_queueFamilyIndex;
   Fl_Vk_Depth        m_depth;
   VkFramebuffer*     m_framebuffers;

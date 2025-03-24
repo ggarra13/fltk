@@ -711,6 +711,20 @@ Fl_Vk_Window::~Fl_Vk_Window() {
   delete pVkWindowDriver;
 }
 
+void Fl_Vk_Window::init_fences()
+{
+    // Initialize fences and semaphores once
+    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        nullptr, 0 };
+    vkCreateFence(m_device, &fenceInfo, nullptr, &m_drawFence);
+    vkCreateFence(m_device, &fenceInfo, nullptr, &m_setupFence);
+}
+
+void Fl_Vk_Window::init_vk_swapchain()
+{
+    pVkWindowDriver->init_vk_swapchain();
+}
+
 void Fl_Vk_Window::init_vulkan()
 {
     // Initialize vulkan
@@ -720,18 +734,10 @@ void Fl_Vk_Window::init_vulkan()
     }
   
     pVkWindowDriver->create_surface();
-    pVkWindowDriver->init_vk_swapchain();
+    init_vk_swapchain();  // to allow changing to HDR for example
     pVkWindowDriver->prepare();
-  
-    // Initialize fences and semaphores once
-    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        nullptr, 0 };
-    vkCreateFence(m_device, &fenceInfo, nullptr, &m_drawFence);
-    vkCreateFence(m_device, &fenceInfo, nullptr, &m_setupFence);
 
-    VkSemaphoreCreateInfo semInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO, nullptr, 0 };
-    vkCreateSemaphore(m_device, &semInfo, nullptr, &m_imageAcquiredSemaphore);
-    vkCreateSemaphore(m_device, &semInfo, nullptr, &m_drawCompleteSemaphore);
+    init_fences();
 }
 
 
