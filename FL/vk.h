@@ -44,6 +44,7 @@
 
 #include <iostream>  // \@todo: remove
 #include <FL/platform.H>
+#include <FL/Fl.H>
 
 #  include "Enumerations.H" // for color names
 #  ifdef _WIN32
