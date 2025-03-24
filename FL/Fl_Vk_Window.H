@@ -220,7 +220,10 @@ public:
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
   VkSurfaceFormatKHR m_surfaceFormat; //needed
+
   VkFormat           m_format;   // for depth and color formats
+  VkColorSpaceKHR    m_color_space; // HDR10 or HLG for example
+  
   VkRenderPass       m_renderPass; // needed
 
   uint32_t               m_swapchainImageCount;
@@ -269,8 +272,6 @@ public:
   VkMemoryRequirements m_mem_reqs;
 
   
-  //!@{ These are from triangle-vulkan GLFW demo
-  VkColorSpaceKHR    m_color_space;
   
   VkPhysicalDeviceMemoryProperties m_memory_properties;
   uint32_t                m_current_buffer;

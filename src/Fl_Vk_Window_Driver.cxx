@@ -589,7 +589,7 @@ void Fl_Vk_Window_Driver::init_vk() {
     err = vkEnumeratePhysicalDevices(pWindow->m_instance, &gpu_count,
                                      physical_devices);
     pWindow->m_gpu = physical_devices[0];
-    free(physical_devices);
+    VK_FREE(physical_devices);
   } else {
     Fl::fatal("vkEnumeratePhysicalDevices reported zero accessible devices."
               "\n\nDo you have a compatible Vulkan installable client"
@@ -622,7 +622,7 @@ void Fl_Vk_Window_Driver::init_vk() {
       assert(pWindow->m_enabled_extension_count < 64);
     }
 
-    free(device_extensions);
+    VK_FREE(device_extensions);
   }
 
   if (!swapchainExtFound) {
@@ -641,7 +641,8 @@ void Fl_Vk_Window_Driver::init_vk() {
 
   pWindow->m_queue_props =
       (VkQueueFamilyProperties *)VK_ALLOC(pWindow->m_queue_count * sizeof(VkQueueFamilyProperties));
-  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->m_gpu, &pWindow->m_queue_count,
+  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->m_gpu,
+                                           &pWindow->m_queue_count,
                                            pWindow->m_queue_props);
   assert(pWindow->m_queue_count >= 1);
 
@@ -723,7 +724,9 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   
   VkSurfaceFormatKHR *surfFormats =
       (VkSurfaceFormatKHR *)VK_ALLOC(formatCount * sizeof(VkSurfaceFormatKHR));
-  result = vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu, pWindow->m_surface, &formatCount,
+  result = vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu,
+                                                pWindow->m_surface,
+                                                &formatCount,
                                                 surfFormats);
   VK_CHECK_RESULT(result);
   // If the format list includes just one entry of VK_FORMAT_UNDEFINED,
@@ -736,6 +739,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   }
   pWindow->m_color_space = surfFormats[0].colorSpace;
 
+  VK_FREE(surfFormats);
+  
   // Get Memory information and properties
   vkGetPhysicalDeviceMemoryProperties(pWindow->m_gpu, &pWindow->m_memory_properties);
 }
