@@ -318,6 +318,7 @@ if(FLTK_BUILD_SHARED_LIBS)
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape-shared vk_shape.cxx "CALL_MAIN;${VKDEMO_SHARED}")
 	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "CALL_MAIN;${VKDEMO_SHARED}")
+	fl_create_example(vk_shape_hdr-shared vk_shape_hdr.cxx "CALL_MAIN;${VKDEMO_SHARED}")
 	fl_create_example(vk_cube-shared vk_cube.cxx "CALL_MAIN;${VKDEMO_SHARED}")
     endif(VULKAN_FOUND)
     
@@ -340,6 +341,7 @@ if(FLTK_BUILD_SHARED_LIBS)
 
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
+	fl_create_example(vk_shape_hdr-shared vk_shape_hdr.cxx "${VKDEMO_SHARED}")
 	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
 	fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
     endif(VULKAN_FOUND)
@@ -363,6 +365,7 @@ else() # not FLTK_BUILD_SHARED_LIBS
     # Vulkan demos. These programs can't be built w/o Vulkan
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
+	fl_create_example(vk_shape_hdr vk_shape_hdr.cxx "${VKDEMO_LIBS}")
 	fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
 	fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
     endif(VULKAN_FOUND)
