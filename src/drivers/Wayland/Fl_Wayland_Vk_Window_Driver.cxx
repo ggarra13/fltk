@@ -152,8 +152,8 @@ static void init_swap_interval() {
     return;
 }
 
-std::vector<std::string> Fl_Wayland_Vk_Window_Driver::get_required_extensions() {
-  std::vector<std::string> out;
+std::vector<const char*> Fl_Wayland_Vk_Window_Driver::get_required_extensions() {
+  std::vector<const char*> out;
   out.push_back("VK_KHR_surface");
   out.push_back(VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME);
   return out;

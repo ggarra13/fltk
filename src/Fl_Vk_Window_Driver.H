@@ -115,7 +115,7 @@ public:
   virtual bool need_scissor() { return false; }
 
   // Vulkan specific methods.
-  virtual std::vector<std::string> get_required_extensions() = 0;
+  virtual std::vector<const char*> get_required_extensions() = 0;
   virtual void create_surface() = 0;
 
   void init_vk();

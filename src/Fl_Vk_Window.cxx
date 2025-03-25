@@ -417,6 +417,12 @@ void Fl_Vk_Window::swap_buffers() {
   result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
   VK_CHECK_RESULT(result);
 
+  if (vkSetHdrMetadataEXT &&
+      m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+  {
+      vkSetHdrMetadataEXT(m_device, 1, &m_swapchain, &m_hdr_metadata);
+  }
+
   VkPresentInfoKHR present = {};
   present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
   present.pNext = NULL;
@@ -731,6 +737,10 @@ void Fl_Vk_Window::init_vulkan()
     if (m_instance == VK_NULL_HANDLE)
     {
         pVkWindowDriver->init_vk();
+        vkSetHdrMetadataEXT =
+            (PFN_vkSetHdrMetadataEXT)
+            vkGetInstanceProcAddr(m_instance,
+                                  "vkSetHdrMetadataEXT");
     }
   
     pVkWindowDriver->create_surface();
@@ -738,6 +748,18 @@ void Fl_Vk_Window::init_vulkan()
     pVkWindowDriver->prepare();
 
     init_fences();
+}
+
+std::vector<const char*> Fl_Vk_Window::get_required_extensions()
+{
+    std::vector<const char*> out;
+    return out;
+}
+
+std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
+{
+    std::vector<const char*> out;
+    return out;
 }
 
 
@@ -780,8 +802,10 @@ void Fl_Vk_Window::init() {
   m_device = VK_NULL_HANDLE;
   m_gpu = VK_NULL_HANDLE;
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class
-
-
+  
+  m_hdr_metadata = {};
+  vkSetHdrMetadataEXT = nullptr;
+  
   m_swapchain = VK_NULL_HANDLE;
   m_renderPass = VK_NULL_HANDLE;
   m_pipeline = VK_NULL_HANDLE;

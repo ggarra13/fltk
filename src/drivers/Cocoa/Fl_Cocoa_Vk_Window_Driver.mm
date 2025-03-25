@@ -282,9 +282,9 @@ static Fl_RGB_Image *cgimage_to_rgb4(CGImageRef img) {
 //   return img;
 // }
 
-std::vector<std::string> Fl_Cocoa_Vk_Window_Driver::get_required_extensions()
+std::vector<const char*> Fl_Cocoa_Vk_Window_Driver::get_required_extensions()
 {
-    std::vector<std::string> out;
+    std::vector<const char*> out;
     out.push_back("VK_KHR_surface");
     out.push_back(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
     return out;

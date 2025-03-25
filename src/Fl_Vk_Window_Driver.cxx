@@ -18,6 +18,22 @@
 bool g_FunctionsLoaded = true;
 
 static int validation_error = 0;
+
+//! Returns true or false if extension name is supported.
+static bool isExtensionSupported(const char* extensionName) {
+    uint32_t extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+    for (const auto& ext : extensions) {
+        if (strcmp(ext.extensionName, extensionName) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 /*
  * Return 1 (true) if all layer names specified in check_names
  * can be found in given layer properties.
@@ -503,10 +519,36 @@ void Fl_Vk_Window_Driver::init_vk() {
   required_extension_count = required_extensions.size();
   for (i = 0; i < required_extension_count; i++) {
     pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-        required_extensions[i].c_str();
+        required_extensions[i];
     assert(pWindow->m_enabled_extension_count < 64);
   }
 
+  required_extensions = pWindow->get_required_extensions();
+  for (i = 0; i < required_extensions.size(); i++) {
+    pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
+        required_extensions[i];
+    assert(pWindow->m_enabled_extension_count < 64);
+  }
+
+  auto optional_extensions = pWindow->get_optional_extensions();
+  for (i = 0; i < optional_extensions.size(); i++) {
+      if (isExtensionSupported(optional_extensions[i]))
+      {
+          pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
+              optional_extensions[i];
+          assert(pWindow->m_enabled_extension_count < 64);
+      }
+      else
+      {
+          if (pWindow->m_validate)
+          {
+              std::cerr << "Optional Vulkan extension "
+                        << optional_extensions[i]
+                        << " not found." << std::endl;
+          }
+      }
+  }
+  
   err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count, NULL);
   assert(!err);
 
@@ -657,7 +699,33 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   VkResult result;
   uint32_t i;
 
-  // Iterate over each queue to learn whether it supports presenting:
+  // Get the list of VkFormat's that are supported:
+  uint32_t formatCount;
+  result =
+      vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu, pWindow->m_surface, &formatCount, NULL);
+  VK_CHECK_RESULT(result);
+  
+  VkSurfaceFormatKHR *surfFormats =
+      (VkSurfaceFormatKHR *)VK_ALLOC(formatCount * sizeof(VkSurfaceFormatKHR));
+  result = vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu,
+                                                pWindow->m_surface,
+                                                &formatCount,
+                                                surfFormats);
+  VK_CHECK_RESULT(result);
+  // If the format list includes just one entry of VK_FORMAT_UNDEFINED,
+  // the surface has no prefresulted format.  Otherwise, at least one
+  // supported format will be returned.
+  if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
+    pWindow->m_format = VK_FORMAT_B8G8R8A8_UNORM;
+  } else {
+    pWindow->m_format = surfFormats[0].format;
+  }
+  pWindow->m_color_space = surfFormats[0].colorSpace;
+
+  VK_FREE(surfFormats);
+  
+  // Get Memory information and properties
+  vkGetPhysicalDeviceMemoryProperties(pWindow->m_gpu, &pWindow->m_memory_properties);  // Iterate over each queue to learn whether it supports presenting:
   VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(pWindow->m_queue_count * sizeof(VkBool32));
   for (i = 0; i < pWindow->m_queue_count; i++) {
     vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->m_gpu, i, pWindow->m_surface,
@@ -693,17 +761,15 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   }
   free(supportsPresent);
 
-  // Generate resultor if could not find both a graphics and a present queue
+  // Generate result or if could not find both a graphics and a present queue
   if (graphicsQueueNodeIndex == UINT32_MAX || presentQueueNodeIndex == UINT32_MAX) {
     Fl::fatal("Could not find a graphics and a present queue\n",
               "Swapchain Initialization Failure");
   }
 
-  // TODO: Add support for separate queues, including presentation,
-  //       synchronization, and appropriate tracking for QueueSubmit.
   // NOTE: While it is possible for an application to use a separate graphics
   //       and a present queues, this demo program assumes it is only using
-  //       one:
+  //       one.
   if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
     Fl::fatal("Could not find a common graphics and a present queue\n",
               "Swapchain Initialization Failure");
@@ -715,34 +781,6 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
       init_device();
 
   vkGetDeviceQueue(pWindow->m_device, pWindow->m_queueFamilyIndex, 0, &pWindow->m_queue);
-
-  // Get the list of VkFormat's that are supported:
-  uint32_t formatCount;
-  result =
-      vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu, pWindow->m_surface, &formatCount, NULL);
-  VK_CHECK_RESULT(result);
-  
-  VkSurfaceFormatKHR *surfFormats =
-      (VkSurfaceFormatKHR *)VK_ALLOC(formatCount * sizeof(VkSurfaceFormatKHR));
-  result = vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu,
-                                                pWindow->m_surface,
-                                                &formatCount,
-                                                surfFormats);
-  VK_CHECK_RESULT(result);
-  // If the format list includes just one entry of VK_FORMAT_UNDEFINED,
-  // the surface has no prefresulted format.  Otherwise, at least one
-  // supported format will be returned.
-  if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
-    pWindow->m_format = VK_FORMAT_B8G8R8A8_UNORM;
-  } else {
-    pWindow->m_format = surfFormats[0].format;
-  }
-  pWindow->m_color_space = surfFormats[0].colorSpace;
-
-  VK_FREE(surfFormats);
-  
-  // Get Memory information and properties
-  vkGetPhysicalDeviceMemoryProperties(pWindow->m_gpu, &pWindow->m_memory_properties);
 }
 
 void Fl_Vk_Window_Driver::prepare() {

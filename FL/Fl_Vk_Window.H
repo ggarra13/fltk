@@ -191,17 +191,11 @@ public:
   VkResult end_setup();
 
   virtual void prepare() = 0;
-  virtual void destroy_resources();
-  
+  virtual void destroy_resources();  
 
-  uint32_t m_enabled_layer_count;
-  const char* m_enabled_layers[64];
-  // These should be moved somewhere else
-  uint32_t m_enabled_extension_count;
-  const char* m_extension_names[64];
+  virtual std::vector<const char*> get_required_extensions();
+  virtual std::vector<const char*> get_optional_extensions();
 
-
-  
   
   // Application
   bool                      m_validate;
@@ -214,21 +208,30 @@ public:
   static VkQueueFamilyProperties* m_queue_props;
   static uint32_t         m_queue_count;
 
+  uint32_t m_enabled_layer_count;
+  const char* m_enabled_layers[64];
 
-  
+  // These should be moved somewhere else
+  uint32_t m_enabled_extension_count;
+  const char* m_extension_names[64];
 
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
   VkSurfaceFormatKHR m_surfaceFormat; //needed
 
   VkFormat           m_format;   // for depth and color formats
-  VkColorSpaceKHR    m_color_space; // HDR10 or HLG for example
+  VkColorSpaceKHR    m_color_space; // sRGB, HDR10 or HLG for example
   
   VkRenderPass       m_renderPass; // needed
 
+  // Per swapchain
   uint32_t               m_swapchainImageCount;
   VkSwapchainKHR         m_swapchain;
   Fl_Vk_SwapchainBuffer* m_buffers;
+
+  // HDR metadata information (passed during swap_buffers)
+  PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
+  VkHdrMetadataEXT        m_hdr_metadata;
   
   VkQueue            m_queue;
   uint32_t           m_queueFamilyIndex;
