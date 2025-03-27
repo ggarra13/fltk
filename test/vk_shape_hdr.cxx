@@ -78,9 +78,6 @@ private:
 
     VkShaderModule prepare_vs();
     VkShaderModule prepare_fs();
-    
-    bool m_texture_needs_recreate = true;  // Flag to recreate texture on resize
-
 };
 
 static void depth_stencil_cb(DynamicTextureWindow* w)
@@ -106,7 +103,6 @@ Fl_Vk_Window(x,y,w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
     m_validate = true;
-    m_texture_needs_recreate = false;
     m_vert_shader_module = VK_NULL_HANDLE;
     m_frag_shader_module = VK_NULL_HANDLE;
 }
@@ -116,7 +112,6 @@ Fl_Vk_Window(w,h,l) {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
     m_validate = true;
-    m_texture_needs_recreate = false;
     m_vert_shader_module = VK_NULL_HANDLE;
     m_frag_shader_module = VK_NULL_HANDLE;
 }
@@ -262,58 +257,6 @@ void DynamicTextureWindow::prepare_textures()
         } else if (props.optimalTilingFeatures &
                    VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) {
             Fl::fatal("Staging buffer path not implemented in this demo");
-            // Must use staging buffer to copy linear texture to optimized
-            // This code is broken and raises validation errors.
-            // Fl_Vk_Texture staging_texture;
-
-            // memset(&staging_texture, 0, sizeof(staging_texture));
-            // prepare_texture_image(
-            //     tex_colors[i], &staging_texture,
-            //     VK_IMAGE_TILING_LINEAR,
-            //     VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-            //     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            //         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-
-            // prepare_texture_image(
-            //     tex_colors[i], &m_textures[i],
-            //     VK_IMAGE_TILING_OPTIMAL,
-            //     (VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
-            //     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-            // set_image_layout(staging_texture.image,
-            //                  VK_IMAGE_ASPECT_COLOR_BIT,
-            //                  staging_texture.imageLayout,
-            //                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            //                  0);
-
-            // set_image_layout(m_textures[i].image,
-            //                  VK_IMAGE_ASPECT_COLOR_BIT,
-            //                  m_textures[i].imageLayout,
-            //                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            //                  0);
-
-            // VkImageCopy copy_region = {};
-            // copy_region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            // copy_region.srcOffset = {0, 0, 0};
-            // copy_region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-            // copy_region.dstOffset = {0, 0, 0};
-            // copy_region.extent = {
-            //     (uint32_t)staging_texture.tex_width,
-            //     (uint32_t)staging_texture.tex_height, 1};
-            // vkCmdCopyImage(
-            //     m_setup_cmd, staging_texture.image,
-            //     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_textures[i].image,
-            //     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy_region);
-
-            // set_image_layout(m_textures[i].image,
-            //                  VK_IMAGE_ASPECT_COLOR_BIT,
-            //                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            //                  m_textures[i].imageLayout,
-            //                  0);
-
-            // flush_init_cmd();
-
-            // destroy_texture_image(&staging_texture);
         } else {
             /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
             Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");
@@ -460,24 +403,23 @@ void DynamicTextureWindow::prepare_vertices()
     buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; 
     buf_info.flags = 0;
 
+    result = vkCreateBuffer(m_device, &buf_info, NULL, &m_vertices.buf);
+    VK_CHECK_RESULT(result);
+    
+    // Use a local variable instead of overwriting m_mem_reqs
+    VkMemoryRequirements vertex_mem_reqs;
+    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &vertex_mem_reqs);
+    
     VkMemoryAllocateInfo mem_alloc = {};
     mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     mem_alloc.pNext = NULL;
-    mem_alloc.allocationSize = 0;
+    mem_alloc.allocationSize = vertex_mem_reqs.size;
     mem_alloc.memoryTypeIndex = 0;
     
     bool pass;
     void *data;
-
-    memset(&m_vertices, 0, sizeof(m_vertices));  // \@todo: remove
-
-    result = vkCreateBuffer(m_device, &buf_info, NULL, &m_vertices.buf);
-    VK_CHECK_RESULT(result);
-
-    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &m_mem_reqs);
-
-    mem_alloc.allocationSize = m_mem_reqs.size;
-    memory_type_from_properties(m_mem_reqs.memoryTypeBits,
+    
+    memory_type_from_properties(vertex_mem_reqs.memoryTypeBits,
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                 &mem_alloc.memoryTypeIndex);
 
@@ -853,13 +795,6 @@ void DynamicTextureWindow::vk_draw_begin()
     m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
     
     Fl_Vk_Window::vk_draw_begin();
-    
-    // Recreate texture if needed (e.g., after resize)
-    if (m_texture_needs_recreate) {
-        prepare_textures();   // Recreate texture
-        prepare_descriptor_set();  // Update descriptor set with new texture
-        m_texture_needs_recreate = false;
-    }
 }
 
 void DynamicTextureWindow::draw() {
