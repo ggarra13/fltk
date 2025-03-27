@@ -28,6 +28,7 @@
 #include <FL/Fl_Vk_Utils.H>
 
 class vk_shape_window : public Fl_Vk_Window {
+    void vk_draw_begin() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
 public:
     int sides;
@@ -472,24 +473,24 @@ void vk_shape_window::prepare()
     prepare_descriptor_set();
 }
 
-void vk_shape_window::draw() {
-    if (!shown() || w() <= 0 || h() <= 0) return;
 
+void vk_shape_window::vk_draw_begin()
+{
     // Background color
     m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
 
-    draw_begin();
+    Fl_Vk_Window::vk_draw_begin();
+}
 
-    // Draw the triangle
+void vk_shape_window::draw() {
+    if (!shown() || w() <= 0 || h() <= 0) return;
+
+    // Draw the shape
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
                            &m_vertices.buf, offsets);
 
     vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
-
-    Fl_Window::draw();
-    
-    draw_end();
 }
 
 void vk_shape_window::destroy_resources() {

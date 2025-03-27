@@ -99,7 +99,7 @@ void Fl_Vk_Window::destroy_resources() {
   }
 }
 
-void Fl_Vk_Window::draw_begin() {
+void Fl_Vk_Window::vk_draw_begin() {
   VkResult result;
 
   // Recreate swapchain if needed
@@ -240,14 +240,14 @@ void Fl_Vk_Window::draw_begin() {
 
 /**
  Supports drawing to an Fl_Vk_Window with the FLTK 2D drawing API.
- \see \ref opengl_with_fltk_widgets
+ \see \ref vulkan_with_fltk_widgets
  */
 
 /**
- To be used as a match for a previous call to Fl_Vk_Window::draw_begin().
- \see \ref opengl_with_fltk_widgets
+ To be used as a match for a previous call to Fl_Vk_Window::vk_draw_begin().
+ \see \ref vulkan_with_fltk_widgets
  */
-void Fl_Vk_Window::draw_end() {
+void Fl_Vk_Window::vk_draw_end() {
   VkResult result;
 
   // Move to draw_end()
@@ -521,30 +521,43 @@ void Fl_Vk_Window::flush() {
 
       // don't draw if only overlay damage or expose events:
       if ((damage() & ~(FL_DAMAGE_OVERLAY | FL_DAMAGE_EXPOSE)))
-        draw();
+      {
+          vk_draw_begin();
+          draw();
+          vk_draw_end();
+      }
       swap_buffers();
 
     } else if (SWAP_TYPE == COPY) {
 
       // don't draw if only the overlay is damaged:
       if (damage() != FL_DAMAGE_OVERLAY)
-        draw();
+      {
+          vk_draw_begin();
+          draw();
+          vk_draw_end();
+      }
       swap_buffers();
 
     } else if (SWAP_TYPE == SWAP) {
       damage(FL_DAMAGE_ALL);
+      vk_draw_begin();
       draw();
+      vk_draw_end();
       swap_buffers();
     } else if (SWAP_TYPE == UNDEFINED) { // SWAP_TYPE == UNDEFINED
       damage1_ = damage();
       clear_damage(0xff);
+      vk_draw_begin();
       draw();
+      vk_draw_end();
       swap_buffers();
     }
 
   } else { // single-buffered context is simpler:
-
-    draw();
+      vk_draw_begin();
+      draw();
+      vk_draw_end();
   }
 }
 
@@ -574,7 +587,7 @@ void Fl_Vk_Window::hide() {
   draw().
 
   The draw() method can <I>only</I> use Vulkan calls.  Do not
-  attempt to call X, any of the functions in <FL/fl_draw.H>, OpenGL or vk
+  attempt to call X, any of the functions in <FL/fl_draw.H>, Vulkan or vk
   directly.  Do not call vk_start() or vk_finish().
 
   Double-buffering is enabled by default in the window, the back and front
@@ -597,14 +610,22 @@ void Fl_Vk_Window::hide() {
   correctly overlay the widgets, Fl_Vk_Window::draw() must be called after
   rendering the main scene.
   \code
+
+  void mywindow::vk_draw_begin()
+  {
+     // Background color
+     m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
+
+     // Clear the screen and prepare m_draw_cmd
+     Fl_Vk_Window::vk_draw_begin();
+  }
+  
   void mywindow::draw() {
   // draw 3d graphics scene
   Fl_Vk_Window::draw();
   // -- or --
-  draw_begin();
   Fl_Window::draw();
   // other 2d drawing calls, overlays, etc.
-  draw_end();
   }
   \endcode
 

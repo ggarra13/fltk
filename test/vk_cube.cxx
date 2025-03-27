@@ -82,6 +82,7 @@ public:
 #include <FL/math.h>
 
 class cube_box : public Fl_Vk_Window {
+    void vk_draw_begin() FL_OVERRIDE;
   void draw() FL_OVERRIDE;
   int handle(int) FL_OVERRIDE;
 
@@ -604,24 +605,23 @@ void cube_box::destroy_resources() {
     }
 }
 
-void cube_box::draw() {
-    lasttime = lasttime + speed;
-
+void cube_box::vk_draw_begin()
+{
     // Background color
     m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
 
-    draw_begin();
+    Fl_Vk_Window::vk_draw_begin();
+}
 
-    // Draw the triangle
+void cube_box::draw() {
+    lasttime = lasttime + speed;
+
+    // Draw the cube
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
                            &m_vertices.buf, offsets);
 
     vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
-
-    Fl_Window::draw();
-    
-    draw_end();
 }
 
 int cube_box::handle(int e) {

@@ -119,10 +119,10 @@ protected:
                                    VkFlags requirements_mask,
                                    uint32_t *typeIndex);
   void destroy_texture_image(Fl_Vk_Texture *tex_obj);
-
-  void draw_begin();
+  
+  virtual void vk_draw_begin();
   void draw() FL_OVERRIDE;
-  void draw_end();
+  virtual void vk_draw_end();
 
   void flush_init_cmd();
 

@@ -31,6 +31,7 @@
 #define DEMO_TEXTURE_COUNT 1
 
 class DynamicTextureWindow : public Fl_Vk_Window {
+    void vk_draw_begin() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
 public:
     int sides;
@@ -839,11 +840,12 @@ void DynamicTextureWindow::prepare()
     Fl::add_timeout(1.0/60.0, (Fl_Timeout_Handler)texture_cb, this);
 }
 
-void DynamicTextureWindow::draw() {
+void DynamicTextureWindow::vk_draw_begin()
+{
     // Background color
     m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
     
-    draw_begin();
+    Fl_Vk_Window::vk_draw_begin();
     
     // Recreate texture if needed (e.g., after resize)
     if (m_texture_needs_recreate) {
@@ -851,10 +853,13 @@ void DynamicTextureWindow::draw() {
         prepare_descriptor_set();  // Update descriptor set with new texture
         m_texture_needs_recreate = false;
     }
+}
+
+void DynamicTextureWindow::draw() {
     
     update_texture();
 
-    // Draw the triangle
+    // Draw the shape
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
                            &m_vertices.buf, offsets);
@@ -862,8 +867,6 @@ void DynamicTextureWindow::draw() {
     vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
 
     Fl_Window::draw();
-    
-    draw_end();
 }
 
 void DynamicTextureWindow::destroy_resources() {
