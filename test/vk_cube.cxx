@@ -567,16 +567,16 @@ void cube_box::prepare_vertices()
     m_vertices.vi.vertexAttributeDescriptionCount = 2;
     m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
 
-    m_vertices.vi_bindings[0].binding = VERTEX_BUFFER_BIND_ID;
+    m_vertices.vi_bindings[0].binding = 0;
     m_vertices.vi_bindings[0].stride = sizeof(vertices[0]);
     m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    m_vertices.vi_attrs[0].binding = VERTEX_BUFFER_BIND_ID;
+    m_vertices.vi_attrs[0].binding = 0;
     m_vertices.vi_attrs[0].location = 0;
     m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     m_vertices.vi_attrs[0].offset = 0;
 
-    m_vertices.vi_attrs[1].binding = VERTEX_BUFFER_BIND_ID;
+    m_vertices.vi_attrs[1].binding = 0;
     m_vertices.vi_attrs[1].location = 1;
     m_vertices.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
     m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
@@ -618,7 +618,7 @@ void cube_box::draw() {
 
     // Draw the cube
     VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(m_draw_cmd, VERTEX_BUFFER_BIND_ID, 1,
+    vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
                            &m_vertices.buf, offsets);
 
     vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
