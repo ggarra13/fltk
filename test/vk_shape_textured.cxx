@@ -127,8 +127,8 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
     VkResult result;
     bool pass;
 
-    tex_obj->tex_width = tex_width;
-    tex_obj->tex_height = tex_height;
+    tex_obj->width = tex_width;
+    tex_obj->height = tex_height;
 
     VkImageCreateInfo image_create_info = {};
     image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
