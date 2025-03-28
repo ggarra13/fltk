@@ -26,8 +26,6 @@
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
-#define VERTEX_BUFFER_BIND_ID 0
-
 
 //! GLFW demo variables
 struct Fl_Vk_SwapchainBuffer {
@@ -44,6 +42,11 @@ struct Fl_Vk_Mesh {
     VkPipelineVertexInputStateCreateInfo vi;
     VkVertexInputBindingDescription vi_bindings[1];
     VkVertexInputAttributeDescription vi_attrs[2];
+
+    Fl_Vk_Mesh()
+        {
+            memset(&vi, 0, sizeof(VkPipelineVertexInputStateCreateInfo));
+        }
 };
 
   

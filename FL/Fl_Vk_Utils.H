@@ -34,4 +34,9 @@ void set_image_layout(VkCommandBuffer cmd,
                       VkAccessFlags dstAccessMask,
                       VkPipelineStageFlags dstStageMask);
     
+// Debugging functions
+FL_EXPORT std::string getVkFormat(const VkFormat format);
+FL_EXPORT std::string getVkSurfaceFormat(const VkSurfaceFormatKHR surfFormat);
+FL_EXPORT std::string getVkColorSpace(const VkColorSpaceKHR colorSpace);
+
 #endif

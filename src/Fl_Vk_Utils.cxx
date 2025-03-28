@@ -77,3 +77,49 @@ void set_image_layout(VkCommandBuffer cmd,
                          srcStageMask, dstStageMask, 0, 0, NULL,
                          0, NULL, 1, &image_memory_barrier);
 }
+
+std::string getVkFormat(const VkFormat format)
+{
+    return "Unknown swapchain surace format";
+}
+
+std::string getVkSurfaceFormat(const VkSurfaceFormatKHR surfFormat)
+{
+    return "Unknown surace format";
+}
+
+
+#define VK_CHECK_COLOR_SPACE(x) case x: \
+    out = #x; \
+    break;
+
+std::string getVkColorSpace(const VkColorSpaceKHR colorSpace)
+{
+    std::string out;
+    switch(colorSpace)
+    {
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_BT709_NONLINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_DCI_P3_LINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_BT709_LINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_BT2020_LINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_HDR10_ST2084_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_DOLBYVISION_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_HDR10_HLG_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_ADOBERGB_NONLINEAR_EXT);
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_PASS_THROUGH_EXT);
+#ifdef VK_AMD_display_native_hdr
+        VK_CHECK_COLOR_SPACE(VK_COLOR_SPACE_DISPLAY_NATIVE_AMD);
+#endif
+
+    default:
+        out = "Unknown VK_COLOR_SPACE constant";
+        break;
+    }
+    return out;
+}

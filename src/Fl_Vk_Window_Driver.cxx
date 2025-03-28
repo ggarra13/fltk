@@ -599,8 +599,6 @@ void Fl_Vk_Window_Driver::init_vk() {
   if (portability_enumeration)
     inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
-  uint32_t gpu_count;
-
   err = vkCreateInstance(&inst_info, NULL, &pWindow->m_instance);
   if (err == VK_ERROR_INCOMPATIBLE_DRIVER) {
     Fl::fatal("Cannot find a compatible Vulkan installable client driver "
@@ -622,33 +620,41 @@ void Fl_Vk_Window_Driver::init_vk() {
   // pWindow->m_instance);
 
   // Make initial call to query gpu_count, then second call for gpu info
+  // Make initial call to query gpu_count
+  uint32_t gpu_count = 0;
   err = vkEnumeratePhysicalDevices(pWindow->m_instance, &gpu_count, NULL);
-  assert(!err && gpu_count > 0);
-
-  if (gpu_count > 0) {
-    VkPhysicalDevice *physical_devices =
-        (VkPhysicalDevice *)VK_ALLOC(sizeof(VkPhysicalDevice) * gpu_count);
-    err = vkEnumeratePhysicalDevices(pWindow->m_instance, &gpu_count,
-                                     physical_devices);
-    pWindow->m_gpu = physical_devices[0];
-    VK_FREE(physical_devices);
-  } else {
-    Fl::fatal("vkEnumeratePhysicalDevices reported zero accessible devices."
-              "\n\nDo you have a compatible Vulkan installable client"
-              " driver (ICD) installed?\nPlease look at the Getting Started"
-              " guide for additional information.\n",
-              "vkEnumeratePhysicalDevices Failure");
+  if (err != VK_SUCCESS || gpu_count == 0) {
+      Fl::fatal("vkEnumeratePhysicalDevices failed to find any GPUs.\n\n"
+                "Error code: %d\n"
+                "Do you have a compatible Vulkan installable client driver (ICD) installed?\n"
+                "Please look at the Getting Started guide for additional information.");
+}
+  
+// Allocate and populate physical devices array
+  VkPhysicalDevice *physical_devices = (VkPhysicalDevice *)VK_ALLOC(sizeof(VkPhysicalDevice) * gpu_count);
+  assert(physical_devices); // Ensure allocation succeeded
+  err = vkEnumeratePhysicalDevices(pWindow->m_instance, &gpu_count, physical_devices);
+  if (err != VK_SUCCESS) {
+      VK_FREE(physical_devices);
+      VK_CHECK_RESULT(err);
+      Fl::fatal("vkEnumeratePhysicalDevices failed to enumerate devices.\n"
+                "Error code");
   }
 
-  // Look for device extensions
+// Assign the first GPU handle and free the array
+  pWindow->m_gpu = physical_devices[0];
+  VK_FREE(physical_devices);
+
+// Look for device extensions
   uint32_t device_extension_count = 0;
   VkBool32 swapchainExtFound = 0;
   pWindow->m_enabled_extension_count = 0;
 
-  err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL, &device_extension_count, NULL);
+  err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL,
+                                             &device_extension_count, NULL);
   assert(!err);
 
-  if (device_extension_count > 0) {
+if (device_extension_count > 0) {
     VkExtensionProperties *device_extensions =
         (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
     err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL, &device_extension_count,
@@ -713,7 +719,7 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
                                                 surfFormats);
   VK_CHECK_RESULT(result);
   // If the format list includes just one entry of VK_FORMAT_UNDEFINED,
-  // the surface has no prefresulted format.  Otherwise, at least one
+  // the surface has no preferred format.  Otherwise, at least one
   // supported format will be returned.
   if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
     pWindow->m_format = VK_FORMAT_B8G8R8A8_UNORM;

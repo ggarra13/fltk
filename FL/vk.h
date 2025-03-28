@@ -42,7 +42,8 @@
 #ifndef FL_vk_H
 #  define FL_vk_H
 
-#include <iostream>  // \@todo: remove
+#include <string>
+#include <iostream> 
 #include <FL/platform.H>
 #include <FL/Fl.H>
 
@@ -196,5 +197,6 @@ inline void vk_check_result(VkResult err, const char* file, const int line)
     Fl::error(buf);
     exit(err);
 }
+
 
 #endif // !FL_vk_H
