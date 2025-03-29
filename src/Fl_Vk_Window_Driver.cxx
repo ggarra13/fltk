@@ -115,6 +115,13 @@ void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
   image_memory_barrier.oldLayout = old_image_layout;
   image_memory_barrier.newLayout = new_image_layout;
   image_memory_barrier.image = image;
+  if (image == VK_NULL_HANDLE)
+  {
+      std::cerr << "image VK_NULL_HANDLE in "
+                << "Fl_Vk_Window_Driver::set_image_layout"
+                << std::endl;
+      abort();
+  }
   image_memory_barrier.subresourceRange = {aspectMask, 0, 1, 0, 1};
 
   VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;         // Default for host writes
@@ -154,7 +161,8 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   // Get surface capabilities
   VkSurfaceCapabilitiesKHR surfCapabilities;
-  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->m_gpu, pWindow->m_surface,
+  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->m_gpu,
+                                                     pWindow->m_surface,
                                                      &surfCapabilities);
   VK_CHECK_RESULT(result);
 

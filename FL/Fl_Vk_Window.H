@@ -38,7 +38,10 @@ struct Fl_Vk_Mesh {
     VkBuffer buf;
     VkDeviceMemory mem;
 
+    // Indices (if used)
     std::vector<int> v;
+
+    // Actual Vulkan Data
     VkPipelineVertexInputStateCreateInfo vi;
     VkVertexInputBindingDescription vi_bindings[1];
     VkVertexInputAttributeDescription vi_attrs[2];
@@ -156,7 +159,9 @@ protected:
   bool memory_type_from_properties(uint32_t typeBits,
                                    VkFlags requirements_mask,
                                    uint32_t *typeIndex);
-  void destroy_texture_image(Fl_Vk_Texture *tex_obj);
+  
+  //! Auxiliary function to destroy all of a Fl_Vk_Texture's resources.
+  void destroy_texture_image(Fl_Vk_Texture& texture);
   
   virtual void vk_draw_begin();
   void draw() FL_OVERRIDE;

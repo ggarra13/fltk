@@ -54,28 +54,26 @@ VkShaderModule create_shader_module(VkDevice device, const std::vector<uint32_t>
 void set_image_layout(VkCommandBuffer cmd,
                       VkImage image,
                       VkImageAspectFlags aspectMask,
-                      VkImageLayout old_image_layout,
-                      VkImageLayout new_image_layout,
+                      VkImageLayout oldLayout,
+                      VkImageLayout newLayout,
                       VkAccessFlags srcAccessMask,
                       VkPipelineStageFlags srcStageMask,
                       VkAccessFlags dstAccessMask,
                       VkPipelineStageFlags dstStageMask)
 {
-    VkResult err;
-
-    VkImageMemoryBarrier image_memory_barrier = {};
-    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    image_memory_barrier.pNext = NULL;
-    image_memory_barrier.srcAccessMask = srcAccessMask;
-    image_memory_barrier.dstAccessMask = dstAccessMask;
-    image_memory_barrier.oldLayout = old_image_layout;
-    image_memory_barrier.newLayout = new_image_layout;
-    image_memory_barrier.image = image;
-    image_memory_barrier.subresourceRange = {aspectMask, 0, 1, 0, 1};
+    VkImageMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.pNext = NULL;
+    barrier.srcAccessMask = srcAccessMask;
+    barrier.dstAccessMask = dstAccessMask;
+    barrier.oldLayout = oldLayout;
+    barrier.newLayout = newLayout;
+    barrier.image = image;
+    barrier.subresourceRange = {aspectMask, 0, 1, 0, 1};
 
     vkCmdPipelineBarrier(cmd,
                          srcStageMask, dstStageMask, 0, 0, NULL,
-                         0, NULL, 1, &image_memory_barrier);
+                         0, NULL, 1, &barrier);
 }
 
 std::string getVkFormat(const VkFormat format)

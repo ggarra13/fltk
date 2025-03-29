@@ -41,10 +41,28 @@ VkPhysicalDeviceFeatures   Fl_Vk_Window::m_gpu_features;
 VkQueueFamilyProperties*   Fl_Vk_Window::m_queue_props = nullptr;
 uint32_t                   Fl_Vk_Window::m_queue_count = 0;
 
-void Fl_Vk_Window::destroy_texture_image(Fl_Vk_Texture *tex_obj) {
-  // /* clean up staging resources */
-  vkDestroyImage(m_device, tex_obj->image, NULL);
-  vkFreeMemory(m_device, tex_obj->mem, NULL);
+void Fl_Vk_Window::destroy_texture_image(Fl_Vk_Texture& texture)
+{
+    if (texture.view != VK_NULL_HANDLE)
+    {
+        vkDestroyImageView(m_device, texture.view, NULL);
+        texture.view = VK_NULL_HANDLE;
+    }
+    if (texture.image != VK_NULL_HANDLE)
+    {
+        vkDestroyImage(m_device, texture.image, NULL);
+        texture.image = VK_NULL_HANDLE;
+    }
+    if (texture.mem != VK_NULL_HANDLE)
+    {
+        vkFreeMemory(m_device, texture.mem, NULL);
+        texture.mem = VK_NULL_HANDLE;
+    }
+    if (texture.sampler != VK_NULL_HANDLE)
+    {
+        vkDestroySampler(m_device, texture.sampler, NULL);
+        texture.sampler = VK_NULL_HANDLE;
+    }
 }
 
 void Fl_Vk_Window::destroy_resources() {
@@ -188,6 +206,12 @@ void Fl_Vk_Window::vk_draw_begin() {
   image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   image_memory_barrier.image = m_buffers[m_current_buffer].image;
   image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+  if (image_memory_barrier.image == VK_NULL_HANDLE)
+  {
+      std::cerr << "Fl_Vk_Window::vk_draw_begin() image_memory_barrier.image "
+                << "VK_NULL_HANDLE" << std::endl;
+      abort();
+  }
 
   vkCmdPipelineBarrier(m_draw_cmd,
                        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,             // No prior work
