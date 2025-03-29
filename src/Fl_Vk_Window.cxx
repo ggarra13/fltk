@@ -419,7 +419,6 @@ void Fl_Vk_Window::make_current() {
 void Fl_Vk_Window::swap_buffers() {
   VkResult result;
 
-  VkFence nullFence = VK_NULL_HANDLE;
   VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
   VkSubmitInfo submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -432,8 +431,12 @@ void Fl_Vk_Window::swap_buffers() {
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = &m_drawCompleteSemaphore;
 
-  result = vkQueueSubmit(m_queue, 1, &submit_info, nullFence);
+  vkResetFences(m_device, 1, &m_drawFence);
+  result = vkQueueSubmit(m_queue, 1, &submit_info, m_drawFence);
   VK_CHECK_RESULT(result);
+  
+  vkWaitForFences(m_device, 1, &m_drawFence, VK_TRUE, UINT64_MAX);
+  vkResetFences(m_device, 1, &m_drawFence);
 
   if (vkSetHdrMetadataEXT &&
       m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
@@ -702,7 +705,6 @@ void Fl_Vk_Window::flush_init_cmd() {
   VK_CHECK_RESULT(result);
 
   const VkCommandBuffer cmd_bufs[] = {m_setup_cmd};
-  VkFence nullFence = {VK_NULL_HANDLE};
   VkSubmitInfo submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.pNext = NULL;
@@ -714,6 +716,7 @@ void Fl_Vk_Window::flush_init_cmd() {
   submit_info.signalSemaphoreCount = 0;
   submit_info.pSignalSemaphores = NULL;
 
+  vkResetFences(m_device, 1, &m_setupFence);
   result = vkQueueSubmit(m_queue, 1, &submit_info, m_setupFence);
   VK_CHECK_RESULT(result);
 

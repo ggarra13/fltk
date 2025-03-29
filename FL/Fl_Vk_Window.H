@@ -20,6 +20,7 @@
 #ifndef Fl_Vk_Window_H
 #define Fl_Vk_Window_H
 
+
 #include "FL/vk.h"
 #include "Fl_Window.H"
 
@@ -275,7 +276,7 @@ public:
   // HDR metadata information (passed during swap_buffers)
   PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
   VkHdrMetadataEXT        m_hdr_metadata;
-  
+
   VkQueue            m_queue;
   uint32_t           m_queueFamilyIndex;
   Fl_Vk_Depth        m_depth;
