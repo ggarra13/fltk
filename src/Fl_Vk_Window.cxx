@@ -206,12 +206,6 @@ void Fl_Vk_Window::vk_draw_begin() {
   image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   image_memory_barrier.image = m_buffers[m_current_buffer].image;
   image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  if (image_memory_barrier.image == VK_NULL_HANDLE)
-  {
-      std::cerr << "Fl_Vk_Window::vk_draw_begin() image_memory_barrier.image "
-                << "VK_NULL_HANDLE" << std::endl;
-      abort();
-  }
 
   vkCmdPipelineBarrier(m_draw_cmd,
                        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,             // No prior work
