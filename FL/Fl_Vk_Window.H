@@ -20,7 +20,6 @@
 #ifndef Fl_Vk_Window_H
 #define Fl_Vk_Window_H
 
-
 #include "FL/vk.h"
 #include "Fl_Window.H"
 
@@ -291,7 +290,7 @@ public:
   VkCommandBuffer    m_setup_cmd; // Command Buffer for resources
   
   VkFence            m_drawFence; // Fence for drawing commands in window
-  VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands  
+  VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands
 
   VkSemaphore        m_imageAcquiredSemaphore;
   VkSemaphore        m_drawCompleteSemaphore;

@@ -862,9 +862,6 @@ void Fl_Vk_Window_Driver::destroy_resources() {
     vkFreeMemory(pWindow->m_device, pWindow->m_depth.mem, NULL);
     pWindow->m_depth.mem = VK_NULL_HANDLE;
   }
-
-  // Recreate resources
-  prepare();
 }
 
 SwapChainSupportDetails

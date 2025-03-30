@@ -122,9 +122,15 @@ void Fl_Vk_Window::vk_draw_begin() {
 
   // Recreate swapchain if needed
   if (m_swapchain_needs_recreation) {
-      vkDeviceWaitIdle(m_device);  // waits for all queue on the device
-      destroy_resources();
-      pVkWindowDriver->destroy_resources(); // Now just prepares resources
+      // Waits for all queue on the device
+      vkDeviceWaitIdle(m_device); 
+
+      // Destroy window and driver resources
+      pVkWindowDriver->destroy_resources(); 
+
+      // Recreate resources
+      pVkWindowDriver->prepare();
+
       m_swapchain_needs_recreation = false; // Reset only if successful
   }
 
@@ -208,7 +214,7 @@ void Fl_Vk_Window::vk_draw_begin() {
   image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
 
   vkCmdPipelineBarrier(m_draw_cmd,
-                       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,             // No prior work
+                       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,   // No prior work
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
                        0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
 
@@ -316,6 +322,8 @@ VkResult Fl_Vk_Window::begin_setup() {
   submit_info.signalSemaphoreCount = 0;
   submit_info.pSignalSemaphores = NULL;
 
+  vkResetFences(m_device, 1, &m_setupFence);
+  
   result = vkQueueSubmit(m_queue, 1, &submit_info, m_setupFence);
   VK_CHECK_RESULT(result);
   
@@ -418,7 +426,7 @@ void Fl_Vk_Window::make_current() {
 */
 void Fl_Vk_Window::swap_buffers() {
   VkResult result;
-
+  
   VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
   VkSubmitInfo submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
