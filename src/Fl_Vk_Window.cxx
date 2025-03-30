@@ -848,7 +848,11 @@ void Fl_Vk_Window::init() {
   m_depthStencil = 1.0;
 
   // Reset Vulkan Handles
+#ifdef NDEBUG
   m_validate = false;
+#else
+  m_validate = true;
+#endif
   m_device = VK_NULL_HANDLE;
   m_gpu = VK_NULL_HANDLE;
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class

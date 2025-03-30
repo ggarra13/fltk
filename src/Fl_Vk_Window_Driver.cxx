@@ -43,7 +43,10 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names, uin
   uint32_t i, j;
   for (i = 0; i < check_count; i++) {
     VkBool32 found = 0;
+    std::cerr << "check_names[" << i << "]" << check_names[i] << std::endl;
     for (j = 0; j < layer_count; j++) {
+        std::cerr << "\tlayers[" << j << "]" << layers[j].layerName
+                  << std::endl;
       if (!strcmp(check_names[i], layers[j].layerName)) {
         found = 1;
         break;
@@ -414,11 +417,11 @@ QueueFamilyIndices Fl_Vk_Window_Driver::find_queue_families(VkPhysicalDevice phy
     vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, pWindow->m_surface, &presentSupport);
 
     if (presentSupport) {
-      indices.presentFamily = i;
+        indices.presentFamily = i;
     }
 
     if (indices.isComplete()) {
-      break;
+        break;
     }
 
     i++;
@@ -429,91 +432,94 @@ QueueFamilyIndices Fl_Vk_Window_Driver::find_queue_families(VkPhysicalDevice phy
 
 
 void Fl_Vk_Window_Driver::init_device() {
-  VkResult result;
+    VkResult result;
 
-  float queue_priorities[1] = {0.0};
-  VkDeviceQueueCreateInfo queue = {};
-  queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queue.pNext = NULL;
-  queue.queueFamilyIndex = pWindow->m_queueFamilyIndex;
-  queue.queueCount = 1;
-  queue.pQueuePriorities = queue_priorities;
+    float queue_priorities[1] = {0.0};
+    VkDeviceQueueCreateInfo queue = {};
+    queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue.pNext = NULL;
+    queue.queueFamilyIndex = pWindow->m_queueFamilyIndex;
+    queue.queueCount = 1;
+    queue.pQueuePriorities = queue_priorities;
 
-  VkDeviceCreateInfo device = {};
-  device.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  device.pNext = NULL;
-  device.queueCreateInfoCount = 1;
-  device.pQueueCreateInfos = &queue;
-  device.enabledLayerCount = 0;
-  device.ppEnabledLayerNames = NULL;
-  device.enabledExtensionCount = pWindow->m_enabled_extension_count;
-  device.ppEnabledExtensionNames = (const char *const *)pWindow->m_extension_names;
+    VkDeviceCreateInfo device = {};
+    device.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device.pNext = NULL;
+    device.queueCreateInfoCount = 1;
+    device.pQueueCreateInfos = &queue;
+    device.enabledLayerCount = 0;
+    device.ppEnabledLayerNames = NULL;
+    device.enabledExtensionCount = pWindow->m_enabled_extension_count;
+    device.ppEnabledExtensionNames = (const char *const *)pWindow->m_extension_names;
 
-  result = vkCreateDevice(pWindow->m_gpu, &device, NULL, &pWindow->m_device);
-  VK_CHECK_RESULT(result);
+    result = vkCreateDevice(pWindow->m_gpu, &device, NULL, &pWindow->m_device);
+    VK_CHECK_RESULT(result);
 }
 
 
 void Fl_Vk_Window_Driver::init_vk() {
-  VkResult err;
-  VkBool32 portability_enumeration = VK_FALSE;
-  uint32_t i = 0;
-  uint32_t required_extension_count = 0;
-  uint32_t instance_extension_count = 0;
-  uint32_t instance_layer_count = 0;
-  uint32_t validation_layer_count = 0;
-  const char **instance_validation_layers = NULL;
-  pWindow->m_enabled_extension_count = 0;
-  pWindow->m_enabled_layer_count = 0;
+    VkResult err;
+    VkBool32 portability_enumeration = VK_FALSE;
+    uint32_t i = 0;
+    uint32_t required_extension_count = 0;
+    uint32_t instance_extension_count = 0;
+    uint32_t instance_layer_count = 0;
+    uint32_t validation_layer_count = 0;
+    const char **instance_validation_layers = NULL;
+    pWindow->m_enabled_extension_count = 0;
+    pWindow->m_enabled_layer_count = 0;
 
-  const char *instance_validation_layers_alt1[] = {
-      "VK_LAYER_KHRONOS_validation",
-  };
-
-
-  /* Look for validation layers */
-  VkBool32 validation_found = 0;
-  if (pWindow->m_validate) {
-
-    err = vkEnumerateInstanceLayerProperties(&instance_layer_count, NULL);
-    assert(!err);
-
-    instance_validation_layers = (const char **)instance_validation_layers_alt1;
-    if (instance_layer_count > 0) {
-      VkLayerProperties *instance_layers =
-          (VkLayerProperties *)VK_ALLOC(sizeof(VkLayerProperties) * instance_layer_count);
-      err = vkEnumerateInstanceLayerProperties(&instance_layer_count, instance_layers);
-      assert(!err);
+    const char *instance_validation_layers_alt1[] = {
+        "VK_LAYER_KHRONOS_validation",
+    };
 
 
-      validation_found =
-          check_layers(VK_ARRAY_SIZE(instance_validation_layers_alt1), instance_validation_layers,
-                       instance_layer_count, instance_layers);
-      if (validation_found) {
-        pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers_alt1);
-        pWindow->m_enabled_layers[0] = "VK_LAYER_LUNARG_standard_validation";
-        validation_layer_count = 1;
-      }
-      free(instance_layers);
+    /* Look for validation layers *//* Look for validation layers */
+    VkBool32 validation_found = 0;
+    if (pWindow->m_validate) {
+        err = vkEnumerateInstanceLayerProperties(&instance_layer_count, NULL);
+        VK_CHECK_RESULT(err);
+
+        instance_validation_layers = (const char **)instance_validation_layers_alt1;
+        if (instance_layer_count > 0) {
+            VkLayerProperties *instance_layers =
+                (VkLayerProperties *)VK_ALLOC(sizeof(VkLayerProperties) * instance_layer_count);
+            err = vkEnumerateInstanceLayerProperties(&instance_layer_count, instance_layers);
+            VK_CHECK_RESULT(err);
+
+            validation_found =
+                check_layers(VK_ARRAY_SIZE(instance_validation_layers_alt1), instance_validation_layers,
+                             instance_layer_count, instance_layers);
+            if (validation_found) {
+                pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers_alt1);
+                pWindow->m_enabled_layers[0] = "VK_LAYER_KHRONOS_validation"; // Updated layer name
+                validation_layer_count = 1;
+            }
+            free(instance_layers);
+        }
+        else
+        {
+            std::cerr << "instance_layer_count=" << instance_layer_count
+                      << std::endl;
+        }
+
+        if (!validation_found) {
+            Fl::fatal("vkEnumerateInstanceLayerProperties failed to find "
+                      "required validation layer.\n\n"
+                      "Please look at the Getting Started guide for additional "
+                      "information.\n",
+                      "vkCreateInstance Failure");
+        }
     }
-
-    if (!validation_found) {
-      Fl::fatal("vkEnumerateInstanceLayerProperties failed to find "
-                "required validation layer.\n\n"
-                "Please look at the Getting Started guide for additional "
-                "information.\n",
-                "vkCreateInstance Failure");
-    }
-  }
-
-  /* Look for instance extensions */
-  auto required_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_required_extensions();
-  if (required_extensions.empty()) {
-    Fl::fatal("FLTK get_required_extensions failed to find the "
-              "platform surface extensions.\n\nDo you have a compatible "
-              "Vulkan installable client driver (ICD) installed?\nPlease "
-              "look at the Getting Started guide for additional "
-              "information.\n",
+    
+    /* Look for instance extensions */
+    auto required_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_required_extensions();
+    if (required_extensions.empty()) {
+        Fl::fatal("FLTK get_required_extensions failed to find the "
+                  "platform surface extensions.\n\nDo you have a compatible "
+                  "Vulkan installable client driver (ICD) installed?\nPlease "
+                  "look at the Getting Started guide for additional "
+                  "information.\n",
               "vkCreateInstance Failure");
   }
 

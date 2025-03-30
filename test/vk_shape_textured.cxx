@@ -70,6 +70,7 @@ protected:
     void prepare_descriptor_set();
     
 private:
+    void _init();
     void prepare_texture_image(const uint32_t *tex_colors,
                                Fl_Vk_Texture* tex_obj,
                                VkImageTiling tiling,
@@ -98,22 +99,27 @@ DynamicTextureWindow::~DynamicTextureWindow()
     vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
 }
 
-DynamicTextureWindow::DynamicTextureWindow(int x,int y,int w,int h,const char *l) :
-Fl_Vk_Window(x,y,w,h,l) {
+void DynamicTextureWindow::_init()
+{
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
+#ifndef NDEBUG
     m_validate = true;
+#else
+    m_validate = false;
+#endif
     m_vert_shader_module = VK_NULL_HANDLE;
     m_frag_shader_module = VK_NULL_HANDLE;
 }
 
+DynamicTextureWindow::DynamicTextureWindow(int x,int y,int w,int h,const char *l) :
+Fl_Vk_Window(x,y,w,h,l) {
+    _init();
+}
+
 DynamicTextureWindow::DynamicTextureWindow(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
-    mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
-    sides = 3;
-    m_validate = true;
-    m_vert_shader_module = VK_NULL_HANDLE;
-    m_frag_shader_module = VK_NULL_HANDLE;
+    _init();
 }
 
 void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
