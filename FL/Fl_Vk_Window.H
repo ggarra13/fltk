@@ -62,10 +62,7 @@ struct Fl_Vk_Texture {
     VkImageView view;           // View for shader access
     VkSampler sampler;          // Sampler for texture sampling
 
-    std::string textureName;
     std::string samplerName;    
-    
-    VkImageLayout imageLayout;  // Image Layout for image
 
     VkDeviceMemory mem;             // Allocated memory for texture
     uint32_t width, height, depth;  // texture width/height/depth
@@ -75,9 +72,12 @@ struct Fl_Vk_Texture {
         format(VK_FORMAT_B8G8R8A8_UNORM),
         image(VK_NULL_HANDLE),
         view(VK_NULL_HANDLE),
-        sampler(VK_NULL_HANDLE)
+        sampler(VK_NULL_HANDLE),
+        mem(VK_NULL_HANDLE),
+        width(1),
+        height(1),
+        depth(1)
         {
-            width = height = depth = 1;
         }
     
     Fl_Vk_Texture(VkImageType type,
@@ -85,17 +85,22 @@ struct Fl_Vk_Texture {
                   VkImage     image,
                   VkImageView view,
                   VkSampler sampler,
-                  std::string textureName,
-                  std::string samplerName) :
+                  VkDeviceMemory mem,
+                  std::string samplerName = "sampler1",
+                  uint32_t width = 1,
+                  uint32_t height = 1,
+                  uint32_t depth = 1) :
         type(type),
         format(format),
         image(image),
         view(view),
         sampler(sampler),
-        textureName(textureName),
-        samplerName(samplerName)
+        mem(mem),
+        samplerName(samplerName),
+        width(width),
+        height(height),
+        depth(depth)
         {
-            width = height = depth = 1;
         }
 };
 

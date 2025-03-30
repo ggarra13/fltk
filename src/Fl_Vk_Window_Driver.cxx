@@ -825,7 +825,7 @@ void Fl_Vk_Window_Driver::prepare() {
 
 // m_device, m_swapchainImageCount, m_framebuffers, m_desc_pool,
 // m_setup_cmd, m_draw_cmd, m_cmd_pool, m_pipeline_layout, m_desc_layout,
-// m_pipeline, m_renderPass, m_vertices, m_textures, m_buffers, m_depth
+// m_pipeline, m_renderPass, m_buffers, m_depth
 void Fl_Vk_Window_Driver::destroy_resources() {
   if (!pWindow || !pWindow->m_device)
     return;
@@ -868,12 +868,12 @@ SwapChainSupportDetails
 Fl_Vk_Window_Driver::query_swap_chain_support(VkPhysicalDevice physicalDevice) {
   SwapChainSupportDetails details;
 
-  // // 1. Get Surface Capabilities
+  // // Get Surface Capabilities
   // vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,
   //                                           pWindow->m_surface,
   //                                           &details.capabilities);
 
-  // // 2. Get Surface Formats
+  // // Get Surface Formats
   // uint32_t formatCount;
   // vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
   //                                      pWindow->m_surface,
@@ -887,7 +887,7 @@ Fl_Vk_Window_Driver::query_swap_chain_support(VkPhysicalDevice physicalDevice) {
   //                                          details.formats.data());
   // }
 
-  // // 3. Get Present Modes
+  // // Get Present Modes
   // uint32_t presentModeCount;
   // vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
   //                                           pWindow->m_surface,

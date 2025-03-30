@@ -43,25 +43,25 @@ uint32_t                   Fl_Vk_Window::m_queue_count = 0;
 
 void Fl_Vk_Window::destroy_texture_image(Fl_Vk_Texture& texture)
 {
+    if (texture.sampler != VK_NULL_HANDLE)
+    {
+        vkDestroySampler(m_device, texture.sampler, NULL);
+        texture.sampler = VK_NULL_HANDLE;
+    }
     if (texture.view != VK_NULL_HANDLE)
     {
         vkDestroyImageView(m_device, texture.view, NULL);
         texture.view = VK_NULL_HANDLE;
-    }
-    if (texture.image != VK_NULL_HANDLE)
-    {
-        vkDestroyImage(m_device, texture.image, NULL);
-        texture.image = VK_NULL_HANDLE;
     }
     if (texture.mem != VK_NULL_HANDLE)
     {
         vkFreeMemory(m_device, texture.mem, NULL);
         texture.mem = VK_NULL_HANDLE;
     }
-    if (texture.sampler != VK_NULL_HANDLE)
+    if (texture.image != VK_NULL_HANDLE)
     {
-        vkDestroySampler(m_device, texture.sampler, NULL);
-        texture.sampler = VK_NULL_HANDLE;
+        vkDestroyImage(m_device, texture.image, NULL);
+        texture.image = VK_NULL_HANDLE;
     }
 }
 
