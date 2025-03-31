@@ -149,6 +149,8 @@ void Fl_Vk_Window::vk_draw_begin() {
       // Recreate resources
       pVkWindowDriver->prepare();
 
+      set_hdr_metadata();
+
       m_swapchain_needs_recreation = false; // Reset only if successful
   }
 
@@ -437,6 +439,14 @@ void Fl_Vk_Window::make_current() {
   current_ = this;
 }
 
+void Fl_Vk_Window::set_hdr_metadata()
+{
+    if (!vkSetHdrMetadataEXT ||
+        m_hdr_metadata.sType != VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+        return;
+    vkSetHdrMetadataEXT(m_device, 1, &m_swapchain, &m_hdr_metadata);
+    m_previous_hdr_metadata = m_hdr_metadata;
+}
 
 /**
   The swap_buffers() method swaps the back and front buffers.
@@ -464,17 +474,10 @@ void Fl_Vk_Window::swap_buffers() {
   vkWaitForFences(m_device, 1, &m_drawFence, VK_TRUE, UINT64_MAX);
   vkResetFences(m_device, 1, &m_drawFence);
 
-  if (vkSetHdrMetadataEXT &&
-      m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT &&
-      (m_color_space == VK_COLOR_SPACE_HDR10_ST2084_EXT ||
-       m_color_space == VK_COLOR_SPACE_DOLBYVISION_EXT))
+  if (!is_equal_hdr_metadata(m_previous_hdr_metadata,
+                             m_hdr_metadata))
   {
-      if (!is_equal_hdr_metadata(m_previous_hdr_metadata,
-                                 m_hdr_metadata))
-      {
-          vkSetHdrMetadataEXT(m_device, 1, &m_swapchain, &m_hdr_metadata);
-          m_previous_hdr_metadata = m_hdr_metadata;
-      }
+      set_hdr_metadata();
   }
 
   VkPresentInfoKHR present = {};
@@ -883,6 +886,7 @@ void Fl_Vk_Window::init() {
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class
   
   m_hdr_metadata = {};
+  m_previous_hdr_metadata = {};
   vkSetHdrMetadataEXT = nullptr;
   
   m_swapchain = VK_NULL_HANDLE;

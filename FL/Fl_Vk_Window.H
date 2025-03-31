@@ -175,6 +175,8 @@ protected:
 
   void flush_init_cmd();
 
+  void set_hdr_metadata();
+
 public:
   void show() FL_OVERRIDE;
   /** Same as Fl_Window::show(int a, char **b) */
