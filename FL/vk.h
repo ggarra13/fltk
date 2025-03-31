@@ -194,8 +194,7 @@ inline void vk_check_result(VkResult err, const char* file, const int line)
     }
     char buf[256];
     snprintf(buf, 256, "Vulkan: %s (%u) at %s, line %d", errorName, err, file, line);
-    Fl::error(buf);
-    exit(err);
+    Fl::fatal(buf);
 }
 
 

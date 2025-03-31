@@ -3,12 +3,16 @@
 mkdir -p build_macos/
 cd build_macos
 
-SDK_VERSION=1.4.309.0
-export VULKAN_SDK=$HOME/VulkanSDK/$SDK_VERSION/macOS
+
+export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH
+export VK_LAYER_PATH=/usr/local/opt/vulkan-profiles/share/vulkan/explicit_layer.d:/usr/local/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d
+export VK_ICD_FILENAMES=/usr/local/etc/vulkan/icd.d/MoltenVK_icd.json
+
+
 
 cmake .. \
       -G Ninja \
-      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_BUILD_TYPE=Debug \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \

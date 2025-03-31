@@ -11,9 +11,17 @@
 #include <stdexcept>
 #include <vector>
 
+#ifndef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+#define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
+#endif
 
 // macros
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
+#define FLTK_ADD_EXTENSION(x) \
+    if (!strcmp(#x, device_extensions[i].extensionName)) { \
+        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] = #x; \
+        assert(pWindow->m_enabled_extension_count < 64); \
+    }
 
 bool g_FunctionsLoaded = true;
 
@@ -43,10 +51,7 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names, uin
   uint32_t i, j;
   for (i = 0; i < check_count; i++) {
     VkBool32 found = 0;
-    std::cerr << "check_names[" << i << "]" << check_names[i] << std::endl;
     for (j = 0; j < layer_count; j++) {
-        std::cerr << "\tlayers[" << j << "]" << layers[j].layerName
-                  << std::endl;
       if (!strcmp(check_names[i], layers[j].layerName)) {
         found = 1;
         break;
@@ -497,11 +502,6 @@ void Fl_Vk_Window_Driver::init_vk() {
             }
             free(instance_layers);
         }
-        else
-        {
-            std::cerr << "instance_layer_count=" << instance_layer_count
-                      << std::endl;
-        }
 
         if (!validation_found) {
             Fl::fatal("vkEnumerateInstanceLayerProperties failed to find "
@@ -520,7 +520,7 @@ void Fl_Vk_Window_Driver::init_vk() {
                   "Vulkan installable client driver (ICD) installed?\nPlease "
                   "look at the Getting Started guide for additional "
                   "information.\n",
-              "vkCreateInstance Failure");
+                  "vkCreateInstance Failure");
   }
 
   required_extension_count = required_extensions.size();
@@ -674,7 +674,13 @@ if (device_extension_count > 0) {
         pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
             VK_KHR_SWAPCHAIN_EXTENSION_NAME;
       }
-      assert(pWindow->m_enabled_extension_count < 64);
+
+      #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+      FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+      #endif
+      #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+      FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+      #endif
     }
 
     VK_FREE(device_extensions);
@@ -703,9 +709,6 @@ if (device_extension_count > 0) {
 
   vkGetPhysicalDeviceFeatures(pWindow->m_gpu, &pWindow->m_gpu_features);
 
-  // Graphics queue and MemMgr queue can be separate.
-  // TODO: Add support for separate queues, including synchronization,
-  //       and appropriate tracking for QueueSubmit
 }
 
 void Fl_Vk_Window_Driver::init_vk_swapchain() {
