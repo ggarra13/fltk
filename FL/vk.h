@@ -105,9 +105,9 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
 #  include <vulkan/vulkan.h>
 #endif
 
+#include <vulkan/vk_enum_string_helper.h>
+
 #define VK_CHECK_RESULT(err) vk_check_result(err, __FILE__, __LINE__);
-#define VK_CHECK_HANDLE(var) vk_check_handle(var == VK_NULL_HANDLE, \
-                                             #var,  __FILE__, __LINE__);
 
 #define VK_ALLOC(x)  (void*)malloc(x)
 #define VK_ASSERT(x) assert(x)
@@ -118,70 +118,11 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
                            << " " << __LINE__ << std::endl;
 
 
-const char *vk_fmt_name(VkFormat fmt);
-const char *vk_csp_name(VkColorSpaceKHR csp);
-
-inline void vk_check_handle(bool is_null_handle,
-                            const char* var, const char* file, const int line)
-{
-    if (is_null_handle)
-    {
-        char buf[256];
-        snprintf(buf, 256, "Vulkan: VK_NULL_HANDLE for %s in %s, line %d",
-                 var, file, line);
-        Fl::fatal(buf);
-        exit(1);
-    }
-}
-
 inline void vk_check_result(VkResult err, const char* file, const int line)
 {
-#define FLTK_VK_ERROR(x)                        \
-    case x:                                     \
-        errorName = #x;                         \
-        break;
-    const char* errorName = "Unknown Error";
-    switch(err)
-    {
-    case VK_SUCCESS:
+    const char* errorName = string_VkResult(err);
+    if (err == VK_SUCCESS)
         return;
-        break;
-    
-        FLTK_VK_ERROR(VK_ERROR_OUT_OF_HOST_MEMORY);
-        FLTK_VK_ERROR(VK_ERROR_OUT_OF_DEVICE_MEMORY);
-        FLTK_VK_ERROR(VK_ERROR_INITIALIZATION_FAILED);
-        FLTK_VK_ERROR(VK_ERROR_DEVICE_LOST);
-        FLTK_VK_ERROR(VK_ERROR_MEMORY_MAP_FAILED);
-        FLTK_VK_ERROR(VK_ERROR_LAYER_NOT_PRESENT);
-        FLTK_VK_ERROR(VK_ERROR_EXTENSION_NOT_PRESENT);
-        FLTK_VK_ERROR(VK_ERROR_FEATURE_NOT_PRESENT);
-        FLTK_VK_ERROR(VK_ERROR_INCOMPATIBLE_DRIVER);
-        FLTK_VK_ERROR(VK_ERROR_TOO_MANY_OBJECTS);
-        FLTK_VK_ERROR(VK_ERROR_FORMAT_NOT_SUPPORTED);
-        FLTK_VK_ERROR(VK_ERROR_FRAGMENTED_POOL);
-        FLTK_VK_ERROR(VK_ERROR_UNKNOWN);
-        FLTK_VK_ERROR(VK_ERROR_OUT_OF_POOL_MEMORY_KHR);
-        FLTK_VK_ERROR(VK_ERROR_INVALID_EXTERNAL_HANDLE);
-        FLTK_VK_ERROR(VK_ERROR_FRAGMENTATION);
-        FLTK_VK_ERROR(VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR);
-        FLTK_VK_ERROR(VK_ERROR_NOT_PERMITTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_SURFACE_LOST_KHR);
-        FLTK_VK_ERROR(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR);
-        FLTK_VK_ERROR(VK_ERROR_OUT_OF_DATE_KHR);
-        FLTK_VK_ERROR(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR);
-        FLTK_VK_ERROR(VK_ERROR_INVALID_SHADER_NV);
-        FLTK_VK_ERROR(VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR);
-        FLTK_VK_ERROR(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT);
-        FLTK_VK_ERROR(VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR);
-        FLTK_VK_ERROR(VK_ERROR_NOT_ENOUGH_SPACE_KHR)
-    default:
-            break;
-    }
     char buf[256];
     snprintf(buf, 256, "Vulkan: %s (%u) at %s) line %d",
         errorName, err, file, line);

@@ -496,7 +496,6 @@ set(VKCPPFILES
   Fl_Vk_Utils.cxx
   Fl_Vk_Window.cxx
   vk_draw.cxx
-  vk.cxx
   # vk_start.cxx
 )
 
