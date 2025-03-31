@@ -118,6 +118,9 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
                            << " " << __LINE__ << std::endl;
 
 
+const char *vk_fmt_name(VkFormat fmt);
+const char *vk_csp_name(VkColorSpaceKHR csp);
+
 inline void vk_check_handle(bool is_null_handle,
                             const char* var, const char* file, const int line)
 {
