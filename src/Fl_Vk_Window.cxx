@@ -41,6 +41,24 @@ VkPhysicalDeviceFeatures   Fl_Vk_Window::m_gpu_features;
 VkQueueFamilyProperties*   Fl_Vk_Window::m_queue_props = nullptr;
 uint32_t                   Fl_Vk_Window::m_queue_count = 0;
 
+
+static bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
+                                  const VkHdrMetadataEXT& b)
+{
+    return (a.displayPrimaryRed.x == b.displayPrimaryRed.x &&
+            a.displayPrimaryRed.y == b.displayPrimaryRed.y &&
+            a.displayPrimaryGreen.x == b.displayPrimaryGreen.x &&
+            a.displayPrimaryGreen.y == b.displayPrimaryGreen.y &&
+            a.displayPrimaryBlue.x == b.displayPrimaryBlue.x &&
+            a.displayPrimaryBlue.y == b.displayPrimaryBlue.y &&
+            a.whitePoint.x == b.whitePoint.x &&
+            a.whitePoint.y == b.whitePoint.y &&
+            a.maxLuminance == b.maxLuminance &&
+            a.minLuminance == b.minLuminance &&
+            a.maxContentLightLevel == b.maxContentLightLevel &&
+            a.maxFrameAverageLightLevel == b.maxFrameAverageLightLevel);
+}
+
 void Fl_Vk_Window::destroy_texture_image(Fl_Vk_Texture& texture)
 {
     if (texture.sampler != VK_NULL_HANDLE)
@@ -447,9 +465,16 @@ void Fl_Vk_Window::swap_buffers() {
   vkResetFences(m_device, 1, &m_drawFence);
 
   if (vkSetHdrMetadataEXT &&
-      m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+      m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT &&
+      (m_color_space == VK_COLOR_SPACE_HDR10_ST2084_EXT ||
+       m_color_space == VK_COLOR_SPACE_DOLBYVISION_EXT))
   {
-      vkSetHdrMetadataEXT(m_device, 1, &m_swapchain, &m_hdr_metadata);
+      if (!is_equal_hdr_metadata(m_previous_hdr_metadata,
+                                 m_hdr_metadata))
+      {
+          vkSetHdrMetadataEXT(m_device, 1, &m_swapchain, &m_hdr_metadata);
+          m_previous_hdr_metadata = m_hdr_metadata;
+      }
   }
 
   VkPresentInfoKHR present = {};

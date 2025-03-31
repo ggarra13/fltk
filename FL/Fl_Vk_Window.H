@@ -147,6 +147,7 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   friend class Fl_Vk_Window_Driver;
   Fl_Vk_Window_Driver *pVkWindowDriver;
 
+  VkHdrMetadataEXT        m_previous_hdr_metadata;
   int mode_;
   const int *alist;
   Fl_Vk_Choice *g; // needed ?  we may need to use it translate
