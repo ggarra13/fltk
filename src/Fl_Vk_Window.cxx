@@ -800,8 +800,7 @@ void Fl_Vk_Window::init_vulkan()
         pVkWindowDriver->init_vk();
         vkSetHdrMetadataEXT =
             (PFN_vkSetHdrMetadataEXT)
-            vkGetInstanceProcAddr(m_instance,
-                                  "vkSetHdrMetadataEXT");
+            vkGetDeviceProcAddr(m_device, "vkSetHdrMetadataEXT");
     }
   
     pVkWindowDriver->create_surface();
