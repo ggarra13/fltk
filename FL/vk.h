@@ -90,9 +90,6 @@ FL_EXPORT void vk_texture_reset();
 
 FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, int ld=0);
 
-// Must come before due to Windows definition bug.
-#include <vulkan/vk_enum_string_helper.h>
-
 #ifdef _WIN32
 #  define VK_USE_PLATFORM_WIN32_KHR
 #  include <vulkan/vulkan.h>
@@ -118,17 +115,7 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
 #define VK_DBG() std::cerr << __FILE__ << " " << __FUNCTION__ \
                            << " " << __LINE__ << std::endl;
 
-
-inline void vk_check_result(VkResult err, const char* file, const int line)
-{
-    const char* errorName = string_VkResult(err);
-    if (err == VK_SUCCESS)
-        return;
-    char buf[256];
-    snprintf(buf, 256, "Vulkan: %s (%u) at %s) line %d",
-        errorName, err, file, line);
-    Fl::fatal(buf);
-}
+void vk_check_result(VkResult err, const char* file, const int line);
 
 
 #endif // !FL_vk_H

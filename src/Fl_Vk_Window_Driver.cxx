@@ -1,5 +1,7 @@
 
-#include "FL/vk.h"
+#include <vulkan/vk_enum_string_helper.h>
+#include <vulkan/vulkan.h>
+
 #include "Fl_Vk_Window_Driver.H"
 
 #ifndef _WIN32

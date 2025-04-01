@@ -21,7 +21,10 @@
 
 #include <FL/platform.H>
 #include "../../Fl_Screen_Driver.H"
-#include <FL/vk.h>
+
+#define VK_USE_PLATFORM_WAYLAND_KHR
+#include <vulkan/vulkan.h>
+
 #include "Fl_Wayland_Vk_Window_Driver.H"
 #ifdef FLTK_USE_X11
 #include "../X11/Fl_X11_Vk_Window_Driver.H"

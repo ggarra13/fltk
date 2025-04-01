@@ -22,7 +22,10 @@
 
 #include <FL/platform.H>
 #include "../../Fl_Screen_Driver.H"
-#include <FL/vk.h>
+
+#define VK_USE_PLATFORM_XLIB_KHR
+#include <vulkan/vulkan.h>
+
 #include "Fl_X11_Vk_Window_Driver.H"
 #include "../../Fl_Vk_Choice.H"
 #include "Fl_X11_Window_Driver.H"

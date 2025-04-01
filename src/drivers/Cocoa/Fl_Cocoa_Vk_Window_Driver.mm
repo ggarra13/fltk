@@ -24,7 +24,7 @@
 #include <Metal/Metal.h>         // For CAMetalLayer
 #include <QuartzCore/QuartzCore.h> // For CAMetalLayer
 
-#include <FL/vk.h>
+#include <vulkan/vulkan.h>
 #include "../../Fl_Vk_Choice.H"
 #include "../../Fl_Screen_Driver.H"
 #include "Fl_Cocoa_Window_Driver.H"

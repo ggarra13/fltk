@@ -21,7 +21,10 @@
 
 #include <FL/platform.H>
 #include "../../Fl_Screen_Driver.H"
-#include <FL/vk.h>
+
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <vulkan/vulkan.h>
+
 #include "Fl_WinAPI_Vk_Window_Driver.H"
 #include "../../Fl_Vk_Choice.H"
 #include "Fl_WinAPI_Window_Driver.H"
