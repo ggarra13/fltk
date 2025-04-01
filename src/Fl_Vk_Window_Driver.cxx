@@ -15,11 +15,15 @@
 #define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
 #endif
 
+#ifndef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME 
+#define VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME "VK_KHR_get_physical_device_properties2"
+#endif
+
 // macros
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
 #define FLTK_ADD_EXTENSION(x) \
-    if (!strcmp(#x, device_extensions[i].extensionName)) { \
-        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] = #x; \
+    if (!strcmp(x, device_extensions[i].extensionName)) { \
+        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] = x; \
         assert(pWindow->m_enabled_extension_count < 64); \
     }
 
@@ -470,11 +474,10 @@ void Fl_Vk_Window_Driver::init_vk() {
     uint32_t instance_extension_count = 0;
     uint32_t instance_layer_count = 0;
     uint32_t validation_layer_count = 0;
-    const char **instance_validation_layers = NULL;
     pWindow->m_enabled_extension_count = 0;
     pWindow->m_enabled_layer_count = 0;
 
-    const char *instance_validation_layers_alt1[] = {
+    const char *instance_validation_layers[] = {
         "VK_LAYER_KHRONOS_validation",
     };
 
@@ -485,7 +488,6 @@ void Fl_Vk_Window_Driver::init_vk() {
         err = vkEnumerateInstanceLayerProperties(&instance_layer_count, NULL);
         VK_CHECK_RESULT(err);
 
-        instance_validation_layers = (const char **)instance_validation_layers_alt1;
         if (instance_layer_count > 0) {
             VkLayerProperties *instance_layers =
                 (VkLayerProperties *)VK_ALLOC(sizeof(VkLayerProperties) * instance_layer_count);
@@ -493,11 +495,12 @@ void Fl_Vk_Window_Driver::init_vk() {
             VK_CHECK_RESULT(err);
 
             validation_found =
-                check_layers(VK_ARRAY_SIZE(instance_validation_layers_alt1), instance_validation_layers,
+                check_layers(VK_ARRAY_SIZE(instance_validation_layers),
+                             instance_validation_layers,
                              instance_layer_count, instance_layers);
             if (validation_found) {
-                pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers_alt1);
-                pWindow->m_enabled_layers[0] = "VK_LAYER_KHRONOS_validation"; // Updated layer name
+                pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers);
+                pWindow->m_enabled_layers[0] = "VK_LAYER_KHRONOS_validation";
                 validation_layer_count = 1;
             }
             free(instance_layers);
@@ -659,44 +662,48 @@ void Fl_Vk_Window_Driver::init_vk() {
                                              &device_extension_count, NULL);
   assert(!err);
 
-if (device_extension_count > 0) {
-    VkExtensionProperties *device_extensions =
-        (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
-    err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL, &device_extension_count,
-                                               device_extensions);
+  if (device_extension_count > 0) {
+      VkExtensionProperties *device_extensions =
+          (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
+      err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL,
+                                                 &device_extension_count,
+                                                 device_extensions);
     assert(!err);
 
+    for (i = 0; i < device_extension_count; i++) {
+              
+        if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME, device_extensions[i].extensionName)) {
+            swapchainExtFound = 1;
+            pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
+                VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+        }
+        
+#ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+        std::cerr << VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+                  << std::endl;
+        FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#endif
+#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+        FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+#endif
+
+    }
+          
     auto required_device_extensions = pWindow->get_device_extensions();
     
-    for (i = 0; i < device_extension_count; i++) {
-      if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME, device_extensions[i].extensionName)) {
-        swapchainExtFound = 1;
-        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-      }
+    for (unsigned j = 0; j < required_device_extensions.size(); ++j)
+    {
+        for (i = 0; i < device_extension_count; i++) {
+            if (!strcmp(required_device_extensions[j],
+                        device_extensions[i].extensionName)) {
+                pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
+                    required_device_extensions[j];
+                std::cerr << "added " << required_device_extensions[j]
+                          << std::endl;
+            }
 
-      #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-      FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-      #endif
-      #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-      FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-      #endif
-
-      for (unsigned j = 0; j < required_device_extensions.size(); ++j)
-      {
-          if (!strcmp(required_device_extensions[j],
-                      device_extensions[i].extensionName)) {
-              pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-                  required_device_extensions[j];
-              std::cerr << "added " << required_device_extensions[j]
-                        << std::endl;
-          }
-          else
-          {
-              std::cerr << "did not add " << required_device_extensions[j]
-                        << std::endl;
-          }
-      }
+        }
+               
     }
 
     VK_FREE(device_extensions);
@@ -730,31 +737,6 @@ if (device_extension_count > 0) {
 void Fl_Vk_Window_Driver::init_vk_swapchain() {
   VkResult result;
   uint32_t i;
-
-  // Get the list of VkFormat's that are supported:
-  uint32_t formatCount;
-  result =
-      vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu, pWindow->m_surface, &formatCount, NULL);
-  VK_CHECK_RESULT(result);
-  
-  VkSurfaceFormatKHR *surfFormats =
-      (VkSurfaceFormatKHR *)VK_ALLOC(formatCount * sizeof(VkSurfaceFormatKHR));
-  result = vkGetPhysicalDeviceSurfaceFormatsKHR(pWindow->m_gpu,
-                                                pWindow->m_surface,
-                                                &formatCount,
-                                                surfFormats);
-  VK_CHECK_RESULT(result);
-  // If the format list includes just one entry of VK_FORMAT_UNDEFINED,
-  // the surface has no preferred format.  Otherwise, at least one
-  // supported format will be returned.
-  if (formatCount == 1 && surfFormats[0].format == VK_FORMAT_UNDEFINED) {
-    pWindow->m_format = VK_FORMAT_B8G8R8A8_UNORM;
-  } else {
-    pWindow->m_format = surfFormats[0].format;
-  }
-  pWindow->m_color_space = surfFormats[0].colorSpace;
-
-  VK_FREE(surfFormats);
   
   // Get Memory information and properties
   vkGetPhysicalDeviceMemoryProperties(pWindow->m_gpu, &pWindow->m_memory_properties);  // Iterate over each queue to learn whether it supports presenting:
@@ -813,6 +795,133 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
       init_device();
 
   vkGetDeviceQueue(pWindow->m_device, pWindow->m_queueFamilyIndex, 0, &pWindow->m_queue);
+
+  uint32_t formatCount;
+  result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+      pWindow->m_gpu, pWindow->m_surface, &formatCount, NULL);
+  VK_CHECK_RESULT(result);
+
+  std::vector<VkSurfaceFormatKHR> formats(formatCount);
+  result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+      pWindow->m_gpu, pWindow->m_surface, &formatCount, formats.data());
+  VK_CHECK_RESULT(result);
+
+  // Look for HDR10 or HLG if present
+  bool hdrMonitorFound = false;
+  VkFormat m_format;
+  VkColorSpaceKHR m_color_space;
+  std::vector<int> scores(formats.size());
+  for (const auto& format : formats)
+  {
+      scores[i] = 0;
+      if (pWindow->m_validate)
+      {
+          // std::cerr << "[" << i << "] format ="
+          //           << string_VkFormat(format.format) << std::endl
+          //           << "color space = "
+          //           << string_VkColorSpaceKHR(format.colorSpace)
+          //           << std::endl;
+      }
+      switch (format.colorSpace)
+      {
+      case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+          scores[i] += 5000;
+          hdrMonitorFound = true;
+          break;
+      case VK_COLOR_SPACE_HDR10_HLG_EXT:
+          scores[i] += 1000;
+          hdrMonitorFound = true;
+          break;
+      case VK_COLOR_SPACE_DOLBYVISION_EXT:
+          scores[i] += 10000;
+          hdrMonitorFound = true;
+          break;
+      default:
+          break;
+      }
+
+      switch (format.format)
+      {
+      case VK_FORMAT_UNDEFINED:
+      case VK_FORMAT_R8G8B8_UNORM:
+      case VK_FORMAT_B8G8R8_UNORM:
+      case VK_FORMAT_R8G8B8A8_UNORM:
+      case VK_FORMAT_B8G8R8A8_UNORM:
+      case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+          break;
+
+      case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+      case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+          scores[i] += 100;
+          break;
+          // Accept 16-bit formats for everything
+      case VK_FORMAT_R16G16B16_UNORM:
+      case VK_FORMAT_R16G16B16A16_UNORM:
+          scores[i] += 200;
+          break;
+      default:
+          break;
+      }
+
+      ++i;
+  }
+
+  if (!hdrMonitorFound)
+  {
+      std::cerr << "No HDR monitor found or configured for SDR!"
+                << std::endl;
+      bool foundLinear = false;
+      for (const auto& format : formats)
+      {
+          // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
+          if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
+              format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+          {
+              m_format = VK_FORMAT_B8G8R8A8_UNORM;
+              m_color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+              foundLinear = true;
+              break;
+          }
+      }
+      if (!foundLinear)
+      {
+          // Fallback to first supported format (usually works)
+          m_format = formats[0].format;
+          m_color_space = formats[0].colorSpace;
+          std::cerr << "No ideal linear format found, using fallback"
+                    << std::endl;
+      }
+  }
+  else
+  {
+      std::cout << "HDR monitor found" << std::endl;
+      // Default clips and washed out colors
+      int best_score = 0;
+      for (unsigned i = 0; i < formats.size(); ++i)
+      {
+          if (scores[i] > best_score)
+          {
+              best_score = scores[i];
+              m_format = formats[i].format;
+              m_color_space = formats[i].colorSpace;
+          }
+      }
+  }
+
+  // Handle undefined format case
+  if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
+  {
+      m_format = VK_FORMAT_B8G8R8A8_UNORM;
+      m_color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  }
+
+  pWindow->m_format = m_format;
+  pWindow->m_color_space = m_color_space;
+
+  std::cout << "\tSelected format = " << string_VkFormat(m_format)
+            << std::endl
+            << "\tSelected color space = "
+            << string_VkColorSpaceKHR(m_color_space) << std::endl;
 }
 
 void Fl_Vk_Window_Driver::prepare() {
