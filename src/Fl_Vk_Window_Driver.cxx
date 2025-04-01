@@ -822,17 +822,24 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
       }
       switch (format.colorSpace)
       {
+      case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+          scores[i] += 4000;
+          hdrMonitorFound = true;
+          break;
       case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-          scores[i] += 5000;
+          scores[i] += 3000;
           hdrMonitorFound = true;
           break;
       case VK_COLOR_SPACE_HDR10_HLG_EXT:
-          scores[i] += 1000;
+          scores[i] += 2000;
           hdrMonitorFound = true;
           break;
       case VK_COLOR_SPACE_DOLBYVISION_EXT:
-          scores[i] += 10000;
+          scores[i] += 1000;
           hdrMonitorFound = true;
+          break;
+      case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+          scores[i] += 500; // SDR baseline
           break;
       default:
           break;
@@ -840,22 +847,19 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
       switch (format.format)
       {
-      case VK_FORMAT_UNDEFINED:
-      case VK_FORMAT_R8G8B8_UNORM:
-      case VK_FORMAT_B8G8R8_UNORM:
-      case VK_FORMAT_R8G8B8A8_UNORM:
-      case VK_FORMAT_B8G8R8A8_UNORM:
-      case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-          break;
-
-      case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
-      case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-          scores[i] += 100;
-          break;
           // Accept 16-bit formats for everything
       case VK_FORMAT_R16G16B16_UNORM:
       case VK_FORMAT_R16G16B16A16_UNORM:
-          scores[i] += 200;
+          scores[i] += 2000;
+          break;
+      case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+      case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+          scores[i] += 1500;
+          break;
+      case VK_FORMAT_R8G8B8A8_UNORM:
+      case VK_FORMAT_B8G8R8A8_UNORM:
+      case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+          scores[i] += 500;
           break;
       default:
           break;
