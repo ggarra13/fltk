@@ -169,6 +169,10 @@ void Fl_Vk_Window::vk_draw_begin() {
     // m_swapchain is out of date (e.g. the window was resized) and
     // must be recreated:
     recreate_swapchain();
+    vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
+    result = vkCreateSemaphore(m_device, &semaphoreCreateInfo, NULL,
+                               &m_imageAcquiredSemaphore);
+    VK_CHECK_RESULT(result);
     result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
                                    m_imageAcquiredSemaphore,
                                    (VkFence)0, // TODO: Show use of fence
