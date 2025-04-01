@@ -623,8 +623,6 @@ void Fl_Vk_Window_Driver::init_vk() {
               "vkCreateInstance Failure");
   }
 
-  // gladLoadVulkanUserPtr(NULL, (GLADuserptrloadfunc) glfwGetInstanceProcAddress,
-  // pWindow->m_instance);
 
   // Make initial call to query gpu_count, then second call for gpu info
   // Make initial call to query gpu_count
@@ -668,6 +666,8 @@ if (device_extension_count > 0) {
                                                device_extensions);
     assert(!err);
 
+    auto required_device_extensions = pWindow->get_device_extensions();
+    
     for (i = 0; i < device_extension_count; i++) {
       if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME, device_extensions[i].extensionName)) {
         swapchainExtFound = 1;
@@ -681,6 +681,22 @@ if (device_extension_count > 0) {
       #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
       FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
       #endif
+
+      for (unsigned j = 0; j < required_device_extensions.size(); ++j)
+      {
+          if (!strcmp(required_device_extensions[j],
+                      device_extensions[i].extensionName)) {
+              pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
+                  required_device_extensions[j];
+              std::cerr << "added " << required_device_extensions[j]
+                        << std::endl;
+          }
+          else
+          {
+              std::cerr << "did not add " << required_device_extensions[j]
+                        << std::endl;
+          }
+      }
     }
 
     VK_FREE(device_extensions);

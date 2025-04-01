@@ -244,6 +244,7 @@ public:
   virtual void prepare() = 0;
   virtual void destroy_resources();  
 
+  virtual std::vector<const char*> get_device_extensions();
   virtual std::vector<const char*> get_required_extensions();
   virtual std::vector<const char*> get_optional_extensions();
 

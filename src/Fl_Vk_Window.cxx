@@ -828,6 +828,12 @@ void Fl_Vk_Window::init_vulkan()
     init_fences();
 }
 
+std::vector<const char*> Fl_Vk_Window::get_device_extensions()
+{
+    std::vector<const char*> out;
+    return out;
+}
+
 std::vector<const char*> Fl_Vk_Window::get_required_extensions()
 {
     std::vector<const char*> out;
