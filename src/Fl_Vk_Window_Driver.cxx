@@ -15,15 +15,11 @@
 #define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
 #endif
 
-#ifndef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME 
-#define VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME "VK_KHR_get_physical_device_properties2"
-#endif
-
 // macros
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
 #define FLTK_ADD_EXTENSION(x) \
-    if (!strcmp(x, device_extensions[i].extensionName)) { \
-        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] = x; \
+    if (!strcmp(#x, device_extensions[i].extensionName)) { \
+        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] = #x; \
         assert(pWindow->m_enabled_extension_count < 64); \
     }
 
@@ -98,6 +94,26 @@ void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
   VkResult err;
 
   VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
+  if (pWindow->m_setup_cmd == VK_NULL_HANDLE) {
+    VkCommandBufferAllocateInfo cmd = {};
+    cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmd.pNext = NULL;
+    cmd.commandPool = pWindow->m_cmd_pool;
+    cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmd.commandBufferCount = 1;
+
+    err = vkAllocateCommandBuffers(pWindow->m_device, &cmd, &pWindow->m_setup_cmd);
+    assert(!err);
+
+    VkCommandBufferBeginInfo cmd_buf_info = {};
+    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_buf_info.pNext = NULL;
+    cmd_buf_info.flags = 0;
+    cmd_buf_info.pInheritanceInfo = NULL;
+
+    err = vkBeginCommandBuffer(pWindow->m_setup_cmd, &cmd_buf_info);
+    assert(!err);
+  }
 
   VkImageMemoryBarrier image_memory_barrier = {};
   image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -642,27 +658,27 @@ void Fl_Vk_Window_Driver::init_vk() {
                                              &device_extension_count, NULL);
   assert(!err);
 
-  if (device_extension_count > 0) {
-      VkExtensionProperties *device_extensions =
-          (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
+if (device_extension_count > 0) {
+    VkExtensionProperties *device_extensions =
+        (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
       err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL,
                                                  &device_extension_count,
-                                                 device_extensions);
+                                               device_extensions);
     assert(!err);
 
     for (i = 0; i < device_extension_count; i++) {
-              
         if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME, device_extensions[i].extensionName)) {
             swapchainExtFound = 1;
             pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME;
         }
         
-#ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-        std::cerr << VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-                  << std::endl;
-        FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-#endif
+      #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+      FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+      #endif
+      #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+      FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+      #endif
 #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
         FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 #endif
@@ -717,7 +733,7 @@ void Fl_Vk_Window_Driver::init_vk() {
 void Fl_Vk_Window_Driver::init_vk_swapchain() {
   VkResult result;
   uint32_t i;
-  
+
   // Get Memory information and properties
   vkGetPhysicalDeviceMemoryProperties(pWindow->m_gpu, &pWindow->m_memory_properties);  // Iterate over each queue to learn whether it supports presenting:
   VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(pWindow->m_queue_count * sizeof(VkBool32));
@@ -938,7 +954,7 @@ void Fl_Vk_Window_Driver::prepare() {
 }
 
 // m_device, m_swapchainImageCount, m_framebuffers, m_desc_pool,
-// m_setup_cmd, m_draw_cmd, m_cmd_pool, m_pipeline_layout, m_desc_layout,
+// m_setup_cmd, m_pipeline_layout, m_desc_layout,
 // m_pipeline, m_renderPass, m_buffers, m_depth
 void Fl_Vk_Window_Driver::destroy_resources() {
   if (!pWindow || !pWindow->m_device)

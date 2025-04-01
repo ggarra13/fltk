@@ -159,6 +159,7 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
 
+  void recreate_swapchain();
   virtual void init_vk_swapchain();
   void init_fences();
   

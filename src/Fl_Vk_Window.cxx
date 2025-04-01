@@ -104,16 +104,6 @@ void Fl_Vk_Window::destroy_resources() {
     m_setup_cmd = VK_NULL_HANDLE;
   }
 
-  if (m_draw_cmd != VK_NULL_HANDLE) {
-    vkFreeCommandBuffers(m_device, m_cmd_pool, 1, &m_draw_cmd);
-    m_draw_cmd = VK_NULL_HANDLE;
-  }
-
-  if (m_cmd_pool != VK_NULL_HANDLE) {
-    vkDestroyCommandPool(m_device, m_cmd_pool, NULL);
-    m_cmd_pool = VK_NULL_HANDLE;
-  }
-
   if (m_pipeline_layout != VK_NULL_HANDLE) {
     vkDestroyPipelineLayout(m_device, m_pipeline_layout, NULL);
     m_pipeline_layout = VK_NULL_HANDLE;
@@ -135,23 +125,28 @@ void Fl_Vk_Window::destroy_resources() {
   }
 }
 
+
+void Fl_Vk_Window::recreate_swapchain() {
+    // Waits for all queue on the device
+    vkDeviceWaitIdle(m_device); 
+
+    // Destroy window and driver resources
+    pVkWindowDriver->destroy_resources(); 
+
+    // Recreate resources
+    pVkWindowDriver->prepare();
+
+    set_hdr_metadata();
+
+    m_swapchain_needs_recreation = false; // Reset only if successful
+}
+
 void Fl_Vk_Window::vk_draw_begin() {
   VkResult result;
 
   // Recreate swapchain if needed
   if (m_swapchain_needs_recreation) {
-      // Waits for all queue on the device
-      vkDeviceWaitIdle(m_device); 
-
-      // Destroy window and driver resources
-      pVkWindowDriver->destroy_resources(); 
-
-      // Recreate resources
-      pVkWindowDriver->prepare();
-
-      set_hdr_metadata();
-
-      m_swapchain_needs_recreation = false; // Reset only if successful
+      recreate_swapchain();
   }
 
 
@@ -173,10 +168,17 @@ void Fl_Vk_Window::vk_draw_begin() {
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     // m_swapchain is out of date (e.g. the window was resized) and
     // must be recreated:
-    m_swapchain_needs_recreation = true;
-    vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
-    vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
-    return;
+    recreate_swapchain();
+    result = vkAcquireNextImageKHR(m_device, m_swapchain, UINT64_MAX,
+                                   m_imageAcquiredSemaphore,
+                                   (VkFence)0, // TODO: Show use of fence
+                                   &m_current_buffer);
+    if (result != VK_SUCCESS)
+    {
+        vkDestroySemaphore(m_device, m_imageAcquiredSemaphore, NULL);
+        vkDestroySemaphore(m_device, m_drawCompleteSemaphore, NULL);
+        return;
+    }
   } else if (result == VK_TIMEOUT) {
     // Timeout occurred, try again next frame
     return;
@@ -770,6 +772,16 @@ Fl_RGB_Image *Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int
 Fl_Vk_Window::~Fl_Vk_Window() {
   hide();
 
+  if (m_draw_cmd != VK_NULL_HANDLE)
+  {
+      vkFreeCommandBuffers(m_device, m_cmd_pool, 1, &m_draw_cmd);
+  }
+
+  if (m_cmd_pool != VK_NULL_HANDLE)
+  {
+      vkDestroyCommandPool(m_device, m_cmd_pool, nullptr);
+  }
+  
   // Clean up fences and semaphores
   vkDestroyFence(m_device, m_drawFence, nullptr);
   vkDestroyFence(m_device, m_setupFence, nullptr);
@@ -794,6 +806,8 @@ void Fl_Vk_Window::init_vk_swapchain()
 
 void Fl_Vk_Window::init_vulkan()
 {
+    VkResult result;
+    
     // Initialize vulkan
     if (m_instance == VK_NULL_HANDLE)
     {
@@ -807,6 +821,26 @@ void Fl_Vk_Window::init_vulkan()
     init_vk_swapchain();  // to allow changing to HDR for example
     pVkWindowDriver->prepare();
 
+
+    VkCommandPoolCreateInfo cmd_pool_info = {};
+    cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmd_pool_info.pNext = NULL;
+    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
+    cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
+    result = vkCreateCommandPool(m_device, &cmd_pool_info, NULL, &m_cmd_pool);
+    VK_CHECK_RESULT(result);
+
+    VkCommandBufferAllocateInfo cmd = {};
+    cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmd.pNext = NULL;
+    cmd.commandPool = m_cmd_pool;
+    cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmd.commandBufferCount = 1;
+
+    result = vkAllocateCommandBuffers(m_device, &cmd, &m_draw_cmd);
+    VK_CHECK_RESULT(result);
+    
     init_fences();
 }
 
@@ -825,6 +859,7 @@ std::vector<const char*> Fl_Vk_Window::get_required_extensions()
 std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
     std::vector<const char*> out;
+    out.push_back("VK_EXT_swapchain_colorspace");
     return out;
 }
 
