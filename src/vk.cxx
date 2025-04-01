@@ -4,6 +4,8 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
+#include <cstdio>
+
 void vk_check_result(VkResult err, const char* file, const int line)
 {
     const char* errorName = string_VkResult(err);
