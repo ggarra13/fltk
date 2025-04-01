@@ -28,6 +28,8 @@
 // ... or uncomment the next line to test w/o OpenGL (see also above)
 // #undef HAVE_VK
 
+#include <iostream>
+
 #include <FL/Fl.H>
 #include <FL/fl_ask.H>
 #include <FL/Fl_Window.H>

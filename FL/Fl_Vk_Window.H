@@ -20,6 +20,8 @@
 #ifndef Fl_Vk_Window_H
 #define Fl_Vk_Window_H
 
+#include <string>
+
 #include "FL/vk.h"
 #include "Fl_Window.H"
 

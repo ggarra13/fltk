@@ -23,6 +23,7 @@
 
 #if HAVE_VK
 
+#include <iostream>
 #include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
@@ -303,6 +304,7 @@ VkShaderModule vk_shape_window::prepare_fs() {
     
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
+        m_frag_shader_module = VK_NULL_HANDLE;
     }
     return m_frag_shader_module;
 }

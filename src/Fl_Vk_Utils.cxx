@@ -1,5 +1,6 @@
 #include <FL/Fl_Vk_Utils.H>
 
+#include <iostream>
 #include <stdexcept>
 
 std::vector<uint32_t> compile_glsl_to_spirv(const std::string &source_code,

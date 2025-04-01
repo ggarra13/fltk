@@ -9,6 +9,7 @@
 #endif
 
 #include <cassert>
+#include <iostream>
 #include <set>
 #include <stdexcept>
 #include <vector>
@@ -696,8 +697,6 @@ if (device_extension_count > 0) {
                         device_extensions[i].extensionName)) {
                 pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
                     required_device_extensions[j];
-                std::cerr << "added " << required_device_extensions[j]
-                          << std::endl;
             }
 
         }
@@ -870,8 +869,6 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   if (!hdrMonitorFound)
   {
-      std::cerr << "No HDR monitor found or configured for SDR!"
-                << std::endl;
       bool foundLinear = false;
       for (const auto& format : formats)
       {
@@ -896,7 +893,6 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   }
   else
   {
-      std::cout << "HDR monitor found" << std::endl;
       // Default clips and washed out colors
       int best_score = 0;
       for (unsigned i = 0; i < formats.size(); ++i)
@@ -920,8 +916,9 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   pWindow->m_format = m_format;
   pWindow->m_color_space = m_color_space;
 
-  std::cout << "\tSelected format = " << string_VkFormat(m_format)
-            << std::endl
+  if (pWindow->m_validate)
+      std::cout << "\tSelected format = " << string_VkFormat(m_format)
+                << std::endl
             << "\tSelected color space = "
             << string_VkColorSpaceKHR(m_color_space) << std::endl;
 }

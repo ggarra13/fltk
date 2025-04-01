@@ -24,6 +24,7 @@
 
 #if HAVE_VK
 
+#include <iostream>
 #include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>

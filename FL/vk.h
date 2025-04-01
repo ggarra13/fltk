@@ -44,11 +44,6 @@
 
 #include "Fl_Export.H"
 
-#include "FL/platform.H"
-#include "FL/Fl.H"
-
-#include <string>
-#include <iostream> 
 
 #  include "Enumerations.H" // for color names
 #  ifdef _WIN32
@@ -117,7 +112,7 @@ FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, in
 #define VK_ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 #define VK_DBG() std::cerr << __FILE__ << " " << __FUNCTION__ \
                            << " " << __LINE__ << std::endl;
-
+    
 FL_EXPORT void vk_check_result(VkResult err, const char* file, const int line);
 
 
