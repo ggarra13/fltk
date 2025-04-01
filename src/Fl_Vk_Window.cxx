@@ -323,14 +323,36 @@ void Fl_Vk_Window::vk_draw_end() {
 VkResult Fl_Vk_Window::begin_setup() {
   VkResult result = VK_SUCCESS;
 
-  if (m_setup_cmd == VK_NULL_HANDLE)
-    return result;
+  VkCommandBufferAllocateInfo cmd = {};
+  cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  cmd.pNext = NULL;
+  cmd.commandPool = m_cmd_pool;
+  cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  cmd.commandBufferCount = 1;
 
-  result = vkEndCommandBuffer(m_setup_cmd);
+  result = vkAllocateCommandBuffers(m_device, &cmd, &m_setup_cmd);
   VK_CHECK_RESULT(result);
 
+  VkCommandBufferBeginInfo cmd_buf_info = {};
+  cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  cmd_buf_info.pNext = NULL;
+  cmd_buf_info.flags = 0;
+  cmd_buf_info.pInheritanceInfo = NULL;
+
+  result = vkBeginCommandBuffer(m_setup_cmd, &cmd_buf_info);
+  VK_CHECK_RESULT(result);
+
+  return result;
+}
+
+
+VkResult Fl_Vk_Window::end_setup() {
+  VkResult result = VK_SUCCESS;
+    
+  result = vkEndCommandBuffer(m_setup_cmd);
+  VK_CHECK_RESULT(result);
+  
   const VkCommandBuffer cmd_bufs[] = {m_setup_cmd};
-  VkFence nullFence = {VK_NULL_HANDLE};
   VkSubmitInfo submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.pNext = NULL;
@@ -352,13 +374,6 @@ VkResult Fl_Vk_Window::begin_setup() {
 
   vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
   m_setup_cmd = VK_NULL_HANDLE;
-
-  return result;
-}
-
-
-VkResult Fl_Vk_Window::end_setup() {
-  VkResult result = VK_SUCCESS;
   return result;
 }
 

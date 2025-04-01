@@ -98,26 +98,6 @@ void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
   VkResult err;
 
   VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
-  if (pWindow->m_setup_cmd == VK_NULL_HANDLE) {
-    VkCommandBufferAllocateInfo cmd = {};
-    cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmd.pNext = NULL;
-    cmd.commandPool = pWindow->m_cmd_pool;
-    cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmd.commandBufferCount = 1;
-
-    err = vkAllocateCommandBuffers(pWindow->m_device, &cmd, &pWindow->m_setup_cmd);
-    assert(!err);
-
-    VkCommandBufferBeginInfo cmd_buf_info = {};
-    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_buf_info.pNext = NULL;
-    cmd_buf_info.flags = 0;
-    cmd_buf_info.pInheritanceInfo = NULL;
-
-    err = vkBeginCommandBuffer(pWindow->m_setup_cmd, &cmd_buf_info);
-    assert(!err);
-  }
 
   VkImageMemoryBarrier image_memory_barrier = {};
   image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
