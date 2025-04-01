@@ -173,8 +173,6 @@ protected:
   void draw() FL_OVERRIDE;
   virtual void vk_draw_end();
 
-  void flush_init_cmd();
-
   void set_hdr_metadata();
 
 public:

@@ -730,38 +730,6 @@ Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::global() {
 void Fl_Vk_Window_Driver::invalidate() {}
 
 
-// Uses m_device, m_setup_cmd, m_queue, m_cmd_pool
-void Fl_Vk_Window::flush_init_cmd() {
-  VkResult result;
-
-  if (m_setup_cmd == VK_NULL_HANDLE)
-    return;
-
-  result = vkEndCommandBuffer(m_setup_cmd);
-  VK_CHECK_RESULT(result);
-
-  const VkCommandBuffer cmd_bufs[] = {m_setup_cmd};
-  VkSubmitInfo submit_info = {};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.pNext = NULL;
-  submit_info.waitSemaphoreCount = 0;
-  submit_info.pWaitSemaphores = NULL;
-  submit_info.pWaitDstStageMask = NULL;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = cmd_bufs;
-  submit_info.signalSemaphoreCount = 0;
-  submit_info.pSignalSemaphores = NULL;
-
-  vkResetFences(m_device, 1, &m_setupFence);
-  result = vkQueueSubmit(m_queue, 1, &submit_info, m_setupFence);
-  VK_CHECK_RESULT(result);
-
-  vkWaitForFences(m_device, 1, &m_setupFence, VK_TRUE, UINT64_MAX);
-  vkResetFences(m_device, 1, &m_setupFence);
-
-  vkFreeCommandBuffers(m_device, m_cmd_pool, 1, cmd_bufs);
-  m_setup_cmd = VK_NULL_HANDLE;
-}
 
 char Fl_Vk_Window_Driver::swap_type() {
   return UNDEFINED;
