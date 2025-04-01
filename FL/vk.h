@@ -42,11 +42,13 @@
 #ifndef FL_vk_H
 #  define FL_vk_H
 
-#include <string>
-#include <iostream> 
+#include "Fl_Export.H"
+
 #include "FL/platform.H"
 #include "FL/Fl.H"
-#include "Fl_Export.H"
+
+#include <string>
+#include <iostream> 
 
 #  include "Enumerations.H" // for color names
 #  ifdef _WIN32
