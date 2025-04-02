@@ -1,5 +1,9 @@
 
+#ifndef __linux__
 #include <vulkan/vk_enum_string_helper.h>
+#else
+#include <FL/vk_enum_string_helper.h>
+#endif
 #include <vulkan/vulkan.h>
 
 #include "Fl_Vk_Window_Driver.H"
@@ -324,11 +328,13 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   pWindow->m_depth.format = depth_format;
 
   /* create image */
-  result = vkCreateImage(pWindow->m_device, &image, NULL, &pWindow->m_depth.image);
+  result = vkCreateImage(pWindow->m_device, &image, NULL,
+                         &pWindow->m_depth.image);
   VK_CHECK_RESULT(result);
 
   /* get memory requirements for this object */
-  vkGetImageMemoryRequirements(pWindow->m_device, pWindow->m_depth.image, &mem_reqs);
+  vkGetImageMemoryRequirements(pWindow->m_device,
+                               pWindow->m_depth.image, &mem_reqs);
 
   /* select memory size and type */
   mem_alloc.allocationSize = mem_reqs.size;
@@ -337,15 +343,18 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   assert(pass);
 
   /* allocate memory */
-  result = vkAllocateMemory(pWindow->m_device, &mem_alloc, NULL, &pWindow->m_depth.mem);
+  result = vkAllocateMemory(pWindow->m_device, &mem_alloc, NULL,
+                            &pWindow->m_depth.mem);
   VK_CHECK_RESULT(result);
 
   /* bind memory */
   result = vkBindImageMemory(pWindow->m_device, pWindow->m_depth.image, pWindow->m_depth.mem, 0);
   VK_CHECK_RESULT(result);
 
-  set_image_layout(pWindow->m_depth.image, VK_IMAGE_ASPECT_DEPTH_BIT,
-                   VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+  set_image_layout(pWindow->m_depth.image,
+                   VK_IMAGE_ASPECT_DEPTH_BIT,
+                   VK_IMAGE_LAYOUT_UNDEFINED,
+                   VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                    0);
 
   /* create image view */

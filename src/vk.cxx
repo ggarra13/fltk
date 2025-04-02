@@ -1,12 +1,20 @@
 
 
+#ifdef __linux__
+
+#include "FL/vk_enum_string_helper.h"
+
+#else
+
 #include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
+
+#endif
+
 
 #include "FL/Fl.H"
 #include "FL/vk.h"
 
-#include <cstdio>
 
 void vk_check_result(VkResult err, const char* file, const int line)
 {

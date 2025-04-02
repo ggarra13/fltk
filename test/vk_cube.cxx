@@ -22,7 +22,7 @@
 // Use '-DHAVE_VK=0' to build and test w/o OpenGL support.
 
 #ifndef HAVE_VK
-#include <config.h> // needed only for 'HAVE_VL'
+#include <config.h> // needed only for 'HAVE_VK'
 #endif
 
 // ... or uncomment the next line to test w/o OpenGL (see also above)
@@ -422,8 +422,6 @@ void cube_box::prepare_pipeline() {
 
     vkDestroyPipelineCache(m_device, m_pipelineCache, NULL);
 
-    // vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
-    // vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
 }
 
 
