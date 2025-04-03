@@ -238,17 +238,55 @@ void Fl_Vk_Window::vk_draw_begin() {
   image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   image_memory_barrier.image = m_buffers[m_current_buffer].image;
   image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
+  
   vkCmdPipelineBarrier(m_draw_cmd,
                        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,   // No prior work
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
                        0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
 
+
+  bool has_depth = mode() & FL_DEPTH;
+  bool has_stencil = mode() & FL_STENCIL;
+  if (has_depth || has_stencil)
+  {
+      VkImageMemoryBarrier barrier = {};
+      barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Current layout
+      barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Desired layout
+      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = m_depth.image;
+      barrier.subresourceRange.aspectMask = 0;
+      if (has_depth)
+          barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+      if (has_stencil)
+          barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+      barrier.subresourceRange.baseMipLevel = 0;
+      barrier.subresourceRange.levelCount = 1;
+      barrier.subresourceRange.baseArrayLayer = 0;
+      barrier.subresourceRange.layerCount = 1;
+      barrier.srcAccessMask = 0; // No previous access (since it's undefined)
+      barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+      vkCmdPipelineBarrier(
+          m_draw_cmd,
+          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source stage (can be more specific if needed)
+          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, // Destination stage
+          0,
+          0, nullptr, // Memory barriers
+          0, nullptr, // Buffer barriers
+          1, &barrier // Image barriers
+          );
+  }
+
   // Begin rendering
   vkCmdBeginRenderPass(m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
   vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-  vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_layout, 0, 1,
-                          &m_desc_set, 0, NULL);
+
+  if (m_desc_set != VK_NULL_HANDLE)
+      vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_layout, 0, 1,
+                              &m_desc_set, 0, NULL);
 
   // The equivalent of glViewport
   VkViewport viewport = {};

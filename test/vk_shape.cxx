@@ -432,36 +432,25 @@ void vk_shape_window::prepare_pipeline() {
 
 
 void vk_shape_window::prepare_descriptor_pool() {
-    VkDescriptorPoolSize type_count = {};
-    type_count.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    type_count.descriptorCount = 0; //DEMO_TEXTURE_COUNT;
-    
-    VkDescriptorPoolCreateInfo descriptor_pool = {};
-    descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptor_pool.pNext = NULL;
-    descriptor_pool.maxSets = 1;
-    descriptor_pool.poolSizeCount = 1;
-    descriptor_pool.pPoolSizes = &type_count;
-
-    VkResult result;
-             
-    result = vkCreateDescriptorPool(m_device, &descriptor_pool, NULL,
-                                    &m_desc_pool);
-    VK_CHECK_RESULT(result);
+    // No textures so no descriptor pool
 }
 
 void vk_shape_window::prepare_descriptor_set() {
-    VkResult result;
-    uint32_t i;
+    // No textures so no descriptor set
+}
 
-    VkDescriptorSetAllocateInfo alloc_info = {};
-    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    alloc_info.pNext = NULL;
-    alloc_info.descriptorPool = m_desc_pool;
-    alloc_info.descriptorSetCount = 1;
-    alloc_info.pSetLayouts = &m_desc_layout;
-        
-    result = vkAllocateDescriptorSets(m_device, &alloc_info, &m_desc_set);
+
+void vk_shape_window::prepare_descriptor_layout() {
+    VkResult result;
+    
+    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
+    pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pPipelineLayoutCreateInfo.pNext = NULL;
+    pPipelineLayoutCreateInfo.setLayoutCount = 0;
+    pPipelineLayoutCreateInfo.pSetLayouts = NULL;
+
+    result = vkCreatePipelineLayout(m_device, &pPipelineLayoutCreateInfo, NULL,
+                                    &m_pipeline_layout);
     VK_CHECK_RESULT(result);
 }
 
@@ -507,37 +496,6 @@ void vk_shape_window::destroy_resources() {
     }
 }
 
-
-void vk_shape_window::prepare_descriptor_layout() {
-    VkDescriptorSetLayoutBinding layout_binding = {};
-    layout_binding.binding = 0;
-    layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    layout_binding.descriptorCount = 0;
-    layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    layout_binding.pImmutableSamplers = NULL;
-  
-    VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
-    descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptor_layout.pNext = NULL;
-    descriptor_layout.bindingCount = 1;
-    descriptor_layout.pBindings = &layout_binding;
-                 
-    VkResult result;
-
-    result = vkCreateDescriptorSetLayout(m_device, &descriptor_layout, NULL,
-                                         &m_desc_layout);
-    VK_CHECK_RESULT(result);
-
-    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
-    pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pPipelineLayoutCreateInfo.pNext = NULL;
-    pPipelineLayoutCreateInfo.setLayoutCount = 1;
-    pPipelineLayoutCreateInfo.pSetLayouts = &m_desc_layout;
-
-    result = vkCreatePipelineLayout(m_device, &pPipelineLayoutCreateInfo, NULL,
-                                    &m_pipeline_layout);
-    VK_CHECK_RESULT(result);
-}
 
 #else
 

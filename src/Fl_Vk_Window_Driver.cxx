@@ -965,9 +965,7 @@ void Fl_Vk_Window_Driver::prepare() {
   prepare_framebuffers(); // can be kept in driver
 }
 
-// m_device, m_swapchainImageCount, m_framebuffers, m_desc_pool,
-// m_setup_cmd, m_pipeline_layout, m_desc_layout,
-// m_pipeline, m_renderPass, m_buffers, m_depth
+// Uses: m_device, m_framebuffers, m_buffers, m_depth
 void Fl_Vk_Window_Driver::destroy_resources() {
   if (!pWindow || !pWindow->m_device)
     return;
