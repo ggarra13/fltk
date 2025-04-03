@@ -971,6 +971,7 @@ void Fl_Vk_Window::init() {
   m_cmd_pool = VK_NULL_HANDLE;
 
   // Texture descriptor handles
+  m_desc_set  = VK_NULL_HANDLE;
   m_desc_pool = VK_NULL_HANDLE;
   m_desc_layout = VK_NULL_HANDLE;
   
