@@ -112,14 +112,15 @@ public:
     double size;
     double speed;
     cube_box(int x,int y,int w,int h,const char *l=0) : Fl_Vk_Window(x,y,w,h,l) {
-      end();
-      mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
-    lasttime = 0.0;
-    m_vert_shader_module = VK_NULL_HANDLE;
-    m_frag_shader_module = VK_NULL_HANDLE;
-    m_validate = true;
+        end();
+        mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
+        lasttime = 0.0;
+        m_vert_shader_module = VK_NULL_HANDLE;
+        m_frag_shader_module = VK_NULL_HANDLE;
+        // Turn on validations
+        m_validate = true;
     
-  }
+    }
     ~cube_box();
 };
 

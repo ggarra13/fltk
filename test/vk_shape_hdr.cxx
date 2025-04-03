@@ -104,11 +104,7 @@ void DynamicTextureWindow::_init()
 {
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
     sides = 3;
-#ifndef NDEBUG
     m_validate = true;
-#else
-    m_validate = false;
-#endif
     m_vert_shader_module = VK_NULL_HANDLE;
     m_frag_shader_module = VK_NULL_HANDLE;
 }
