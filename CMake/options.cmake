@@ -141,6 +141,7 @@ set(FLTK_IMAGE_LIBRARIES "")
 #######################################################################
 #  Ensure that png and zlib are both system or both local for compatibility
 #######################################################################
+set(CMAKE_FIND_FRAMEWORK LAST)  # or NEVER
 
 if(FLTK_USE_SYSTEM_ZLIB)
   find_package(ZLIB)
