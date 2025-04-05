@@ -675,7 +675,11 @@ endif(FLTK_BUILD_GL)
 
 if(FLTK_BUILD_VK)
     # Required components
-    find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+    find_package(Vulkan REQUIRED
+	COMPONENTS
+	glslang
+	shaderc_combined
+	SPIRV-Tools)
 else(FLTK_BUILD_VK)
   set(VK_FOUND FALSE)
   set(HAVE_VK FALSE)
@@ -741,6 +745,17 @@ if(VULKAN_FOUND)
       list(APPEND VULKAN_LIBRARIES
 	  Vulkan::shaderc_combined
       )
+      if(UNIX AND NOT APPLE)
+	  list(APPEND VULKAN_LIBRARIES
+	      Vulkan::SPIRV-Tools
+	      Vulkan::glslang
+	      )
+	  find_library(SPIRV_Tools_opt_LIBRARY SPIRV-Tools-opt)
+	  if(SPIRV_Tools_opt_LIBRARY)
+	      list(APPEND VULKAN_LIBRARIES ${SPIRV_Tools_opt_LIBRARY})
+	  endif()
+      endif()
+      
   else()
       message(FATAL_ERROR "shaderc_combined not found!")
   endif()
