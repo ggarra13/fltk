@@ -12,6 +12,10 @@
 #include <signal.h>
 #endif
 
+#ifdef __APPLE__
+#include <FL/fl_utf8.h>
+#endif
+
 #include <cassert>
 #include <iostream>
 #include <set>
@@ -30,7 +34,6 @@
         assert(pWindow->m_enabled_extension_count < 64); \
     }
 
-bool g_FunctionsLoaded = true;
 
 static int validation_error = 0;
 
@@ -475,6 +478,17 @@ void Fl_Vk_Window_Driver::init_device() {
 
 
 void Fl_Vk_Window_Driver::init_vk() {
+
+#ifdef __APPLE___
+    std::string dylibpath = "/usr/local/lib:";
+    const char* libpath = fl_getenv("DYLD_LIBRARY_PATH");
+    if (libpath)
+    {
+        dylibpath += libpath;
+    }
+    setenv("DYLD_LIBRARY_PATH", dylibpath.c_str());
+#endif
+    
     VkResult err;
     VkBool32 portability_enumeration = VK_FALSE;
     uint32_t i = 0;
@@ -508,7 +522,7 @@ void Fl_Vk_Window_Driver::init_vk() {
                              instance_layer_count, instance_layers);
             if (validation_found) {
                 pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers);
-                pWindow->m_enabled_layers[0] = "VK_LAYER_KHRONOS_validation";
+                pWindow->m_enabled_layers[0] = instance_validation_layers[0];
                 validation_layer_count = 1;
             }
             free(instance_layers);
