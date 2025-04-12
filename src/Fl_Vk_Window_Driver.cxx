@@ -28,10 +28,9 @@
 
 // macros
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
-#define FLTK_ADD_EXTENSION(x) \
-    if (!strcmp(#x, device_extensions[i].extensionName)) { \
-        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] = #x; \
-        assert(pWindow->m_enabled_extension_count < 64); \
+#define FLTK_ADD_DEVICE_EXTENSION(x) \
+    if (!strcmp(x, device_extensions[i].extensionName)) { \
+        pWindow->m_device_extensions.push_back(x);        \
     }
 
 
@@ -400,57 +399,6 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
 }
 
 
-bool Fl_Vk_Window_Driver::check_device_extension_support(VkPhysicalDevice device) {
-  uint32_t extensionCount;
-  vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-
-  std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-  vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount,
-                                       availableExtensions.data());
-
-  std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
-  std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-
-  for (const auto &extension : availableExtensions) {
-    requiredExtensions.erase(extension.extensionName);
-  }
-
-  return requiredExtensions.empty();
-}
-
-QueueFamilyIndices Fl_Vk_Window_Driver::find_queue_families(VkPhysicalDevice physicalDevice) {
-  QueueFamilyIndices indices;
-
-  uint32_t queueFamilyCount = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-
-  std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-  vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
-
-  int i = 0;
-  for (const auto &queueFamily : queueFamilies) {
-    if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-      indices.graphicsFamily = i;
-    }
-
-    VkBool32 presentSupport = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, pWindow->m_surface, &presentSupport);
-
-    if (presentSupport) {
-        indices.presentFamily = i;
-    }
-
-    if (indices.isComplete()) {
-        break;
-    }
-
-    i++;
-  }
-
-  return indices;
-}
-
-
 void Fl_Vk_Window_Driver::init_device() {
     VkResult result;
 
@@ -467,10 +415,10 @@ void Fl_Vk_Window_Driver::init_device() {
     device.pNext = NULL;
     device.queueCreateInfoCount = 1;
     device.pQueueCreateInfos = &queue;
-    device.enabledLayerCount = 0;
-    device.ppEnabledLayerNames = NULL;
-    device.enabledExtensionCount = pWindow->m_enabled_extension_count;
-    device.ppEnabledExtensionNames = (const char *const *)pWindow->m_extension_names;
+    device.enabledLayerCount = pWindow->m_enabled_layers.size();
+    device.ppEnabledLayerNames = pWindow->m_enabled_layers.data();
+    device.enabledExtensionCount = pWindow->m_device_extensions.size();
+    device.ppEnabledExtensionNames = (const char *const *)pWindow->m_device_extensions.data();
 
     result = vkCreateDevice(pWindow->m_gpu, &device, NULL, &pWindow->m_device);
     VK_CHECK_RESULT(result);
@@ -496,8 +444,6 @@ void Fl_Vk_Window_Driver::init_vk() {
     uint32_t instance_extension_count = 0;
     uint32_t instance_layer_count = 0;
     uint32_t validation_layer_count = 0;
-    pWindow->m_enabled_extension_count = 0;
-    pWindow->m_enabled_layer_count = 0;
 
     const char *instance_validation_layers[] = {
         "VK_LAYER_KHRONOS_validation",
@@ -521,8 +467,7 @@ void Fl_Vk_Window_Driver::init_vk() {
                              instance_validation_layers,
                              instance_layer_count, instance_layers);
             if (validation_found) {
-                pWindow->m_enabled_layer_count = VK_ARRAY_SIZE(instance_validation_layers);
-                pWindow->m_enabled_layers[0] = instance_validation_layers[0];
+                pWindow->m_enabled_layers.push_back(instance_validation_layers[0]);
                 validation_layer_count = 1;
             }
             free(instance_layers);
@@ -539,44 +484,35 @@ void Fl_Vk_Window_Driver::init_vk() {
     
     /* Look for instance extensions */
     auto required_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_required_extensions();
-    if (required_extensions.empty()) {
+    if (required_extensions.empty())
+    {
         Fl::fatal("FLTK get_required_extensions failed to find the "
                   "platform surface extensions.\n\nDo you have a compatible "
                   "Vulkan installable client driver (ICD) installed?\nPlease "
                   "look at the Getting Started guide for additional "
                   "information.\n",
                   "vkCreateInstance Failure");
-  }
+    }
 
-  required_extension_count = required_extensions.size();
-  for (i = 0; i < required_extension_count; i++) {
-    pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-        required_extensions[i];
-    assert(pWindow->m_enabled_extension_count < 64);
-  }
-
-  required_extensions = pWindow->get_required_extensions();
-  for (i = 0; i < required_extensions.size(); i++) {
-    pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-        required_extensions[i];
-    assert(pWindow->m_enabled_extension_count < 64);
-  }
-
-  auto optional_extensions = pWindow->get_optional_extensions();
-  for (i = 0; i < optional_extensions.size(); i++) {
-      if (isExtensionSupported(optional_extensions[i]))
+    for (const auto& extension : required_extensions)
+    {
+        pWindow->m_instance_extensions.push_back(extension);
+    }
+  
+    auto optional_extensions = pWindow->get_optional_extensions();
+    for (const auto& extension : optional_extensions)
+    {
+      if (isExtensionSupported(extension))
       {
-          pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-              optional_extensions[i];
-          assert(pWindow->m_enabled_extension_count < 64);
+          pWindow->m_instance_extensions.push_back(extension);
       }
       else
       {
           if (pWindow->m_validate)
           {
-              std::cerr << "Optional Vulkan extension "
-                        << optional_extensions[i]
-                        << " not found." << std::endl;
+              std::cerr << "Optional Vulkan extension '"
+                        << extension
+                        << "' not found." << std::endl;
           }
       }
   }
@@ -590,21 +526,23 @@ void Fl_Vk_Window_Driver::init_vk() {
     err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count,
                                                  instance_extensions);
     assert(!err);
-    for (i = 0; i < instance_extension_count; i++) {
-      if (!strcmp(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, instance_extensions[i].extensionName)) {
-        if (pWindow->m_validate) {
-          pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-              VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+    for (i = 0; i < instance_extension_count; i++)
+    {
+      if (!strcmp(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, instance_extensions[i].extensionName))
+      {
+        if (pWindow->m_validate)
+        {
+            pWindow->m_instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
         }
       }
-      assert(pWindow->m_enabled_extension_count < 64);
+
+      // This one is needed for MoltenVK
       if (!strcmp(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-                  instance_extensions[i].extensionName)) {
-        pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-            VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
-        portability_enumeration = VK_TRUE;
+                  instance_extensions[i].extensionName))
+      {
+          pWindow->m_instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+          portability_enumeration = VK_TRUE;
       }
-      assert(pWindow->m_enabled_extension_count < 64);
     }
 
     free(instance_extensions);
@@ -623,10 +561,10 @@ void Fl_Vk_Window_Driver::init_vk() {
   inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   inst_info.pNext = NULL;
   inst_info.pApplicationInfo = &app;
-  inst_info.enabledLayerCount = pWindow->m_enabled_layer_count;
-  inst_info.ppEnabledLayerNames = (const char *const *)instance_validation_layers;
-  inst_info.enabledExtensionCount = pWindow->m_enabled_extension_count;
-  inst_info.ppEnabledExtensionNames = (const char *const *)pWindow->m_extension_names;
+  inst_info.enabledLayerCount = pWindow->m_enabled_layers.size();
+  inst_info.ppEnabledLayerNames = pWindow->m_enabled_layers.data();
+  inst_info.enabledExtensionCount = pWindow->m_instance_extensions.size();
+  inst_info.ppEnabledExtensionNames = pWindow->m_instance_extensions.data();
 
   if (portability_enumeration)
     inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
@@ -671,14 +609,13 @@ void Fl_Vk_Window_Driver::init_vk() {
                 "Error code");
   }
 
-// Assign the first GPU handle and free the array
+  // Assign the first GPU handle and free the array
   pWindow->m_gpu = physical_devices[0];
   VK_FREE(physical_devices);
 
-// Look for device extensions
+  // Look for device extensions
   uint32_t device_extension_count = 0;
   VkBool32 swapchainExtFound = 0;
-  pWindow->m_enabled_extension_count = 0;
 
   err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL,
                                              &device_extension_count, NULL);
@@ -689,41 +626,43 @@ if (device_extension_count > 0) {
         (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
       err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL,
                                                  &device_extension_count,
-                                               device_extensions);
+                                                 device_extensions);
     assert(!err);
 
-    for (i = 0; i < device_extension_count; i++) {
-        if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME, device_extensions[i].extensionName)) {
+    for (i = 0; i < device_extension_count; i++)
+    {
+        if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                    device_extensions[i].extensionName))
+        {
             swapchainExtFound = 1;
-            pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+            pWindow->m_device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         }
         
       #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-      FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+        FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
       #endif
-      #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-      FLTK_ADD_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-      #endif
-#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-        FLTK_ADD_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-#endif
+//       #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+//       FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+//       #endif
+// #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+//         FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+// #endif
 
     }
           
-    auto required_device_extensions = pWindow->get_device_extensions();
-    
-    for (unsigned j = 0; j < required_device_extensions.size(); ++j)
+    auto wanted_device_extensions = pWindow->get_device_extensions();
+    for (const auto& extension : wanted_device_extensions)
     {
-        for (i = 0; i < device_extension_count; i++) {
-            if (!strcmp(required_device_extensions[j],
-                        device_extensions[i].extensionName)) {
-                pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-                    required_device_extensions[j];
+        for (i = 0; i < device_extension_count; i++)
+        {
+            if (!strcmp(extension,
+                        device_extensions[i].extensionName))
+            {
+                pWindow->m_device_extensions.push_back(extension);
+                break;
             }
 
         }
-               
     }
 
     VK_FREE(device_extensions);
@@ -1016,45 +955,6 @@ void Fl_Vk_Window_Driver::destroy_resources() {
     vkFreeMemory(pWindow->m_device, pWindow->m_depth.mem, NULL);
     pWindow->m_depth.mem = VK_NULL_HANDLE;
   }
-}
-
-SwapChainSupportDetails
-Fl_Vk_Window_Driver::query_swap_chain_support(VkPhysicalDevice physicalDevice) {
-  SwapChainSupportDetails details;
-
-  // // Get Surface Capabilities
-  // vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,
-  //                                           pWindow->m_surface,
-  //                                           &details.capabilities);
-
-  // // Get Surface Formats
-  // uint32_t formatCount;
-  // vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
-  //                                      pWindow->m_surface,
-  //                                      &formatCount, nullptr);
-
-  // if (formatCount != 0) {
-  //     details.formats.resize(formatCount);
-  //     vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice,
-  //                                          pWindow->m_surface,
-  //                                          &formatCount,
-  //                                          details.formats.data());
-  // }
-
-  // // Get Present Modes
-  // uint32_t presentModeCount;
-  // vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
-  //                                           pWindow->m_surface,
-  //                                           &presentModeCount, nullptr);
-
-  // if (presentModeCount != 0) {
-  //     details.presentModes.resize(presentModeCount);
-  //     vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice,
-  //                                               pWindow->m_surface, &presentModeCount,
-  //                                               details.presentModes.data());
-  // }
-
-  return details;
 }
 
 

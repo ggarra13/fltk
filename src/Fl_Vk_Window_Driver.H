@@ -33,32 +33,12 @@
 class Fl_Vk_Choice;
 class Fl_Font_Descriptor;
 
-struct QueueFamilyIndices {
-  uint32_t graphicsFamily;
-  bool graphicsFamilyValid = false;
-  uint32_t presentFamily;
-  bool presentFamilyValid = false;
-
-  bool isComplete() { return graphicsFamilyValid && presentFamilyValid; }
-};
-
-struct SwapChainSupportDetails {
-  VkSurfaceCapabilitiesKHR capabilities;
-  std::vector<VkSurfaceFormatKHR> formats;
-  std::vector<VkPresentModeKHR> presentModes;
-};
-
 /* The constructor of each Fl_Vk_Window object creates also an object from a
    platform-specific derived class from this class.
 */
 class Fl_Vk_Window_Driver {
 protected:
   Fl_Vk_Window *pWindow;
-
-protected:
-  bool check_device_extension_support(VkPhysicalDevice device);
-  QueueFamilyIndices find_queue_families(VkPhysicalDevice device);
-  SwapChainSupportDetails query_swap_chain_support(VkPhysicalDevice device);
 
 public:
   static Fl_Window *cached_window;

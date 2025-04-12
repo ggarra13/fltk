@@ -21,6 +21,7 @@
 #define Fl_Vk_Window_H
 
 #include <string>
+#include <vector>
 
 #include "FL/vk.h"
 #include "Fl_Window.H"
@@ -32,7 +33,6 @@ class Fl_Vk_Window_Driver;
 //! GLFW demo variables
 struct Fl_Vk_SwapchainBuffer {
     VkImage image;
-    VkCommandBuffer cmd;
     VkImageView view;
 };
 
@@ -261,12 +261,13 @@ public:
   static VkQueueFamilyProperties* m_queue_props;
   static uint32_t         m_queue_count;
 
-  uint32_t m_enabled_layer_count;
-  const char* m_enabled_layers[64];
+  std::vector<const char*> m_enabled_layers;
+  std::vector<const char*> m_instance_extensions;
+  std::vector<const char*> m_device_extensions;
 
   // These should be moved somewhere else
-  uint32_t m_enabled_extension_count;
-  const char* m_extension_names[64];
+  // uint32_t m_enabled_extension_count;
+  // const char* m_extension_names[64];
 
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
