@@ -88,15 +88,32 @@ void vk_shape_window::prepare_vertices()
     {
         float x, y, z;  // 3D position
     };
+    
+    // Add the center vertex
+    Vertex center = {0.0f, 0.0f, 0.0f};
 
-    std::vector<Vertex> vertices(sides);
-    for (int j=0; j<sides; j++) {
-        double ang = j*2*M_PI/sides;
+    // Generate the outer vertices
+    std::vector<Vertex> outerVertices(sides);
+    for (int j = 0; j < sides; ++j) {
+        double ang = j * 2 * M_PI / sides;
         float x = cos(ang);
         float y = sin(ang);
-        vertices[j].x = x;
-        vertices[j].y = y;
-        vertices[j].z = 0.F;
+        outerVertices[j].x = x;
+        outerVertices[j].y = y;
+        outerVertices[j].z = 0.0f;
+    }
+
+    // Create the triangle list
+    std::vector<Vertex> vertices;
+    for (int i = 0; i < sides; ++i) {
+        // First vertex of the triangle: the center
+        vertices.push_back(center);
+
+        // Second vertex: current outer vertex
+        vertices.push_back(outerVertices[i]);
+
+        // Third vertex: next outer vertex (wrap around for the last side)
+        vertices.push_back(outerVertices[(i + 1) % sides]);
     }
     
             
@@ -153,7 +170,7 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi.pNext = NULL;
     m_vertices.vi.vertexBindingDescriptionCount = 1;
     m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
-    m_vertices.vi.vertexAttributeDescriptionCount = 2;
+    m_vertices.vi.vertexAttributeDescriptionCount = 1;
     m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
 
     m_vertices.vi_bindings[0].binding = 0;
@@ -164,11 +181,6 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi_attrs[0].location = 0;
     m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     m_vertices.vi_attrs[0].offset = 0;
-
-    m_vertices.vi_attrs[1].binding = 0;
-    m_vertices.vi_attrs[1].location = 1;
-    m_vertices.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
-    m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
 // m_format, m_depth (optionally) -> creates m_renderPass
@@ -338,7 +350,7 @@ void vk_shape_window::prepare_pipeline() {
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -481,7 +493,7 @@ void vk_shape_window::draw() {
     vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
                            &m_vertices.buf, offsets);
 
-    vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
+    vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
 }
 
 void vk_shape_window::destroy_resources() {

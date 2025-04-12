@@ -22,16 +22,8 @@
 #include <stdexcept>
 #include <vector>
 
-#ifndef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-#define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
-#endif
-
 // macros
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
-#define FLTK_ADD_DEVICE_EXTENSION(x) \
-    if (!strcmp(x, device_extensions[i].extensionName)) { \
-        pWindow->m_device_extensions.push_back(x);        \
-    }
 
 
 static int validation_error = 0;
@@ -555,7 +547,7 @@ void Fl_Vk_Window_Driver::init_vk() {
   app.applicationVersion = 0;
   app.pEngineName = "FLTK";
   app.engineVersion = 0;
-  app.apiVersion = VK_API_VERSION_1_0;
+  app.apiVersion = VK_API_VERSION_1_3;
 
   VkInstanceCreateInfo inst_info = {};
   inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -621,33 +613,40 @@ void Fl_Vk_Window_Driver::init_vk() {
                                              &device_extension_count, NULL);
   assert(!err);
 
-if (device_extension_count > 0) {
-    VkExtensionProperties *device_extensions =
-        (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
+#define FLTK_ADD_DEVICE_EXTENSION(x) \
+    if (!strcmp(x, device_extensions[i].extensionName)) { \
+        pWindow->m_device_extensions.push_back(x);        \
+    }
+
+#ifndef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+#   define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
+#endif
+
+#ifndef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+#   define VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME "VK_KHR_get_physical_device_properties2"
+#endif
+  
+  if (device_extension_count > 0) {
+      VkExtensionProperties *device_extensions =
+          (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
       err = vkEnumerateDeviceExtensionProperties(pWindow->m_gpu, NULL,
                                                  &device_extension_count,
                                                  device_extensions);
-    assert(!err);
-
-    for (i = 0; i < device_extension_count; i++)
-    {
-        if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                    device_extensions[i].extensionName))
-        {
-            swapchainExtFound = 1;
-            pWindow->m_device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-        }
+      assert(!err);
+      
+      for (i = 0; i < device_extension_count; i++)
+      {
+          if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                      device_extensions[i].extensionName))
+          {
+              swapchainExtFound = 1;
+              pWindow->m_device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+          }
         
       #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-        FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+          FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+          FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
       #endif
-//       #ifdef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
-//       FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-//       #endif
-// #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-//         FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-// #endif
-
     }
           
     auto wanted_device_extensions = pWindow->get_device_extensions();

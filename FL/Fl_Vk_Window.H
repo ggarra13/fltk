@@ -265,10 +265,6 @@ public:
   std::vector<const char*> m_instance_extensions;
   std::vector<const char*> m_device_extensions;
 
-  // These should be moved somewhere else
-  // uint32_t m_enabled_extension_count;
-  // const char* m_extension_names[64];
-
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
   VkSurfaceFormatKHR m_surfaceFormat; //needed

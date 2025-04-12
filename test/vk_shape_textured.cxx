@@ -378,18 +378,38 @@ void DynamicTextureWindow::prepare_vertices()
         float u, v;      // UV coordinates
     };
 
-    std::vector<Vertex> vertices(sides);
+    
+    // Add the center vertex
+    Vertex center = {0.0f, 0.0f, 0.0f, 0.5f, 0.5f};
+
+    // Generate the outer vertices
+    std::vector<Vertex> outerVertices(sides);
     float z = 0.5F;
-    for (int j=0; j<sides; j++) {
-        double ang = j*2*M_PI/sides;
+    for (int j = 0; j < sides; ++j) {
+        double ang = j * 2 * M_PI / sides;
         float x = cos(ang);
         float y = sin(ang);
-        vertices[j].x = x;
-        vertices[j].y = y;
-        vertices[j].z = z;
+        outerVertices[j].x = x;
+        outerVertices[j].y = y;
+        outerVertices[j].z = z;
+        
+        // Map NDC coordinates [-1, 1] to UV coordinates [0, 1], flipping V
+        outerVertices[j].u = (x + 1.0f) / 2.0f;
+        outerVertices[j].v = 1.0f - (y + 1.0f) / 2.0f;
         z += std::min(j / (float)(sides - 1), 1.F);
-        vertices[j].u = x / 2 + 1;
-        vertices[j].v = y / 2 + 1;
+    }
+
+    // Create the triangle list
+    std::vector<Vertex> vertices;
+    for (int i = 0; i < sides; ++i) {
+        // First vertex of the triangle: the center
+        vertices.push_back(center);
+
+        // Second vertex: current outer vertex
+        vertices.push_back(outerVertices[i]);
+
+        // Third vertex: next outer vertex (wrap around for the last side)
+        vertices.push_back(outerVertices[(i + 1) % sides]);
     }
     
     // clang-format on
@@ -631,7 +651,7 @@ void DynamicTextureWindow::prepare_pipeline() {
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -803,7 +823,7 @@ void DynamicTextureWindow::draw() {
     vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
                            &m_vertices.buf, offsets);
 
-    vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
+    vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
 
     Fl_Window::draw();
 }
