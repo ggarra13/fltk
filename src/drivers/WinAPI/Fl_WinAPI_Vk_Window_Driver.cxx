@@ -176,7 +176,7 @@ static void init_swap_interval() {
     return;
 }
 
-std::vector<const char*> Fl_WinAPI_Vk_Window_Driver::get_required_extensions() {
+std::vector<const char*> Fl_WinAPI_Vk_Window_Driver::get_instance_extensions() {
   std::vector<const char*> out;
   out.push_back("VK_KHR_surface");
   out.push_back("VK_KHR_win32_surface");

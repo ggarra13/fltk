@@ -1,4 +1,31 @@
-
+/*
+ * Copyright (c) 2015-2016 The Khronos Group Inc.
+ * Copyright (c) 2015-2016 Valve Corporation
+ * Copyright (c) 2015-2016 LunarG, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Author: Chia-I Wu <olvaffe@gmail.com>
+ * Author: Cody Northrop <cody@lunarg.com>
+ * Author: Courtney Goeltzenleuchter <courtney@LunarG.com>
+ * Author: Ian Elliott <ian@LunarG.com>
+ * Author: Jon Ashburn <jon@lunarg.com>
+ * Author: Piers Daniell <pdaniell@nvidia.com>
+ * Author: Gwan-gyeong Mun <elongbug@gmail.com>
+ * Author: Camilla Löwy <elmindreda@glfw.org>
+ * Porter: Gonzalo Garramuño <ggarra13@gmail.com>
+ *
+ */
 #ifndef __linux__
 #include <vulkan/vk_enum_string_helper.h>
 #else
@@ -30,25 +57,7 @@
         assert(pWindow->m_enabled_extension_count < 64); \
     }
 
-bool g_FunctionsLoaded = true;
 
-static int validation_error = 0;
-
-//! Returns true or false if extension name is supported.
-static bool isExtensionSupported(const char* extensionName) {
-    uint32_t extensionCount = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-    std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-
-    for (const auto& ext : extensions) {
-        if (strcmp(ext.extensionName, extensionName) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
 /*
  * Return 1 (true) if all layer names specified in check_names
  * can be found in given layer properties.
@@ -524,9 +533,9 @@ void Fl_Vk_Window_Driver::init_vk() {
     }
     
     /* Look for instance extensions */
-    auto required_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_required_extensions();
-    if (required_extensions.empty()) {
-        Fl::fatal("FLTK get_required_extensions failed to find the "
+    std::vector<const char*> instance_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_instance_extensions();
+    if (instance_extensions.empty()) {
+        Fl::fatal("FLTK get_instance_extensions failed to find the "
                   "platform surface extensions.\n\nDo you have a compatible "
                   "Vulkan installable client driver (ICD) installed?\nPlease "
                   "look at the Getting Started guide for additional "
@@ -537,35 +546,10 @@ void Fl_Vk_Window_Driver::init_vk() {
   required_extension_count = required_extensions.size();
   for (i = 0; i < required_extension_count; i++) {
     pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-        required_extensions[i];
+        instance_extensions[i];
     assert(pWindow->m_enabled_extension_count < 64);
   }
 
-  required_extensions = pWindow->get_required_extensions();
-  for (i = 0; i < required_extensions.size(); i++) {
-    pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-        required_extensions[i];
-    assert(pWindow->m_enabled_extension_count < 64);
-  }
-
-  auto optional_extensions = pWindow->get_optional_extensions();
-  for (i = 0; i < optional_extensions.size(); i++) {
-      if (isExtensionSupported(optional_extensions[i]))
-      {
-          pWindow->m_extension_names[pWindow->m_enabled_extension_count++] =
-              optional_extensions[i];
-          assert(pWindow->m_enabled_extension_count < 64);
-      }
-      else
-      {
-          if (pWindow->m_validate)
-          {
-              std::cerr << "Optional Vulkan extension "
-                        << optional_extensions[i]
-                        << " not found." << std::endl;
-          }
-      }
-  }
   
   err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count, NULL);
   assert(!err);

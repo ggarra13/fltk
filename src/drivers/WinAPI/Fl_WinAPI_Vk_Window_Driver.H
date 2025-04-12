@@ -37,7 +37,7 @@ class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   int flush_begin() FL_OVERRIDE;
   Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
   void *GetProcAddress(const char *procName) FL_OVERRIDE;
-  std::vector<const char*> get_required_extensions() FL_OVERRIDE;
+  std::vector<const char*> get_instance_extensions() FL_OVERRIDE;
   void create_surface() FL_OVERRIDE;
 };
 

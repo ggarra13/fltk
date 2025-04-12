@@ -41,7 +41,7 @@ class Fl_Cocoa_Vk_Window_Driver : public Fl_Vk_Window_Driver {
 #if !(USE_XFT || FLTK_USE_CAIRO)
   // virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum) FL_OVERRIDE;
 #endif
-  std::vector<const char*> get_required_extensions() FL_OVERRIDE;
+  std::vector<const char*> get_instance_extensions() FL_OVERRIDE;
   void create_surface() FL_OVERRIDE;
 };
 

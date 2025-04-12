@@ -154,7 +154,7 @@ static void init_swap_interval() {
     return;
 }
 
-std::vector<const char*> Fl_X11_Vk_Window_Driver::get_required_extensions() {
+std::vector<const char*> Fl_X11_Vk_Window_Driver::get_instance_extensions() {
   std::vector<const char*> out;
   out.push_back("VK_KHR_surface");
   out.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
