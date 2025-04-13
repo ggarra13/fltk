@@ -438,17 +438,8 @@ void Fl_Vk_Window_Driver::init_device() {
 }
 
 
-void Fl_Vk_Window_Driver::init_vk() {
-
-#ifdef __APPLE___
-    std::string dylibpath = "/usr/local/lib:";
-    const char* libpath = fl_getenv("DYLD_LIBRARY_PATH");
-    if (libpath)
-    {
-        dylibpath += libpath;
-    }
-    setenv("DYLD_LIBRARY_PATH", dylibpath.c_str());
-#endif
+void Fl_Vk_Window_Driver::init_vk()
+{
     
     VkResult err;
     VkBool32 portability_enumeration = VK_FALSE;
@@ -496,10 +487,10 @@ void Fl_Vk_Window_Driver::init_vk() {
     }
     
     /* Look for instance extensions */
-    auto required_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_required_extensions();
-    if (required_extensions.empty())
+    auto instance_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_instance_extensions();
+    if (instance_extensions.empty())
     {
-        Fl::fatal("FLTK get_required_extensions failed to find the "
+        Fl::fatal("FLTK get_instance_extensions failed to find the "
                   "platform surface extensions.\n\nDo you have a compatible "
                   "Vulkan installable client driver (ICD) installed?\nPlease "
                   "look at the Getting Started guide for additional "
@@ -507,7 +498,7 @@ void Fl_Vk_Window_Driver::init_vk() {
                   "vkCreateInstance Failure");
     }
 
-    for (const auto& extension : required_extensions)
+    for (const auto& extension : instance_extensions)
     {
         pWindow->ctx.instance_extensions.push_back(extension);
     }
@@ -582,23 +573,27 @@ void Fl_Vk_Window_Driver::init_vk() {
   if (portability_enumeration)
     inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
-  err = vkCreateInstance(&inst_info, NULL, &pWindow->ctx.instance);
-  if (err == VK_ERROR_INCOMPATIBLE_DRIVER) {
-    Fl::fatal("Cannot find a compatible Vulkan installable client driver "
-              "(ICD).\n\nPlease look at the Getting Started guide for "
-              "additional information.\n",
-              "vkCreateInstance Failure");
-  } else if (err == VK_ERROR_EXTENSION_NOT_PRESENT) {
-    Fl::fatal("Cannot find a specified extension library"
-              ".\nMake sure your layers path is set appropriately\n",
-              "vkCreateInstance Failure");
-  } else if (err) {
-    Fl::fatal("vkCreateInstance failed.\n\nDo you have a compatible Vulkan "
-              "installable client driver (ICD) installed?\nPlease look at "
-              "the Getting Started guide for additional information.\n",
-              "vkCreateInstance Failure");
+  if (pWindow->m_instance == VK_NULL_HANDLE)
+  {
+      err = vkCreateInstance(&inst_info, NULL, &pWindow->m_instance);
+      if (err == VK_ERROR_INCOMPATIBLE_DRIVER) {
+          Fl::fatal("Cannot find a compatible Vulkan installable client driver "
+                    "(ICD).\n\nPlease look at the Getting Started guide for "
+                    "additional information.\n",
+                    "vkCreateInstance Failure");
+      } else if (err == VK_ERROR_EXTENSION_NOT_PRESENT) {
+          Fl::fatal("Cannot find a specified extension library"
+                    ".\nMake sure your layers path is set appropriately\n",
+                    "vkCreateInstance Failure");
+      } else if (err) {
+          Fl::fatal("vkCreateInstance failed.\n\nDo you have a compatible Vulkan "
+                    "installable client driver (ICD) installed?\nPlease look at "
+                    "the Getting Started guide for additional information.\n",
+                    "vkCreateInstance Failure");
+      }
   }
 
+  pWindow->ctx.instance = pWindow->m_instance;
 
   // Make initial call to query gpu_count, then second call for gpu info
   // Make initial call to query gpu_count

@@ -30,7 +30,7 @@ extern int fl_vk_load_plugin;
 // #include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
 // #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
-
+VkInstance Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
 
 
 static bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,

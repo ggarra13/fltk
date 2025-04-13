@@ -290,6 +290,8 @@ public:
   
   // Application
   bool m_validate;  // if true, turns on validation layers
+  static VkInstance m_instance; // this gets copied into ctx.instance for every
+                                // window.
   Fl_Vk_Context ctx;
 
   // Per Window
