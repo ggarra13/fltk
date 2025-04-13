@@ -227,10 +227,6 @@ protected:
   virtual void init_vk_swapchain();
   void init_fences();
   
-  bool memory_type_from_properties(uint32_t typeBits,
-                                   VkFlags requirements_mask,
-                                   uint32_t *typeIndex);
-  
   virtual void vk_draw_begin();
   void draw() FL_OVERRIDE;
   virtual void vk_draw_end();

@@ -146,7 +146,8 @@ void vk_shape_window::prepare_vertices()
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
-    pass = memory_type_from_properties(m_mem_reqs.memoryTypeBits,
+    pass = memory_type_from_properties(gpu(),
+                                       m_mem_reqs.memoryTypeBits,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);

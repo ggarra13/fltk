@@ -866,25 +866,6 @@ std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 }
 
 
-bool Fl_Vk_Window::memory_type_from_properties(uint32_t typeBits, VkFlags requirements_mask,
-                                               uint32_t *typeIndex) {
-  uint32_t i;
-  // Search memtypes to find first index with those properties
-  for (i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
-    if ((typeBits & 1) == 1) {
-      // Type is available, does it match user properties?
-      if ((m_memory_properties.memoryTypes[i].propertyFlags & requirements_mask) ==
-          requirements_mask) {
-        *typeIndex = i;
-        return true;
-      }
-    }
-    typeBits >>= 1;
-  }
-  // No memory types matched, return failure
-  return false;
-}
-
 void Fl_Vk_Window::init() {
   pVkWindowDriver = Fl_Vk_Window_Driver::newVkWindowDriver(this);
   end(); // we probably don't want any children

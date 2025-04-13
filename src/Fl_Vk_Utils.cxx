@@ -178,3 +178,212 @@ FL_EXPORT void transitionImageLayout(
 }
 
 
+
+VkImageView createImageView(VkDevice device,
+                            VkImage image, VkFormat format,
+                            VkImageType imageType)
+{
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType =
+        (imageType == VK_IMAGE_TYPE_1D)   ? VK_IMAGE_VIEW_TYPE_1D
+        : (imageType == VK_IMAGE_TYPE_2D) ? VK_IMAGE_VIEW_TYPE_2D
+        : VK_IMAGE_VIEW_TYPE_3D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    if (vkCreateImageView(device, &viewInfo, nullptr, &imageView) !=
+        VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create image view");
+    }
+    return imageView;
+}
+
+VkImage createImage(
+    VkDevice device,
+    VkImageType imageType, uint32_t width, uint32_t height, uint32_t depth,
+    VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage)
+{
+
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = imageType;
+    imageInfo.format = format;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = depth;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.tiling = tiling;
+    imageInfo.usage = usage;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+    VkImage image;
+    if (vkCreateImage(device, &imageInfo, nullptr, &image) !=
+        VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create image");
+    }
+    return image;
+}
+
+bool memory_type_from_properties(VkPhysicalDevice gpu,
+                                 uint32_t typeBits, VkFlags requirements_mask,
+                                 uint32_t *typeIndex)
+{
+  uint32_t i;
+
+  VkPhysicalDeviceMemoryProperties memProperties;
+  vkGetPhysicalDeviceMemoryProperties(gpu, &memProperties);
+    
+  // Search memtypes to find first index with those properties
+  for (i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
+    if ((typeBits & 1) == 1) {
+      // Type is available, does it match user properties?
+      if ((memProperties.memoryTypes[i].propertyFlags & requirements_mask) ==
+          requirements_mask) {
+        *typeIndex = i;
+        return true;
+      }
+    }
+    typeBits >>= 1;
+  }
+  // No memory types matched, return failure
+  return false;
+}
+
+VkDeviceMemory allocateAndBindImageMemory(VkDevice device,
+                                          VkPhysicalDevice gpu,
+                                          VkImage image,
+                                          VkFlags requirementsMask)
+{
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device, image, &memRequirements);
+
+
+    uint32_t memoryTypeIndex = 0;
+    bool ok = memory_type_from_properties(gpu, memRequirements.memoryTypeBits,
+                                          requirementsMask, &memoryTypeIndex);
+    if (!ok)
+    {
+        throw std::runtime_error("No memory types matched");
+    }
+    // for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+    // {
+    //     if ((memRequirements.memoryTypeBits & (1 << i)) &&
+    //         (memProperties.memoryTypes[i].propertyFlags &
+    //          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+    //     {
+    //         memoryTypeIndex = i;
+    //         break;
+    //     }
+    // }
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+    VkDeviceMemory imageMemory;
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &imageMemory) !=
+        VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate image memory");
+    }
+
+    vkBindImageMemory(device, image, imageMemory, 0);
+    return imageMemory;
+}
+
+FL_EXPORT void createBuffer(
+    VkDevice device,
+    VkPhysicalDevice gpu,
+    VkDeviceSize size, VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags properties, VkBuffer& buffer,
+    VkDeviceMemory& bufferMemory)
+{
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    bufferInfo.usage = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) !=
+        VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create buffer");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device, buffer, &memRequirements);
+
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(gpu, &memProperties);
+
+    uint32_t memoryTypeIndex = 0;
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
+    {
+        if ((memRequirements.memoryTypeBits & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) ==
+            properties)
+        {
+            memoryTypeIndex = i;
+            break;
+        }
+    }
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = memoryTypeIndex;
+
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) !=
+        VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to allocate buffer memory");
+    }
+
+    vkBindBufferMemory(device, buffer, bufferMemory, 0);
+}
+
+VkSampler createSampler(VkDevice device,
+                        VkFilter magFilter,
+                        VkFilter minFilter,
+                        VkSamplerAddressMode addressModeU,
+                        VkSamplerAddressMode addressModeV,
+                        VkSamplerAddressMode addressModeW)
+{
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = magFilter;
+    samplerInfo.minFilter = minFilter;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.addressModeU = addressModeU;
+    samplerInfo.addressModeV = addressModeV;
+    samplerInfo.addressModeW = addressModeW;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+    VkSampler sampler;
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &sampler) !=
+        VK_SUCCESS)
+    {
+        throw std::runtime_error("Failed to create sampler");
+    }
+    return sampler;
+}

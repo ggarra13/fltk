@@ -159,7 +159,8 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
     vkGetImageMemoryRequirements(device(), tex_obj->image, &m_mem_reqs);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
-    pass = memory_type_from_properties(m_mem_reqs.memoryTypeBits,
+    pass = memory_type_from_properties(gpu(),
+                                       m_mem_reqs.memoryTypeBits,
                                        required_props,
                                        &mem_alloc.memoryTypeIndex);
 
@@ -197,20 +198,9 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
         vkUnmapMemory(device(), tex_obj->mem);
     }
 
-    VkCommandBuffer cmd;
-    VkCommandBufferAllocateInfo cmdAllocInfo = {};
-    cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdAllocInfo.commandPool = commandPool();
-    cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdAllocInfo.commandBufferCount = 1;
-    vkAllocateCommandBuffers(device(), &cmdAllocInfo, &cmd);
-
-    VkCommandBufferBeginInfo cmdBeginInfo = {};
-    cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(cmd, &cmdBeginInfo);
     
     // Initial transition to shader-readable layout
-    set_image_layout(cmd, tex_obj->image,
+    set_image_layout(device(), commandPool(), queue(), tex_obj->image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_UNDEFINED,   // Initial layout
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -218,17 +208,6 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
                      VK_PIPELINE_STAGE_HOST_BIT, // Host stage
                      VK_ACCESS_SHADER_READ_BIT,  // Shader read
                      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-    
-    // Submit the command buffer to apply the transition
-    vkEndCommandBuffer(cmd);
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &cmd;
-    vkQueueSubmit(queue(), 1, &submit_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue());  // Wait for completion
-
-    vkFreeCommandBuffers(device(), commandPool(), 1, &cmd);
 }
 
 
@@ -306,33 +285,13 @@ void DynamicTextureWindow::prepare_textures()
 
 void DynamicTextureWindow::update_texture()
 {
-    
-    VkCommandBuffer update_cmd;
-    VkCommandBufferAllocateInfo cmdAllocInfo = {};
-    cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdAllocInfo.commandPool = commandPool();
-    cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdAllocInfo.commandBufferCount = 1;
-    vkAllocateCommandBuffers(device(), &cmdAllocInfo, &update_cmd);
-
-    VkCommandBufferBeginInfo cmdBeginInfo = {};
-    cmdBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(update_cmd, &cmdBeginInfo);
 
     // Transition to GENERAL for CPU writes
-    set_image_layout(update_cmd, m_textures[0].image, VK_IMAGE_ASPECT_COLOR_BIT,
+    set_image_layout(device(), commandPool(), queue(), m_textures[0].image, VK_IMAGE_ASPECT_COLOR_BIT,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_LAYOUT_GENERAL,
                     VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                     VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT);
-
-    vkEndCommandBuffer(update_cmd);
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &update_cmd;
-    vkQueueSubmit(queue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue());  // Synchronize before CPU write
 
     void* data;
     vkMapMemory(device(), m_textures[0].mem, 0, m_mem_reqs.size, 0, &data);
@@ -346,23 +305,13 @@ void DynamicTextureWindow::update_texture()
     
     vkUnmapMemory(device(), m_textures[0].mem);
 
-    // Reallocate command buffer for second transition
-    vkAllocateCommandBuffers(device(), &cmdAllocInfo, &update_cmd);
-    vkBeginCommandBuffer(update_cmd, &cmdBeginInfo);
-
     // Transition back to SHADER_READ_ONLY_OPTIMAL
-    set_image_layout(update_cmd, m_textures[0].image, VK_IMAGE_ASPECT_COLOR_BIT,
-                    VK_IMAGE_LAYOUT_GENERAL,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
-                    VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
-
-    vkEndCommandBuffer(update_cmd);
-    submitInfo.pCommandBuffers = &update_cmd;
-    vkQueueSubmit(queue(), 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue());  // Synchronize before rendering
-
-    vkFreeCommandBuffers(device(), commandPool(), 1, &update_cmd);
+    set_image_layout(device(), commandPool(), queue(),
+                     m_textures[0].image, VK_IMAGE_ASPECT_COLOR_BIT,
+                     VK_IMAGE_LAYOUT_GENERAL,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                     VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                     VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 }
 
 
@@ -435,7 +384,8 @@ void DynamicTextureWindow::prepare_vertices()
     bool pass;
     void *data;
     
-    memory_type_from_properties(vertex_mem_reqs.memoryTypeBits,
+    memory_type_from_properties(gpu(),
+                                vertex_mem_reqs.memoryTypeBits,
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                 &mem_alloc.memoryTypeIndex);
 
@@ -936,7 +886,7 @@ int main(int argc, char **argv) {
     window.end();
     window.show(argc,argv);
     
-    //Fl::add_timeout(0.05, (Fl_Timeout_Handler)depth_stencil_cb, &sw);
+    Fl::add_timeout(0.05, (Fl_Timeout_Handler)depth_stencil_cb, &sw);
         
     return Fl::run();
 }

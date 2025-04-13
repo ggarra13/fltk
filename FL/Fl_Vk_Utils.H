@@ -32,7 +32,30 @@ FL_EXPORT void endSingleTimeCommands(VkCommandBuffer commandBuffer,
                                      VkCommandPool commandPool,
                                      VkQueue queue);
 
-// Image layout functions
+// Image functions
+FL_EXPORT VkImage createImage(VkDevice device,
+                              VkImageType imageType,
+                              uint32_t width, uint32_t height, uint32_t depth,
+                              VkFormat format,
+                              VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL,
+                              VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT |
+                              VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+
+FL_EXPORT bool memory_type_from_properties(VkPhysicalDevice gpu,
+                                           uint32_t typeBits, VkFlags requirements_mask,
+                                           uint32_t *typeIndex);
+
+FL_EXPORT VkDeviceMemory allocateAndBindImageMemory(VkDevice device,
+                                                    VkPhysicalDevice gpu,
+                                                    VkImage image,
+                                                    VkFlags requirementsMask = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+FL_EXPORT void createBuffer(VkDevice device,
+                            VkPhysicalDevice gpu,
+                            VkDeviceSize size, VkBufferUsageFlags usage,
+                            VkMemoryPropertyFlags properties, VkBuffer& buffer,
+                            VkDeviceMemory& bufferMemory);
+
 FL_EXPORT void set_image_layout(VkDevice device,
                                 VkCommandPool commandPool,
                                 VkQueue queue,
@@ -52,4 +75,14 @@ FL_EXPORT void transitionImageLayout(VkDevice device,
                                      VkImageLayout oldLayout,
                                      VkImageLayout newLayout);
 
+VkImageView createImageView(VkDevice device,
+                            VkImage image, VkFormat format,
+                            VkImageType imageType);
+
+VkSampler createSampler(VkDevice device,
+                        VkFilter magFilter = VK_FILTER_LINEAR,
+                        VkFilter minFilter = VK_FILTER_LINEAR,
+                        VkSamplerAddressMode addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VkSamplerAddressMode addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                        VkSamplerAddressMode addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 #endif

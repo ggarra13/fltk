@@ -488,7 +488,8 @@ void cube_box::prepare_vertices()
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
-    pass = memory_type_from_properties(m_mem_reqs.memoryTypeBits,
+    pass = memory_type_from_properties(gpu(),
+                                       m_mem_reqs.memoryTypeBits,
                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
@@ -531,8 +532,6 @@ void cube_box::prepare()
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
-    prepare_descriptor_pool();
-    prepare_descriptor_set();
 }
 
 
