@@ -323,7 +323,7 @@ VkShaderModule vk_shape_window::prepare_fs() {
 
 void vk_shape_window::prepare_pipeline() {
     VkGraphicsPipelineCreateInfo pipeline;
-    VkPipelineCacheCreateInfo pipelineCache;
+    VkPipelineCacheCreateInfo pipelineCacheCreateInfo;
 
     VkPipelineVertexInputStateCreateInfo vi;
     VkPipelineInputAssemblyStateCreateInfo ia;
@@ -426,17 +426,17 @@ void vk_shape_window::prepare_pipeline() {
     pipeline.renderPass = m_renderPass;
     pipeline.pDynamicState = &dynamicState;
 
-    memset(&pipelineCache, 0, sizeof(pipelineCache));
-    pipelineCache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+    memset(&pipelineCacheCreateInfo, 0, sizeof(pipelineCacheCreateInfo));
+    pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 
-    result = vkCreatePipelineCache(ctx.device, &pipelineCache, NULL,
-                                   &m_pipelineCache);
+    result = vkCreatePipelineCache(ctx.device, &pipelineCacheCreateInfo, NULL,
+                                   &ctx.pipeline_cache);
     VK_CHECK_RESULT(result);
-    result = vkCreateGraphicsPipelines(ctx.device, m_pipelineCache, 1,
+    result = vkCreateGraphicsPipelines(ctx.device, ctx.pipeline_cache, 1,
                                        &pipeline, NULL, &m_pipeline);
     VK_CHECK_RESULT(result);
 
-    vkDestroyPipelineCache(ctx.device, m_pipelineCache, NULL);
+    vkDestroyPipelineCache(ctx.device, ctx.pipeline_cache, NULL);
 
     // vkDestroyShaderModule(ctx.device, m_frag_shader_module, NULL);
     // vkDestroyShaderModule(ctx.device, m_vert_shader_module, NULL);

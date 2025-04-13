@@ -226,8 +226,8 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &cmd;
-    vkQueueSubmit(m_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_queue);  // Wait for completion
+    vkQueueSubmit(ctx.queue, 1, &submit_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(ctx.queue);  // Wait for completion
 
     vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, &cmd);
 }
@@ -244,7 +244,7 @@ void DynamicTextureWindow::prepare_textures()
 
     // Query if image supports texture format
     VkFormatProperties props;
-    vkGetPhysicalDeviceFormatProperties(m_gpu, tex_format, &props);
+    vkGetPhysicalDeviceFormatProperties(ctx.gpu, tex_format, &props);
 
     for (int i = 0; i < DEMO_TEXTURE_COUNT; i++) {
         if ((props.linearTilingFeatures &
@@ -332,8 +332,8 @@ void DynamicTextureWindow::update_texture()
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &update_cmd;
-    vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_queue);  // Synchronize before CPU write
+    vkQueueSubmit(ctx.queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(ctx.queue);  // Synchronize before CPU write
 
     void* data;
     vkMapMemory(ctx.device, m_textures[0].mem, 0, m_mem_reqs.size, 0, &data);
@@ -360,8 +360,8 @@ void DynamicTextureWindow::update_texture()
 
     vkEndCommandBuffer(update_cmd);
     submitInfo.pCommandBuffers = &update_cmd;
-    vkQueueSubmit(m_queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(m_queue);  // Synchronize before rendering
+    vkQueueSubmit(ctx.queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(ctx.queue);  // Synchronize before rendering
 
     vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, &update_cmd);
 }

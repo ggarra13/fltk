@@ -184,7 +184,7 @@ void Fl_Vk_Window::vk_draw_begin() {
   cmd_buf_info.flags = 0;
   cmd_buf_info.pInheritanceInfo = NULL;
 
-  vkQueueWaitIdle(m_queue);
+  vkQueueWaitIdle(ctx.queue);
   // Reset the command buffer to ensure it’s reusable
   result = vkResetCommandBuffer(m_draw_cmd, 0);
   VK_CHECK_RESULT(result);
@@ -393,7 +393,7 @@ VkResult Fl_Vk_Window::end_setup() {
 
   vkResetFences(ctx.device, 1, &m_setupFence);
   
-  result = vkQueueSubmit(m_queue, 1, &submit_info, m_setupFence);
+  result = vkQueueSubmit(ctx.queue, 1, &submit_info, m_setupFence);
   VK_CHECK_RESULT(result);
   
   vkWaitForFences(ctx.device, 1, &m_setupFence, VK_TRUE, UINT64_MAX);
@@ -510,7 +510,7 @@ void Fl_Vk_Window::swap_buffers() {
   submit_info.pSignalSemaphores = &m_drawCompleteSemaphore;
 
   vkResetFences(ctx.device, 1, &m_drawFence);
-  result = vkQueueSubmit(m_queue, 1, &submit_info, m_drawFence);
+  result = vkQueueSubmit(ctx.queue, 1, &submit_info, m_drawFence);
   VK_CHECK_RESULT(result);
   
   vkWaitForFences(ctx.device, 1, &m_drawFence, VK_TRUE, UINT64_MAX);
@@ -531,14 +531,14 @@ void Fl_Vk_Window::swap_buffers() {
   present.pSwapchains = &m_swapchain;
   present.pImageIndices = &m_current_buffer;
 
-  result = vkQueuePresentKHR(m_queue, &present);
+  result = vkQueuePresentKHR(ctx.queue, &present);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     m_swapchain_needs_recreation = true;
   } else {
     VK_CHECK_RESULT(result);
   }
 
-  result = vkQueueWaitIdle(m_queue);
+  result = vkQueueWaitIdle(ctx.queue);
   VK_CHECK_RESULT(result);
   
   vkDestroySemaphore(ctx.device, m_imageAcquiredSemaphore, NULL);
@@ -835,7 +835,7 @@ void Fl_Vk_Window::init_vulkan()
     VkResult result;
     
     // Initialize vulkan
-    if (m_instance == VK_NULL_HANDLE)
+    if (ctx.instance == VK_NULL_HANDLE)
     {
         pVkWindowDriver->init_vk();
         vkSetHdrMetadataEXT =

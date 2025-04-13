@@ -45,6 +45,15 @@ struct Fl_Vk_Context
     uint32_t         queue_count;
     VkQueue          queue;
 
+    // List of enabled layers
+    std::vector<const char*> enabled_layers;
+
+    // List of instance extensions
+    std::vector<const char*> instance_extensions;
+
+    // List of device extensions
+    std::vector<const char*> device_extensions;
+
     Fl_Vk_Context() :
         instance(VK_NULL_HANDLE),
         gpu(VK_NULL_HANDLE),
@@ -280,10 +289,6 @@ public:
   // Application
   bool m_validate;  // if true, turns on validation layers
   Fl_Vk_Context ctx;
-
-  std::vector<const char*> m_enabled_layers;
-  std::vector<const char*> m_instance_extensions;
-  std::vector<const char*> m_device_extensions;
 
   // Per Window
   VkSurfaceKHR       m_surface;  // needed

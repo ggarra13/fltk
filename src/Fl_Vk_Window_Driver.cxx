@@ -389,24 +389,25 @@ void Fl_Vk_Window_Driver::init_device() {
     VkResult result;
 
     float queue_priorities[1] = {0.0};
-    VkDeviceQueueCreateInfo queue = {};
-    queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue.pNext = NULL;
-    queue.queueFamilyIndex = pWindow->m_queueFamilyIndex;
-    queue.queueCount = 1;
-    queue.pQueuePriorities = queue_priorities;
+    VkDeviceQueueCreateInfo queueCreateInfo = {};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.pNext = NULL;
+    queueCreateInfo.queueFamilyIndex = pWindow->m_queueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = queue_priorities;
 
     VkDeviceCreateInfo device = {};
     device.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device.pNext = NULL;
     device.queueCreateInfoCount = 1;
-    device.pQueueCreateInfos = &queue;
-    device.enabledLayerCount = pWindow->m_enabled_layers.size();
-    device.ppEnabledLayerNames = pWindow->m_enabled_layers.data();
+    device.pQueueCreateInfos = &queueCreateInfo;
+    device.enabledLayerCount = pWindow->ctx.enabled_layers.size();
+    device.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
     device.enabledExtensionCount = pWindow->ctx.device_extensions.size();
-    device.ppEnabledExtensionNames = (const char *const *)pWindow->ctx.device_extensions.data();
+    device.ppEnabledExtensionNames = pWindow->ctx.device_extensions.data();
 
-    result = vkCreateDevice(pWindow->ctx.gpu, &device, NULL, &pWindow->ctx.device);
+    result = vkCreateDevice(pWindow->ctx.gpu, &device, NULL,
+                            &pWindow->ctx.device);
     VK_CHECK_RESULT(result);
 }
 
@@ -453,7 +454,7 @@ void Fl_Vk_Window_Driver::init_vk() {
                              instance_validation_layers,
                              instance_layer_count, instance_layers);
             if (validation_found) {
-                pWindow->m_enabled_layers.push_back(instance_validation_layers[0]);
+                pWindow->ctx.enabled_layers.push_back(instance_validation_layers[0]);
                 validation_layer_count = 1;
             }
             free(instance_layers);
@@ -482,7 +483,7 @@ void Fl_Vk_Window_Driver::init_vk() {
 
     for (const auto& extension : required_extensions)
     {
-        pWindow->m_instance_extensions.push_back(extension);
+        pWindow->ctx.instance_extensions.push_back(extension);
     }
   
     auto optional_extensions = pWindow->get_optional_extensions();
@@ -490,7 +491,7 @@ void Fl_Vk_Window_Driver::init_vk() {
     {
       if (isExtensionSupported(extension))
       {
-          pWindow->m_instance_extensions.push_back(extension);
+          pWindow->ctx.instance_extensions.push_back(extension);
       }
       else
       {
@@ -518,7 +519,7 @@ void Fl_Vk_Window_Driver::init_vk() {
       {
         if (pWindow->m_validate)
         {
-            pWindow->m_instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+            pWindow->ctx.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
         }
       }
 
@@ -526,7 +527,7 @@ void Fl_Vk_Window_Driver::init_vk() {
       if (!strcmp(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
                   instance_extensions[i].extensionName))
       {
-          pWindow->m_instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+          pWindow->ctx.instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
           portability_enumeration = VK_TRUE;
       }
     }
@@ -547,10 +548,10 @@ void Fl_Vk_Window_Driver::init_vk() {
   inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   inst_info.pNext = NULL;
   inst_info.pApplicationInfo = &app;
-  inst_info.enabledLayerCount = pWindow->m_enabled_layers.size();
-  inst_info.ppEnabledLayerNames = pWindow->m_enabled_layers.data();
-  inst_info.enabledExtensionCount = pWindow->m_instance_extensions.size();
-  inst_info.ppEnabledExtensionNames = pWindow->m_instance_extensions.data();
+  inst_info.enabledLayerCount = pWindow->ctx.enabled_layers.size();
+  inst_info.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
+  inst_info.enabledExtensionCount = pWindow->ctx.instance_extensions.size();
+  inst_info.ppEnabledExtensionNames = pWindow->ctx.instance_extensions.data();
 
   if (portability_enumeration)
     inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
@@ -673,14 +674,16 @@ void Fl_Vk_Window_Driver::init_vk() {
   vkGetPhysicalDeviceProperties(pWindow->ctx.gpu, &pWindow->ctx.gpu_props);
 
   // Query with NULL data to get count
-  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->ctx.gpu, &pWindow->m_queue_count, NULL);
-
-  pWindow->m_queue_props =
-      (VkQueueFamilyProperties *)VK_ALLOC(pWindow->m_queue_count * sizeof(VkQueueFamilyProperties));
   vkGetPhysicalDeviceQueueFamilyProperties(pWindow->ctx.gpu,
-                                           &pWindow->m_queue_count,
-                                           pWindow->m_queue_props);
-  assert(pWindow->m_queue_count >= 1);
+                                           &pWindow->ctx.queue_count, NULL);
+
+  pWindow->ctx.queue_props =
+      (VkQueueFamilyProperties *)VK_ALLOC(pWindow->ctx.queue_count *
+                                          sizeof(VkQueueFamilyProperties));
+  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->ctx.gpu,
+                                           &pWindow->ctx.queue_count,
+                                           pWindow->ctx.queue_props);
+  assert(pWindow->ctx.queue_count >= 1);
 
   vkGetPhysicalDeviceFeatures(pWindow->ctx.gpu, &pWindow->ctx.gpu_features);
 
@@ -691,10 +694,16 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   uint32_t i;
 
   // Get Memory information and properties
-  vkGetPhysicalDeviceMemoryProperties(pWindow->ctx.gpu, &pWindow->m_memory_properties);  // Iterate over each queue to learn whether it supports presenting:
-  VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(pWindow->m_queue_count * sizeof(VkBool32));
-  for (i = 0; i < pWindow->m_queue_count; i++) {
-    vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->ctx.gpu, i, pWindow->m_surface,
+  size_t numQueues = pWindow->ctx.queue_count;
+  vkGetPhysicalDeviceMemoryProperties(pWindow->ctx.gpu,
+                                      &pWindow->m_memory_properties);
+
+  // Iterate over each queue to learn whether it supports presenting:
+  VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
+                                                   sizeof(VkBool32));
+  for (i = 0; i < numQueues; i++) {
+    vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->ctx.gpu, i,
+                                         pWindow->m_surface,
                                          &supportsPresent[i]);
   }
 
@@ -702,8 +711,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   // families, try to find one that supports both
   uint32_t graphicsQueueNodeIndex = UINT32_MAX;
   uint32_t presentQueueNodeIndex = UINT32_MAX;
-  for (i = 0; i < pWindow->m_queue_count; i++) {
-    if ((pWindow->m_queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+  for (i = 0; i < numQueues; i++) {
+    if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
       if (graphicsQueueNodeIndex == UINT32_MAX) {
         graphicsQueueNodeIndex = i;
       }
@@ -718,7 +727,7 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   if (presentQueueNodeIndex == UINT32_MAX) {
     // If didn't find a queue that supports both graphics and present, then
     // find a separate present queue.
-    for (i = 0; i < pWindow->m_queue_count; ++i) {
+    for (i = 0; i < numQueues; ++i) {
       if (supportsPresent[i] == VK_TRUE) {
         presentQueueNodeIndex = i;
         break;
@@ -728,14 +737,14 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   free(supportsPresent);
 
   // Generate result or if could not find both a graphics and a present queue
-  if (graphicsQueueNodeIndex == UINT32_MAX || presentQueueNodeIndex == UINT32_MAX) {
+  if (graphicsQueueNodeIndex == UINT32_MAX ||
+      presentQueueNodeIndex == UINT32_MAX) {
     Fl::fatal("Could not find a graphics and a present queue\n",
               "Swapchain Initialization Failure");
   }
 
-  // NOTE: While it is possible for an application to use a separate graphics
-  //       and a present queues, this demo program assumes it is only using
-  //       one.
+  // \@note: It is possible for an application to use a separate graphics
+  //         and a present queues.  Here we assume not.
   if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
     Fl::fatal("Could not find a common graphics and a present queue\n",
               "Swapchain Initialization Failure");
@@ -746,7 +755,9 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   if (pWindow->ctx.device == VK_NULL_HANDLE)
       init_device();
 
-  vkGetDeviceQueue(pWindow->ctx.device, pWindow->m_queueFamilyIndex, 0, &pWindow->m_queue);
+  vkGetDeviceQueue(pWindow->ctx.device,
+                   pWindow->m_queueFamilyIndex, 0,
+                   &pWindow->ctx.queue);
 
   uint32_t formatCount;
   result = vkGetPhysicalDeviceSurfaceFormatsKHR(

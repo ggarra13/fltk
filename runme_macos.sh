@@ -62,5 +62,5 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" 
 
-ninja && bin/test/vk_shape-shared
-#bin/test/vk_shape_textured-shared
+#ninja && bin/test/vk_shape-shared
+ninja && bin/test/vk_shape_textured-shared
