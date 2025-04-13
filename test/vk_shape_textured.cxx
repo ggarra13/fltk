@@ -384,7 +384,7 @@ void DynamicTextureWindow::prepare_vertices()
 
     // Generate the outer vertices
     std::vector<Vertex> outerVertices(sides);
-    float z = 0.5F;
+    float z = 0.0F;
     for (int j = 0; j < sides; ++j) {
         double ang = j * 2 * M_PI / sides;
         float x = cos(ang);
@@ -857,6 +857,8 @@ void DynamicTextureWindow::destroy_resources() {
             m_textures[i].sampler = VK_NULL_HANDLE;
         }
     }
+    
+    Fl_Vk_Window::destroy_resources();
 }
 
 

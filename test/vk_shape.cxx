@@ -506,6 +506,8 @@ void vk_shape_window::destroy_resources() {
         vkFreeMemory(m_device, m_vertices.mem, NULL);
         m_vertices.mem = VK_NULL_HANDLE;
     }
+
+    Fl_Vk_Window::destroy_resources();
 }
 
 
