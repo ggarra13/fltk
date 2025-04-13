@@ -161,8 +161,8 @@ void drawcube(int wire) {
 
 cube_box::~cube_box()
 {
-    vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
-    vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
+    vkDestroyShaderModule(ctx.device, m_frag_shader_module, NULL);
+    vkDestroyShaderModule(ctx.device, m_vert_shader_module, NULL);
 }
 
 // m_format, m_depth (optionally) -> creates m_renderPass
@@ -242,7 +242,7 @@ void cube_box::prepare_render_pass()
     rp_info.pDependencies = NULL;
                     
     VkResult result;
-    result = vkCreateRenderPass(m_device, &rp_info, NULL, &m_renderPass);
+    result = vkCreateRenderPass(ctx.device, &rp_info, NULL, &m_renderPass);
     VK_CHECK_RESULT(result);
 }
 
@@ -266,7 +266,7 @@ VkShaderModule cube_box::prepare_vs() {
             "vertex_shader.glsl"    // Filename for error reporting
         );
 
-        m_vert_shader_module = create_shader_module(m_device, spirv);
+        m_vert_shader_module = create_shader_module(ctx.device, spirv);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         m_vert_shader_module = VK_NULL_HANDLE;
@@ -298,7 +298,7 @@ VkShaderModule cube_box::prepare_fs() {
             "frag_shader.glsl"    // Filename for error reporting
         );
         // Assuming you have a VkDevice 'device' already created
-        m_frag_shader_module = create_shader_module(m_device, spirv);
+        m_frag_shader_module = create_shader_module(ctx.device, spirv);
     
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -335,7 +335,7 @@ void cube_box::prepare_pipeline() {
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -414,79 +414,37 @@ void cube_box::prepare_pipeline() {
     memset(&pipelineCache, 0, sizeof(pipelineCache));
     pipelineCache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 
-    result = vkCreatePipelineCache(m_device, &pipelineCache, NULL,
-                                   &m_pipelineCache);
+    result = vkCreatePipelineCache(ctx.device, &pipelineCache, NULL,
+                                   &ctx.pipeline_cache);
     VK_CHECK_RESULT(result);
-    result = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1,
+    result = vkCreateGraphicsPipelines(ctx.device, ctx.pipeline_cache, 1,
                                        &pipeline, NULL, &m_pipeline);
     VK_CHECK_RESULT(result);
 
-    vkDestroyPipelineCache(m_device, m_pipelineCache, NULL);
+    vkDestroyPipelineCache(ctx.device, ctx.pipeline_cache, NULL);
 
 }
 
 
 void cube_box::prepare_descriptor_pool() {
-    VkDescriptorPoolSize type_count = {};
-    type_count.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    type_count.descriptorCount = 1;
-    
-    VkDescriptorPoolCreateInfo descriptor_pool = {};
-    descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descriptor_pool.pNext = NULL;
-    descriptor_pool.maxSets = 1;
-    descriptor_pool.poolSizeCount = 1;
-    descriptor_pool.pPoolSizes = &type_count;
-
-    VkResult result;
-             
-    result = vkCreateDescriptorPool(m_device, &descriptor_pool, NULL,
-                                    &m_desc_pool);
-    VK_CHECK_RESULT(result);
+    // No textures so no descriptor pool
 }
 
 void cube_box::prepare_descriptor_set() {
-    VkResult result;
-    uint32_t i;
-
-    VkDescriptorSetAllocateInfo alloc_info = {};
-    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    alloc_info.pNext = NULL;
-    alloc_info.descriptorPool = m_desc_pool;
-    alloc_info.descriptorSetCount = 1;
-    alloc_info.pSetLayouts = &m_desc_layout;
-        
-    result = vkAllocateDescriptorSets(m_device, &alloc_info, &m_desc_set);
-    VK_CHECK_RESULT(result);
+    // No textures so no descriptor set
 }
 
 void cube_box::prepare_descriptor_layout() {
-    VkDescriptorSetLayoutBinding layout_binding = {};
-    layout_binding.binding = 0;
-    layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    layout_binding.descriptorCount = 0;
-    layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    layout_binding.pImmutableSamplers = NULL;
-  
-    VkDescriptorSetLayoutCreateInfo descriptor_layout = {};
-    descriptor_layout.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descriptor_layout.pNext = NULL;
-    descriptor_layout.bindingCount = 1;
-    descriptor_layout.pBindings = &layout_binding;
-                 
+    
     VkResult result;
-
-    result = vkCreateDescriptorSetLayout(m_device, &descriptor_layout, NULL,
-                                         &m_desc_layout);
-    VK_CHECK_RESULT(result);
-
+    
     VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
     pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pPipelineLayoutCreateInfo.pNext = NULL;
-    pPipelineLayoutCreateInfo.setLayoutCount = 1;
-    pPipelineLayoutCreateInfo.pSetLayouts = &m_desc_layout;
+    pPipelineLayoutCreateInfo.setLayoutCount = 0;
+    pPipelineLayoutCreateInfo.pSetLayouts = NULL;
 
-    result = vkCreatePipelineLayout(m_device, &pPipelineLayoutCreateInfo, NULL,
+    result = vkCreatePipelineLayout(ctx.device, &pPipelineLayoutCreateInfo, NULL,
                                     &m_pipeline_layout);
     VK_CHECK_RESULT(result);
 }
@@ -534,10 +492,10 @@ void cube_box::prepare_vertices()
 
     memset(&m_vertices, 0, sizeof(m_vertices));
 
-    result = vkCreateBuffer(m_device, &buf_info, NULL, &m_vertices.buf);
+    result = vkCreateBuffer(ctx.device, &buf_info, NULL, &m_vertices.buf);
     VK_CHECK_RESULT(result);
 
-    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &m_mem_reqs);
+    vkGetBufferMemoryRequirements(ctx.device, m_vertices.buf, &m_mem_reqs);
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
@@ -546,18 +504,18 @@ void cube_box::prepare_vertices()
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
 
-    result = vkAllocateMemory(m_device, &mem_alloc, NULL, &m_vertices.mem);
+    result = vkAllocateMemory(ctx.device, &mem_alloc, NULL, &m_vertices.mem);
     VK_CHECK_RESULT(result);
 
-    result = vkMapMemory(m_device, m_vertices.mem, 0,
+    result = vkMapMemory(ctx.device, m_vertices.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
 	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
-    vkUnmapMemory(m_device, m_vertices.mem);
+    vkUnmapMemory(ctx.device, m_vertices.mem);
 
-    result = vkBindBufferMemory(m_device, m_vertices.buf, m_vertices.mem, 0);
+    result = vkBindBufferMemory(ctx.device, m_vertices.buf, m_vertices.mem, 0);
     VK_CHECK_RESULT(result);
 
     m_vertices.vi.sType =
@@ -565,7 +523,7 @@ void cube_box::prepare_vertices()
     m_vertices.vi.pNext = NULL;
     m_vertices.vi.vertexBindingDescriptionCount = 1;
     m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
-    m_vertices.vi.vertexAttributeDescriptionCount = 2;
+    m_vertices.vi.vertexAttributeDescriptionCount = 1;
     m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
 
     m_vertices.vi_bindings[0].binding = 0;
@@ -576,11 +534,6 @@ void cube_box::prepare_vertices()
     m_vertices.vi_attrs[0].location = 0;
     m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     m_vertices.vi_attrs[0].offset = 0;
-
-    m_vertices.vi_attrs[1].binding = 0;
-    m_vertices.vi_attrs[1].location = 1;
-    m_vertices.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
-    m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
 void cube_box::prepare()
@@ -596,12 +549,12 @@ void cube_box::prepare()
 
 void cube_box::destroy_resources() {
     if (m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(m_device, m_vertices.buf, NULL);
+        vkDestroyBuffer(ctx.device, m_vertices.buf, NULL);
         m_vertices.buf = VK_NULL_HANDLE;
     }
 
     if (m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(m_device, m_vertices.mem, NULL);
+        vkFreeMemory(ctx.device, m_vertices.mem, NULL);
         m_vertices.mem = VK_NULL_HANDLE;
     }
     
