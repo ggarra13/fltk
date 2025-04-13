@@ -160,8 +160,9 @@ void Fl_WinAPI_Vk_Window_Driver::create_surface() {
   createInfo.hinstance = GetModuleHandle(nullptr); // Get the instance handle
 
 
-  if (vkCreateWin32SurfaceKHR(pWindow->m_instance, &createInfo, nullptr, &pWindow->m_surface) !=
-      VK_SUCCESS) {
+  if (vkCreateWin32SurfaceKHR(pWindow->ctx.instance, &createInfo, nullptr,
+                              &pWindow->m_surface) != VK_SUCCESS)
+  {
     Fl::fatal("Win32 Vulkan: failed to create window surface!");
   }
 }

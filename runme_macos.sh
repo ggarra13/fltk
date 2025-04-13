@@ -3,11 +3,23 @@
 mkdir -p build_macos/
 cd build_macos
 
-
-export DYLD_LIBRARY_PATH=/usr/local/lib:$DYLD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=/usr/local/lib
+export DYLD_FALLBACK_LIBRARY_PATH=/usr/local/lib:
 export VK_LAYER_PATH=/usr/local/opt/vulkan-profiles/share/vulkan/explicit_layer.d:/usr/local/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d
 export VK_ICD_FILENAMES=/usr/local/etc/vulkan/icd.d/MoltenVK_icd.json
 
+# export VK_LOADER_DEBUG=all  # Use this to debug configuration issues.
+
+# \@bug:
+#      When using macOS (Intel at least) validationlayers, from the macOS
+#      distribution, the validation layer comes without a path, which breaks
+#      loading it when creating the instance.
+#
+#  The solution seems to be running this sed command to hard-code the path:
+#
+#      sed -i '' 's#"library_path": "libVkLayer_khronos_validation.dylib"#"library_path": "/usr/local/lib/libVkLayer_khronos_validation.dylib"#' /usr/local/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
+#
+#
 
 
 cmake .. \
@@ -50,5 +62,5 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" 
 
-# ninja && bin/test/vk_shape-shared
+#ninja && bin/test/vk_shape-shared
 ninja && bin/test/vk_shape_textured-shared

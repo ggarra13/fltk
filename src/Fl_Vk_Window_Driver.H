@@ -33,7 +33,6 @@
 class Fl_Vk_Choice;
 class Fl_Font_Descriptor;
 
-
 /* The constructor of each Fl_Vk_Window object creates also an object from a
    platform-specific derived class from this class.
 */

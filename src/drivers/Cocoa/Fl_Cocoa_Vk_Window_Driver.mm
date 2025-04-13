@@ -308,7 +308,7 @@ void Fl_Cocoa_Vk_Window_Driver::create_surface()
     surfaceInfo.flags = 0;
     surfaceInfo.pView = (__bridge void*)view; // Bridge NSView to void* for Vulkan
     
-    VkResult result = vkCreateMacOSSurfaceMVK(pWindow->m_instance,
+    VkResult result = vkCreateMacOSSurfaceMVK(pWindow->ctx.instance,
                                               &surfaceInfo,
                                               pWindow->m_allocator,
                                               &pWindow->m_surface);

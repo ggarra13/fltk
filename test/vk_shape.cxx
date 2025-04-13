@@ -63,8 +63,8 @@ private:
 
 vk_shape_window::~vk_shape_window()
 {
-    vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
-    vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
+    vkDestroyShaderModule(ctx.device, m_frag_shader_module, NULL);
+    vkDestroyShaderModule(ctx.device, m_vert_shader_module, NULL);
 }
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
@@ -88,15 +88,32 @@ void vk_shape_window::prepare_vertices()
     {
         float x, y, z;  // 3D position
     };
+    
+    // Add the center vertex
+    Vertex center = {0.0f, 0.0f, 0.0f};
 
-    std::vector<Vertex> vertices(sides);
-    for (int j=0; j<sides; j++) {
-        double ang = j*2*M_PI/sides;
+    // Generate the outer vertices
+    std::vector<Vertex> outerVertices(sides);
+    for (int j = 0; j < sides; ++j) {
+        double ang = j * 2 * M_PI / sides;
         float x = cos(ang);
         float y = sin(ang);
-        vertices[j].x = x;
-        vertices[j].y = y;
-        vertices[j].z = 0.F;
+        outerVertices[j].x = x;
+        outerVertices[j].y = y;
+        outerVertices[j].z = 0.0f;
+    }
+
+    // Create the triangle list
+    std::vector<Vertex> vertices;
+    for (int i = 0; i < sides; ++i) {
+        // First vertex of the triangle: the center
+        vertices.push_back(center);
+
+        // Second vertex: current outer vertex
+        vertices.push_back(outerVertices[i]);
+
+        // Third vertex: next outer vertex (wrap around for the last side)
+        vertices.push_back(outerVertices[(i + 1) % sides]);
     }
     
             
@@ -122,10 +139,10 @@ void vk_shape_window::prepare_vertices()
 
     memset(&m_vertices, 0, sizeof(m_vertices));
 
-    result = vkCreateBuffer(m_device, &buf_info, NULL, &m_vertices.buf);
+    result = vkCreateBuffer(ctx.device, &buf_info, NULL, &m_vertices.buf);
     VK_CHECK_RESULT(result);
 
-    vkGetBufferMemoryRequirements(m_device, m_vertices.buf, &m_mem_reqs);
+    vkGetBufferMemoryRequirements(ctx.device, m_vertices.buf, &m_mem_reqs);
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
@@ -134,18 +151,18 @@ void vk_shape_window::prepare_vertices()
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
 
-    result = vkAllocateMemory(m_device, &mem_alloc, NULL, &m_vertices.mem);
+    result = vkAllocateMemory(ctx.device, &mem_alloc, NULL, &m_vertices.mem);
     VK_CHECK_RESULT(result);
 
-    result = vkMapMemory(m_device, m_vertices.mem, 0,
+    result = vkMapMemory(ctx.device, m_vertices.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
 	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
-    vkUnmapMemory(m_device, m_vertices.mem);
+    vkUnmapMemory(ctx.device, m_vertices.mem);
 
-    result = vkBindBufferMemory(m_device, m_vertices.buf, m_vertices.mem, 0);
+    result = vkBindBufferMemory(ctx.device, m_vertices.buf, m_vertices.mem, 0);
     VK_CHECK_RESULT(result);
 
     m_vertices.vi.sType =
@@ -153,7 +170,7 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi.pNext = NULL;
     m_vertices.vi.vertexBindingDescriptionCount = 1;
     m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
-    m_vertices.vi.vertexAttributeDescriptionCount = 2;
+    m_vertices.vi.vertexAttributeDescriptionCount = 1;
     m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
 
     m_vertices.vi_bindings[0].binding = 0;
@@ -164,11 +181,6 @@ void vk_shape_window::prepare_vertices()
     m_vertices.vi_attrs[0].location = 0;
     m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     m_vertices.vi_attrs[0].offset = 0;
-
-    m_vertices.vi_attrs[1].binding = 0;
-    m_vertices.vi_attrs[1].location = 1;
-    m_vertices.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
-    m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
 // m_format, m_depth (optionally) -> creates m_renderPass
@@ -244,7 +256,7 @@ void vk_shape_window::prepare_render_pass()
     rp_info.pDependencies = NULL;
                     
     VkResult result;
-    result = vkCreateRenderPass(m_device, &rp_info, NULL, &m_renderPass);
+    result = vkCreateRenderPass(ctx.device, &rp_info, NULL, &m_renderPass);
     VK_CHECK_RESULT(result);
 }
 
@@ -268,7 +280,7 @@ VkShaderModule vk_shape_window::prepare_vs() {
             "vertex_shader.glsl"    // Filename for error reporting
         );
 
-        m_vert_shader_module = create_shader_module(m_device, spirv);
+        m_vert_shader_module = create_shader_module(ctx.device, spirv);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         m_vert_shader_module = VK_NULL_HANDLE;
@@ -300,7 +312,7 @@ VkShaderModule vk_shape_window::prepare_fs() {
             "frag_shader.glsl"    // Filename for error reporting
         );
         // Assuming you have a VkDevice 'device' already created
-        m_frag_shader_module = create_shader_module(m_device, spirv);
+        m_frag_shader_module = create_shader_module(ctx.device, spirv);
     
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -311,7 +323,7 @@ VkShaderModule vk_shape_window::prepare_fs() {
 
 void vk_shape_window::prepare_pipeline() {
     VkGraphicsPipelineCreateInfo pipeline;
-    VkPipelineCacheCreateInfo pipelineCache;
+    VkPipelineCacheCreateInfo pipelineCacheCreateInfo;
 
     VkPipelineVertexInputStateCreateInfo vi;
     VkPipelineInputAssemblyStateCreateInfo ia;
@@ -338,7 +350,7 @@ void vk_shape_window::prepare_pipeline() {
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+    ia.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -414,20 +426,20 @@ void vk_shape_window::prepare_pipeline() {
     pipeline.renderPass = m_renderPass;
     pipeline.pDynamicState = &dynamicState;
 
-    memset(&pipelineCache, 0, sizeof(pipelineCache));
-    pipelineCache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+    memset(&pipelineCacheCreateInfo, 0, sizeof(pipelineCacheCreateInfo));
+    pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 
-    result = vkCreatePipelineCache(m_device, &pipelineCache, NULL,
-                                   &m_pipelineCache);
+    result = vkCreatePipelineCache(ctx.device, &pipelineCacheCreateInfo, NULL,
+                                   &ctx.pipeline_cache);
     VK_CHECK_RESULT(result);
-    result = vkCreateGraphicsPipelines(m_device, m_pipelineCache, 1,
+    result = vkCreateGraphicsPipelines(ctx.device, ctx.pipeline_cache, 1,
                                        &pipeline, NULL, &m_pipeline);
     VK_CHECK_RESULT(result);
 
-    vkDestroyPipelineCache(m_device, m_pipelineCache, NULL);
+    vkDestroyPipelineCache(ctx.device, ctx.pipeline_cache, NULL);
 
-    // vkDestroyShaderModule(m_device, m_frag_shader_module, NULL);
-    // vkDestroyShaderModule(m_device, m_vert_shader_module, NULL);
+    // vkDestroyShaderModule(ctx.device, m_frag_shader_module, NULL);
+    // vkDestroyShaderModule(ctx.device, m_vert_shader_module, NULL);
 }
 
 
@@ -449,7 +461,7 @@ void vk_shape_window::prepare_descriptor_layout() {
     pPipelineLayoutCreateInfo.setLayoutCount = 0;
     pPipelineLayoutCreateInfo.pSetLayouts = NULL;
 
-    result = vkCreatePipelineLayout(m_device, &pPipelineLayoutCreateInfo, NULL,
+    result = vkCreatePipelineLayout(ctx.device, &pPipelineLayoutCreateInfo, NULL,
                                     &m_pipeline_layout);
     VK_CHECK_RESULT(result);
 }
@@ -481,19 +493,21 @@ void vk_shape_window::draw() {
     vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
                            &m_vertices.buf, offsets);
 
-    vkCmdDraw(m_draw_cmd, sides, 1, 0, 0);
+    vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
 }
 
 void vk_shape_window::destroy_resources() {
     if (m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(m_device, m_vertices.buf, NULL);
+        vkDestroyBuffer(ctx.device, m_vertices.buf, NULL);
         m_vertices.buf = VK_NULL_HANDLE;
     }
 
     if (m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(m_device, m_vertices.mem, NULL);
+        vkFreeMemory(ctx.device, m_vertices.mem, NULL);
         m_vertices.mem = VK_NULL_HANDLE;
     }
+
+    Fl_Vk_Window::destroy_resources();
 }
 
 

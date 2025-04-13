@@ -21,6 +21,7 @@
 #define Fl_Vk_Window_H
 
 #include <string>
+#include <vector>
 
 #include "FL/vk.h"
 #include "Fl_Window.H"
@@ -29,11 +30,48 @@ class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
 
-//! GLFW demo variables
+
+struct Fl_Vk_Context
+{
+    VkInstance         instance; 
+
+    VkPhysicalDevice   gpu;
+    VkPhysicalDeviceProperties gpu_props;
+    VkPhysicalDeviceFeatures gpu_features;
+    
+    VkDevice           device;
+    VkPipelineCache    pipeline_cache; 
+    VkQueueFamilyProperties* queue_props;
+    uint32_t         queue_count;
+    VkQueue          queue;
+    VkCommandPool    command_pool;  // memory for command buffers
+
+    // List of enabled layers
+    std::vector<const char*> enabled_layers;
+
+    // List of instance extensions
+    std::vector<const char*> instance_extensions;
+
+    // List of device extensions
+    std::vector<const char*> device_extensions;
+
+    Fl_Vk_Context() :
+        instance(VK_NULL_HANDLE),
+        gpu(VK_NULL_HANDLE),
+        device(VK_NULL_HANDLE),
+        pipeline_cache(VK_NULL_HANDLE),
+        queue_props(nullptr),
+        queue_count(0),
+        queue(VK_NULL_HANDLE),
+        command_pool(VK_NULL_HANDLE)
+        {
+        };
+};
+
 struct Fl_Vk_SwapchainBuffer {
     VkImage image;
-    VkCommandBuffer cmd;
     VkImageView view;
+    VkFramebuffer framebuffer;
 };
 
 struct Fl_Vk_Mesh {
@@ -251,22 +289,8 @@ public:
 
   
   // Application
-  bool                      m_validate;
-  static VkInstance         m_instance; 
-  static VkPhysicalDevice   m_gpu;
-  static VkPipelineCache    m_pipelineCache; 
-  static VkDevice           m_device;
-  static VkPhysicalDeviceProperties m_gpu_props;
-  static VkPhysicalDeviceFeatures m_gpu_features;
-  static VkQueueFamilyProperties* m_queue_props;
-  static uint32_t         m_queue_count;
-
-  uint32_t m_enabled_layer_count;
-  const char* m_enabled_layers[64];
-
-  // These should be moved somewhere else
-  uint32_t m_enabled_extension_count;
-  const char* m_extension_names[64];
+  bool m_validate;  // if true, turns on validation layers
+  Fl_Vk_Context ctx;
 
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
@@ -280,20 +304,17 @@ public:
   // Per swapchain
   uint32_t               m_swapchainImageCount;
   VkSwapchainKHR         m_swapchain;
-  Fl_Vk_SwapchainBuffer* m_buffers;
+  std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
 
   // HDR metadata information (passed during swap_buffers)
   PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
   VkHdrMetadataEXT        m_hdr_metadata;
 
-  VkQueue            m_queue;
   uint32_t           m_queueFamilyIndex;
   Fl_Vk_Depth        m_depth;
-  VkFramebuffer*     m_framebuffers;
 
   // For drawing
   VkPipeline         m_pipeline;  
-  VkCommandPool      m_cmd_pool;  // memory for command buffers
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
   
   VkFence            m_setupFence;// Fence for setup commands in window

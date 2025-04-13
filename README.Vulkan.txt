@@ -30,13 +30,11 @@ The code has currently been tested on Windows, X11 and macOS.
 =========================
 
 
- 2.1 Enabling Wayland
+ 2.1 Enabling Vulkan
 ---------------------
 
-Programs using X11 specific functions may need to disable the automatic
-detection of Wayland at runtime so they fall back to X11 only.
 
-Note 2: When building a user project with CMake 3.4 or higher, i.e. using
+Note: When building a user project with CMake 3.4 or higher, i.e. using
 
   cmake_minimum_required (VERSION 3.4)
 
@@ -44,8 +42,6 @@ or any higher (minimum) CMake version users need to use at least one of
 the following techniques:
 
 -D FLTK_USE_VK=ON
--D Vulkan_INCLUDE_DIR=/usr/local/Vulkan-Headers
--D Vulkan_LIBRARY=/usr/lib/x86_64-linux-gnu/libvulkan.so.1
 
 
  2.2 Configuration
