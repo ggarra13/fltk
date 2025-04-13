@@ -18,6 +18,8 @@ export VK_ICD_FILENAMES=/usr/local/etc/vulkan/icd.d/MoltenVK_icd.json
 #  The solution seems to be running this sed command to hard-code the path:
 #
 #      sed -i '' 's#"library_path": "libVkLayer_khronos_validation.dylib"#"library_path": "/usr/local/lib/libVkLayer_khronos_validation.dylib"#' /usr/local/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
+#
+#
 
 
 cmake .. \
@@ -60,7 +62,5 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" 
 
-ninja
-
-# bin/test/vk_shape-shared
-bin/test/vk_shape_textured-shared
+ninja && bin/test/vk_shape-shared
+#bin/test/vk_shape_textured-shared

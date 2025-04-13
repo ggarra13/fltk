@@ -138,8 +138,9 @@ void Fl_X11_Vk_Window_Driver::create_surface() {
   createInfo.dpy = fl_x11_display();
   createInfo.window = fl_x11_xid(pWindow);
 
-  if (vkCreateXlibSurfaceKHR(pWindow->m_instance, &createInfo, nullptr, &pWindow->m_surface) !=
-      VK_SUCCESS) {
+  if (vkCreateXlibSurfaceKHR(pWindow->ctx.instance, &createInfo, nullptr,
+                             &pWindow->m_surface) !=  VK_SUCCESS)
+  {
     Fl::fatal("Failed to create Xlib surface!");
   }
 }

@@ -139,7 +139,8 @@ void Fl_Wayland_Vk_Window_Driver::create_surface() {
   createInfo.display = fl_wl_display();
   createInfo.surface = fl_wl_surface(fl_wl_xid(pWindow));
 
-  if (vkCreateWaylandSurfaceKHR(pWindow->m_instance, &createInfo, nullptr, &pWindow->m_surface) !=
+  if (vkCreateWaylandSurfaceKHR(pWindow->ctx.instance, &createInfo, nullptr,
+                                &pWindow->m_surface) !=
       VK_SUCCESS) {
     Fl::fatal("Failed to create Wayland surface!");
   }

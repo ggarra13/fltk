@@ -30,10 +30,37 @@ class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
 
-//! GLFW demo variables
+
+struct Fl_Vk_Context
+{
+    VkInstance         instance; 
+
+    VkPhysicalDevice   gpu;
+    VkPhysicalDeviceProperties gpu_props;
+    VkPhysicalDeviceFeatures gpu_features;
+    
+    VkDevice           device;
+    VkPipelineCache    pipeline_cache; 
+    VkQueueFamilyProperties* queue_props;
+    uint32_t         queue_count;
+    VkQueue          queue;
+
+    Fl_Vk_Context() :
+        instance(VK_NULL_HANDLE),
+        gpu(VK_NULL_HANDLE),
+        device(VK_NULL_HANDLE),
+        pipeline_cache(VK_NULL_HANDLE),
+        queue_props(nullptr),
+        queue_count(0),
+        queue(VK_NULL_HANDLE)
+        {
+        };
+};
+
 struct Fl_Vk_SwapchainBuffer {
     VkImage image;
     VkImageView view;
+    VkFramebuffer framebuffer;
 };
 
 struct Fl_Vk_Mesh {
@@ -251,15 +278,8 @@ public:
 
   
   // Application
-  bool                      m_validate;
-  static VkInstance         m_instance; 
-  static VkPhysicalDevice   m_gpu;
-  static VkPipelineCache    m_pipelineCache; 
-  static VkDevice           m_device;
-  static VkPhysicalDeviceProperties m_gpu_props;
-  static VkPhysicalDeviceFeatures m_gpu_features;
-  static VkQueueFamilyProperties* m_queue_props;
-  static uint32_t         m_queue_count;
+  bool m_validate;  // if true, turns on validation layers
+  Fl_Vk_Context ctx;
 
   std::vector<const char*> m_enabled_layers;
   std::vector<const char*> m_instance_extensions;
@@ -277,16 +297,14 @@ public:
   // Per swapchain
   uint32_t               m_swapchainImageCount;
   VkSwapchainKHR         m_swapchain;
-  Fl_Vk_SwapchainBuffer* m_buffers;
+  std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
 
   // HDR metadata information (passed during swap_buffers)
   PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
   VkHdrMetadataEXT        m_hdr_metadata;
 
-  VkQueue            m_queue;
   uint32_t           m_queueFamilyIndex;
   Fl_Vk_Depth        m_depth;
-  VkFramebuffer*     m_framebuffers;
 
   // For drawing
   VkPipeline         m_pipeline;  
