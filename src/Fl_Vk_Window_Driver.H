@@ -64,8 +64,7 @@ public:
   virtual int mode_(int /*m*/, const int * /*a*/) { return 0; }
   virtual void make_current_before() {}
   virtual void make_current_after() {}
-  virtual void swap_buffers();
-  virtual void destroy_resources();
+  virtual void swap_buffers() {};
   virtual void prepare();
   virtual char swap_type();
   virtual void swap_interval(int) {}
@@ -97,6 +96,7 @@ public:
   // Vulkan specific methods.
   virtual std::vector<const char*> get_instance_extensions() = 0;
   virtual void create_surface() = 0;
+  virtual void destroy_resources();
 
   void init_vk();
   void init_vk_swapchain();

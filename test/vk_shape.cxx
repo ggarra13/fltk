@@ -63,8 +63,8 @@ private:
 
 vk_shape_window::~vk_shape_window()
 {
-    vkDestroyShaderModule(ctx.device, m_frag_shader_module, NULL);
-    vkDestroyShaderModule(ctx.device, m_vert_shader_module, NULL);
+    vkDestroyShaderModule(device(), m_frag_shader_module, NULL);
+    vkDestroyShaderModule(device(), m_vert_shader_module, NULL);
 }
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
@@ -139,10 +139,10 @@ void vk_shape_window::prepare_vertices()
 
     memset(&m_vertices, 0, sizeof(m_vertices));
 
-    result = vkCreateBuffer(ctx.device, &buf_info, NULL, &m_vertices.buf);
+    result = vkCreateBuffer(device(), &buf_info, NULL, &m_vertices.buf);
     VK_CHECK_RESULT(result);
 
-    vkGetBufferMemoryRequirements(ctx.device, m_vertices.buf, &m_mem_reqs);
+    vkGetBufferMemoryRequirements(device(), m_vertices.buf, &m_mem_reqs);
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
@@ -151,18 +151,18 @@ void vk_shape_window::prepare_vertices()
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
 
-    result = vkAllocateMemory(ctx.device, &mem_alloc, NULL, &m_vertices.mem);
+    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_vertices.mem);
     VK_CHECK_RESULT(result);
 
-    result = vkMapMemory(ctx.device, m_vertices.mem, 0,
+    result = vkMapMemory(device(), m_vertices.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
 	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
-    vkUnmapMemory(ctx.device, m_vertices.mem);
+    vkUnmapMemory(device(), m_vertices.mem);
 
-    result = vkBindBufferMemory(ctx.device, m_vertices.buf, m_vertices.mem, 0);
+    result = vkBindBufferMemory(device(), m_vertices.buf, m_vertices.mem, 0);
     VK_CHECK_RESULT(result);
 
     m_vertices.vi.sType =
@@ -256,7 +256,7 @@ void vk_shape_window::prepare_render_pass()
     rp_info.pDependencies = NULL;
                     
     VkResult result;
-    result = vkCreateRenderPass(ctx.device, &rp_info, NULL, &m_renderPass);
+    result = vkCreateRenderPass(device(), &rp_info, NULL, &m_renderPass);
     VK_CHECK_RESULT(result);
 }
 
@@ -280,7 +280,7 @@ VkShaderModule vk_shape_window::prepare_vs() {
             "vertex_shader.glsl"    // Filename for error reporting
         );
 
-        m_vert_shader_module = create_shader_module(ctx.device, spirv);
+        m_vert_shader_module = create_shader_module(device(), spirv);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         m_vert_shader_module = VK_NULL_HANDLE;
@@ -312,7 +312,7 @@ VkShaderModule vk_shape_window::prepare_fs() {
             "frag_shader.glsl"    // Filename for error reporting
         );
         // Assuming you have a VkDevice 'device' already created
-        m_frag_shader_module = create_shader_module(ctx.device, spirv);
+        m_frag_shader_module = create_shader_module(device(), spirv);
     
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
@@ -429,17 +429,15 @@ void vk_shape_window::prepare_pipeline() {
     memset(&pipelineCacheCreateInfo, 0, sizeof(pipelineCacheCreateInfo));
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 
-    result = vkCreatePipelineCache(ctx.device, &pipelineCacheCreateInfo, NULL,
-                                   &ctx.pipeline_cache);
+    result = vkCreatePipelineCache(device(), &pipelineCacheCreateInfo, NULL,
+                                   &pipelineCache());
     VK_CHECK_RESULT(result);
-    result = vkCreateGraphicsPipelines(ctx.device, ctx.pipeline_cache, 1,
+    result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1,
                                        &pipeline, NULL, &m_pipeline);
     VK_CHECK_RESULT(result);
 
-    vkDestroyPipelineCache(ctx.device, ctx.pipeline_cache, NULL);
+    vkDestroyPipelineCache(device(), pipelineCache(), NULL);
 
-    // vkDestroyShaderModule(ctx.device, m_frag_shader_module, NULL);
-    // vkDestroyShaderModule(ctx.device, m_vert_shader_module, NULL);
 }
 
 
@@ -461,7 +459,7 @@ void vk_shape_window::prepare_descriptor_layout() {
     pPipelineLayoutCreateInfo.setLayoutCount = 0;
     pPipelineLayoutCreateInfo.pSetLayouts = NULL;
 
-    result = vkCreatePipelineLayout(ctx.device, &pPipelineLayoutCreateInfo, NULL,
+    result = vkCreatePipelineLayout(device(), &pPipelineLayoutCreateInfo, NULL,
                                     &m_pipeline_layout);
     VK_CHECK_RESULT(result);
 }
@@ -498,12 +496,12 @@ void vk_shape_window::draw() {
 
 void vk_shape_window::destroy_resources() {
     if (m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(ctx.device, m_vertices.buf, NULL);
+        vkDestroyBuffer(device(), m_vertices.buf, NULL);
         m_vertices.buf = VK_NULL_HANDLE;
     }
 
     if (m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(ctx.device, m_vertices.mem, NULL);
+        vkFreeMemory(device(), m_vertices.mem, NULL);
         m_vertices.mem = VK_NULL_HANDLE;
     }
 

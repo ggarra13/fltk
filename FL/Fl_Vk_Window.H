@@ -40,11 +40,11 @@ struct Fl_Vk_Context
     VkPhysicalDeviceFeatures gpu_features;
     
     VkDevice           device;
-    VkPipelineCache    pipeline_cache; 
+    VkPipelineCache    pipelineCache; 
     VkQueueFamilyProperties* queue_props;
-    uint32_t         queue_count;
-    VkQueue          queue;
-    VkCommandPool    command_pool;  // memory for command buffers
+    uint32_t                queue_count;
+    VkQueue                       queue;
+    VkCommandPool           commandPool;  // memory for command buffers
 
     // List of enabled layers
     std::vector<const char*> enabled_layers;
@@ -59,11 +59,11 @@ struct Fl_Vk_Context
         instance(VK_NULL_HANDLE),
         gpu(VK_NULL_HANDLE),
         device(VK_NULL_HANDLE),
-        pipeline_cache(VK_NULL_HANDLE),
+        pipelineCache(VK_NULL_HANDLE),
         queue_props(nullptr),
         queue_count(0),
         queue(VK_NULL_HANDLE),
-        command_pool(VK_NULL_HANDLE)
+        commandPool(VK_NULL_HANDLE)
         {
         };
 };
@@ -142,6 +142,30 @@ struct Fl_Vk_Texture {
         depth(depth)
         {
         }
+
+    void destroy(VkDevice device)
+        {
+            if (sampler != VK_NULL_HANDLE)
+            {
+                vkDestroySampler(device, sampler, NULL);
+                sampler = VK_NULL_HANDLE;
+            }
+            if (view != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(device, view, NULL);
+                view = VK_NULL_HANDLE;
+            }
+            if (mem != VK_NULL_HANDLE)
+            {
+                vkFreeMemory(device, mem, NULL);
+                mem = VK_NULL_HANDLE;
+            }
+            if (image != VK_NULL_HANDLE)
+            {
+                vkDestroyImage(device, image, NULL);
+                image = VK_NULL_HANDLE;
+            }
+        }
 };
 
   
@@ -206,9 +230,6 @@ protected:
   bool memory_type_from_properties(uint32_t typeBits,
                                    VkFlags requirements_mask,
                                    uint32_t *typeIndex);
-  
-  //! Auxiliary function to destroy all of a Fl_Vk_Texture's resources.
-  void destroy_texture_image(Fl_Vk_Texture& texture);
   
   virtual void vk_draw_begin();
   void draw() FL_OVERRIDE;
@@ -287,6 +308,21 @@ public:
   virtual std::vector<const char*> get_required_extensions();
   virtual std::vector<const char*> get_optional_extensions();
 
+  inline VkInstance&             instance() { return m_instance; }
+  inline VkPhysicalDevice&            gpu() { return ctx.gpu; }
+  inline VkPhysicalDevice& physicalDevice() { return ctx.gpu; }
+  inline VkDevice&                 device() { return ctx.device; }
+  inline VkPipelineCache&   pipelineCache() { return ctx.pipelineCache; }
+  inline VkQueue&                   queue() { return ctx.queue; }
+  inline VkCommandPool&       commandPool() { return ctx.commandPool; }
+  
+  inline const VkInstance&             instance() const { return m_instance; }
+  inline const VkPhysicalDevice&            gpu() const { return ctx.gpu; }
+  inline const VkPhysicalDevice& physicalDevice() const { return ctx.gpu; }
+  inline const VkDevice&                 device() const { return ctx.device; }
+  inline const VkPipelineCache&   pipelineCache() const { return ctx.pipelineCache; }
+  inline const VkQueue&                   queue() const { return ctx.queue; }
+  inline const VkCommandPool&       commandPool() const { return ctx.commandPool; }
   
   // Application
   bool m_validate;  // if true, turns on validation layers

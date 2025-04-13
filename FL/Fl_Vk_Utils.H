@@ -23,20 +23,33 @@ VkShaderModule
 create_shader_module(VkDevice device,
                      const std::vector<uint32_t>& spirv_code);
 
-FL_EXPORT
-void set_image_layout(VkCommandBuffer cmd,
-                      VkImage image,
-                      VkImageAspectFlags aspectMask,
-                      VkImageLayout old_image_layout,
-                      VkImageLayout new_image_layout,
-                      VkAccessFlags srcAccessMask,
-                      VkPipelineStageFlags srcStageMask,
-                      VkAccessFlags dstAccessMask,
-                      VkPipelineStageFlags dstStageMask);
-    
-// Debugging functions
-FL_EXPORT std::string getVkFormat(const VkFormat format);
-FL_EXPORT std::string getVkSurfaceFormat(const VkSurfaceFormatKHR surfFormat);
-FL_EXPORT std::string getVkColorSpace(const VkColorSpaceKHR colorSpace);
+// Command buffer functions
+FL_EXPORT VkCommandBuffer beginSingleTimeCommands(VkDevice device,
+                                                  VkCommandPool commandPool);
+
+FL_EXPORT void endSingleTimeCommands(VkCommandBuffer commandBuffer,
+                                     VkDevice device,
+                                     VkCommandPool commandPool,
+                                     VkQueue queue);
+
+// Image layout functions
+FL_EXPORT void set_image_layout(VkDevice device,
+                                VkCommandPool commandPool,
+                                VkQueue queue,
+                                VkImage image,
+                                VkImageAspectFlags aspectMask,
+                                VkImageLayout old_image_layout,
+                                VkImageLayout new_image_layout,
+                                VkAccessFlags srcAccessMask,
+                                VkPipelineStageFlags srcStageMask,
+                                VkAccessFlags dstAccessMask,
+                                VkPipelineStageFlags dstStageMask);
+
+FL_EXPORT void transitionImageLayout(VkDevice device,
+                                     VkCommandPool commandPool,
+                                     VkQueue queue,
+                                     VkImage image,
+                                     VkImageLayout oldLayout,
+                                     VkImageLayout newLayout);
 
 #endif

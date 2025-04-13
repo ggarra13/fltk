@@ -1,11 +1,15 @@
 
+
 #ifndef __Fl_vk_enum_string_helper_h__
 #define __Fl_vk_enum_string_helper_h__
 
+#ifdef __linux__
+
 #include <vulkan/vulkan.h>
 #include <cstdio>
-static inline const char* string_VkResult(VkResult input_value) {
-    switch (input_value) {
+static inline const char* string_VkResult(VkResult input) {
+    switch (input)
+    {
         case VK_SUCCESS:
             return "VK_SUCCESS";
         case VK_NOT_READY:
@@ -104,8 +108,9 @@ static inline const char* string_VkResult(VkResult input_value) {
             return "Unhandled VkResult";
     }
 }
-static inline const char* string_VkFormat(VkFormat input_value) {
-    switch (input_value) {
+static inline const char* string_VkFormat(VkFormat input) {
+    switch (input)
+    {
         case VK_FORMAT_UNDEFINED:
             return "VK_FORMAT_UNDEFINED";
         case VK_FORMAT_R4G4_UNORM_PACK8:
@@ -605,8 +610,9 @@ static inline const char* string_VkFormat(VkFormat input_value) {
     }
 }
 
-static inline const char* string_VkColorSpaceKHR(VkColorSpaceKHR input_value) {
-    switch (input_value) {
+static inline const char* string_VkColorSpaceKHR(VkColorSpaceKHR input) {
+    switch (input)
+    {
         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
             return "VK_COLOR_SPACE_SRGB_NONLINEAR_KHR";
         case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
@@ -644,5 +650,8 @@ static inline const char* string_VkColorSpaceKHR(VkColorSpaceKHR input_value) {
     }
 }
 
+#else
+   #include <vulkan/vk_enum_string_helper.h>
+#endif // __linux__
 
 #endif // __Fl_vk_enum_string_helper_h__

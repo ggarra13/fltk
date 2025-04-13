@@ -3,7 +3,9 @@
 mkdir -p build_x11/
 cd build_x11
 
-export VULKAN_SDK=/usr/
+if [[ -z "$VULKAN_SDK" ]]; then
+    export VULKAN_SDK=/usr/
+fi
 
 cmake .. \
       -G Ninja \
@@ -45,6 +47,4 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH=""
 
-# ninja && bin/test/vk_shape-shared && bin/test/vk_shape_textured-shared && bin/test/vk_cube-shared
-
-ninja && bin/test/vk_shape-shared
+ninja && bin/test/vk_shape-shared && bin/test/vk_shape_textured-shared && bin/test/vk_cube-shared

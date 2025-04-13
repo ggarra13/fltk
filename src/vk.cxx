@@ -1,15 +1,7 @@
 
 
-#ifdef __linux__
-
 #include "FL/vk_enum_string_helper.h"
-
-#else
-
-#include <vulkan/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
-
-#endif
 
 
 #include "FL/Fl.H"

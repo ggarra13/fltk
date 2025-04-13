@@ -26,26 +26,13 @@
  * Porter: Gonzalo Garramuño <ggarra13@gmail.com>
  *
  */
-#ifndef __linux__
-#include <vulkan/vk_enum_string_helper.h>
-#else
 #include <FL/vk_enum_string_helper.h>
-#endif
 #include <vulkan/vulkan.h>
 
 #include "Fl_Vk_Window_Driver.H"
 
-#ifndef _WIN32
-#include <signal.h>
-#endif
-
-#ifdef __APPLE__
-#include <FL/fl_utf8.h>
-#endif
-
 #include <cassert>
 #include <iostream>
-#include <set>
 #include <stdexcept>
 #include <vector>
 
@@ -93,8 +80,10 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names, uin
 }
 
 // needed
-static bool memory_type_from_properties(Fl_Vk_Window *pWindow, uint32_t typeBits,
-                                        VkFlags requirements_mask, uint32_t *typeIndex) {
+static bool memory_type_from_properties(Fl_Vk_Window *pWindow,
+                                        uint32_t typeBits,
+                                        VkFlags requirements_mask,
+                                        uint32_t *typeIndex) {
   uint32_t i;
   // Search memtypes to find first index with those properties
   for (i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
@@ -125,11 +114,11 @@ void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
     VkCommandBufferAllocateInfo cmd = {};
     cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmd.pNext = NULL;
-    cmd.commandPool = pWindow->ctx.command_pool;
+    cmd.commandPool = pWindow->commandPool();
     cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmd.commandBufferCount = 1;
 
-    err = vkAllocateCommandBuffers(pWindow->ctx.device, &cmd, &pWindow->m_setup_cmd);
+    err = vkAllocateCommandBuffers(pWindow->device(), &cmd, &pWindow->m_setup_cmd);
     assert(!err);
 
     VkCommandBufferBeginInfo cmd_buf_info = {};
@@ -189,7 +178,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   // Get surface capabilities
   VkSurfaceCapabilitiesKHR surfCapabilities;
-  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->ctx.gpu,
+  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
                                                      pWindow->m_surface,
                                                      &surfCapabilities);
   VK_CHECK_RESULT(result);
@@ -230,14 +219,14 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   // Destroy old buffers
   for (auto& buffer : pWindow->m_buffers)
   {
-      vkDestroyFramebuffer(pWindow->ctx.device, buffer.framebuffer, NULL);
-      vkDestroyImageView(pWindow->ctx.device, buffer.view, NULL);
+      vkDestroyFramebuffer(pWindow->device(), buffer.framebuffer, NULL);
+      vkDestroyImageView(pWindow->device(), buffer.view, NULL);
       // image belongs to the swapchain.
   }
   pWindow->m_buffers.clear();
 
   // Create new swapchain
-  result = vkCreateSwapchainKHR(pWindow->ctx.device, &swapchain, NULL, &pWindow->m_swapchain);
+  result = vkCreateSwapchainKHR(pWindow->device(), &swapchain, NULL, &pWindow->m_swapchain);
   VK_CHECK_RESULT(result);
   if (pWindow->m_swapchain == VK_NULL_HANDLE) {
     printf("swapchain creation failed and returned NULL HANDLE\n");
@@ -247,7 +236,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
     printf("Single buffering failed (%d), falling back to double buffering\n", result);
     swapchain.minImageCount = 2;
     swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    result = vkCreateSwapchainKHR(pWindow->ctx.device, &swapchain, NULL, &pWindow->m_swapchain);
+    result = vkCreateSwapchainKHR(pWindow->device(), &swapchain, NULL, &pWindow->m_swapchain);
   }
   if (result != VK_SUCCESS) {
     pWindow->m_swapchain = oldSwapchain;
@@ -255,18 +244,18 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   }
 
   if (oldSwapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(pWindow->ctx.device, oldSwapchain, NULL);
+    vkDestroySwapchainKHR(pWindow->device(), oldSwapchain, NULL);
   }
 
   // Get new swapchain images
   uint32_t swapchainImageCount = 2;
-  result = vkGetSwapchainImagesKHR(pWindow->ctx.device, pWindow->m_swapchain,
+  result = vkGetSwapchainImagesKHR(pWindow->device(), pWindow->m_swapchain,
                                    &swapchainImageCount, NULL);
   VK_CHECK_RESULT(result);
 
   VkImage *swapchainImages = (VkImage *)malloc(swapchainImageCount * sizeof(VkImage));
   assert(swapchainImages);
-  result = vkGetSwapchainImagesKHR(pWindow->ctx.device, pWindow->m_swapchain,
+  result = vkGetSwapchainImagesKHR(pWindow->device(), pWindow->m_swapchain,
                                    &swapchainImageCount, swapchainImages);
   VK_CHECK_RESULT(result);
 
@@ -281,7 +270,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.layerCount = 1;
-    result = vkCreateImageView(pWindow->ctx.device, &view_info, NULL, &pWindow->m_buffers[i].view);
+    result = vkCreateImageView(pWindow->device(), &view_info, NULL, &pWindow->m_buffers[i].view);
     VK_CHECK_RESULT(result);
     pWindow->m_buffers[i].image = swapchainImages[i];
   }
@@ -347,12 +336,12 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   pWindow->m_depth.format = depth_format;
 
   /* create image */
-  result = vkCreateImage(pWindow->ctx.device, &image, NULL,
+  result = vkCreateImage(pWindow->device(), &image, NULL,
                          &pWindow->m_depth.image);
   VK_CHECK_RESULT(result);
 
   /* get memory requirements for this object */
-  vkGetImageMemoryRequirements(pWindow->ctx.device,
+  vkGetImageMemoryRequirements(pWindow->device(),
                                pWindow->m_depth.image, &mem_reqs);
 
   /* select memory size and type */
@@ -362,12 +351,12 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   assert(pass);
 
   /* allocate memory */
-  result = vkAllocateMemory(pWindow->ctx.device, &mem_alloc, NULL,
+  result = vkAllocateMemory(pWindow->device(), &mem_alloc, NULL,
                             &pWindow->m_depth.mem);
   VK_CHECK_RESULT(result);
 
   /* bind memory */
-  result = vkBindImageMemory(pWindow->ctx.device, pWindow->m_depth.image, pWindow->m_depth.mem, 0);
+  result = vkBindImageMemory(pWindow->device(), pWindow->m_depth.image, pWindow->m_depth.mem, 0);
   VK_CHECK_RESULT(result);
 
   set_image_layout(pWindow->m_depth.image,
@@ -378,7 +367,7 @@ void Fl_Vk_Window_Driver::prepare_depth() {
 
   /* create image view */
   view.image = pWindow->m_depth.image;
-  result = vkCreateImageView(pWindow->ctx.device, &view, NULL, &pWindow->m_depth.view);
+  result = vkCreateImageView(pWindow->device(), &view, NULL, &pWindow->m_depth.view);
   VK_CHECK_RESULT(result);
 }
 
@@ -405,7 +394,7 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   for (auto& buffer : pWindow->m_buffers)
   {
       attachments[0] = buffer.view;
-      result = vkCreateFramebuffer(pWindow->ctx.device, &fb_info, NULL, &buffer.framebuffer);
+      result = vkCreateFramebuffer(pWindow->device(), &fb_info, NULL, &buffer.framebuffer);
       VK_CHECK_RESULT(result);
   }
 }
@@ -432,8 +421,8 @@ void Fl_Vk_Window_Driver::init_device() {
     device.enabledExtensionCount = pWindow->ctx.device_extensions.size();
     device.ppEnabledExtensionNames = pWindow->ctx.device_extensions.data();
 
-    result = vkCreateDevice(pWindow->ctx.gpu, &device, NULL,
-                            &pWindow->ctx.device);
+    result = vkCreateDevice(pWindow->gpu(), &device, NULL,
+                            &pWindow->device());
     VK_CHECK_RESULT(result);
 }
 
@@ -618,14 +607,14 @@ void Fl_Vk_Window_Driver::init_vk()
   }
 
   // Assign the first GPU handle and free the array
-  pWindow->ctx.gpu = physical_devices[0];
+  pWindow->gpu() = physical_devices[0];
   VK_FREE(physical_devices);
 
   // Look for device extensions
   uint32_t device_extension_count = 0;
   VkBool32 swapchainExtFound = 0;
 
-  err = vkEnumerateDeviceExtensionProperties(pWindow->ctx.gpu, NULL,
+  err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
                                              &device_extension_count, NULL);
   assert(!err);
 
@@ -645,7 +634,7 @@ void Fl_Vk_Window_Driver::init_vk()
   if (device_extension_count > 0) {
       VkExtensionProperties *device_extensions =
           (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
-      err = vkEnumerateDeviceExtensionProperties(pWindow->ctx.gpu, NULL,
+      err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
                                                  &device_extension_count,
                                                  device_extensions);
       assert(!err);
@@ -692,21 +681,21 @@ void Fl_Vk_Window_Driver::init_vk()
               "vkCreateInstance Failure");
   }
 
-  vkGetPhysicalDeviceProperties(pWindow->ctx.gpu, &pWindow->ctx.gpu_props);
+  vkGetPhysicalDeviceProperties(pWindow->gpu(), &pWindow->ctx.gpu_props);
 
   // Query with NULL data to get count
-  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->ctx.gpu,
+  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
                                            &pWindow->ctx.queue_count, NULL);
 
   pWindow->ctx.queue_props =
       (VkQueueFamilyProperties *)VK_ALLOC(pWindow->ctx.queue_count *
                                           sizeof(VkQueueFamilyProperties));
-  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->ctx.gpu,
+  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
                                            &pWindow->ctx.queue_count,
                                            pWindow->ctx.queue_props);
   assert(pWindow->ctx.queue_count >= 1);
 
-  vkGetPhysicalDeviceFeatures(pWindow->ctx.gpu, &pWindow->ctx.gpu_features);
+  vkGetPhysicalDeviceFeatures(pWindow->gpu(), &pWindow->ctx.gpu_features);
 
 }
 
@@ -716,14 +705,14 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   // Get Memory information and properties
   size_t numQueues = pWindow->ctx.queue_count;
-  vkGetPhysicalDeviceMemoryProperties(pWindow->ctx.gpu,
+  vkGetPhysicalDeviceMemoryProperties(pWindow->gpu(),
                                       &pWindow->m_memory_properties);
 
   // Iterate over each queue to learn whether it supports presenting:
   VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
                                                    sizeof(VkBool32));
   for (i = 0; i < numQueues; i++) {
-    vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->ctx.gpu, i,
+    vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
                                          pWindow->m_surface,
                                          &supportsPresent[i]);
   }
@@ -773,21 +762,21 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
 
-  if (pWindow->ctx.device == VK_NULL_HANDLE)
+  if (pWindow->device() == VK_NULL_HANDLE)
       init_device();
 
-  vkGetDeviceQueue(pWindow->ctx.device,
+  vkGetDeviceQueue(pWindow->device(),
                    pWindow->m_queueFamilyIndex, 0,
                    &pWindow->ctx.queue);
 
   uint32_t formatCount;
   result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-      pWindow->ctx.gpu, pWindow->m_surface, &formatCount, NULL);
+      pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
   VK_CHECK_RESULT(result);
 
   std::vector<VkSurfaceFormatKHR> formats(formatCount);
   result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-      pWindow->ctx.gpu, pWindow->m_surface, &formatCount, formats.data());
+      pWindow->gpu(), pWindow->m_surface, &formatCount, formats.data());
   VK_CHECK_RESULT(result);
 
   // Look for HDR10 or HLG if present
@@ -904,10 +893,12 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   pWindow->m_color_space = m_color_space;
 
   if (pWindow->m_validate)
-      std::cout << "\tSelected format = " << string_VkFormat(m_format)
+  {
+      std::cout << pWindow << "\tSelected format = " << string_VkFormat(m_format)
                 << std::endl
-            << "\tSelected color space = "
-            << string_VkColorSpaceKHR(m_color_space) << std::endl;
+                << pWindow << "\tSelected color space = "
+                << string_VkColorSpaceKHR(m_color_space) << std::endl;
+  }
 }
 
 void Fl_Vk_Window_Driver::prepare() {
@@ -919,19 +910,19 @@ void Fl_Vk_Window_Driver::prepare() {
   cmd_pool_info.queueFamilyIndex = pWindow->m_queueFamilyIndex;
   cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-  result = vkCreateCommandPool(pWindow->ctx.device, &cmd_pool_info, NULL,
-                               &pWindow->ctx.command_pool);
+  result = vkCreateCommandPool(pWindow->device(), &cmd_pool_info, NULL,
+                               &pWindow->commandPool());
   VK_CHECK_RESULT(result);
 
 
   VkCommandBufferAllocateInfo cmd = {};
   cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   cmd.pNext = NULL;
-  cmd.commandPool = pWindow->ctx.command_pool;
+  cmd.commandPool = pWindow->commandPool();
   cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmd.commandBufferCount = 1;
 
-  result = vkAllocateCommandBuffers(pWindow->ctx.device, &cmd, &pWindow->m_draw_cmd);
+  result = vkAllocateCommandBuffers(pWindow->device(), &cmd, &pWindow->m_draw_cmd);
   VK_CHECK_RESULT(result);
 
   prepare_buffers();
@@ -946,14 +937,14 @@ void Fl_Vk_Window_Driver::prepare() {
 
 // Uses: ctx.device, m_framebuffers, m_buffers, m_depth
 void Fl_Vk_Window_Driver::destroy_resources() {
-  if (!pWindow || !pWindow->ctx.device)
+  if (!pWindow || !pWindow->device())
     return;
 
   uint32_t i;
   VkResult result;
 
   // Wait for all GPU operations to complete before destroying resources
-  result = vkDeviceWaitIdle(pWindow->ctx.device);
+  result = vkDeviceWaitIdle(pWindow->device());
   VK_CHECK_RESULT(result);
 
   // Destroy resources in reverse creation order (first, those of window)
@@ -961,27 +952,25 @@ void Fl_Vk_Window_Driver::destroy_resources() {
 
   for (auto& buffer : pWindow->m_buffers)
   {
-      vkDestroyFramebuffer(pWindow->ctx.device, buffer.framebuffer, NULL);
-      vkDestroyImageView(pWindow->ctx.device, buffer.view, NULL);
+      vkDestroyFramebuffer(pWindow->device(), buffer.framebuffer, NULL);
+      vkDestroyImageView(pWindow->device(), buffer.view, NULL);
       // image belongs to the swapchain.
   }
   pWindow->m_buffers.clear();
 
   if (pWindow->m_depth.view != VK_NULL_HANDLE) {
-    vkDestroyImageView(pWindow->ctx.device, pWindow->m_depth.view, NULL);
+    vkDestroyImageView(pWindow->device(), pWindow->m_depth.view, NULL);
     pWindow->m_depth.view = VK_NULL_HANDLE;
   }
 
   if (pWindow->m_depth.image != VK_NULL_HANDLE) {
-    vkDestroyImage(pWindow->ctx.device, pWindow->m_depth.image, NULL);
+    vkDestroyImage(pWindow->device(), pWindow->m_depth.image, NULL);
     pWindow->m_depth.image = VK_NULL_HANDLE;
   }
 
   if (pWindow->m_depth.mem != VK_NULL_HANDLE) {
-    vkFreeMemory(pWindow->ctx.device, pWindow->m_depth.mem, NULL);
+    vkFreeMemory(pWindow->device(), pWindow->m_depth.mem, NULL);
     pWindow->m_depth.mem = VK_NULL_HANDLE;
   }
 }
 
-
-void Fl_Vk_Window_Driver::swap_buffers() {}
