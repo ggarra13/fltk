@@ -201,7 +201,7 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
     VkCommandBuffer cmd;
     VkCommandBufferAllocateInfo cmdAllocInfo = {};
     cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdAllocInfo.commandPool = m_cmd_pool;
+    cmdAllocInfo.commandPool = ctx.command_pool;
     cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAllocInfo.commandBufferCount = 1;
     vkAllocateCommandBuffers(ctx.device, &cmdAllocInfo, &cmd);
@@ -229,7 +229,7 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
     vkQueueSubmit(ctx.queue, 1, &submit_info, VK_NULL_HANDLE);
     vkQueueWaitIdle(ctx.queue);  // Wait for completion
 
-    vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, &cmd);
+    vkFreeCommandBuffers(ctx.device, ctx.command_pool, 1, &cmd);
 }
 
 
@@ -311,7 +311,7 @@ void DynamicTextureWindow::update_texture()
     VkCommandBuffer update_cmd;
     VkCommandBufferAllocateInfo cmdAllocInfo = {};
     cmdAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmdAllocInfo.commandPool = m_cmd_pool;
+    cmdAllocInfo.commandPool = ctx.command_pool;
     cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAllocInfo.commandBufferCount = 1;
     vkAllocateCommandBuffers(ctx.device, &cmdAllocInfo, &update_cmd);
@@ -363,7 +363,7 @@ void DynamicTextureWindow::update_texture()
     vkQueueSubmit(ctx.queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(ctx.queue);  // Synchronize before rendering
 
-    vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, &update_cmd);
+    vkFreeCommandBuffers(ctx.device, ctx.command_pool, 1, &update_cmd);
 }
 
 

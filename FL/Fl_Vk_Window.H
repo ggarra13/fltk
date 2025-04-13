@@ -44,6 +44,7 @@ struct Fl_Vk_Context
     VkQueueFamilyProperties* queue_props;
     uint32_t         queue_count;
     VkQueue          queue;
+    VkCommandPool    command_pool;  // memory for command buffers
 
     // List of enabled layers
     std::vector<const char*> enabled_layers;
@@ -61,7 +62,8 @@ struct Fl_Vk_Context
         pipeline_cache(VK_NULL_HANDLE),
         queue_props(nullptr),
         queue_count(0),
-        queue(VK_NULL_HANDLE)
+        queue(VK_NULL_HANDLE),
+        command_pool(VK_NULL_HANDLE)
         {
         };
 };
@@ -313,7 +315,6 @@ public:
 
   // For drawing
   VkPipeline         m_pipeline;  
-  VkCommandPool      m_cmd_pool;  // memory for command buffers
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
   
   VkFence            m_setupFence;// Fence for setup commands in window

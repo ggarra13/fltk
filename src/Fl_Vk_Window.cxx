@@ -83,7 +83,7 @@ void Fl_Vk_Window::destroy_resources() {
   }
 
   if (m_setup_cmd != VK_NULL_HANDLE) {
-    vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, &m_setup_cmd);
+    vkFreeCommandBuffers(ctx.device, ctx.command_pool, 1, &m_setup_cmd);
     m_setup_cmd = VK_NULL_HANDLE;
   }
 
@@ -353,7 +353,7 @@ VkResult Fl_Vk_Window::begin_setup() {
   VkCommandBufferAllocateInfo cmd = {};
   cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   cmd.pNext = NULL;
-  cmd.commandPool = m_cmd_pool;
+  cmd.commandPool = ctx.command_pool;
   cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmd.commandBufferCount = 1;
 
@@ -399,7 +399,7 @@ VkResult Fl_Vk_Window::end_setup() {
   vkWaitForFences(ctx.device, 1, &m_setupFence, VK_TRUE, UINT64_MAX);
   vkResetFences(ctx.device, 1, &m_setupFence);
 
-  vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, cmd_bufs);
+  vkFreeCommandBuffers(ctx.device, ctx.command_pool, 1, cmd_bufs);
   m_setup_cmd = VK_NULL_HANDLE;
   return result;
 }
@@ -800,12 +800,12 @@ Fl_Vk_Window::~Fl_Vk_Window() {
 
   if (m_draw_cmd != VK_NULL_HANDLE)
   {
-      vkFreeCommandBuffers(ctx.device, m_cmd_pool, 1, &m_draw_cmd);
+      vkFreeCommandBuffers(ctx.device, ctx.command_pool, 1, &m_draw_cmd);
   }
 
-  if (m_cmd_pool != VK_NULL_HANDLE)
+  if (ctx.command_pool != VK_NULL_HANDLE)
   {
-      vkDestroyCommandPool(ctx.device, m_cmd_pool, nullptr);
+      vkDestroyCommandPool(ctx.device, ctx.command_pool, nullptr);
   }
   
   // Clean up fences and semaphores
@@ -854,13 +854,13 @@ void Fl_Vk_Window::init_vulkan()
     cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    result = vkCreateCommandPool(ctx.device, &cmd_pool_info, NULL, &m_cmd_pool);
+    result = vkCreateCommandPool(ctx.device, &cmd_pool_info, NULL, &ctx.command_pool);
     VK_CHECK_RESULT(result);
 
     VkCommandBufferAllocateInfo cmd = {};
     cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmd.pNext = NULL;
-    cmd.commandPool = m_cmd_pool;
+    cmd.commandPool = ctx.command_pool;
     cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmd.commandBufferCount = 1;
 
@@ -949,9 +949,6 @@ void Fl_Vk_Window::init() {
   // Draw command and fence (currently unused)
   m_draw_cmd = VK_NULL_HANDLE;
   m_drawFence = VK_NULL_HANDLE;
-
-  // Setup pool
-  m_cmd_pool = VK_NULL_HANDLE;
 
   // Texture descriptor handles
   m_desc_set  = VK_NULL_HANDLE;

@@ -47,6 +47,7 @@
 
 #  include "Enumerations.H" // for color names
 #  ifdef _WIN32
+#    define NOMINMAX
 #    include <windows.h>
 #  endif
 #  ifndef APIENTRY

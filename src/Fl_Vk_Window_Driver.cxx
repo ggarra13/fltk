@@ -26,8 +26,6 @@
 #define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
 
 
-static int validation_error = 0;
-
 //! Returns true or false if extension name is supported.
 static bool isExtensionSupported(const char* extensionName) {
     uint32_t extensionCount = 0;
@@ -86,7 +84,7 @@ static bool memory_type_from_properties(Fl_Vk_Window *pWindow, uint32_t typeBits
   return false;
 }
 
-// Uses m_cmd_pool, m_setup_cmd
+// Uses m_setup_cmd
 void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
                                            VkImageAspectFlags aspectMask,
                                            VkImageLayout old_image_layout,
@@ -99,7 +97,7 @@ void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
     VkCommandBufferAllocateInfo cmd = {};
     cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmd.pNext = NULL;
-    cmd.commandPool = pWindow->m_cmd_pool;
+    cmd.commandPool = pWindow->ctx.command_pool;
     cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmd.commandBufferCount = 1;
 
@@ -898,14 +896,15 @@ void Fl_Vk_Window_Driver::prepare() {
   cmd_pool_info.queueFamilyIndex = pWindow->m_queueFamilyIndex;
   cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-  result = vkCreateCommandPool(pWindow->ctx.device, &cmd_pool_info, NULL, &pWindow->m_cmd_pool);
+  result = vkCreateCommandPool(pWindow->ctx.device, &cmd_pool_info, NULL,
+                               &pWindow->ctx.command_pool);
   VK_CHECK_RESULT(result);
 
 
   VkCommandBufferAllocateInfo cmd = {};
   cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   cmd.pNext = NULL;
-  cmd.commandPool = pWindow->m_cmd_pool;
+  cmd.commandPool = pWindow->ctx.command_pool;
   cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmd.commandBufferCount = 1;
 
