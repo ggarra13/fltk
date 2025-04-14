@@ -16,16 +16,12 @@
 //     https://www.fltk.org/bugs.php
 //
 
-// Define 'HAVE_VK=1' on the compiler commandline to build this program
-// w/o 'config.h' (needs FLTK lib with GL), for instance like:
-//   $ fltk-config --use-vk --compile cube.cxx -DHAVE_VK=1
-// Use '-DHAVE_VK=0' to build and test w/o OpenGL support.
 
 #ifndef HAVE_VK
 #include <config.h> // needed only for 'HAVE_VK'
 #endif
 
-// ... or uncomment the next line to test w/o OpenGL (see also above)
+// Uncomment the next line to test w/o Vulkan (see also above)
 // #undef HAVE_VK
 
 #include <iostream>
@@ -83,6 +79,16 @@ public:
 #include <FL/vk.h>
 #include <FL/math.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtx/transform.hpp>
+
+struct MVP
+{
+    glm::mat4x4 model;
+    glm::mat4x4 view;
+    glm::mat4x4 proj;
+};
+
 class cube_box : public Fl_Vk_Window {
     void vk_draw_begin() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
@@ -90,6 +96,7 @@ class cube_box : public Fl_Vk_Window {
 
     void prepare() FL_OVERRIDE;
     void prepare_vertices();
+    void prepare_uniform_buffer();
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();
@@ -103,12 +110,15 @@ class cube_box : public Fl_Vk_Window {
     VkShaderModule m_frag_shader_module;
     
     //! This is for holding a mesh
-    Fl_Vk_Mesh m_vertices;
+    Fl_Vk_Mesh m_cube;
 public:
-    double lasttime;
+    float lasttime;
     int wire;
     double size;
     double speed;
+
+    const char* application_name() { return "vk_cube"; };
+    
     cube_box(int x,int y,int w,int h,const char *l=0) : Fl_Vk_Window(x,y,w,h,l) {
         end();
         mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
@@ -122,40 +132,6 @@ public:
     ~cube_box();
 };
 
-/* The cube definition */
-float v0[3] = {0.0, 0.0, 0.0};
-float v1[3] = {1.0, 0.0, 0.0};
-float v2[3] = {1.0, 1.0, 0.0};
-float v3[3] = {0.0, 1.0, 0.0};
-float v4[3] = {0.0, 0.0, 1.0};
-float v5[3] = {1.0, 0.0, 1.0};
-float v6[3] = {1.0, 1.0, 1.0};
-float v7[3] = {0.0, 1.0, 1.0};
-
-#define v3f(x) glVertex3fv(x)
-
-void drawcube(int wire) {
-/* Draw a colored cube */
-  // glBegin(wire ? GL_LINE_LOOP : GL_POLYGON);
-  // glColor3ub(0,0,255);
-  // v3f(v0); v3f(v1); v3f(v2); v3f(v3);
-  // glEnd();
-  // glBegin(wire ? GL_LINE_LOOP : GL_POLYGON);
-  // glColor3ub(0,255,255); v3f(v4); v3f(v5); v3f(v6); v3f(v7);
-  // glEnd();
-  // glBegin(wire ? GL_LINE_LOOP : GL_POLYGON);
-  // glColor3ub(255,0,255); v3f(v0); v3f(v1); v3f(v5); v3f(v4);
-  // glEnd();
-  // glBegin(wire ? GL_LINE_LOOP : GL_POLYGON);
-  // glColor3ub(255,255,0); v3f(v2); v3f(v3); v3f(v7); v3f(v6);
-  // glEnd();
-  // glBegin(wire ? GL_LINE_LOOP : GL_POLYGON);
-  // glColor3ub(0,255,0); v3f(v0); v3f(v4); v3f(v7); v3f(v3);
-  // glEnd();
-  // glBegin(wire ? GL_LINE_LOOP : GL_POLYGON);
-  // glColor3ub(255,0,0); v3f(v1); v3f(v2); v3f(v6); v3f(v5);
-  // glEnd();
-}
 
 cube_box::~cube_box()
 {
@@ -252,8 +228,19 @@ VkShaderModule cube_box::prepare_vs() {
     std::string vertex_shader_glsl = R"(
         #version 450
         layout(location = 0) in vec3 inPos;
+        layout(location = 1) in vec3 inColor;
+
+        layout(location = 0) out vec3 fragColor;
+
+        layout(set = 0, binding = 0) uniform MVP {
+          mat4 model;
+          mat4 view;
+          mat4 proj;
+        } mvp;
+
         void main() {
-            gl_Position = vec4(inPos, 1.0);
+            gl_Position = mvp.proj * mvp.view * mvp.model * vec4(inPos, 1.0);
+            fragColor = inColor;
         }
     )";
     
@@ -280,11 +267,12 @@ VkShaderModule cube_box::prepare_fs() {
     std::string frag_shader_glsl = R"(
         #version 450
 
+        layout(location = 0) in vec3 fragColor;
         // Output color
         layout(location = 0) out vec4 outColor;
 
         void main() {
-            outColor = vec4(0.5, 0.6, 0.7, 1.0);
+            outColor = vec4(fragColor, 1.0);
         }
     )";
     // Compile to SPIR-V
@@ -303,6 +291,61 @@ VkShaderModule cube_box::prepare_fs() {
     }
     return m_frag_shader_module;
 }
+
+// clang-format off
+struct Vertex
+{
+    float pos[3];  // 3D position
+    uint8_t color[3];  // color
+};
+    
+std::vector<Vertex> vertices = {
+    // Front face (blue)
+    {{0.0f, 0.0f, 0.0f}, {0, 0, 255}},
+    {{1.0f, 0.0f, 0.0f}, {0, 0, 255}},
+    {{1.0f, 1.0f, 0.0f}, {0, 0, 255}},
+    {{0.0f, 1.0f, 0.0f}, {0, 0, 255}},
+
+    // Back face (cyan)
+    {{0.0f, 0.0f, 1.0f}, {0, 255, 255}},
+    {{1.0f, 0.0f, 1.0f}, {0, 255, 255}},
+    {{1.0f, 1.0f, 1.0f}, {0, 255, 255}},
+    {{0.0f, 1.0f, 1.0f}, {0, 255, 255}},
+
+    // Left face (magenta)
+    {{0.0f, 0.0f, 0.0f}, {255, 0, 255}},
+    {{0.0f, 0.0f, 1.0f}, {255, 0, 255}},
+    {{0.0f, 1.0f, 1.0f}, {255, 0, 255}},
+    {{0.0f, 1.0f, 0.0f}, {255, 0, 255}},
+
+    // Right face (red)
+    {{1.0f, 0.0f, 0.0f}, {255, 0, 0}},
+    {{1.0f, 0.0f, 1.0f}, {255, 0, 0}},
+    {{1.0f, 1.0f, 1.0f}, {255, 0, 0}},
+    {{1.0f, 1.0f, 0.0f}, {255, 0, 0}},
+
+    // Top face (yellow)
+    {{0.0f, 1.0f, 0.0f}, {255, 255, 0}},
+    {{0.0f, 1.0f, 1.0f}, {255, 255, 0}},
+    {{1.0f, 1.0f, 1.0f}, {255, 255, 0}},
+    {{1.0f, 1.0f, 0.0f}, {255, 255, 0}},
+
+    // Bottom face (green)
+    {{0.0f, 0.0f, 0.0f}, {0, 255, 0}},
+    {{0.0f, 0.0f, 1.0f}, {0, 255, 0}},
+    {{1.0f, 0.0f, 1.0f}, {0, 255, 0}},
+    {{1.0f, 0.0f, 0.0f}, {0, 255, 0}},
+};
+
+std::vector<uint16_t> indices = {
+    0, 1, 2,  2, 3, 0,        // front
+    4, 5, 6,  6, 7, 4,        // back
+    8, 9,10, 10,11, 8,        // left
+    12,13,14, 14,15,12,       // right
+    16,17,18, 18,19,16,       // top
+    20,21,22, 22,23,20        // bottom
+};
+
 
 void cube_box::prepare_pipeline() {
     VkGraphicsPipelineCreateInfo pipeline;
@@ -329,7 +372,7 @@ void cube_box::prepare_pipeline() {
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline.layout = m_pipeline_layout;
 
-    vi = m_vertices.vi;
+    vi = m_cube.vi;
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -441,25 +484,7 @@ void cube_box::prepare_descriptor_layout() {
 void cube_box::prepare_vertices()
 {
     
-    // clang-format off
-    struct Vertex
-    {
-        float x, y, z;  // 3D position
-    };
-
-    int sides = 3;
-    std::vector<Vertex> vertices(sides);
-    for (int j=0; j<sides; j++) {
-        double ang = j*2*M_PI/sides;
-        float x = cos(ang);
-        float y = sin(ang);
-        vertices[j].x = x;
-        vertices[j].y = y;
-        vertices[j].z = 0.F;
-    }
-    
-            
-	VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+	VkDeviceSize buffer_size = sizeof(vertices[0]) * sizeof(vertices);
     
     // clang-format on
     VkBufferCreateInfo buf_info = {};
@@ -479,12 +504,57 @@ void cube_box::prepare_vertices()
     bool pass;
     void *data;
 
-    memset(&m_vertices, 0, sizeof(m_vertices));
+    memset(&m_cube, 0, sizeof(m_cube));
 
-    result = vkCreateBuffer(device(), &buf_info, NULL, &m_vertices.buf);
+    VkDeviceSize index_buffer_size = sizeof(indices[0]) * indices.size();
+
+    VkBufferCreateInfo index_buf_info = {};
+    index_buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    index_buf_info.size = index_buffer_size;
+    index_buf_info.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    index_buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    result = vkCreateBuffer(device(), &index_buf_info, nullptr, &m_cube.indexBuffer);
     VK_CHECK_RESULT(result);
 
-    vkGetBufferMemoryRequirements(device(), m_vertices.buf, &m_mem_reqs);
+    // Get memory requirements
+    VkMemoryRequirements index_mem_reqs;
+    vkGetBufferMemoryRequirements(device(), m_cube.indexBuffer, &index_mem_reqs);
+
+    // Allocate memory
+    VkMemoryAllocateInfo index_alloc_info = {};
+    index_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    index_alloc_info.allocationSize = index_mem_reqs.size;
+
+    bool index_mem_type_found = memory_type_from_properties(
+        gpu(),
+        index_mem_reqs.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &index_alloc_info.memoryTypeIndex);
+    
+    if (!index_mem_type_found) {
+        throw std::runtime_error("Failed to find suitable memory type for index buffer");
+    }
+
+    result = vkAllocateMemory(device(), &index_alloc_info, nullptr, &m_cube.indexMem);
+    VK_CHECK_RESULT(result);
+
+    // Upload data
+    void* index_data = nullptr;
+    result = vkMapMemory(device(), m_cube.indexMem, 0, index_alloc_info.allocationSize, 0, &index_data);
+    VK_CHECK_RESULT(result);
+
+    memcpy(index_data, indices.data(), static_cast<size_t>(index_buffer_size));
+    vkUnmapMemory(device(), m_cube.indexMem);
+
+    // Bind buffer to memory
+    result = vkBindBufferMemory(device(), m_cube.indexBuffer, m_cube.indexMem, 0);
+    VK_CHECK_RESULT(result);
+
+    result = vkCreateBuffer(device(), &buf_info, NULL, &m_cube.buf);
+    VK_CHECK_RESULT(result);
+
+    vkGetBufferMemoryRequirements(device(), m_cube.buf, &m_mem_reqs);
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
@@ -494,41 +564,71 @@ void cube_box::prepare_vertices()
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
 
-    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_vertices.mem);
+    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_cube.mem);
     VK_CHECK_RESULT(result);
 
-    result = vkMapMemory(device(), m_vertices.mem, 0,
+    result = vkMapMemory(device(), m_cube.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
 	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
-    vkUnmapMemory(device(), m_vertices.mem);
+    vkUnmapMemory(device(), m_cube.mem);
 
-    result = vkBindBufferMemory(device(), m_vertices.buf, m_vertices.mem, 0);
+    result = vkBindBufferMemory(device(), m_cube.buf, m_cube.mem, 0);
     VK_CHECK_RESULT(result);
 
-    m_vertices.vi.sType =
+    memset(&m_cube.vi, 0, sizeof(m_cube.vi));
+    m_cube.vi.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    m_vertices.vi.pNext = NULL;
-    m_vertices.vi.vertexBindingDescriptionCount = 1;
-    m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
-    m_vertices.vi.vertexAttributeDescriptionCount = 1;
-    m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
+    m_cube.vi.pNext = NULL;
+    m_cube.vi.vertexBindingDescriptionCount = 1;
+    m_cube.vi.pVertexBindingDescriptions = m_cube.vi_bindings;
+    m_cube.vi.vertexAttributeDescriptionCount = 2;
+    m_cube.vi.pVertexAttributeDescriptions = m_cube.vi_attrs;
 
-    m_vertices.vi_bindings[0].binding = 0;
-    m_vertices.vi_bindings[0].stride = sizeof(vertices[0]);
-    m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    m_cube.vi_bindings[0].binding = 0;
+    m_cube.vi_bindings[0].stride = sizeof(Vertex);
+    m_cube.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    m_vertices.vi_attrs[0].binding = 0;
-    m_vertices.vi_attrs[0].location = 0;
-    m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    m_vertices.vi_attrs[0].offset = 0;
+    m_cube.vi_attrs[0].location = 0;
+    m_cube.vi_attrs[0].binding = 0;
+    m_cube.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    m_cube.vi_attrs[0].offset = offsetof(Vertex, pos);
+    
+    m_cube.vi_attrs[1].location = 1;
+    m_cube.vi_attrs[1].binding = 0;
+    m_cube.vi_attrs[1].format = VK_FORMAT_R8G8B8_UNORM;
+    m_cube.vi_attrs[1].offset = offsetof(Vertex, color);
+}
+
+void cube_box::prepare_uniform_buffer()
+{
+    VkBufferCreateInfo ubo_buf_info = {};
+    ubo_buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    ubo_buf_info.size = sizeof(MVP);
+    ubo_buf_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    ubo_buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    
+    vkCreateBuffer(device(), &ubo_buf_info, nullptr, &m_cube.uniformBuffer);
+    vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &m_cube.uboMemReqs);
+    
+    VkMemoryAllocateInfo ubo_alloc_info = {};
+    ubo_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    ubo_alloc_info.allocationSize = m_cube.uboMemReqs.size;
+    memory_type_from_properties(gpu(), m_cube.uboMemReqs.memoryTypeBits,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                &ubo_alloc_info.memoryTypeIndex);
+
+    vkAllocateMemory(device(), &ubo_alloc_info, nullptr, &m_cube.uniformMemory);
+    vkBindBufferMemory(device(), m_cube.uniformBuffer, m_cube.uniformMemory, 0);
 }
 
 void cube_box::prepare()
 {
     prepare_vertices();
+    prepare_uniform_buffer();
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
@@ -536,14 +636,14 @@ void cube_box::prepare()
 
 
 void cube_box::destroy_resources() {
-    if (m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_vertices.buf, NULL);
-        m_vertices.buf = VK_NULL_HANDLE;
+    if (m_cube.buf != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device(), m_cube.buf, NULL);
+        m_cube.buf = VK_NULL_HANDLE;
     }
 
-    if (m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_vertices.mem, NULL);
-        m_vertices.mem = VK_NULL_HANDLE;
+    if (m_cube.mem != VK_NULL_HANDLE) {
+        vkFreeMemory(device(), m_cube.mem, NULL);
+        m_cube.mem = VK_NULL_HANDLE;
     }
     
     Fl_Vk_Window::destroy_resources();
@@ -560,12 +660,29 @@ void cube_box::vk_draw_begin()
 void cube_box::draw() {
     lasttime = lasttime + speed;
 
+    MVP ubo{};
+    ubo.model = glm::rotate(glm::radians(lasttime*1.6), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.model *= glm::rotate(glm::radians(lasttime*4.2), glm::vec3(1.0f, 0.0f, 0.0f));
+    ubo.model *= glm::rotate(glm::radians(lasttime*2.3), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.model *= glm::translate(glm::vec3(-1.F, 1.2F, -1.5F));
+    ubo.model *= glm::scale(glm::vec3(size, size, size));
+    ubo.view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -10.0f));
+    ubo.proj  = glm::frustum(-1.0, 1.0, -1.0, 1.0, 2.0, 10000.0);
+    // Create the projection matrix (equivalent to glFrustum)
+    ubo.proj[1][1] *= -1; // Flip Y for Vulkan
+
+    void* data;
+    vkMapMemory(device(), m_cube.uniformMemory, 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device(), m_cube.uniformMemory);
+
     // Draw the cube
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
-                           &m_vertices.buf, offsets);
+                           &m_cube.buf, offsets);
 
-    vkCmdDraw(m_draw_cmd, 3, 1, 0, 0);
+    vkCmdBindIndexBuffer(m_draw_cmd, m_cube.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdDrawIndexed(m_draw_cmd, sizeof(indices)/sizeof(uint16_t), 1, 0, 0, 0);
 }
 
 int cube_box::handle(int e) {

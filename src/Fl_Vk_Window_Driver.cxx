@@ -29,6 +29,7 @@
 #include <FL/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
+#include "FL/Fl_Vk_Utils.H"
 #include "Fl_Vk_Window_Driver.H"
 
 #include <cassert>
@@ -99,75 +100,6 @@ static bool memory_type_from_properties(Fl_Vk_Window *pWindow,
   }
   // No memory types matched, return failure
   return false;
-}
-
-// Uses m_setup_cmd
-void Fl_Vk_Window_Driver::set_image_layout(VkImage image,
-                                           VkImageAspectFlags aspectMask,
-                                           VkImageLayout old_image_layout,
-                                           VkImageLayout new_image_layout,
-                                           int srcAccessMaskInt) {
-  VkResult err;
-
-  VkAccessFlagBits srcAccessMask = static_cast<VkAccessFlagBits>(srcAccessMaskInt);
-  if (pWindow->m_setup_cmd == VK_NULL_HANDLE) {
-    VkCommandBufferAllocateInfo cmd = {};
-    cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmd.pNext = NULL;
-    cmd.commandPool = pWindow->commandPool();
-    cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmd.commandBufferCount = 1;
-
-    err = vkAllocateCommandBuffers(pWindow->device(), &cmd, &pWindow->m_setup_cmd);
-    assert(!err);
-
-    VkCommandBufferBeginInfo cmd_buf_info = {};
-    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    cmd_buf_info.pNext = NULL;
-    cmd_buf_info.flags = 0;
-    cmd_buf_info.pInheritanceInfo = NULL;
-
-    err = vkBeginCommandBuffer(pWindow->m_setup_cmd, &cmd_buf_info);
-    assert(!err);
-  }
-
-  VkImageMemoryBarrier image_memory_barrier = {};
-  image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  image_memory_barrier.pNext = NULL;
-  image_memory_barrier.srcAccessMask = srcAccessMask;
-  image_memory_barrier.dstAccessMask = 0;
-  image_memory_barrier.oldLayout = old_image_layout;
-  image_memory_barrier.newLayout = new_image_layout;
-  image_memory_barrier.image = image;
-  image_memory_barrier.subresourceRange = {aspectMask, 0, 1, 0, 1};
-
-  VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;         // Default for host writes
-  VkPipelineStageFlags dest_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT; // Default
-
-  // Adjust source and destination stages based on access and layout
-  if (srcAccessMask & VK_ACCESS_HOST_WRITE_BIT) {
-    src_stages = VK_PIPELINE_STAGE_HOST_BIT;
-  } else if (srcAccessMask & VK_ACCESS_TRANSFER_WRITE_BIT) {
-    src_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  }
-
-  if (new_image_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-    image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    dest_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  } else if (new_image_layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
-    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dest_stages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  } else if (new_image_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) {
-    image_memory_barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dest_stages = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-  } else if (new_image_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-    image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    dest_stages = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-  }
-
-  vkCmdPipelineBarrier(pWindow->m_setup_cmd, src_stages,
-                       dest_stages, 0, 0, NULL, 0, NULL, 1,
-                       &image_memory_barrier);
 }
 
 // Uses m_swapchain, ctx.gpu, m_surface, m_format, m_color_space, m_buffers
@@ -359,11 +291,15 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   result = vkBindImageMemory(pWindow->device(), pWindow->m_depth.image, pWindow->m_depth.mem, 0);
   VK_CHECK_RESULT(result);
 
-  set_image_layout(pWindow->m_depth.image,
+  set_image_layout(pWindow->device(),
+                   pWindow->commandPool(),
+                   pWindow->queue(),
+                   pWindow->m_depth.image,
                    VK_IMAGE_ASPECT_DEPTH_BIT,
                    VK_IMAGE_LAYOUT_UNDEFINED,
                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                   0);
+                   0, VK_PIPELINE_STAGE_HOST_BIT,
+                   0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 
   /* create image view */
   view.image = pWindow->m_depth.image;
@@ -476,23 +412,50 @@ void Fl_Vk_Window_Driver::init_vk()
     }
     
     /* Look for instance extensions */
-    auto instance_extensions = Fl_Vk_Window_Driver::driver(pWindow)->get_instance_extensions();
-    if (instance_extensions.empty())
     {
-        Fl::fatal("FLTK get_instance_extensions failed to find the "
-                  "platform surface extensions.\n\nDo you have a compatible "
-                  "Vulkan installable client driver (ICD) installed?\nPlease "
-                  "look at the Getting Started guide for additional "
-                  "information.\n",
-                  "vkCreateInstance Failure");
+        const std::vector<const char*>& instance_extensions =
+            Fl_Vk_Window_Driver::driver(pWindow)->get_instance_extensions();
+        if (instance_extensions.empty())
+        {
+            Fl::fatal("FLTK get_instance_extensions failed to find the "
+                      "platform surface extensions.\n\nDo you have a compatible "
+                      "Vulkan installable client driver (ICD) installed?\nPlease "
+                      "look at the Getting Started guide for additional "
+                      "information.\n",
+                      "vkCreateInstance Failure");
+        }
+        
+
+        for (const auto& extension : instance_extensions)
+        {
+            if (!isExtensionSupported(extension))
+            {
+                std::string unsupported = "Unsupported window driver extension '";
+                unsupported += extension;
+                unsupported += "'";
+                Fl::fatal(unsupported.c_str());
+            }
+            pWindow->ctx.instance_extensions.push_back(extension);
+        }
     }
 
-    for (const auto& extension : instance_extensions)
     {
-        pWindow->ctx.instance_extensions.push_back(extension);
+        const std::vector<const char*>& instance_extensions = pWindow->get_instance_extensions();
+        for (const auto& extension : instance_extensions)
+        {
+            if (!isExtensionSupported(extension))
+            {
+                std::string unsupported = "Unsupported window extension '";
+                unsupported += extension;
+                unsupported += "'";
+                Fl::fatal(unsupported.c_str());
+            }
+            pWindow->ctx.instance_extensions.push_back(extension);
+        }
     }
-  
-    auto optional_extensions = pWindow->get_optional_extensions();
+    
+    const std::vector<const char*>& optional_extensions =
+        pWindow->get_optional_extensions();
     for (const auto& extension : optional_extensions)
     {
       if (isExtensionSupported(extension))
@@ -544,9 +507,9 @@ void Fl_Vk_Window_Driver::init_vk()
   VkApplicationInfo app = {};
   app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app.pNext = NULL;
-  app.pApplicationName = "FLTK";
+  app.pApplicationName = pWindow->application_name();
   app.applicationVersion = 0;
-  app.pEngineName = "FLTK";
+  app.pEngineName = pWindow->engine_name();
   app.engineVersion = 0;
   app.apiVersion = VK_API_VERSION_1_3;
 

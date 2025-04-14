@@ -37,6 +37,7 @@ public:
     vk_shape_window(int w,int h,const char *l=0);
     ~vk_shape_window();
 
+    const char* application_name() { return "vk_shape"; };
     void prepare() FL_OVERRIDE;
     void prepare_vertices();
     void destroy_resources() FL_OVERRIDE;

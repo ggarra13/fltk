@@ -41,6 +41,7 @@ public:
 
     float depthIncrement = -0.01f;
     
+    const char* application_name() { return "vk_shape_textured"; };
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
     void prepare_vertices();

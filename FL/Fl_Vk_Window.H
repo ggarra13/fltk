@@ -77,10 +77,13 @@ struct Fl_Vk_SwapchainBuffer {
 struct Fl_Vk_Mesh {
     VkBuffer buf;
     VkDeviceMemory mem;
+    
+    VkDeviceMemory indexMem;
+    VkBuffer indexBuffer;
 
-    // Indices (if used)
-    std::vector<int> v;
-
+    VkDeviceMemory uniformMemory;
+    VkBuffer uniformBuffer;
+    
     // Actual Vulkan Data
     VkPipelineVertexInputStateCreateInfo vi;
     VkVertexInputBindingDescription vi_bindings[1];
@@ -293,17 +296,19 @@ public:
   **/
   int mode(const int *a) {return mode(0, a);}
 
-  VkResult begin_setup();
-  virtual void setup() {}; 
-  VkResult end_setup();
-
+  // Application and engine name.
+  virtual const char* application_name() { return "FLTK"; }
+  virtual const char* engine_name() { return "FLTK"; }
+  
+  // Main entry point for Vulkan render pass creation and destruction.
   virtual void prepare() = 0;
   virtual void destroy_resources();  
 
   virtual std::vector<const char*> get_device_extensions();
-  virtual std::vector<const char*> get_required_extensions();
+  virtual std::vector<const char*> get_instance_extensions();
   virtual std::vector<const char*> get_optional_extensions();
 
+  // Accessors to Vulkan context elements
   inline VkInstance&             instance() { return m_instance; }
   inline VkPhysicalDevice&            gpu() { return ctx.gpu; }
   inline VkPhysicalDevice& physicalDevice() { return ctx.gpu; }
@@ -336,7 +341,6 @@ public:
   VkRenderPass       m_renderPass; // needed
 
   // Per swapchain
-  uint32_t               m_swapchainImageCount;
   VkSwapchainKHR         m_swapchain;
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
 
@@ -350,10 +354,7 @@ public:
   // For drawing
   VkPipeline         m_pipeline;  
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
-  
-  VkFence            m_setupFence;// Fence for setup commands in window
-  VkCommandBuffer    m_setup_cmd; // Command Buffer for resources
-  
+    
   VkFence            m_drawFence; // Fence for drawing commands in window
   VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands
 

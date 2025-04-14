@@ -18,8 +18,6 @@
 
 #if HAVE_VK
 
-extern int fl_vk_load_plugin;
-
 
 #include <FL/vk.h>
 #include <FL/Fl_Vk_Window.H>
@@ -27,9 +25,8 @@ extern int fl_vk_load_plugin;
 #include "Fl_Window_Driver.H"
 #include <FL/Fl_Graphics_Driver.H>
 #include <FL/fl_utf8.h>
-// #include "drivers/Vulkan/Fl_Vulkan_Display_Device.H"
-// #include "drivers/Vulkan/Fl_Vulkan_Graphics_Driver.H"
 
+//! Instance is per application
 VkInstance Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
 
 
@@ -51,16 +48,9 @@ static bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
 }
 
 void Fl_Vk_Window::destroy_resources() {
-  VkResult result;
-
   if (m_desc_pool != VK_NULL_HANDLE) {
     vkDestroyDescriptorPool(device(), m_desc_pool, NULL);
     m_desc_pool = VK_NULL_HANDLE;
-  }
-
-  if (m_setup_cmd != VK_NULL_HANDLE) {
-      vkFreeCommandBuffers(device(), commandPool(), 1, &m_setup_cmd);
-      m_setup_cmd = VK_NULL_HANDLE;
   }
 
   if (m_pipeline_layout != VK_NULL_HANDLE) {
@@ -148,11 +138,6 @@ void Fl_Vk_Window::vk_draw_begin() {
   } else {
     VK_CHECK_RESULT(result);
   }
-
-  begin_setup();
-  setup();     // empty
-  end_setup(); // empty
-
 
   VkCommandBufferBeginInfo cmd_buf_info = {};
   cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -323,62 +308,6 @@ void Fl_Vk_Window::vk_draw_end() {
   VK_CHECK_RESULT(result);
 }
 
-VkResult Fl_Vk_Window::begin_setup() {
-  VkResult result = VK_SUCCESS;
-
-  VkCommandBufferAllocateInfo cmd = {};
-  cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmd.pNext = NULL;
-  cmd.commandPool = commandPool();
-  cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cmd.commandBufferCount = 1;
-
-  result = vkAllocateCommandBuffers(device(), &cmd, &m_setup_cmd);
-  VK_CHECK_RESULT(result);
-
-  VkCommandBufferBeginInfo cmd_buf_info = {};
-  cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  cmd_buf_info.pNext = NULL;
-  cmd_buf_info.flags = 0;
-  cmd_buf_info.pInheritanceInfo = NULL;
-
-  result = vkBeginCommandBuffer(m_setup_cmd, &cmd_buf_info);
-  VK_CHECK_RESULT(result);
-
-  return result;
-}
-
-
-VkResult Fl_Vk_Window::end_setup() {
-  VkResult result = VK_SUCCESS;
-    
-  result = vkEndCommandBuffer(m_setup_cmd);
-  VK_CHECK_RESULT(result);
-  
-  const VkCommandBuffer cmd_bufs[] = {m_setup_cmd};
-  VkSubmitInfo submit_info = {};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.pNext = NULL;
-  submit_info.waitSemaphoreCount = 0;
-  submit_info.pWaitSemaphores = NULL;
-  submit_info.pWaitDstStageMask = NULL;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = cmd_bufs;
-  submit_info.signalSemaphoreCount = 0;
-  submit_info.pSignalSemaphores = NULL;
-
-  vkResetFences(device(), 1, &m_setupFence);
-  
-  result = vkQueueSubmit(ctx.queue, 1, &submit_info, m_setupFence);
-  VK_CHECK_RESULT(result);
-  
-  vkWaitForFences(device(), 1, &m_setupFence, VK_TRUE, UINT64_MAX);
-  vkResetFences(device(), 1, &m_setupFence);
-
-  vkFreeCommandBuffers(device(), commandPool(), 1, cmd_bufs);
-  m_setup_cmd = VK_NULL_HANDLE;
-  return result;
-}
 
 ////////////////////////////////////////////////////////////////
 
@@ -786,7 +715,6 @@ Fl_Vk_Window::~Fl_Vk_Window() {
   
   // Clean up fences and semaphores
   vkDestroyFence(device(), m_drawFence, nullptr);
-  vkDestroyFence(device(), m_setupFence, nullptr);
     
   destroy_resources();
   delete pVkWindowDriver;
@@ -798,7 +726,6 @@ void Fl_Vk_Window::init_fences()
     VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         nullptr, 0 };
     vkCreateFence(device(), &fenceInfo, nullptr, &m_drawFence);
-    vkCreateFence(device(), &fenceInfo, nullptr, &m_setupFence);
 }
 
 void Fl_Vk_Window::init_vk_swapchain()
@@ -852,7 +779,7 @@ std::vector<const char*> Fl_Vk_Window::get_device_extensions()
     return out;
 }
 
-std::vector<const char*> Fl_Vk_Window::get_required_extensions()
+std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 {
     std::vector<const char*> out;
     return out;
@@ -899,10 +826,6 @@ void Fl_Vk_Window::init() {
   m_pipeline = VK_NULL_HANDLE;
   m_allocator = nullptr;
 
-  // Setup command and fence
-  m_setup_cmd = VK_NULL_HANDLE;
-  m_setupFence = VK_NULL_HANDLE;
-
   // Draw command and fence (currently unused)
   m_draw_cmd = VK_NULL_HANDLE;
   m_drawFence = VK_NULL_HANDLE;
@@ -915,7 +838,6 @@ void Fl_Vk_Window::init() {
   m_pipeline_layout = VK_NULL_HANDLE;
 
   // Counters
-  m_swapchainImageCount = 0;
   m_current_buffer = 0;
 }
 
