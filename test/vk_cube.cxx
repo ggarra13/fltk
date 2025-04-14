@@ -39,7 +39,7 @@
 
 // Glocal constants and variables
 
-const double fps      = 25.0;     // desired frame rate (independent of speed slider)
+const double fps      = 60.0;     // desired frame rate (independent of speed slider)
 const double delay    = 1.0/fps;  // calculated timer delay
 int count             = -2;       // initialize loop (draw) counter
 int done              =  0;       // set to 1 in exit button callback
@@ -94,16 +94,15 @@ class cube_box : public Fl_Vk_Window {
     void draw() FL_OVERRIDE;
     int handle(int) FL_OVERRIDE;
 
-    void prepare() FL_OVERRIDE;
     void prepare_vertices();
     void prepare_uniform_buffer();
     void prepare_descriptor_layout();
+    void prepare_descriptor_pool();
+    void prepare_descriptor_set();
     void prepare_render_pass();
     void prepare_pipeline();
     VkShaderModule prepare_vs();
     VkShaderModule prepare_fs();
-    
-    void destroy_resources() FL_OVERRIDE;
     
     //! Shaders
     VkShaderModule m_vert_shader_module;
@@ -111,20 +110,27 @@ class cube_box : public Fl_Vk_Window {
     
     //! This is for holding a mesh
     Fl_Vk_Mesh m_cube;
+    
+    VkPipeline m_wire_pipeline; // Pipeline for wireframe mode
 public:
-    float lasttime;
+    double lasttime;
     int wire;
     double size;
     double speed;
+
+    void create_device() FL_OVERRIDE;
+    void prepare() FL_OVERRIDE;
+    void destroy_resources() FL_OVERRIDE;
 
     const char* application_name() { return "vk_cube"; };
     
     cube_box(int x,int y,int w,int h,const char *l=0) : Fl_Vk_Window(x,y,w,h,l) {
         end();
-        mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
+        mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
         lasttime = 0.0;
         m_vert_shader_module = VK_NULL_HANDLE;
         m_frag_shader_module = VK_NULL_HANDLE;
+        m_wire_pipeline = VK_NULL_HANDLE; 
         // Turn on validations
         m_validate = true;
     
@@ -300,13 +306,13 @@ struct Vertex
 };
     
 std::vector<Vertex> vertices = {
-    // Front face (blue)
+    // Front face (blue) - ok
     {{0.0f, 0.0f, 0.0f}, {0, 0, 255}},
     {{1.0f, 0.0f, 0.0f}, {0, 0, 255}},
     {{1.0f, 1.0f, 0.0f}, {0, 0, 255}},
     {{0.0f, 1.0f, 0.0f}, {0, 0, 255}},
 
-    // Back face (cyan)
+    // Back face (cyan) - ok
     {{0.0f, 0.0f, 1.0f}, {0, 255, 255}},
     {{1.0f, 0.0f, 1.0f}, {0, 255, 255}},
     {{1.0f, 1.0f, 1.0f}, {0, 255, 255}},
@@ -452,34 +458,29 @@ void cube_box::prepare_pipeline() {
     pipeline.renderPass = m_renderPass;
     pipeline.pDynamicState = &dynamicState;
 
+    
     memset(&pipelineCacheCreateInfo, 0, sizeof(pipelineCacheCreateInfo));
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 
     result = vkCreatePipelineCache(device(), &pipelineCacheCreateInfo, NULL,
                                    &pipelineCache());
     VK_CHECK_RESULT(result);
-    result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1,
-                                       &pipeline, NULL, &m_pipeline);
+
+    // Create fill pipeline
+    rs.polygonMode = VK_POLYGON_MODE_FILL;
+    pipeline.pRasterizationState = &rs;
+    result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1, &pipeline, NULL, &m_pipeline);
     VK_CHECK_RESULT(result);
 
+    // Create wireframe pipeline
+    rs.polygonMode = VK_POLYGON_MODE_LINE;
+    result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1, &pipeline, NULL, &m_wire_pipeline);
+    VK_CHECK_RESULT(result);
+    
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
 
 }
 
-void cube_box::prepare_descriptor_layout() {
-    
-    VkResult result;
-    
-    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
-    pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pPipelineLayoutCreateInfo.pNext = NULL;
-    pPipelineLayoutCreateInfo.setLayoutCount = 0;
-    pPipelineLayoutCreateInfo.pSetLayouts = NULL;
-
-    result = vkCreatePipelineLayout(device(), &pPipelineLayoutCreateInfo, NULL,
-                                    &m_pipeline_layout);
-    VK_CHECK_RESULT(result);
-}
 
 void cube_box::prepare_vertices()
 {
@@ -611,43 +612,160 @@ void cube_box::prepare_uniform_buffer()
     ubo_buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
     vkCreateBuffer(device(), &ubo_buf_info, nullptr, &m_cube.uniformBuffer);
-    vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &m_cube.uboMemReqs);
+    vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &m_mem_reqs);
     
     VkMemoryAllocateInfo ubo_alloc_info = {};
     ubo_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    ubo_alloc_info.allocationSize = m_cube.uboMemReqs.size;
-    memory_type_from_properties(gpu(), m_cube.uboMemReqs.memoryTypeBits,
+    ubo_alloc_info.allocationSize = m_mem_reqs.size;
+    memory_type_from_properties(gpu(), m_mem_reqs.memoryTypeBits,
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                 &ubo_alloc_info.memoryTypeIndex);
 
     vkAllocateMemory(device(), &ubo_alloc_info, nullptr, &m_cube.uniformMemory);
     vkBindBufferMemory(device(), m_cube.uniformBuffer, m_cube.uniformMemory, 0);
+
+    
+    // vkCreateBuffer(device(), &ubo_buf_info, nullptr, &m_cube.uniformBuffer);
+    // vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &m_cube.uboMemReqs);
+    
+    // VkMemoryAllocateInfo ubo_alloc_info = {};
+    // ubo_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    // ubo_alloc_info.allocationSize = m_cube.uboMemReqs.size;
+    // memory_type_from_properties(gpu(), m_cube.uboMemReqs.memoryTypeBits,
+    //                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+    //                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    //                             &ubo_alloc_info.memoryTypeIndex);
+
+    // vkAllocateMemory(device(), &ubo_alloc_info, nullptr, &m_cube.uniformMemory);
+    // vkBindBufferMemory(device(), m_cube.uniformBuffer, m_cube.uniformMemory, 0);
+}
+
+void cube_box::prepare_descriptor_pool()
+{
+    VkDescriptorPoolSize poolSize = {};
+    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    poolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+
+    VkResult result = vkCreateDescriptorPool(device(), &poolInfo, nullptr, &m_desc_pool);
+    VK_CHECK_RESULT(result);
+}
+
+void cube_box::prepare_descriptor_set()
+{
+    VkResult result;
+
+    // Create descriptor set layout
+    VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+    uboLayoutBinding.binding = 0;
+    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboLayoutBinding.descriptorCount = 1;
+    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboLayoutBinding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &uboLayoutBinding;
+
+    result = vkCreateDescriptorSetLayout(device(), &layoutInfo, nullptr, &m_desc_layout);
+    VK_CHECK_RESULT(result);
+
+    // Allocate descriptor set
+    VkDescriptorSetAllocateInfo alloc_info = {};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = m_desc_pool;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = &m_desc_layout;
+
+    result = vkAllocateDescriptorSets(device(), &alloc_info, &m_desc_set);
+    VK_CHECK_RESULT(result);
+
+    // Update descriptor set
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = m_cube.uniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(MVP);
+
+    VkWriteDescriptorSet descriptorWrite = {};
+    descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptorWrite.dstSet = m_desc_set;
+    descriptorWrite.dstBinding = 0;
+    descriptorWrite.dstArrayElement = 0;
+    descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descriptorWrite.descriptorCount = 1;
+    descriptorWrite.pBufferInfo = &bufferInfo;
+
+    vkUpdateDescriptorSets(device(), 1, &descriptorWrite, 0, nullptr);
+}
+
+void cube_box::prepare_descriptor_layout()
+{
+    VkResult result;
+
+    VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
+    pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pPipelineLayoutCreateInfo.setLayoutCount = 1;
+    pPipelineLayoutCreateInfo.pSetLayouts = &m_desc_layout;
+
+    result = vkCreatePipelineLayout(device(), &pPipelineLayoutCreateInfo, nullptr, &m_pipeline_layout);
+    VK_CHECK_RESULT(result);
+}
+
+void cube_box::destroy_resources()
+{
+    if (m_cube.buf != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device(), m_cube.buf, nullptr);
+        m_cube.buf = VK_NULL_HANDLE;
+    }
+    if (m_cube.mem != VK_NULL_HANDLE) {
+        vkFreeMemory(device(), m_cube.mem, nullptr);
+        m_cube.mem = VK_NULL_HANDLE;
+    }
+    if (m_cube.uniformBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device(), m_cube.uniformBuffer, nullptr);
+        m_cube.uniformBuffer = VK_NULL_HANDLE;
+    }
+    if (m_cube.uniformMemory != VK_NULL_HANDLE) {
+        vkFreeMemory(device(), m_cube.uniformMemory, nullptr);
+        m_cube.uniformMemory = VK_NULL_HANDLE;
+    }
+    if (m_cube.indexBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device(), m_cube.indexBuffer, nullptr);
+        m_cube.indexBuffer = VK_NULL_HANDLE;
+    }
+    if (m_cube.indexMem != VK_NULL_HANDLE) {
+        vkFreeMemory(device(), m_cube.indexMem, nullptr);
+        m_cube.indexMem = VK_NULL_HANDLE;
+    }
+    if (m_desc_layout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device(), m_desc_layout, nullptr);
+        m_desc_layout = VK_NULL_HANDLE;
+    }
+    if (m_desc_pool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device(), m_desc_pool, nullptr);
+        m_desc_pool = VK_NULL_HANDLE;
+    }
+    Fl_Vk_Window::destroy_resources();
 }
 
 void cube_box::prepare()
 {
     prepare_vertices();
     prepare_uniform_buffer();
+    prepare_descriptor_pool();
+    prepare_descriptor_set();
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
 }
 
-
-void cube_box::destroy_resources() {
-    if (m_cube.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_cube.buf, NULL);
-        m_cube.buf = VK_NULL_HANDLE;
-    }
-
-    if (m_cube.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_cube.mem, NULL);
-        m_cube.mem = VK_NULL_HANDLE;
-    }
-    
-    Fl_Vk_Window::destroy_resources();
-}
 
 void cube_box::vk_draw_begin()
 {
@@ -661,9 +779,13 @@ void cube_box::draw() {
     lasttime = lasttime + speed;
 
     MVP ubo{};
-    ubo.model = glm::rotate(glm::radians(lasttime*1.6), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.model *= glm::rotate(glm::radians(lasttime*4.2), glm::vec3(1.0f, 0.0f, 0.0f));
-    ubo.model *= glm::rotate(glm::radians(lasttime*2.3), glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.model = glm::mat4(1.0);
+    ubo.model *= glm::rotate((float)glm::radians(lasttime*1.6F),
+                             glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.model *= glm::rotate((float)glm::radians(lasttime*4.2F),
+                             glm::vec3(1.0f, 0.0f, 0.0f));
+    ubo.model *= glm::rotate((float)glm::radians(lasttime*2.3F),
+                             glm::vec3(0.0f, 1.0f, 0.0f));
     ubo.model *= glm::translate(glm::vec3(-1.F, 1.2F, -1.5F));
     ubo.model *= glm::scale(glm::vec3(size, size, size));
     ubo.view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -10.0f));
@@ -675,6 +797,18 @@ void cube_box::draw() {
     vkMapMemory(device(), m_cube.uniformMemory, 0, sizeof(ubo), 0, &data);
     memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(device(), m_cube.uniformMemory);
+    
+    // Bind pipeline based on wire
+    vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      wire ? m_wire_pipeline : m_pipeline);
+
+    
+    vkCmdBindDescriptorSets(
+        m_draw_cmd,
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        m_pipeline_layout,
+        0, 1, &m_desc_set,
+        0, nullptr);
 
     // Draw the cube
     VkDeviceSize offsets[1] = {0};
@@ -682,7 +816,48 @@ void cube_box::draw() {
                            &m_cube.buf, offsets);
 
     vkCmdBindIndexBuffer(m_draw_cmd, m_cube.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(m_draw_cmd, sizeof(indices)/sizeof(uint16_t), 1, 0, 0, 0);
+    vkCmdDrawIndexed(m_draw_cmd, 6*3*2, 1, 0, 0, 0);
+}
+
+
+
+
+void cube_box::create_device() {
+    VkResult result;
+
+    // Assuming m_physicalDevice is set
+    VkPhysicalDeviceFeatures features = {};
+    vkGetPhysicalDeviceFeatures(gpu(), &features);
+    if (!features.fillModeNonSolid)
+    {
+        fprintf(stderr, "Warning: fillModeNonSolid not supported, wireframe unavailable\n");
+    }
+    else
+    {
+        features.fillModeNonSolid = VK_TRUE;
+    }
+    
+    float queue_priorities[1] = {0.0};
+    VkDeviceQueueCreateInfo queueCreateInfo = {};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.pNext = NULL;
+    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = queue_priorities;
+
+    VkDeviceCreateInfo deviceInfo = {};
+    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceInfo.pNext = NULL;
+    deviceInfo.queueCreateInfoCount = 1;
+    deviceInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceInfo.pEnabledFeatures = &features;
+    deviceInfo.enabledLayerCount = ctx.enabled_layers.size();
+    deviceInfo.ppEnabledLayerNames = ctx.enabled_layers.data();
+    deviceInfo.enabledExtensionCount = ctx.device_extensions.size();
+    deviceInfo.ppEnabledExtensionNames = ctx.device_extensions.data();
+
+    result = vkCreateDevice(gpu(), &deviceInfo, NULL, &device());
+    VK_CHECK_RESULT(result);
 }
 
 int cube_box::handle(int e) {
@@ -806,6 +981,10 @@ void wire_cb(Fl_Widget *w, void *) {
   int wire = ((Fl_Light_Button *)w)->value();
   lt_cube->wire = wire;
   rt_cube->wire = 1 - wire;
+  lt_cube->destroy_resources();
+  rt_cube->destroy_resources();
+  lt_cube->prepare();
+  rt_cube->prepare();
 }
 
 // print screen demo
@@ -913,7 +1092,7 @@ int main(int argc, char **argv) {
   Fl::set_color(FL_FREE_COLOR, 255, 255, 0, 75);
   makeform(argv[0]);
 
-  speed->bounds(6, 0);
+  speed->bounds(60, 0);
   speed->value(lt_cube->speed = 2.0);
   speed->callback(speed_cb);
 
@@ -928,8 +1107,8 @@ int main(int argc, char **argv) {
 
   form->label("Cube Demo");
   form->show(argc,argv);
-  // lt_cube->show();
-  // rt_cube->show();
+  lt_cube->show();
+  rt_cube->show();
 
   lt_cube->wire  = wire->value();
   lt_cube->size  = size->value();
@@ -944,7 +1123,6 @@ int main(int argc, char **argv) {
 #if HAVE_VK
 
   // with Vulkan: use a timer for drawing and measure performance
-
   form->wait_for_expose();
   Fl::add_timeout(0.1, timer_cb);      // start timer
   int ret = Fl::run();

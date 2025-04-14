@@ -308,6 +308,9 @@ public:
   virtual std::vector<const char*> get_instance_extensions();
   virtual std::vector<const char*> get_optional_extensions();
 
+  // Create the logical device.
+  virtual void create_device();
+  
   // Accessors to Vulkan context elements
   inline VkInstance&             instance() { return m_instance; }
   inline VkPhysicalDevice&            gpu() { return ctx.gpu; }

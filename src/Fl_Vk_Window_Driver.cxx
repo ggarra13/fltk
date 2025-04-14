@@ -335,34 +335,6 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   }
 }
 
-
-void Fl_Vk_Window_Driver::init_device() {
-    VkResult result;
-
-    float queue_priorities[1] = {0.0};
-    VkDeviceQueueCreateInfo queueCreateInfo = {};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.pNext = NULL;
-    queueCreateInfo.queueFamilyIndex = pWindow->m_queueFamilyIndex;
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = queue_priorities;
-
-    VkDeviceCreateInfo device = {};
-    device.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device.pNext = NULL;
-    device.queueCreateInfoCount = 1;
-    device.pQueueCreateInfos = &queueCreateInfo;
-    device.enabledLayerCount = pWindow->ctx.enabled_layers.size();
-    device.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
-    device.enabledExtensionCount = pWindow->ctx.device_extensions.size();
-    device.ppEnabledExtensionNames = pWindow->ctx.device_extensions.data();
-
-    result = vkCreateDevice(pWindow->gpu(), &device, NULL,
-                            &pWindow->device());
-    VK_CHECK_RESULT(result);
-}
-
-
 void Fl_Vk_Window_Driver::init_vk()
 {
     
@@ -724,9 +696,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   }
 
   pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
-
-  if (pWindow->device() == VK_NULL_HANDLE)
-      init_device();
+  
+  pWindow->create_device();
 
   vkGetDeviceQueue(pWindow->device(),
                    pWindow->m_queueFamilyIndex, 0,
@@ -857,9 +828,9 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   if (pWindow->m_validate)
   {
-      std::cout << pWindow << "\tSelected format = " << string_VkFormat(m_format)
+      std::cout << pWindow << "\tSelected window format = " << string_VkFormat(m_format)
                 << std::endl
-                << pWindow << "\tSelected color space = "
+                << pWindow << "\tSelected window color space = "
                 << string_VkColorSpaceKHR(m_color_space) << std::endl;
   }
 }

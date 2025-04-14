@@ -793,6 +793,32 @@ std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 }
 
 
+void Fl_Vk_Window::create_device() {
+    VkResult result;
+
+    float queue_priorities[1] = {0.0};
+    VkDeviceQueueCreateInfo queueCreateInfo = {};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.pNext = NULL;
+    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = queue_priorities;
+
+    VkDeviceCreateInfo deviceInfo = {};
+    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceInfo.pNext = NULL;
+    deviceInfo.queueCreateInfoCount = 1;
+    deviceInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceInfo.enabledLayerCount = ctx.enabled_layers.size();
+    deviceInfo.ppEnabledLayerNames = ctx.enabled_layers.data();
+    deviceInfo.enabledExtensionCount = ctx.device_extensions.size();
+    deviceInfo.ppEnabledExtensionNames = ctx.device_extensions.data();
+
+    result = vkCreateDevice(gpu(), &deviceInfo, NULL, &device());
+    VK_CHECK_RESULT(result);
+}
+
+
 void Fl_Vk_Window::init() {
   pVkWindowDriver = Fl_Vk_Window_Driver::newVkWindowDriver(this);
   end(); // we probably don't want any children
