@@ -98,11 +98,11 @@ public:
   virtual void create_surface() = 0;
   virtual void destroy_resources();
 
-  void init_vk();
   void init_vk_swapchain();
+  void init_vk();
 
 protected:
-  void init_device();
+  void init_instance();
   void prepare_buffers();
   void prepare_depth();
   void prepare_framebuffers();

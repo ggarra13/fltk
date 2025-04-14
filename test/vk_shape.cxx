@@ -48,7 +48,7 @@ protected:
     VkShaderModule m_frag_shader_module;
     
     //! This is for holding a mesh
-    Fl_Vk_Mesh m_vertices;
+    Fl_Vk_Mesh m_mesh;
     
     void prepare_descriptor_layout();
     void prepare_render_pass();
@@ -138,12 +138,12 @@ void vk_shape_window::prepare_vertices()
     bool pass;
     void *data;
 
-    memset(&m_vertices, 0, sizeof(m_vertices));
+    memset(&m_mesh, 0, sizeof(m_mesh));
 
-    result = vkCreateBuffer(device(), &buf_info, NULL, &m_vertices.buf);
+    result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
     VK_CHECK_RESULT(result);
 
-    vkGetBufferMemoryRequirements(device(), m_vertices.buf, &m_mem_reqs);
+    vkGetBufferMemoryRequirements(device(), m_mesh.buf, &m_mem_reqs);
     VK_CHECK_RESULT(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
@@ -153,36 +153,36 @@ void vk_shape_window::prepare_vertices()
                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                        &mem_alloc.memoryTypeIndex);
 
-    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_vertices.mem);
+    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_mesh.mem);
     VK_CHECK_RESULT(result);
 
-    result = vkMapMemory(device(), m_vertices.mem, 0,
+    result = vkMapMemory(device(), m_mesh.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
 	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
-    vkUnmapMemory(device(), m_vertices.mem);
+    vkUnmapMemory(device(), m_mesh.mem);
 
-    result = vkBindBufferMemory(device(), m_vertices.buf, m_vertices.mem, 0);
+    result = vkBindBufferMemory(device(), m_mesh.buf, m_mesh.mem, 0);
     VK_CHECK_RESULT(result);
 
-    m_vertices.vi.sType =
+    m_mesh.vi.sType =
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    m_vertices.vi.pNext = NULL;
-    m_vertices.vi.vertexBindingDescriptionCount = 1;
-    m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
-    m_vertices.vi.vertexAttributeDescriptionCount = 1;
-    m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
+    m_mesh.vi.pNext = NULL;
+    m_mesh.vi.vertexBindingDescriptionCount = 1;
+    m_mesh.vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
+    m_mesh.vi.vertexAttributeDescriptionCount = 1;
+    m_mesh.vi.pVertexAttributeDescriptions = m_mesh.vi_attrs;
 
-    m_vertices.vi_bindings[0].binding = 0;
-    m_vertices.vi_bindings[0].stride = sizeof(vertices[0]);
-    m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    m_mesh.vi_bindings[0].binding = 0;
+    m_mesh.vi_bindings[0].stride = sizeof(vertices[0]);
+    m_mesh.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    m_vertices.vi_attrs[0].binding = 0;
-    m_vertices.vi_attrs[0].location = 0;
-    m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    m_vertices.vi_attrs[0].offset = 0;
+    m_mesh.vi_attrs[0].binding = 0;
+    m_mesh.vi_attrs[0].location = 0;
+    m_mesh.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    m_mesh.vi_attrs[0].offset = 0;
 }
 
 // m_format, m_depth (optionally) -> creates m_renderPass
@@ -348,7 +348,7 @@ void vk_shape_window::prepare_pipeline() {
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline.layout = m_pipeline_layout;
 
-    vi = m_vertices.vi;
+    vi = m_mesh.vi;
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -491,21 +491,13 @@ void vk_shape_window::draw() {
     // Draw the shape
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
-                           &m_vertices.buf, offsets);
+                           &m_mesh.buf, offsets);
 
     vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
 }
 
 void vk_shape_window::destroy_resources() {
-    if (m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_vertices.buf, NULL);
-        m_vertices.buf = VK_NULL_HANDLE;
-    }
-
-    if (m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_vertices.mem, NULL);
-        m_vertices.mem = VK_NULL_HANDLE;
-    }
+    m_mesh.destroy(device());
 
     Fl_Vk_Window::destroy_resources();
 }

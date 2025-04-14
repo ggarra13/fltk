@@ -75,12 +75,15 @@ struct Fl_Vk_SwapchainBuffer {
 };
 
 struct Fl_Vk_Mesh {
+    // Memory and Buffer used for the actual mesh
     VkBuffer buf;
     VkDeviceMemory mem;
-    
+
+    // Memory and Buffer used for indices (optional)
     VkDeviceMemory indexMem;
     VkBuffer indexBuffer;
 
+    // Memory and Buffer used for UBO (matrix transforms)
     VkDeviceMemory uniformMemory;
     VkBuffer uniformBuffer;
     
@@ -89,9 +92,54 @@ struct Fl_Vk_Mesh {
     VkVertexInputBindingDescription vi_bindings[1];
     VkVertexInputAttributeDescription vi_attrs[2];
 
-    Fl_Vk_Mesh()
+    Fl_Vk_Mesh() :
+        buf(VK_NULL_HANDLE),
+        mem(VK_NULL_HANDLE),
+        indexBuffer(VK_NULL_HANDLE),
+        indexMem(VK_NULL_HANDLE),
+        uniformBuffer(VK_NULL_HANDLE),
+        uniformMemory(VK_NULL_HANDLE)
         {
             memset(&vi, 0, sizeof(VkPipelineVertexInputStateCreateInfo));
+        }
+
+    void destroy(VkDevice device)
+        {
+            if (buf != VK_NULL_HANDLE)
+            {
+                vkDestroyBuffer(device, buf, NULL);
+                buf = VK_NULL_HANDLE;
+            }
+
+            if (mem != VK_NULL_HANDLE)
+            {
+                vkFreeMemory(device, mem, NULL);
+                mem = VK_NULL_HANDLE;
+            }
+            
+            if (indexBuffer != VK_NULL_HANDLE)
+            {
+                vkDestroyBuffer(device, indexBuffer, NULL);
+                indexBuffer = VK_NULL_HANDLE;
+            }
+
+            if (indexMem != VK_NULL_HANDLE)
+            {
+                vkFreeMemory(device, indexMem, NULL);
+                indexMem = VK_NULL_HANDLE;
+            }
+            
+            if (uniformBuffer != VK_NULL_HANDLE)
+            {
+                vkDestroyBuffer(device, uniformBuffer, NULL);
+                uniformBuffer = VK_NULL_HANDLE;
+            }
+
+            if (uniformMemory != VK_NULL_HANDLE)
+            {
+                vkFreeMemory(device, uniformMemory, NULL);
+                uniformMemory = VK_NULL_HANDLE;
+            }
         }
 };
 
@@ -105,7 +153,8 @@ struct Fl_Vk_Texture {
     VkImageView view;           // View for shader access
     VkSampler sampler;          // Sampler for texture sampling
 
-    std::string samplerName;    
+    uint32_t    binding;
+    std::string samplerName;        // name of sampler
 
     VkDeviceMemory mem;             // Allocated memory for texture
     uint32_t width, height, depth;  // texture width/height/depth
@@ -117,6 +166,8 @@ struct Fl_Vk_Texture {
         view(VK_NULL_HANDLE),
         sampler(VK_NULL_HANDLE),
         mem(VK_NULL_HANDLE),
+        samplerName("sampler1"),
+        binding(0),
         width(1),
         height(1),
         depth(1)
@@ -130,6 +181,7 @@ struct Fl_Vk_Texture {
                   VkSampler sampler,
                   VkDeviceMemory mem,
                   std::string samplerName = "sampler1",
+                  uint32_t binding = 0,
                   uint32_t width = 1,
                   uint32_t height = 1,
                   uint32_t depth = 1) :
@@ -140,6 +192,7 @@ struct Fl_Vk_Texture {
         sampler(sampler),
         mem(mem),
         samplerName(samplerName),
+        binding(binding),
         width(width),
         height(height),
         depth(depth)
@@ -185,6 +238,27 @@ struct Fl_Vk_Depth {
         view(VK_NULL_HANDLE)
         {
         };
+
+    void destroy(VkDevice& device)
+        {
+            if (view != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(device, view, NULL);
+                view = VK_NULL_HANDLE;
+            }
+
+            if (image != VK_NULL_HANDLE)
+            {
+                vkDestroyImage(device, image, NULL);
+                image = VK_NULL_HANDLE;
+            }
+
+            if (mem != VK_NULL_HANDLE)
+            {
+                vkFreeMemory(device, mem, NULL);
+                mem = VK_NULL_HANDLE;
+            }
+        }
 };
 
 /**
@@ -296,22 +370,28 @@ public:
   **/
   int mode(const int *a) {return mode(0, a);}
 
-  // Application and engine name.
+  //! Application and engine name.
   virtual const char* application_name() { return "FLTK"; }
   virtual const char* engine_name() { return "FLTK"; }
   
-  // Main entry point for Vulkan render pass creation and destruction.
+  //! Main entry point for Vulkan render pass creation and destruction.
   virtual void prepare() = 0;
   virtual void destroy_resources();  
 
-  virtual std::vector<const char*> get_device_extensions();
+  //! Required and optional instance extensions
   virtual std::vector<const char*> get_instance_extensions();
   virtual std::vector<const char*> get_optional_extensions();
 
-  // Create the logical device.
+  //! Required device extensions
+  virtual std::vector<const char*> get_device_extensions();
+
+  //! Log level of Vulkan API
+  virtual int log_level() const { return 0; }
+
+  //! Create the logical device.
   virtual void create_device();
   
-  // Accessors to Vulkan context elements
+  //! @{ Accessors to Vulkan elements
   inline VkInstance&             instance() { return m_instance; }
   inline VkPhysicalDevice&            gpu() { return ctx.gpu; }
   inline VkPhysicalDevice& physicalDevice() { return ctx.gpu; }
@@ -319,6 +399,8 @@ public:
   inline VkPipelineCache&   pipelineCache() { return ctx.pipelineCache; }
   inline VkQueue&                   queue() { return ctx.queue; }
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
+  inline VkRenderPass&         renderPass() { return m_renderPass; }
+  inline VkPipeline&             pipeline() { return m_pipeline; }
   
   inline const VkInstance&             instance() const { return m_instance; }
   inline const VkPhysicalDevice&            gpu() const { return ctx.gpu; }
@@ -327,6 +409,10 @@ public:
   inline const VkPipelineCache&   pipelineCache() const { return ctx.pipelineCache; }
   inline const VkQueue&                   queue() const { return ctx.queue; }
   inline const VkCommandPool&       commandPool() const { return ctx.commandPool; }
+  inline const VkRenderPass&         renderPass() const { return m_renderPass; }
+  inline const VkPipeline&             pipeline() const { return m_pipeline; }
+
+  //! @}
   
   // Application
   bool m_validate;  // if true, turns on validation layers

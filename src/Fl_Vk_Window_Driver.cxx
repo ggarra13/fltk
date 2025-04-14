@@ -49,8 +49,10 @@ static bool isExtensionSupported(const char* extensionName) {
     std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-    for (const auto& ext : extensions) {
-        if (strcmp(ext.extensionName, extensionName) == 0) {
+    for (const auto& ext : extensions)
+    {
+        if (strcmp(ext.extensionName, extensionName) == 0)
+        {
             return true;
         }
     }
@@ -61,7 +63,8 @@ static bool isExtensionSupported(const char* extensionName) {
  * Return 1 (true) if all layer names specified in check_names
  * can be found in given layer properties.
  */
-static VkBool32 check_layers(uint32_t check_count, const char **check_names, uint32_t layer_count,
+static VkBool32 check_layers(uint32_t check_count, const char **check_names,
+                             uint32_t layer_count,
                              VkLayerProperties *layers) {
   uint32_t i, j;
   for (i = 0; i < check_count; i++) {
@@ -80,27 +83,6 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names, uin
   return 1;
 }
 
-// needed
-static bool memory_type_from_properties(Fl_Vk_Window *pWindow,
-                                        uint32_t typeBits,
-                                        VkFlags requirements_mask,
-                                        uint32_t *typeIndex) {
-  uint32_t i;
-  // Search memtypes to find first index with those properties
-  for (i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
-    if ((typeBits & 1) == 1) {
-      // Type is available, does it match user properties?
-      if ((pWindow->m_memory_properties.memoryTypes[i].propertyFlags & requirements_mask) ==
-          requirements_mask) {
-        *typeIndex = i;
-        return true;
-      }
-    }
-    typeBits >>= 1;
-  }
-  // No memory types matched, return failure
-  return false;
-}
 
 // Uses m_swapchain, ctx.gpu, m_surface, m_format, m_color_space, m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
@@ -160,8 +142,9 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   // Create new swapchain
   result = vkCreateSwapchainKHR(pWindow->device(), &swapchain, NULL, &pWindow->m_swapchain);
   VK_CHECK_RESULT(result);
-  if (pWindow->m_swapchain == VK_NULL_HANDLE) {
-    printf("swapchain creation failed and returned NULL HANDLE\n");
+  if (pWindow->m_swapchain == VK_NULL_HANDLE)
+  {
+      fprintf(stderr, "swapchain creation failed and returned NULL HANDLE\n");
   }
 
   if (result != VK_SUCCESS && pWindow->mode() & FL_SINGLE) {
@@ -278,7 +261,7 @@ void Fl_Vk_Window_Driver::prepare_depth() {
 
   /* select memory size and type */
   mem_alloc.allocationSize = mem_reqs.size;
-  pass = memory_type_from_properties(pWindow, mem_reqs.memoryTypeBits, 0, /* No requirements */
+  pass = memory_type_from_properties(pWindow->gpu(), mem_reqs.memoryTypeBits, 0, /* No requirements */
                                      &mem_alloc.memoryTypeIndex);
   assert(pass);
 
@@ -335,25 +318,20 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   }
 }
 
-void Fl_Vk_Window_Driver::init_vk()
+void Fl_Vk_Window_Driver::init_instance()
 {
-    
     VkResult err;
     VkBool32 portability_enumeration = VK_FALSE;
     uint32_t i = 0;
-    uint32_t required_extension_count = 0;
-    uint32_t instance_extension_count = 0;
-    uint32_t instance_layer_count = 0;
-    uint32_t validation_layer_count = 0;
 
     const char *instance_validation_layers[] = {
         "VK_LAYER_KHRONOS_validation",
     };
-
-
+    
     /* Look for validation layers *//* Look for validation layers */
     VkBool32 validation_found = 0;
     if (pWindow->m_validate) {
+        uint32_t instance_layer_count = 0;
         err = vkEnumerateInstanceLayerProperties(&instance_layer_count, NULL);
         VK_CHECK_RESULT(err);
 
@@ -369,7 +347,6 @@ void Fl_Vk_Window_Driver::init_vk()
                              instance_layer_count, instance_layers);
             if (validation_found) {
                 pWindow->ctx.enabled_layers.push_back(instance_validation_layers[0]);
-                validation_layer_count = 1;
             }
             free(instance_layers);
         }
@@ -430,131 +407,142 @@ void Fl_Vk_Window_Driver::init_vk()
         pWindow->get_optional_extensions();
     for (const auto& extension : optional_extensions)
     {
-      if (isExtensionSupported(extension))
-      {
-          pWindow->ctx.instance_extensions.push_back(extension);
-      }
-      else
-      {
-          if (pWindow->m_validate)
-          {
-              std::cerr << "Optional Vulkan extension '"
-                        << extension
-                        << "' not found." << std::endl;
-          }
-      }
-  }
-  
-  err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count, NULL);
-  assert(!err);
-
-  if (instance_extension_count > 0) {
-    VkExtensionProperties *instance_extensions =
-        (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * instance_extension_count);
-    err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count,
-                                                 instance_extensions);
-    assert(!err);
-    for (i = 0; i < instance_extension_count; i++)
-    {
-      if (!strcmp(VK_EXT_DEBUG_REPORT_EXTENSION_NAME, instance_extensions[i].extensionName))
-      {
-        if (pWindow->m_validate)
+        if (isExtensionSupported(extension))
         {
-            pWindow->ctx.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+            pWindow->ctx.instance_extensions.push_back(extension);
         }
-      }
+        else
+        {
+            if (pWindow->m_validate)
+            {
+                fprintf(stderr, "Optional Vulkan extension '%s' not found.",
+                        extension);
+            }
+        }
+    }
+  
+    uint32_t instance_extension_count = 0;
+    err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count, NULL);
+    assert(!err);
 
-      // This one is needed for MoltenVK
-      if (!strcmp(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
-                  instance_extensions[i].extensionName))
-      {
-          pWindow->ctx.instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-          portability_enumeration = VK_TRUE;
-      }
+    if (instance_extension_count > 0) {
+        VkExtensionProperties *instance_extensions =
+            (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) *
+                                              instance_extension_count);
+        err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count,
+                                                     instance_extensions);
+        assert(!err);
+        for (i = 0; i < instance_extension_count; i++)
+        {
+            if (!strcmp(VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+                        instance_extensions[i].extensionName))
+            {
+                if (pWindow->m_validate)
+                {
+                    pWindow->ctx.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+                }
+            }
+
+            // This one is needed for MoltenVK
+            if (!strcmp(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+                        instance_extensions[i].extensionName))
+            {
+                pWindow->ctx.instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+                portability_enumeration = VK_TRUE;
+            }
+        }
+
+        free(instance_extensions);
     }
 
-    free(instance_extensions);
-  }
+    VkApplicationInfo app = {};
+    app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app.pNext = NULL;
+    app.pApplicationName = pWindow->application_name();
+    app.applicationVersion = 0;
+    app.pEngineName = pWindow->engine_name();
+    app.engineVersion = 0;
+    app.apiVersion = VK_API_VERSION_1_3;
 
-  VkApplicationInfo app = {};
-  app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  app.pNext = NULL;
-  app.pApplicationName = pWindow->application_name();
-  app.applicationVersion = 0;
-  app.pEngineName = pWindow->engine_name();
-  app.engineVersion = 0;
-  app.apiVersion = VK_API_VERSION_1_3;
+    VkInstanceCreateInfo inst_info = {};
+    inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    inst_info.pNext = NULL;
+    inst_info.pApplicationInfo = &app;
+    inst_info.enabledLayerCount = pWindow->ctx.enabled_layers.size();
+    inst_info.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
+    inst_info.enabledExtensionCount = pWindow->ctx.instance_extensions.size();
+    inst_info.ppEnabledExtensionNames = pWindow->ctx.instance_extensions.data();
 
-  VkInstanceCreateInfo inst_info = {};
-  inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  inst_info.pNext = NULL;
-  inst_info.pApplicationInfo = &app;
-  inst_info.enabledLayerCount = pWindow->ctx.enabled_layers.size();
-  inst_info.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
-  inst_info.enabledExtensionCount = pWindow->ctx.instance_extensions.size();
-  inst_info.ppEnabledExtensionNames = pWindow->ctx.instance_extensions.data();
+    if (portability_enumeration)
+        inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
-  if (portability_enumeration)
-    inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-
-  if (pWindow->m_instance == VK_NULL_HANDLE)
-  {
-      err = vkCreateInstance(&inst_info, NULL, &pWindow->m_instance);
-      if (err == VK_ERROR_INCOMPATIBLE_DRIVER) {
-          Fl::fatal("Cannot find a compatible Vulkan installable client driver "
-                    "(ICD).\n\nPlease look at the Getting Started guide for "
-                    "additional information.\n",
-                    "vkCreateInstance Failure");
-      } else if (err == VK_ERROR_EXTENSION_NOT_PRESENT) {
-          Fl::fatal("Cannot find a specified extension library"
-                    ".\nMake sure your layers path is set appropriately\n",
-                    "vkCreateInstance Failure");
-      } else if (err) {
-          Fl::fatal("vkCreateInstance failed.\n\nDo you have a compatible Vulkan "
-                    "installable client driver (ICD) installed?\nPlease look at "
-                    "the Getting Started guide for additional information.\n",
-                    "vkCreateInstance Failure");
-      }
-  }
-
-  pWindow->ctx.instance = pWindow->m_instance;
-
-  // Make initial call to query gpu_count, then second call for gpu info
-  // Make initial call to query gpu_count
-  uint32_t gpu_count = 0;
-  err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, NULL);
-  if (err != VK_SUCCESS || gpu_count == 0) {
-      Fl::fatal("vkEnumeratePhysicalDevices failed to find any GPUs.\n\n"
-                "Error code: %d\n"
-                "Do you have a compatible Vulkan installable client driver (ICD) installed?\n"
-                "Please look at the Getting Started guide for additional information.");
+    if (pWindow->m_instance == VK_NULL_HANDLE)
+    {
+        err = vkCreateInstance(&inst_info, NULL, &pWindow->m_instance);
+        if (err == VK_ERROR_INCOMPATIBLE_DRIVER) {
+            Fl::fatal("Cannot find a compatible Vulkan installable client driver "
+                      "(ICD).\n\nPlease look at the Getting Started guide for "
+                      "additional information.\n",
+                      "vkCreateInstance Failure");
+        } else if (err == VK_ERROR_EXTENSION_NOT_PRESENT) {
+            Fl::fatal("Cannot find a specified extension library"
+                      ".\nMake sure your layers path is set appropriately\n",
+                      "vkCreateInstance Failure");
+        } else if (err) {
+            Fl::fatal("vkCreateInstance failed.\n\nDo you have a compatible Vulkan "
+                      "installable client driver (ICD) installed?\nPlease look at "
+                      "the Getting Started guide for additional information.\n",
+                      "vkCreateInstance Failure");
+        }
+    }
+    
 }
+
+void Fl_Vk_Window_Driver::init_vk()
+{
+    VkResult err;
+    uint32_t i = 0;
+    
+    if (pWindow->m_instance == VK_NULL_HANDLE)
+        init_instance();
+    
+    pWindow->ctx.instance = pWindow->m_instance;
+
+    // Make initial call to query gpu_count, then second call for gpu info
+    // Make initial call to query gpu_count
+    uint32_t gpu_count = 0;
+    err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, NULL);
+    if (err != VK_SUCCESS || gpu_count == 0)
+    {
+        Fl::fatal("vkEnumeratePhysicalDevices failed to find any GPUs.\n\n"
+                  "Do you have a compatible Vulkan installable client driver (ICD) installed?\n"
+                  "Please look at the Getting Started guide for additional information.");
+    }
   
-// Allocate and populate physical devices array
-  VkPhysicalDevice *physical_devices = (VkPhysicalDevice *)VK_ALLOC(sizeof(VkPhysicalDevice) * gpu_count);
-  assert(physical_devices); // Ensure allocation succeeded
-  err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, physical_devices);
-  if (err != VK_SUCCESS) {
-      VK_CHECK_RESULT(err);
-      VK_FREE(physical_devices);
-      Fl::fatal("vkEnumeratePhysicalDevices failed to enumerate devices.\n"
-                "Error code");
-  }
+    // Allocate and populate physical devices array
+    VkPhysicalDevice *physicalDevices = (VkPhysicalDevice *)VK_ALLOC(sizeof(VkPhysicalDevice) * gpu_count);
+    err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, physicalDevices);
+    if (err != VK_SUCCESS) {
+        VK_CHECK_RESULT(err);
+        VK_FREE(physicalDevices);
+        Fl::fatal("vkEnumeratePhysicalDevices failed to enumerate devices.\n"
+                  "Error code");
+    }
 
-  // Assign the first GPU handle and free the array
-  pWindow->gpu() = physical_devices[0];
-  VK_FREE(physical_devices);
+    // Assign the first GPU handle and free the array
+    pWindow->gpu() = physicalDevices[0];
+    VK_FREE(physicalDevices);
 
-  // Look for device extensions
-  uint32_t device_extension_count = 0;
-  VkBool32 swapchainExtFound = 0;
+    // Look for device extensions
+    uint32_t device_extension_count = 0;
+    VkBool32 swapchainExtFound = 0;
 
-  err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
-                                             &device_extension_count, NULL);
-  assert(!err);
+    err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
+                                               &device_extension_count, NULL);
+    assert(!err);
 
-#define FLTK_ADD_DEVICE_EXTENSION(x) \
-    if (!strcmp(x, device_extensions[i].extensionName)) { \
+#define FLTK_ADD_DEVICE_EXTENSION(x)                        \
+    if (!strcmp(x, device_extensions[i].extensionName)) {   \
         pWindow->ctx.device_extensions.push_back(x);        \
     }
 
@@ -566,89 +554,90 @@ void Fl_Vk_Window_Driver::init_vk()
 #   define VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME "VK_KHR_get_physical_device_properties2"
 #endif
   
-  if (device_extension_count > 0) {
-      VkExtensionProperties *device_extensions =
-          (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
-      err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
-                                                 &device_extension_count,
-                                                 device_extensions);
-      assert(!err);
-      
-      for (i = 0; i < device_extension_count; i++)
-      {
-          if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                      device_extensions[i].extensionName))
-          {
-              swapchainExtFound = 1;
-              pWindow->ctx.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-          }
-        
-      #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-          FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
-          FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-      #endif
-    }
-          
-    auto wanted_device_extensions = pWindow->get_device_extensions();
-    for (const auto& extension : wanted_device_extensions)
+    if (device_extension_count > 0)
     {
+        VkExtensionProperties *device_extensions =
+            (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
+        err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
+                                                   &device_extension_count,
+                                                   device_extensions);
+        assert(!err);
+      
         for (i = 0; i < device_extension_count; i++)
         {
-            if (!strcmp(extension,
+            if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                         device_extensions[i].extensionName))
             {
-                pWindow->ctx.device_extensions.push_back(extension);
-                break;
+                swapchainExtFound = 1;
+                pWindow->ctx.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             }
-
+        
+#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+            FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+            FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#endif
         }
+          
+        auto wanted_device_extensions = pWindow->get_device_extensions();
+        for (const auto& extension : wanted_device_extensions)
+        {
+            for (i = 0; i < device_extension_count; i++)
+            {
+                if (!strcmp(extension,
+                            device_extensions[i].extensionName))
+                {
+                    pWindow->ctx.device_extensions.push_back(extension);
+                    break;
+                }
+
+            }
+        }
+
+        VK_FREE(device_extensions);
     }
 
-    VK_FREE(device_extensions);
-  }
+    if (!swapchainExtFound) {
+        Fl::fatal("vkEnumerateDeviceExtensionProperties failed to find "
+                  "the " VK_KHR_SWAPCHAIN_EXTENSION_NAME " extension.\n\nDo you have a compatible "
+                  "Vulkan installable client driver (ICD) installed?\nPlease "
+                  "look at the Getting Started guide for additional "
+                  "information.\n",
+                  "vkCreateInstance Failure");
+    }
 
-  if (!swapchainExtFound) {
-    Fl::fatal("vkEnumerateDeviceExtensionProperties failed to find "
-              "the " VK_KHR_SWAPCHAIN_EXTENSION_NAME " extension.\n\nDo you have a compatible "
-              "Vulkan installable client driver (ICD) installed?\nPlease "
-              "look at the Getting Started guide for additional "
-              "information.\n",
-              "vkCreateInstance Failure");
-  }
+    vkGetPhysicalDeviceProperties(pWindow->gpu(), &pWindow->ctx.gpu_props);
 
-  vkGetPhysicalDeviceProperties(pWindow->gpu(), &pWindow->ctx.gpu_props);
+    // Query with NULL data to get count
+    vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
+                                             &pWindow->ctx.queue_count, NULL);
 
-  // Query with NULL data to get count
-  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
-                                           &pWindow->ctx.queue_count, NULL);
+    pWindow->ctx.queue_props =
+        (VkQueueFamilyProperties *)VK_ALLOC(pWindow->ctx.queue_count *
+                                            sizeof(VkQueueFamilyProperties));
+    vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
+                                             &pWindow->ctx.queue_count,
+                                             pWindow->ctx.queue_props);
+    assert(pWindow->ctx.queue_count >= 1);
 
-  pWindow->ctx.queue_props =
-      (VkQueueFamilyProperties *)VK_ALLOC(pWindow->ctx.queue_count *
-                                          sizeof(VkQueueFamilyProperties));
-  vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
-                                           &pWindow->ctx.queue_count,
-                                           pWindow->ctx.queue_props);
-  assert(pWindow->ctx.queue_count >= 1);
-
-  vkGetPhysicalDeviceFeatures(pWindow->gpu(), &pWindow->ctx.gpu_features);
+    vkGetPhysicalDeviceFeatures(pWindow->gpu(), &pWindow->ctx.gpu_features);
 
 }
 
 void Fl_Vk_Window_Driver::init_vk_swapchain() {
-  VkResult result;
-  uint32_t i;
+    VkResult result;
+    uint32_t i;
 
-  // Get Memory information and properties
-  size_t numQueues = pWindow->ctx.queue_count;
-  vkGetPhysicalDeviceMemoryProperties(pWindow->gpu(),
-                                      &pWindow->m_memory_properties);
+    // Get Memory information and properties
+    size_t numQueues = pWindow->ctx.queue_count;
+    vkGetPhysicalDeviceMemoryProperties(pWindow->gpu(),
+                                        &pWindow->m_memory_properties);
 
-  // Iterate over each queue to learn whether it supports presenting:
-  VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
-                                                   sizeof(VkBool32));
-  for (i = 0; i < numQueues; i++) {
-    vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
-                                         pWindow->m_surface,
+    // Iterate over each queue to learn whether it supports presenting:
+    VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
+                                                     sizeof(VkBool32));
+    for (i = 0; i < numQueues; i++) {
+        vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
+                                             pWindow->m_surface,
                                          &supportsPresent[i]);
   }
 
@@ -697,7 +686,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
   
-  pWindow->create_device();
+  if (pWindow->device() == VK_NULL_HANDLE)
+      pWindow->create_device();
 
   vkGetDeviceQueue(pWindow->device(),
                    pWindow->m_queueFamilyIndex, 0,
@@ -721,13 +711,11 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   for (const auto& format : formats)
   {
       scores[i] = 0;
-      if (pWindow->m_validate)
+      if (pWindow->log_level() > 5)
       {
-          // std::cerr << "[" << i << "] format ="
-          //           << string_VkFormat(format.format) << std::endl
-          //           << "color space = "
-          //           << string_VkColorSpaceKHR(format.colorSpace)
-          //           << std::endl;
+          printf("[%d] format = %s color space = %s\n",
+                 i, string_VkFormat(format.format),
+                 string_VkColorSpaceKHR(format.colorSpace));
       }
       switch (format.colorSpace)
       {
@@ -797,8 +785,10 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
           // Fallback to first supported format (usually works)
           m_format = formats[0].format;
           m_color_space = formats[0].colorSpace;
-          std::cerr << "No ideal linear format found, using fallback"
-                    << std::endl;
+          if (pWindow->log_level() > 2)
+          {
+              fprintf(stderr, "No ideal linear format found, using fallback\n");
+          }
       }
   }
   else
@@ -826,12 +816,12 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   pWindow->m_format = m_format;
   pWindow->m_color_space = m_color_space;
 
-  if (pWindow->m_validate)
+  if (pWindow->log_level() > 2)
   {
-      std::cout << pWindow << "\tSelected window format = " << string_VkFormat(m_format)
-                << std::endl
-                << pWindow << "\tSelected window color space = "
-                << string_VkColorSpaceKHR(m_color_space) << std::endl;
+      printf("%p\tSelected window format = %s\n"
+             "%p\tSelected window color space = %s\n",
+             pWindow, string_VkFormat(m_format),
+             pWindow, string_VkColorSpaceKHR(m_color_space));
   }
 }
 
@@ -891,20 +881,6 @@ void Fl_Vk_Window_Driver::destroy_resources() {
       // image belongs to the swapchain.
   }
   pWindow->m_buffers.clear();
-
-  if (pWindow->m_depth.view != VK_NULL_HANDLE) {
-    vkDestroyImageView(pWindow->device(), pWindow->m_depth.view, NULL);
-    pWindow->m_depth.view = VK_NULL_HANDLE;
-  }
-
-  if (pWindow->m_depth.image != VK_NULL_HANDLE) {
-    vkDestroyImage(pWindow->device(), pWindow->m_depth.image, NULL);
-    pWindow->m_depth.image = VK_NULL_HANDLE;
-  }
-
-  if (pWindow->m_depth.mem != VK_NULL_HANDLE) {
-    vkFreeMemory(pWindow->device(), pWindow->m_depth.mem, NULL);
-    pWindow->m_depth.mem = VK_NULL_HANDLE;
-  }
+  pWindow->m_depth.destroy(pWindow->device());
 }
 

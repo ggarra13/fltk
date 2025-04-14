@@ -624,21 +624,6 @@ void cube_box::prepare_uniform_buffer()
 
     vkAllocateMemory(device(), &ubo_alloc_info, nullptr, &m_cube.uniformMemory);
     vkBindBufferMemory(device(), m_cube.uniformBuffer, m_cube.uniformMemory, 0);
-
-    
-    // vkCreateBuffer(device(), &ubo_buf_info, nullptr, &m_cube.uniformBuffer);
-    // vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &m_cube.uboMemReqs);
-    
-    // VkMemoryAllocateInfo ubo_alloc_info = {};
-    // ubo_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    // ubo_alloc_info.allocationSize = m_cube.uboMemReqs.size;
-    // memory_type_from_properties(gpu(), m_cube.uboMemReqs.memoryTypeBits,
-    //                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-    //                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    //                             &ubo_alloc_info.memoryTypeIndex);
-
-    // vkAllocateMemory(device(), &ubo_alloc_info, nullptr, &m_cube.uniformMemory);
-    // vkBindBufferMemory(device(), m_cube.uniformBuffer, m_cube.uniformMemory, 0);
 }
 
 void cube_box::prepare_descriptor_pool()
@@ -720,30 +705,8 @@ void cube_box::prepare_descriptor_layout()
 
 void cube_box::destroy_resources()
 {
-    if (m_cube.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_cube.buf, nullptr);
-        m_cube.buf = VK_NULL_HANDLE;
-    }
-    if (m_cube.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_cube.mem, nullptr);
-        m_cube.mem = VK_NULL_HANDLE;
-    }
-    if (m_cube.uniformBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_cube.uniformBuffer, nullptr);
-        m_cube.uniformBuffer = VK_NULL_HANDLE;
-    }
-    if (m_cube.uniformMemory != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_cube.uniformMemory, nullptr);
-        m_cube.uniformMemory = VK_NULL_HANDLE;
-    }
-    if (m_cube.indexBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_cube.indexBuffer, nullptr);
-        m_cube.indexBuffer = VK_NULL_HANDLE;
-    }
-    if (m_cube.indexMem != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_cube.indexMem, nullptr);
-        m_cube.indexMem = VK_NULL_HANDLE;
-    }
+    m_cube.destroy(device());
+    
     if (m_desc_layout != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device(), m_desc_layout, nullptr);
         m_desc_layout = VK_NULL_HANDLE;

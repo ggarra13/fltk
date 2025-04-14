@@ -833,7 +833,7 @@ void Fl_Vk_Window::init() {
   m_swapchain_needs_recreation = false;
   m_use_staging_buffer = false;
   m_depthStencil = 1.0;
-
+  
   // Reset Vulkan Handles
 #ifdef NDEBUG
   m_validate = false;

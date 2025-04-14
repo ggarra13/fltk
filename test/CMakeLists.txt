@@ -281,6 +281,8 @@ unset(_compilers)
 # This is currently pretty complicated and should be improved.
 # It will be simplified significantly when we use more "modern CMake".
 
+find_file(HAS_GLM glm/glm.hpp)
+
 if(FLTK_BUILD_SHARED_LIBS)
 
   if(MSVC) # MS Visual C++ aka. Visual Studio
@@ -318,7 +320,9 @@ if(FLTK_BUILD_SHARED_LIBS)
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape-shared vk_shape.cxx "CALL_MAIN;${VKDEMO_SHARED}")
 	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "CALL_MAIN;${VKDEMO_SHARED}")
-	fl_create_example(vk_cube-shared vk_cube.cxx "CALL_MAIN;${VKDEMO_SHARED}")
+	if (HAS_GLM)
+	    fl_create_example(vk_cube-shared vk_cube.cxx "CALL_MAIN;${VKDEMO_SHARED}")
+	endif()
     endif(VULKAN_FOUND)
     
     # apply property COMPILE_DEFINITIONS "-D FL_DLL" in a loop for all necessary source files
@@ -341,7 +345,9 @@ if(FLTK_BUILD_SHARED_LIBS)
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
 	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
-	fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
+	if (HAS_GLM)
+	    fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
+	endif()
     endif(VULKAN_FOUND)
 
   endif(MSVC) # (not MSVC)
@@ -364,7 +370,9 @@ else() # not FLTK_BUILD_SHARED_LIBS
     if(VULKAN_FOUND)
 	fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
 	fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
-	fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
+	if (HAS_GLM)
+	    fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
+	endif()
     endif(VULKAN_FOUND)
 
 endif(FLTK_BUILD_SHARED_LIBS)

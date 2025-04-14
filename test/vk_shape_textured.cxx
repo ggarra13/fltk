@@ -28,8 +28,6 @@
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
 
-#define DEMO_TEXTURE_COUNT 1
-
 class DynamicTextureWindow : public Fl_Vk_Window {
     void vk_draw_begin() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
@@ -60,8 +58,8 @@ protected:
     uint32_t frame_counter = 0;
     
     //! This is for holding a mesh
-    Fl_Vk_Mesh m_vertices;
-    Fl_Vk_Texture  m_textures[DEMO_TEXTURE_COUNT];
+    Fl_Vk_Mesh m_mesh;
+    Fl_Vk_Texture  m_texture;
     
     void prepare_textures();
     void prepare_descriptor_layout();
@@ -216,86 +214,85 @@ void DynamicTextureWindow::prepare_textures()
 {
     VkResult result;
     const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
-    const uint32_t tex_colors[DEMO_TEXTURE_COUNT][2] = {
+    const uint32_t tex_colors[2] = {
         // B G R A     B G R A
-        {0xffff0000, 0xff00ff00},  // Red, Green
-    };
+        0xffff0000, 0xff00ff00  // Red, Green
+            };
 
     // Query if image supports texture format
     VkFormatProperties props;
     vkGetPhysicalDeviceFormatProperties(gpu(), tex_format, &props);
 
-    for (int i = 0; i < DEMO_TEXTURE_COUNT; i++) {
-        if ((props.linearTilingFeatures &
-             VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) &&
-            !m_use_staging_buffer) {
-            // Device can texture using linear textures
-            prepare_texture_image(
-                tex_colors[i], &m_textures[i], VK_IMAGE_TILING_LINEAR,
-                VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        } else if (props.optimalTilingFeatures &
-                   VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) {
-            Fl::fatal("Staging buffer path not implemented in this demo");
-        } else {
-            /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
-            Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");
-        }
-        
-        VkSamplerCreateInfo sampler_info = {};
-        sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        sampler_info.pNext = NULL;
-        sampler_info.magFilter = VK_FILTER_NEAREST;
-        sampler_info.minFilter = VK_FILTER_NEAREST;
-        sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-        sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        sampler_info.mipLodBias = 0.0f;
-        sampler_info.anisotropyEnable = VK_FALSE;
-        sampler_info.maxAnisotropy = 1;
-        sampler_info.compareOp = VK_COMPARE_OP_NEVER;
-        sampler_info.minLod = 0.0f;
-        sampler_info.maxLod = 0.0f;
-        sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-        sampler_info.unnormalizedCoordinates = VK_FALSE;
-
-        VkImageViewCreateInfo view_info = {};
-        view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        view_info.pNext = NULL;
-        view_info.image = m_textures[i].image;
-        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        view_info.format = tex_format;
-        view_info.components =
-            {
-                VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
-                VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
-            };
-        view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-        view_info.flags = 0;
-
-        result = vkCreateSampler(device(), &sampler_info, NULL,
-                                 &m_textures[i].sampler);
-        VK_CHECK_RESULT(result);
-
-        result = vkCreateImageView(device(), &view_info, NULL, &m_textures[i].view);
-        VK_CHECK_RESULT(result);
+    if ((props.linearTilingFeatures &
+         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) &&
+        !m_use_staging_buffer) {
+        // Device can texture using linear textures
+        prepare_texture_image(
+            tex_colors, &m_texture, VK_IMAGE_TILING_LINEAR,
+            VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    } else if (props.optimalTilingFeatures &
+               VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) {
+        Fl::fatal("Staging buffer path not implemented in this demo");
+    } else {
+        /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
+        Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");
     }
+        
+    VkSamplerCreateInfo sampler_info = {};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.pNext = NULL;
+    sampler_info.magFilter = VK_FILTER_NEAREST;
+    sampler_info.minFilter = VK_FILTER_NEAREST;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.mipLodBias = 0.0f;
+    sampler_info.anisotropyEnable = VK_FALSE;
+    sampler_info.maxAnisotropy = 1;
+    sampler_info.compareOp = VK_COMPARE_OP_NEVER;
+    sampler_info.minLod = 0.0f;
+    sampler_info.maxLod = 0.0f;
+    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+
+    VkImageViewCreateInfo view_info = {};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.pNext = NULL;
+    view_info.image = m_texture.image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = tex_format;
+    view_info.components =
+        {
+            VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+            VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A,
+        };
+    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    view_info.flags = 0;
+
+    result = vkCreateSampler(device(), &sampler_info, NULL,
+                             &m_texture.sampler);
+    VK_CHECK_RESULT(result);
+
+    result = vkCreateImageView(device(), &view_info, NULL, &m_texture.view);
+    VK_CHECK_RESULT(result);
 }
 
 void DynamicTextureWindow::update_texture()
 {
 
     // Transition to GENERAL for CPU writes
-    set_image_layout(device(), commandPool(), queue(), m_textures[0].image, VK_IMAGE_ASPECT_COLOR_BIT,
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    VK_IMAGE_LAYOUT_GENERAL,
-                    VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                    VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT);
+    set_image_layout(device(), commandPool(), queue(), m_texture.image,
+                     VK_IMAGE_ASPECT_COLOR_BIT,
+                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                     VK_IMAGE_LAYOUT_GENERAL,
+                     VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                     VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT);
 
     void* data;
-    vkMapMemory(device(), m_textures[0].mem, 0, m_mem_reqs.size, 0, &data);
+    vkMapMemory(device(), m_texture.mem, 0, m_mem_reqs.size, 0, &data);
     
     uint32_t* pixels = (uint32_t*)data;
     uint8_t intensity = (frame_counter++ % 255);
@@ -304,11 +301,11 @@ void DynamicTextureWindow::update_texture()
     pixels[2] = (intensity) | 0xFF;              // Blue
     pixels[3] = ((255 - intensity) << 16) | 0xFF;// Inverted Red
     
-    vkUnmapMemory(device(), m_textures[0].mem);
+    vkUnmapMemory(device(), m_texture.mem);
 
     // Transition back to SHADER_READ_ONLY_OPTIMAL
     set_image_layout(device(), commandPool(), queue(),
-                     m_textures[0].image, VK_IMAGE_ASPECT_COLOR_BIT,
+                     m_texture.image, VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_GENERAL,
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
@@ -369,12 +366,12 @@ void DynamicTextureWindow::prepare_vertices()
     buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; 
     buf_info.flags = 0;
 
-    result = vkCreateBuffer(device(), &buf_info, NULL, &m_vertices.buf);
+    result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
     VK_CHECK_RESULT(result);
     
     // Use a local variable instead of overwriting m_mem_reqs
     VkMemoryRequirements vertex_mem_reqs;
-    vkGetBufferMemoryRequirements(device(), m_vertices.buf, &vertex_mem_reqs);
+    vkGetBufferMemoryRequirements(device(), m_mesh.buf, &vertex_mem_reqs);
     
     VkMemoryAllocateInfo mem_alloc = {};
     mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -390,40 +387,40 @@ void DynamicTextureWindow::prepare_vertices()
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                                 &mem_alloc.memoryTypeIndex);
 
-    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_vertices.mem);
+    result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_mesh.mem);
     VK_CHECK_RESULT(result);
 
-    result = vkMapMemory(device(), m_vertices.mem, 0,
+    result = vkMapMemory(device(), m_mesh.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK_RESULT(result);
 
     memcpy(data, vertices.data(), sizeof(Vertex) * vertices.size());
 
-    vkUnmapMemory(device(), m_vertices.mem);
+    vkUnmapMemory(device(), m_mesh.mem);
 
-    result = vkBindBufferMemory(device(), m_vertices.buf, m_vertices.mem, 0);
+    result = vkBindBufferMemory(device(), m_mesh.buf, m_mesh.mem, 0);
     VK_CHECK_RESULT(result);
 
-    m_vertices.vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    m_vertices.vi.pNext = NULL;
-    m_vertices.vi.vertexBindingDescriptionCount = 1;
-    m_vertices.vi.pVertexBindingDescriptions = m_vertices.vi_bindings;
-    m_vertices.vi.vertexAttributeDescriptionCount = 2;
-    m_vertices.vi.pVertexAttributeDescriptions = m_vertices.vi_attrs;
+    m_mesh.vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    m_mesh.vi.pNext = NULL;
+    m_mesh.vi.vertexBindingDescriptionCount = 1;
+    m_mesh.vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
+    m_mesh.vi.vertexAttributeDescriptionCount = 2;
+    m_mesh.vi.pVertexAttributeDescriptions = m_mesh.vi_attrs;
 
-    m_vertices.vi_bindings[0].binding = 0;
-    m_vertices.vi_bindings[0].stride = sizeof(vertices[0]);
-    m_vertices.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    m_mesh.vi_bindings[0].binding = 0;
+    m_mesh.vi_bindings[0].stride = sizeof(vertices[0]);
+    m_mesh.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    m_vertices.vi_attrs[0].binding = 0;
-    m_vertices.vi_attrs[0].location = 0;
-    m_vertices.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    m_vertices.vi_attrs[0].offset = 0;
+    m_mesh.vi_attrs[0].binding = 0;
+    m_mesh.vi_attrs[0].location = 0;
+    m_mesh.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    m_mesh.vi_attrs[0].offset = 0;
 
-    m_vertices.vi_attrs[1].binding = 0;
-    m_vertices.vi_attrs[1].location = 1;
-    m_vertices.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
-    m_vertices.vi_attrs[1].offset = sizeof(float) * 3;
+    m_mesh.vi_attrs[1].binding = 0;
+    m_mesh.vi_attrs[1].location = 1;
+    m_mesh.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
+    m_mesh.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
 // m_format, m_depth (optionally) -> creates m_renderPass
@@ -597,7 +594,7 @@ void DynamicTextureWindow::prepare_pipeline() {
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline.layout = m_pipeline_layout;
 
-    vi = m_vertices.vi;
+    vi = m_mesh.vi;
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -695,7 +692,7 @@ void DynamicTextureWindow::prepare_pipeline() {
 void DynamicTextureWindow::prepare_descriptor_pool() {
     VkDescriptorPoolSize type_count = {};
     type_count.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    type_count.descriptorCount = DEMO_TEXTURE_COUNT;
+    type_count.descriptorCount = 1;  // one texture
     
     VkDescriptorPoolCreateInfo descriptor_pool = {};
     descriptor_pool.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -712,7 +709,7 @@ void DynamicTextureWindow::prepare_descriptor_pool() {
 }
 
 void DynamicTextureWindow::prepare_descriptor_set() {
-    VkDescriptorImageInfo tex_descs[DEMO_TEXTURE_COUNT];
+    VkDescriptorImageInfo tex_descs[1];
     VkResult result;
     uint32_t i;
 
@@ -727,16 +724,14 @@ void DynamicTextureWindow::prepare_descriptor_set() {
     VK_CHECK_RESULT(result);
 
     memset(&tex_descs, 0, sizeof(tex_descs));
-    for (i = 0; i < DEMO_TEXTURE_COUNT; i++) {
-        tex_descs[i].sampler = m_textures[i].sampler;
-        tex_descs[i].imageView = m_textures[i].view;
-        tex_descs[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    }
+    tex_descs[0].sampler = m_texture.sampler;
+    tex_descs[0].imageView = m_texture.view;
+    tex_descs[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkWriteDescriptorSet write = {};
     write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write.dstSet = m_desc_set;
-    write.descriptorCount = DEMO_TEXTURE_COUNT;
+    write.descriptorCount = 1;
     write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     write.pImageInfo = tex_descs;
 
@@ -771,7 +766,7 @@ void DynamicTextureWindow::draw() {
     // Draw the shape
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
-                           &m_vertices.buf, offsets);
+                           &m_mesh.buf, offsets);
 
     vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
 
@@ -779,19 +774,8 @@ void DynamicTextureWindow::draw() {
 }
 
 void DynamicTextureWindow::destroy_resources() {
-    if (m_vertices.buf != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device(), m_vertices.buf, NULL);
-        m_vertices.buf = VK_NULL_HANDLE;
-    }
-
-    if (m_vertices.mem != VK_NULL_HANDLE) {
-        vkFreeMemory(device(), m_vertices.mem, NULL);
-        m_vertices.mem = VK_NULL_HANDLE;
-    }
-    
-    for (uint32_t i = 0; i < DEMO_TEXTURE_COUNT; i++) {
-        m_textures[i].destroy(device());
-    }
+    m_mesh.destroy(device());
+    m_texture.destroy(device());
     
     Fl_Vk_Window::destroy_resources();
 }
@@ -801,7 +785,7 @@ void DynamicTextureWindow::prepare_descriptor_layout() {
     VkDescriptorSetLayoutBinding layout_binding = {};
     layout_binding.binding = 0;
     layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    layout_binding.descriptorCount = DEMO_TEXTURE_COUNT;
+    layout_binding.descriptorCount = 1;
     layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     layout_binding.pImmutableSamplers = NULL;
   
