@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <cstring>
 
 std::vector<uint32_t> compile_glsl_to_spirv(const std::string &source_code,
                                             shaderc_shader_kind shader_kind,
@@ -386,4 +387,67 @@ VkSampler createSampler(VkDevice device,
         throw std::runtime_error("Failed to create sampler");
     }
     return sampler;
+}
+
+void uploadTextureData(VkDevice device,
+                       VkPhysicalDevice gpu,
+                       VkCommandPool commandPool,
+                       VkQueue queue,
+                       VkImage image,
+                       uint32_t width,
+                       uint32_t height,
+                       uint32_t depth,
+                       VkFormat format,
+                       const uint16_t channels,
+                       const uint16_t pixel_fmt_size,
+                       const void* data)
+{
+    VkResult result;
+
+    VkDeviceSize imageSize = width * height * depth * channels * pixel_fmt_size;
+
+    // Create staging buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    createBuffer(
+        device, gpu,
+        imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
+
+    // Copy data to staging buffer
+    void* mappedData;
+    result = vkMapMemory(
+        device, stagingBufferMemory, 0, imageSize, 0, &mappedData);
+    VK_CHECK_RESULT(result);
+
+    std::memcpy(mappedData, data, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    // Copy staging buffer to image
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands(device, commandPool);
+
+    VkBufferImageCopy region = {};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {width, height, depth};
+
+    vkCmdCopyBufferToImage(
+        commandBuffer, stagingBuffer, image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    endSingleTimeCommands(commandBuffer, device,
+                          commandPool, queue);
+
+    // Clean up staging buffer
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
 }

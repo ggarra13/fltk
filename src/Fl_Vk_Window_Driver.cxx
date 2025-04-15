@@ -84,7 +84,7 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
-// Uses m_swapchain, ctx.gpu, m_surface, m_format, m_color_space, m_buffers
+// Uses m_swapchain, ctx.gpu, m_surface, m_format, m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
   VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
@@ -117,8 +117,8 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   if (swapchain.minImageCount < surfCapabilities.minImageCount) {
     swapchain.minImageCount = surfCapabilities.minImageCount;
   }
-  swapchain.imageFormat = pWindow->m_format;
-  swapchain.imageColorSpace = pWindow->m_color_space;
+  swapchain.imageFormat = pWindow->format();
+  swapchain.imageColorSpace = pWindow->colorSpace();
   swapchain.imageExtent = swapchainExtent;
   swapchain.imageArrayLayers = 1;
   swapchain.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -181,7 +181,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
     view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view_info.image = swapchainImages[i];
     view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = pWindow->m_format;
+    view_info.format = pWindow->format();
     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.levelCount = 1;
     view_info.subresourceRange.layerCount = 1;
@@ -705,8 +705,7 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
 
   // Look for HDR10 or HLG if present
   bool hdrMonitorFound = false;
-  VkFormat m_format;
-  VkColorSpaceKHR m_color_space;
+  VkColorSpaceKHR color_space;
   std::vector<int> scores(formats.size());
   for (const auto& format : formats)
   {
@@ -765,6 +764,7 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
       ++i;
   }
 
+  VkFormat view_format;
   if (!hdrMonitorFound)
   {
       bool foundLinear = false;
@@ -774,8 +774,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
           if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
               format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
           {
-              m_format = VK_FORMAT_B8G8R8A8_UNORM;
-              m_color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+              view_format = VK_FORMAT_B8G8R8A8_UNORM;
+              color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
               foundLinear = true;
               break;
           }
@@ -783,8 +783,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
       if (!foundLinear)
       {
           // Fallback to first supported format (usually works)
-          m_format = formats[0].format;
-          m_color_space = formats[0].colorSpace;
+          view_format = formats[0].format;
+          color_space = formats[0].colorSpace;
           if (pWindow->log_level() > 2)
           {
               fprintf(stderr, "No ideal linear format found, using fallback\n");
@@ -800,8 +800,8 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
           if (scores[i] > best_score)
           {
               best_score = scores[i];
-              m_format = formats[i].format;
-              m_color_space = formats[i].colorSpace;
+              view_format = formats[i].format;
+              color_space = formats[i].colorSpace;
           }
       }
   }
@@ -809,19 +809,19 @@ void Fl_Vk_Window_Driver::init_vk_swapchain() {
   // Handle undefined format case
   if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
   {
-      m_format = VK_FORMAT_B8G8R8A8_UNORM;
-      m_color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+      view_format = VK_FORMAT_B8G8R8A8_UNORM;
+      color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
   }
 
-  pWindow->m_format = m_format;
-  pWindow->m_color_space = m_color_space;
+  pWindow->ctx.format = view_format;
+  pWindow->ctx.colorSpace = color_space;
 
   if (pWindow->log_level() > 2)
   {
       printf("%p\tSelected window format = %s\n"
              "%p\tSelected window color space = %s\n",
-             pWindow, string_VkFormat(m_format),
-             pWindow, string_VkColorSpaceKHR(m_color_space));
+             pWindow, string_VkFormat(view_format),
+             pWindow, string_VkColorSpaceKHR(color_space));
   }
 }
 

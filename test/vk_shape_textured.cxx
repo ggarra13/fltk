@@ -423,7 +423,7 @@ void DynamicTextureWindow::prepare_vertices()
     m_mesh.vi_attrs[1].offset = sizeof(float) * 3;
 }
 
-// m_format, m_depth (optionally) -> creates m_renderPass
+// m_depth (optionally) -> creates m_renderPass
 void DynamicTextureWindow::prepare_render_pass() 
 {
     bool has_depth = mode() & FL_DEPTH;
@@ -431,7 +431,7 @@ void DynamicTextureWindow::prepare_render_pass()
 
     VkAttachmentDescription attachments[2];
     attachments[0] = VkAttachmentDescription();
-    attachments[0].format = m_format;
+    attachments[0].format = format();
     attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;

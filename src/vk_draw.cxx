@@ -438,14 +438,6 @@ int vk_texture_pile_height(void)
   return vk_fifo->size();
 }
 
-/** To call after VK operations that may invalidate textures used to draw text in VK scenes
- (e.g., switch between FL_DOUBLE / FL_SINGLE modes).
- */
-void vk_texture_reset()
-{
-  if (vk_fifo) vk_texture_pile_height(vk_texture_pile_height());
-}
-
 
 /**
  Changes the maximum height of the pile of pre-computed string textures
@@ -459,6 +451,14 @@ void vk_texture_pile_height(int max)
 {
   if (vk_fifo) delete vk_fifo;
   vk_fifo = new vk_texture_fifo(max);
+}
+
+/** To call after VK operations that may invalidate textures used to draw text in VK scenes
+ (e.g., switch between FL_DOUBLE / FL_SINGLE modes).
+ */
+void vk_texture_reset()
+{
+  if (vk_fifo) vk_texture_pile_height(vk_texture_pile_height());
 }
 
 

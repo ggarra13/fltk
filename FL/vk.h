@@ -44,8 +44,6 @@
 
 #include "Fl_Export.H"
 
-
-#  include "Enumerations.H" // for color names
 #  ifdef _WIN32
 #    define NOMINMAX
 #    include <windows.h>
@@ -57,37 +55,6 @@
 #      define APIENTRY
 #    endif
 #  endif
-
-FL_EXPORT void vk_start();
-FL_EXPORT void vk_finish();
-
-FL_EXPORT void vk_color(Fl_Color i);
-/** back compatibility */
-inline void vk_color(int c) {vk_color((Fl_Color)c);}
-
-FL_EXPORT void vk_rect(int x,int y,int w,int h);
-FL_EXPORT void vk_rectf(int x,int y,int w,int h);
-
-FL_EXPORT void vk_font(int fontid, int size);
-FL_EXPORT int  vk_height();
-FL_EXPORT int  vk_descent();
-FL_EXPORT double vk_width(const char *);
-FL_EXPORT double vk_width(const char *, int n);
-FL_EXPORT double vk_width(uchar);
-
-FL_EXPORT void vk_draw(const char*);
-FL_EXPORT void vk_draw(const char*, int n);
-FL_EXPORT void vk_draw(const char*, int x, int y);
-FL_EXPORT void vk_draw(const char*, float x, float y);
-FL_EXPORT void vk_draw(const char*, int n, int x, int y);
-FL_EXPORT void vk_draw(const char*, int n, float x, float y);
-FL_EXPORT void vk_draw(const char*, int x, int y, int w, int h, Fl_Align);
-FL_EXPORT void vk_measure(const char*, int& x, int& y);
-FL_EXPORT void vk_texture_pile_height(int max);
-FL_EXPORT int  vk_texture_pile_height();
-FL_EXPORT void vk_texture_reset();
-
-FL_EXPORT void vk_draw_image(const uchar *, int x,int y,int w,int h, int d=3, int ld=0);
 
 #ifdef _WIN32
 #  define VK_USE_PLATFORM_WIN32_KHR

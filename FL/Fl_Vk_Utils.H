@@ -75,14 +75,30 @@ FL_EXPORT void transitionImageLayout(VkDevice device,
                                      VkImageLayout oldLayout,
                                      VkImageLayout newLayout);
 
-VkImageView createImageView(VkDevice device,
-                            VkImage image, VkFormat format,
-                            VkImageType imageType);
+FL_EXPORT void uploadTextureData(VkDevice device,
+                                 VkPhysicalDevice gpu,
+                                 VkCommandPool commandPool,
+                                 VkQueue queue,
+                                 VkImage image,
+                                 uint32_t width,
+                                 uint32_t height,
+                                 uint32_t depth,
+                                 VkFormat format,
+                                 const uint16_t channels,
+                                 const uint16_t pixel_fmt_size,
+                                 const void* data);
 
-VkSampler createSampler(VkDevice device,
-                        VkFilter magFilter = VK_FILTER_LINEAR,
-                        VkFilter minFilter = VK_FILTER_LINEAR,
-                        VkSamplerAddressMode addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                        VkSamplerAddressMode addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                        VkSamplerAddressMode addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+FL_EXPORT VkImageView createImageView(VkDevice device,
+                                      VkImage image, VkFormat format,
+                                      VkImageType imageType);
+
+FL_EXPORT VkSampler createSampler(VkDevice device,
+                                  VkFilter magFilter = VK_FILTER_LINEAR,
+                                  VkFilter minFilter = VK_FILTER_LINEAR,
+                                  VkSamplerAddressMode addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                  VkSamplerAddressMode addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                  VkSamplerAddressMode addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+
+
 #endif

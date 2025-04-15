@@ -46,6 +46,9 @@ struct Fl_Vk_Context
     VkQueue                       queue;
     VkCommandPool           commandPool;  // memory for command buffers
 
+    VkFormat                     format;   // for depth and color formats
+    VkColorSpaceKHR          colorSpace; // sRGB, HDR10 or HLG for example
+
     // List of enabled layers
     std::vector<const char*> enabled_layers;
 
@@ -399,9 +402,11 @@ public:
   inline VkPipelineCache&   pipelineCache() { return ctx.pipelineCache; }
   inline VkQueue&                   queue() { return ctx.queue; }
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
+  inline VkFormat&                 format() { return ctx.format; }
+  inline VkColorSpaceKHR&      colorSpace() { return ctx.colorSpace; }
   inline VkRenderPass&         renderPass() { return m_renderPass; }
   inline VkPipeline&             pipeline() { return m_pipeline; }
-  
+      
   inline const VkInstance&             instance() const { return m_instance; }
   inline const VkPhysicalDevice&            gpu() const { return ctx.gpu; }
   inline const VkPhysicalDevice& physicalDevice() const { return ctx.gpu; }
@@ -409,6 +414,8 @@ public:
   inline const VkPipelineCache&   pipelineCache() const { return ctx.pipelineCache; }
   inline const VkQueue&                   queue() const { return ctx.queue; }
   inline const VkCommandPool&       commandPool() const { return ctx.commandPool; }
+  inline const VkFormat&                 format() const { return ctx.format; }
+  inline const VkColorSpaceKHR&      colorSpace() const { return ctx.colorSpace; }
   inline const VkRenderPass&         renderPass() const { return m_renderPass; }
   inline const VkPipeline&             pipeline() const { return m_pipeline; }
 
@@ -423,9 +430,6 @@ public:
   // Per Window
   VkSurfaceKHR       m_surface;  // needed
   VkSurfaceFormatKHR m_surfaceFormat; //needed
-
-  VkFormat           m_format;   // for depth and color formats
-  VkColorSpaceKHR    m_color_space; // sRGB, HDR10 or HLG for example
   
   VkRenderPass       m_renderPass; // needed
 

@@ -153,7 +153,7 @@ void cube_box::prepare_render_pass()
 
     VkAttachmentDescription attachments[2] = {};
     attachments[0] = VkAttachmentDescription();
-    attachments[0].format = m_format;
+    attachments[0].format = format();
     attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
