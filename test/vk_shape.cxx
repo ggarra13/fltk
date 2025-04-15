@@ -185,7 +185,7 @@ void vk_shape_window::prepare_vertices()
     m_mesh.vi_attrs[0].offset = 0;
 }
 
-// m_format, m_depth (optionally) -> creates m_renderPass
+// m_depth (optionally) -> creates m_renderPass
 void vk_shape_window::prepare_render_pass() 
 {
     bool has_depth = mode() & FL_DEPTH;
