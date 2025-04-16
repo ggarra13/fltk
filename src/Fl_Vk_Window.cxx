@@ -75,189 +75,236 @@ void Fl_Vk_Window::destroy_resources() {
 }
 
 
+
 void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
-    
-    // Wait for previous rendering operations (if any)
-    if (m_renderingActive) {
-        result = vkWaitForFences(device(), 1, &m_drawFence,
-                                 VK_TRUE, UINT64_MAX);
-        VK_CHECK(result);
-        vkResetFences(device(), 1, &m_drawFence);
+
+    // Wait for all frames
+    for (auto& frame : m_frames) {
+        if (frame.active && frame.fence != VK_NULL_HANDLE) {
+            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+            VK_CHECK(result);
+            frame.active = false;
+        }
+        if (frame.fence != VK_NULL_HANDLE) {
+            result = vkResetFences(device(), 1, &frame.fence);
+            VK_CHECK(result);
+        }
     }
+    m_draw_cmd_pending = false;
+    m_draw_cmd_last_frame = UINT32_MAX;
 
     // Wait for previous resize operations
-    result = vkWaitForFences(device(), 1, &m_resizeFence, VK_TRUE, UINT64_MAX);
-    VK_CHECK(result);
-    vkResetFences(device(), 1, &m_resizeFence);
+    if (m_resizeFence != VK_NULL_HANDLE) {
+        result = vkWaitForFences(device(), 1, &m_resizeFence, VK_TRUE, UINT64_MAX);
+        VK_CHECK(result);
+        result = vkResetFences(device(), 1, &m_resizeFence);
+        VK_CHECK(result);
+    }
 
-    // Destroy window and driver resources
-    pVkWindowDriver->destroy_resources(); 
+    // Destroy resources
+    pVkWindowDriver->destroy_resources();
 
     // Recreate resources
     pVkWindowDriver->prepare();
 
+    // Update swapchain image count
+    result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
+    if (result != VK_SUCCESS) {
+        VK_CHECK(result);
+        return;
+    }
+
+    // Resize frames to match swapchain
+    if (m_frames.size() < m_swapchainImageCount) {
+        VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+        VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
+        size_t oldSize = m_frames.size();
+        m_frames.resize(m_swapchainImageCount);
+        for (size_t i = oldSize; i < m_swapchainImageCount; ++i) {
+            auto& frame = m_frames[i];
+            result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr, &frame.imageAcquiredSemaphore);
+            VK_CHECK(result);
+            result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr, &frame.drawCompleteSemaphore);
+            VK_CHECK(result);
+            result = vkCreateFence(device(), &fenceInfo, nullptr, &frame.fence);
+            VK_CHECK(result);
+            frame.active = false;
+        }
+    }
+
     set_hdr_metadata();
-    
-    // Update current extent
     updateExtent(w(), h());
 
     // Signal resize fence
     VkSubmitInfo submit_info = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     result = vkQueueSubmit(queue(), 1, &submit_info, m_resizeFence);
     VK_CHECK(result);
-    
-    m_swapchain_needs_recreation = false; // Reset only if successful
+
+    m_swapchain_needs_recreation = false;
 }
 
-void Fl_Vk_Window::vk_draw_begin() {
-  VkResult result;
 
-  // Wait for previous frame's fence
-  vkWaitForFences(device(), 1, &m_drawFence, VK_TRUE, UINT64_MAX);
-  vkResetFences(device(), 1, &m_drawFence);
-    
-  // Recreate swapchain if needed
-  if (m_swapchain_needs_recreation) {
-      recreate_swapchain();
-  }
-  
-  // Get the index of the next available swapchain image:
-  result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX, m_imageAcquiredSemaphore,
-                                 (VkFence)0, // TODO: Show use of fence
-                                 &m_current_buffer);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    // m_swapchain is out of date (e.g. the window was resized) and
-    // must be recreated:
-    recreate_swapchain();
-    VK_CHECK(result);
+void Fl_Vk_Window::vk_draw_begin() {
+    VkResult result;
+
+    // Recreate swapchain if needed
+    if (m_swapchain_needs_recreation) {
+        recreate_swapchain();
+    }
+
+    // Get current frame data
+    FrameData& frame = m_frames[m_currentFrameIndex];
+
+    // Wait for m_draw_cmd to be free if it’s pending
+    if (m_draw_cmd_pending && m_draw_cmd_last_frame != UINT32_MAX) {
+        FrameData& last_frame = m_frames[m_draw_cmd_last_frame];
+        if (last_frame.active && last_frame.fence != VK_NULL_HANDLE) {
+            result = vkWaitForFences(device(), 1, &last_frame.fence, VK_TRUE, UINT64_MAX);
+            if (result != VK_SUCCESS) {
+                return;
+            }
+            last_frame.active = false;
+            m_draw_cmd_pending = false;
+        }
+        if (last_frame.fence != VK_NULL_HANDLE) {
+            result = vkResetFences(device(), 1, &last_frame.fence);
+            VK_CHECK(result);
+        }
+    }
+
+    // Wait for this frame’s previous use (if any)
+    if (frame.active && frame.fence != VK_NULL_HANDLE) {
+        result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+        if (result != VK_SUCCESS) {
+            VK_CHECK(result);
+            return;
+        }
+        frame.active = false;
+    }
+
+    // Reset fence for this frame
+    if (frame.fence != VK_NULL_HANDLE) {
+        result = vkResetFences(device(), 1, &frame.fence);
+        VK_CHECK(result);
+    }
+
+    // Acquire next swapchain image
     result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX,
-                                   m_imageAcquiredSemaphore,
-                                   (VkFence)0, // TODO: Show use of fence
+                                   frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
                                    &m_current_buffer);
-    if (result != VK_SUCCESS)
-    {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        m_swapchain_needs_recreation = true;
+        recreate_swapchain();
+        result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX,
+                                       frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
+                                       &m_current_buffer);
+        if (result != VK_SUCCESS) {
+            VK_CHECK(result);
+            return;
+        }
+    } else if (result != VK_SUCCESS) {
+        VK_CHECK(result);
         return;
     }
-  } else if (result == VK_TIMEOUT) {
-    // Timeout occurred, try again next frame
-    return;
-  } else {
+
+    // Reset and begin command buffer
+    VkCommandBufferBeginInfo cmd_buf_info = {};
+    cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    result = vkResetCommandBuffer(m_draw_cmd, 0);
     VK_CHECK(result);
-  }
 
-  VkCommandBufferBeginInfo cmd_buf_info = {};
-  cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  cmd_buf_info.pNext = NULL;
-  cmd_buf_info.flags = 0;
-  cmd_buf_info.pInheritanceInfo = NULL;
+    result = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
+    VK_CHECK(result);
 
-  vkQueueWaitIdle(ctx.queue);
-  // Reset the command buffer to ensure it’s reusable
-  result = vkResetCommandBuffer(m_draw_cmd, 0);
-  VK_CHECK(result);
+    // Set clear values and begin render pass
+    VkClearValue clear_values[2];
+    clear_values[0].color = m_clearColor;
+    clear_values[1].depthStencil = {m_depthStencil, 0};
 
-  result = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
-  VK_CHECK(result);
+    VkRenderPassBeginInfo rp_begin = {};
+    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp_begin.renderPass = m_renderPass;
+    rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
+    rp_begin.renderArea.offset.x = 0;
+    rp_begin.renderArea.offset.y = 0;
+    rp_begin.renderArea.extent.width = w();
+    rp_begin.renderArea.extent.height = h();
+    rp_begin.clearValueCount = 2;
+    rp_begin.pClearValues = clear_values;
 
-  // glClearColor / glClearStencil equivalents
-  VkClearValue clear_values[2];
-  clear_values[0].color = m_clearColor;
-  clear_values[1].depthStencil = {m_depthStencil, 0};
+    // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL
+    VkImageMemoryBarrier image_memory_barrier = {};
+    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.srcAccessMask = 0;
+    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_memory_barrier.image = m_buffers[m_current_buffer].image;
+    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    vkCmdPipelineBarrier(m_draw_cmd,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier);
 
-  VkRenderPassBeginInfo rp_begin = {};
-  rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  rp_begin.pNext = NULL;
-  rp_begin.renderPass = m_renderPass;
-  rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
-  rp_begin.renderArea.offset.x = 0;
-  rp_begin.renderArea.offset.y = 0;
-  rp_begin.renderArea.extent.width = w();
-  rp_begin.renderArea.extent.height = h();
-  rp_begin.clearValueCount = 2;
-  rp_begin.pClearValues = clear_values;
+    // Handle depth/stencil
+    bool has_depth = mode() & FL_DEPTH;
+    bool has_stencil = mode() & FL_STENCIL;
+    if (has_depth || has_stencil) {
+        VkImageMemoryBarrier barrier = {};
+        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = m_depth.image;
+        barrier.subresourceRange.aspectMask = 0;
+        if (has_depth)
+            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (has_stencil)
+            barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        barrier.subresourceRange.baseMipLevel = 0;
+        barrier.subresourceRange.levelCount = 1;
+        barrier.subresourceRange.baseArrayLayer = 0;
+        barrier.subresourceRange.layerCount = 1;
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        vkCmdPipelineBarrier(m_draw_cmd,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                             0, 0, nullptr, 0, nullptr, 1, &barrier);
+    }
 
-  // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for rendering
-  VkImageMemoryBarrier image_memory_barrier = {};
-  image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  image_memory_barrier.pNext = NULL;
-  image_memory_barrier.srcAccessMask = 0; // No prior access (undefined)
-  image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  image_memory_barrier.image = m_buffers[m_current_buffer].image;
-  image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-  
-  vkCmdPipelineBarrier(m_draw_cmd,
-                       VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,   // No prior work
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, // For color writes
-                       0, 0, NULL, 0, NULL, 1, &image_memory_barrier);
+    // Begin rendering
+    vkCmdBeginRenderPass(m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
+    if (m_desc_set != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_pipeline_layout, 0, 1, &m_desc_set, 0, nullptr);
+    }
 
-  bool has_depth = mode() & FL_DEPTH;
-  bool has_stencil = mode() & FL_STENCIL;
-  if (has_depth || has_stencil)
-  {
-      VkImageMemoryBarrier barrier = {};
-      barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Current layout
-      barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // Desired layout
-      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = m_depth.image;
-      barrier.subresourceRange.aspectMask = 0;
-      if (has_depth)
-          barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
-      if (has_stencil)
-          barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-      barrier.subresourceRange.baseMipLevel = 0;
-      barrier.subresourceRange.levelCount = 1;
-      barrier.subresourceRange.baseArrayLayer = 0;
-      barrier.subresourceRange.layerCount = 1;
-      barrier.srcAccessMask = 0; // No previous access (since it's undefined)
-      barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    // Set viewport and scissor
+    VkViewport viewport = {};
+    viewport.width = (float)w();
+    viewport.height = (float)h();
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    viewport.x = 0;
+    viewport.y = 0;
+    vkCmdSetViewport(m_draw_cmd, 0, 1, &viewport);
 
-      vkCmdPipelineBarrier(
-          m_draw_cmd,
-          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source stage (can be more specific if needed)
-          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, // Destination stage
-          0,
-          0, nullptr, // Memory barriers
-          0, nullptr, // Buffer barriers
-          1, &barrier // Image barriers
-          );
-  }
+    VkRect2D scissor = {};
+    scissor.extent.width = w();
+    scissor.extent.height = h();
+    scissor.offset.x = 0;
+    scissor.offset.y = 0;
+    vkCmdSetScissor(m_draw_cmd, 0, 1, &scissor);
 
-  // Begin rendering
-  vkCmdBeginRenderPass(m_draw_cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-  vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-  if (m_desc_set != VK_NULL_HANDLE)
-      vkCmdBindDescriptorSets(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_layout, 0, 1,
-                              &m_desc_set, 0, NULL);
-
-  // The equivalent of glViewport
-  VkViewport viewport = {};
-  viewport.width = (float)w();
-  viewport.height = (float)h();
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
-  viewport.x = 0;
-  viewport.y = 0;
-
-  vkCmdSetViewport(m_draw_cmd, 0, 1, &viewport);
-
-  // The equvalent of glScissor
-  VkRect2D scissor = {};
-  scissor.extent.width = w();
-  scissor.extent.height = h();
-  scissor.offset.x = 0;
-  scissor.offset.y = 0;
-
-  vkCmdSetScissor(m_draw_cmd, 0, 1, &scissor);
+    frame.active = true;
 }
 
 
@@ -401,60 +448,98 @@ void Fl_Vk_Window::set_hdr_metadata()
     m_hdr_metadata_changed = true; // Mark as changed
 }
 
-/**
-  The swap_buffers() method swaps the back and front buffers.
-  It is called automatically after the draw() method is called.
-*/
+
 void Fl_Vk_Window::swap_buffers() {
-  VkResult result;
-  
-  // Ensure swapchain and command buffer are valid
-  if (m_swapchain == VK_NULL_HANDLE || m_draw_cmd == VK_NULL_HANDLE) {
-      return; // Skip if not initialized
-  }
-  
-  VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-  VkSubmitInfo submit_info = {};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.pNext = NULL;
-  submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &m_imageAcquiredSemaphore;
-  submit_info.pWaitDstStageMask = &pipe_stage_flags;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &m_draw_cmd;
-  submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = &m_drawCompleteSemaphore;
-  
-  // Submit with fence for CPU-GPU synchronization
-  result = vkQueueSubmit(ctx.queue, 1, &submit_info, m_drawFence);
-  VK_CHECK(result);
-  
+    VkResult result;
 
-  VkPresentInfoKHR present_info = {};
-  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  present_info.pNext = NULL;
-  present_info.waitSemaphoreCount = 1;
-  present_info.pWaitSemaphores = &m_drawCompleteSemaphore;
-  present_info.swapchainCount = 1;
-  present_info.pSwapchains = &m_swapchain;
-  present_info.pImageIndices = &m_current_buffer;
+    // Ensure swapchain and command buffer are valid
+    if (m_swapchain == VK_NULL_HANDLE || m_draw_cmd == VK_NULL_HANDLE) {
+        m_frames[m_currentFrameIndex].active = false;
+        return;
+    }
 
-  result = vkQueuePresentKHR(ctx.queue, &present_info);
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    m_swapchain_needs_recreation = true;
-  } else {
-    VK_CHECK(result);
-  }
-  
-  // Update HDR metadata only if changed (cached in m_hdr_metadata_changed)
-  if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-      m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
-      vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-      m_previous_hdr_metadata = m_hdr_metadata;
-      m_hdr_metadata_changed = false;
-  }
-  
-  pVkWindowDriver->swap_buffers();
+    // Get current frame data
+    FrameData& frame = m_frames[m_currentFrameIndex];
+
+    // Skip submission if m_draw_cmd is pending from another frame
+    if (m_draw_cmd_pending && m_draw_cmd_last_frame != m_currentFrameIndex) {
+        m_frames[m_currentFrameIndex].active = false;
+        return;
+    }
+
+    // Reset fence
+    if (frame.fence != VK_NULL_HANDLE) {
+        result = vkResetFences(device(), 1, &frame.fence);
+        if (result != VK_SUCCESS) {
+            m_frames[m_currentFrameIndex].active = false;
+            return;
+        }
+    }
+
+    // Submit command buffer
+    VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &frame.imageAcquiredSemaphore;
+    submit_info.pWaitDstStageMask = &pipe_stage_flags;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &m_draw_cmd;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
+
+    result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
+    if (result != VK_SUCCESS) {
+        m_frames[m_currentFrameIndex].active = false;
+        if (frame.fence != VK_NULL_HANDLE) {
+            vkResetFences(device(), 1, &frame.fence);
+        }
+        return;
+    }
+
+    // Mark m_draw_cmd as pending
+    m_draw_cmd_pending = true;
+    m_draw_cmd_last_frame = m_currentFrameIndex;
+
+    // Present swapchain image
+    VkPresentInfoKHR present_info = {};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = &m_swapchain;
+    present_info.pImageIndices = &m_current_buffer;
+
+    result = vkQueuePresentKHR(queue(), &present_info);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        m_swapchain_needs_recreation = true;
+        m_frames[m_currentFrameIndex].active = false;
+        m_draw_cmd_pending = false;
+        if (frame.fence != VK_NULL_HANDLE) {
+            vkResetFences(device(), 1, &frame.fence);
+        }
+        return;
+    } else if (result != VK_SUCCESS) {
+        m_frames[m_currentFrameIndex].active = false;
+        m_draw_cmd_pending = false;
+        if (frame.fence != VK_NULL_HANDLE) {
+            vkResetFences(device(), 1, &frame.fence);
+        }
+        return;
+    }
+
+    // Update HDR metadata if changed
+    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
+        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+        m_previous_hdr_metadata = m_hdr_metadata;
+        m_hdr_metadata_changed = false;
+    }
+
+    pVkWindowDriver->swap_buffers();
+
+    // Advance to next frame
+    m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
 }
 
 /**
@@ -705,20 +790,25 @@ Fl_RGB_Image *Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int
   return nullptr;
 }
 
-void Fl_Vk_Window::shutdown_vulkan()
-{
+void Fl_Vk_Window::shutdown_vulkan() {
     if (device() == VK_NULL_HANDLE) {
         return;
     }
 
-    // Wait for rendering and resize operations
-    if (m_renderingActive) {
-        vkWaitForFences(device(), 1, &m_drawFence, VK_TRUE, UINT64_MAX);
-        vkResetFences(device(), 1, &m_drawFence);
-        m_renderingActive = false;
+    // Wait for all frames and resize operations
+    for (auto& frame : m_frames) {
+        if (frame.active && frame.fence != VK_NULL_HANDLE) {
+            vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+            frame.active = false;
+        }
+        if (frame.fence != VK_NULL_HANDLE) {
+            vkResetFences(device(), 1, &frame.fence);
+        }
     }
+    m_draw_cmd_pending = false;
+    m_draw_cmd_last_frame = UINT32_MAX;
+    
     vkWaitForFences(device(), 1, &m_resizeFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device(), 1, &m_resizeFence);
 
     // Ensure queue is idle
     vkQueueWaitIdle(queue());
@@ -734,24 +824,26 @@ void Fl_Vk_Window::shutdown_vulkan()
         commandPool() = VK_NULL_HANDLE;
     }
 
-    if (m_drawFence != VK_NULL_HANDLE) {
-        vkDestroyFence(device(), m_drawFence, nullptr);
-        m_drawFence = VK_NULL_HANDLE;
+    // Destroy frame resources
+    for (auto& frame : m_frames) {
+        if (frame.fence != VK_NULL_HANDLE) {
+            vkDestroyFence(device(), frame.fence, nullptr);
+            frame.fence = VK_NULL_HANDLE;
+        }
+        if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE) {
+            vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
+            frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
+        }
+        if (frame.drawCompleteSemaphore != VK_NULL_HANDLE) {
+            vkDestroySemaphore(device(), frame.drawCompleteSemaphore, nullptr);
+            frame.drawCompleteSemaphore = VK_NULL_HANDLE;
+        }
     }
+    m_frames.clear();
 
     if (m_resizeFence != VK_NULL_HANDLE) {
         vkDestroyFence(device(), m_resizeFence, nullptr);
         m_resizeFence = VK_NULL_HANDLE;
-    }
-
-    if (m_imageAcquiredSemaphore != VK_NULL_HANDLE) {
-        vkDestroySemaphore(device(), m_imageAcquiredSemaphore, nullptr);
-        m_imageAcquiredSemaphore = VK_NULL_HANDLE;
-    }
-
-    if (m_drawCompleteSemaphore != VK_NULL_HANDLE) {
-        vkDestroySemaphore(device(), m_drawCompleteSemaphore, nullptr);
-        m_drawCompleteSemaphore = VK_NULL_HANDLE;
     }
 
     destroy_resources();
@@ -774,66 +866,74 @@ void Fl_Vk_Window::init_vk_swapchain()
     pVkWindowDriver->init_vk_swapchain();
 }
 
-void Fl_Vk_Window::init_vulkan()
-{
+void Fl_Vk_Window::init_vulkan() {
     VkResult result;
-    
-    // Initialize vulkan
-    if (ctx.instance == VK_NULL_HANDLE)
-    {
+
+    // Initialize Vulkan instance and device
+    if (ctx.instance == VK_NULL_HANDLE) {
         pVkWindowDriver->init_vk();
-        vkSetHdrMetadataEXT =
-            (PFN_vkSetHdrMetadataEXT)
-            vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+        vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
     }
-  
+
     pVkWindowDriver->create_surface();
-    init_vk_swapchain();  // to allow changing to HDR for example
+    init_vk_swapchain();
     pVkWindowDriver->prepare();
 
+    // Verify swapchain is valid
+    if (m_swapchain == VK_NULL_HANDLE) {
+        fprintf(stderr, "Failed to create swapchain in init_vulkan\n");
+        return;
+    }
 
+    // Get swapchain image count
+    result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
+    if (result != VK_SUCCESS) {
+        VK_CHECK(result);
+        return;
+    }
+
+    // Create command pool
     VkCommandPoolCreateInfo cmd_pool_info = {};
     cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmd_pool_info.pNext = NULL;
     cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-    result = vkCreateCommandPool(device(), &cmd_pool_info, NULL, &commandPool());
+    result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
     VK_CHECK(result);
 
+    // Allocate command buffer
     VkCommandBufferAllocateInfo cmd = {};
     cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmd.pNext = NULL;
     cmd.commandPool = commandPool();
     cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmd.commandBufferCount = 1;
-
     result = vkAllocateCommandBuffers(device(), &cmd, &m_draw_cmd);
     VK_CHECK(result);
-    
-    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    semaphoreCreateInfo.pNext = NULL;
-    semaphoreCreateInfo.flags = 0;
 
-    result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_imageAcquiredSemaphore);
-    VK_CHECK(result);
-    
-    result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_drawCompleteSemaphore);
-    VK_CHECK(result);
-    
-    VkFenceCreateInfo fenceInfo = {
-        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        nullptr,
-        VK_FENCE_CREATE_SIGNALED_BIT };
-    vkCreateFence(device(), &fenceInfo, nullptr, &m_drawFence);
-    
+    // Initialize frame data to match swapchain image count
+    uint32_t maxFramesInFlight = m_swapchainImageCount;
+    m_frames.resize(maxFramesInFlight);
+    VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
+    for (auto& frame : m_frames) {
+        result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr, &frame.imageAcquiredSemaphore);
+        VK_CHECK(result);
+        result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr, &frame.drawCompleteSemaphore);
+        VK_CHECK(result);
+        result = vkCreateFence(device(), &fenceInfo, nullptr, &frame.fence);
+        VK_CHECK(result);
+        frame.active = false;
+    }
+
     // Create resize fence
     result = vkCreateFence(device(), &fenceInfo, nullptr, &m_resizeFence);
     VK_CHECK(result);
-    
+
+    m_currentFrameIndex = 0;
+    m_draw_cmd_pending = false;
+    m_draw_cmd_last_frame = UINT32_MAX;
     m_renderingActive = false;
 }
+
 
 std::vector<const char*> Fl_Vk_Window::get_device_extensions()
 {
@@ -893,7 +993,6 @@ void Fl_Vk_Window::init() {
 
   // Set up defaults
   m_swapchain_needs_recreation = false;
-  m_use_staging_buffer = false;
   m_depthStencil = 1.0;
   
   // Reset Vulkan Handles
@@ -904,19 +1003,29 @@ void Fl_Vk_Window::init() {
 #endif
   
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class
-  
+
+  // HDR metadata
   m_hdr_metadata = {};
   m_previous_hdr_metadata = {};
+  m_hdr_metadata_changed = false;
+
+  // Pointer to function to set HDR
   vkSetHdrMetadataEXT = nullptr;
-  
+
+  // Swapchain info
   m_swapchain = VK_NULL_HANDLE;
+  m_resizeFence = VK_NULL_HANDLE;
+  m_currentExtent = {0, 0};
+
+  
   m_renderPass = VK_NULL_HANDLE;
   m_pipeline = VK_NULL_HANDLE;
   m_allocator = nullptr;
 
-  // Draw command and fence (currently unused)
+  // Draw command
   m_draw_cmd = VK_NULL_HANDLE;
-  m_drawFence = VK_NULL_HANDLE;
+  m_draw_cmd_pending = false; // Track if m_draw_cmd is pending
+  m_draw_cmd_last_frame = UINT32_MAX; // Last frame that used m_draw_cmd
 
   // Texture descriptor handles
   m_desc_set  = VK_NULL_HANDLE;
@@ -927,6 +1036,8 @@ void Fl_Vk_Window::init() {
 
   // Counters
   m_current_buffer = 0;
+  m_currentFrameIndex = 0;
+  m_swapchainImageCount = 0; // Track swapchain image count
 }
 
 /**

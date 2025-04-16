@@ -439,11 +439,32 @@ public:
   
   VkRenderPass       m_renderPass; // needed
 
-  // Per swapchain
-  VkExtent2D m_currentExtent = {0, 0}; // Track current swapchain extent
+  // Per frame
+  struct FrameData {
+      VkSemaphore imageAcquiredSemaphore;
+      VkSemaphore drawCompleteSemaphore;
+      VkFence fence;
+      bool active;
+
+      FrameData() :
+          imageAcquiredSemaphore(VK_NULL_HANDLE),
+          drawCompleteSemaphore(VK_NULL_HANDLE),
+          fence(VK_NULL_HANDLE),
+          active(false)
+          {
+          }
+  };
+  
+  std::vector<FrameData> m_frames;
+  uint32_t m_currentFrameIndex;
+
+  // Swapchain
+  VkExtent2D             m_currentExtent; // Track current swapchain extent
   VkFence                m_resizeFence;
   VkSwapchainKHR         m_swapchain;
+  uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
+  uint32_t                m_current_buffer;
 
   // HDR metadata information (passed during swap_buffers)
   bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
@@ -459,8 +480,9 @@ public:
   VkPipeline         m_pipeline;  
   VkDescriptorPool   m_desc_pool; // memory for descriptor sets
     
-  VkFence            m_drawFence; // Fence for drawing commands in window
   VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands
+  bool m_draw_cmd_pending; // Track if m_draw_cmd is pending
+  uint32_t m_draw_cmd_last_frame; // Last frame that used m_draw_cmd
 
   VkSemaphore        m_imageAcquiredSemaphore;
   VkSemaphore        m_drawCompleteSemaphore;
@@ -481,16 +503,12 @@ public:
   //! Flag used to handle resizes (swapchain and other resources recreation)
   bool               m_swapchain_needs_recreation;
 
-  // \@bug: this is broken and unimplemented
-  bool               m_use_staging_buffer;
-
   // Auxiliary variable for multiple memory requirements use
   VkMemoryRequirements m_mem_reqs;
 
   
   
   VkPhysicalDeviceMemoryProperties m_memory_properties;
-  uint32_t                m_current_buffer;
 
   
 

@@ -223,18 +223,14 @@ void DynamicTextureWindow::prepare_textures()
     VkFormatProperties props;
     vkGetPhysicalDeviceFormatProperties(gpu(), tex_format, &props);
 
-    if ((props.linearTilingFeatures &
-         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) &&
-        !m_use_staging_buffer) {
+    if (props.linearTilingFeatures &
+         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) {
         // Device can texture using linear textures
         prepare_texture_image(
             tex_colors, &m_texture, VK_IMAGE_TILING_LINEAR,
             VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    } else if (props.optimalTilingFeatures &
-               VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) {
-        Fl::fatal("Staging buffer path not implemented in this demo");
     } else {
         /* Can't support VK_FORMAT_B8G8R8A8_UNORM !? */
         Fl::fatal("No support for B8G8R8A8_UNORM as texture image format");
