@@ -50,6 +50,10 @@ protected:
     //! This is for holding a mesh
     Fl_Vk_Mesh m_mesh;
     
+    VkPipeline            m_pipeline;  
+    VkPipelineLayout      m_pipeline_layout;  // interface between shaders and desc.sets
+    VkDescriptorSetLayout m_desc_layout; // describe texture bindings whithin desc. set
+    
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();

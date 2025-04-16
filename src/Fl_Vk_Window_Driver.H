@@ -96,6 +96,7 @@ public:
   // Vulkan specific methods.
   virtual std::vector<const char*> get_instance_extensions() = 0;
   virtual void create_surface() = 0;
+  virtual void destroy_surface();
   virtual void destroy_resources();
 
   void init_vk_swapchain();

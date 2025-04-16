@@ -866,6 +866,14 @@ void Fl_Vk_Window_Driver::prepare() {
   prepare_framebuffers(); // can be kept in driver
 }
 
+void Fl_Vk_Window_Driver::destroy_surface() {
+  if (!pWindow || !pWindow->instance())
+    return;
+  
+  vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
+  pWindow->m_surface = VK_NULL_HANDLE;
+}
+
 // Uses: ctx.device, m_framebuffers, m_buffers, m_depth
 void Fl_Vk_Window_Driver::destroy_resources() {
   if (!pWindow || !pWindow->device())
