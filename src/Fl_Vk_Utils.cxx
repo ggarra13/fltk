@@ -421,7 +421,7 @@ void uploadTextureData(VkDevice device,
     void* mappedData;
     result = vkMapMemory(
         device, stagingBufferMemory, 0, imageSize, 0, &mappedData);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     std::memcpy(mappedData, data, static_cast<size_t>(imageSize));
     vkUnmapMemory(device, stagingBufferMemory);

@@ -105,10 +105,10 @@ void Fl_Vk_Window::vk_draw_begin() {
   semaphoreCreateInfo.flags = 0;
 
   result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_imageAcquiredSemaphore);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
 
   result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_drawCompleteSemaphore);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
   
   // Get the index of the next available swapchain image:
   result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX, m_imageAcquiredSemaphore,
@@ -121,7 +121,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     vkDestroySemaphore(device(), m_imageAcquiredSemaphore, NULL);
     result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL,
                                &m_imageAcquiredSemaphore);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
     result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX,
                                    m_imageAcquiredSemaphore,
                                    (VkFence)0, // TODO: Show use of fence
@@ -136,7 +136,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     // Timeout occurred, try again next frame
     return;
   } else {
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
   }
 
   VkCommandBufferBeginInfo cmd_buf_info = {};
@@ -148,10 +148,10 @@ void Fl_Vk_Window::vk_draw_begin() {
   vkQueueWaitIdle(ctx.queue);
   // Reset the command buffer to ensure it’s reusable
   result = vkResetCommandBuffer(m_draw_cmd, 0);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
 
   result = vkBeginCommandBuffer(m_draw_cmd, &cmd_buf_info);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
 
   // glClearColor / glClearStencil equivalents
   VkClearValue clear_values[2];
@@ -305,7 +305,7 @@ void Fl_Vk_Window::vk_draw_end() {
                        0, 0, NULL, 0, NULL, 1, &prePresentBarrier);
 
   result = vkEndCommandBuffer(m_draw_cmd);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
 }
 
 
@@ -416,7 +416,7 @@ void Fl_Vk_Window::swap_buffers() {
 
   vkResetFences(device(), 1, &m_drawFence);
   result = vkQueueSubmit(ctx.queue, 1, &submit_info, m_drawFence);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
   
   vkWaitForFences(device(), 1, &m_drawFence, VK_TRUE, UINT64_MAX);
   vkResetFences(device(), 1, &m_drawFence);
@@ -440,11 +440,11 @@ void Fl_Vk_Window::swap_buffers() {
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     m_swapchain_needs_recreation = true;
   } else {
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
   }
 
   result = vkQueueWaitIdle(ctx.queue);
-  VK_CHECK_RESULT(result);
+  VK_CHECK(result);
   
   vkDestroySemaphore(device(), m_imageAcquiredSemaphore, NULL);
   vkDestroySemaphore(device(), m_drawCompleteSemaphore, NULL);
@@ -758,7 +758,7 @@ void Fl_Vk_Window::init_vulkan()
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
     result = vkCreateCommandPool(device(), &cmd_pool_info, NULL, &commandPool());
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     VkCommandBufferAllocateInfo cmd = {};
     cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -768,7 +768,7 @@ void Fl_Vk_Window::init_vulkan()
     cmd.commandBufferCount = 1;
 
     result = vkAllocateCommandBuffers(device(), &cmd, &m_draw_cmd);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
     
     init_fences();
 }
@@ -815,7 +815,7 @@ void Fl_Vk_Window::create_device() {
     deviceInfo.ppEnabledExtensionNames = ctx.device_extensions.data();
 
     result = vkCreateDevice(gpu(), &deviceInfo, NULL, &device());
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 

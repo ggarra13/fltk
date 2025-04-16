@@ -153,7 +153,7 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
     mem_alloc.memoryTypeIndex = 0;
 
     result = vkCreateImage(device(), &image_create_info, NULL, &tex_obj->image);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     vkGetImageMemoryRequirements(device(), tex_obj->image, &m_mem_reqs);
 
@@ -165,11 +165,11 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
 
     /* allocate memory */
     result = vkAllocateMemory(device(), &mem_alloc, NULL, &tex_obj->mem);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     /* bind memory */
     result = vkBindImageMemory(device(), tex_obj->image, tex_obj->mem, 0);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     if (required_props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
         VkImageSubresource subres = {};
@@ -185,7 +185,7 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
 
         result = vkMapMemory(device(), tex_obj->mem, 0,
                              mem_alloc.allocationSize, 0, &data);
-        VK_CHECK_RESULT(result);
+        VK_CHECK(result);
 
         // Tile the texture over tex_height and tex_width
         for (y = 0; y < tex_height; y++) {
@@ -274,10 +274,10 @@ void DynamicTextureWindow::prepare_textures()
 
     result = vkCreateSampler(device(), &sampler_info, NULL,
                              &m_texture.sampler);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     result = vkCreateImageView(device(), &view_info, NULL, &m_texture.view);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 void DynamicTextureWindow::update_texture()
@@ -367,7 +367,7 @@ void DynamicTextureWindow::prepare_vertices()
     buf_info.flags = 0;
 
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
     
     // Use a local variable instead of overwriting m_mem_reqs
     VkMemoryRequirements vertex_mem_reqs;
@@ -388,18 +388,18 @@ void DynamicTextureWindow::prepare_vertices()
                                 &mem_alloc.memoryTypeIndex);
 
     result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_mesh.mem);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     result = vkMapMemory(device(), m_mesh.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     memcpy(data, vertices.data(), sizeof(Vertex) * vertices.size());
 
     vkUnmapMemory(device(), m_mesh.mem);
 
     result = vkBindBufferMemory(device(), m_mesh.buf, m_mesh.mem, 0);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     m_mesh.vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     m_mesh.vi.pNext = NULL;
@@ -497,7 +497,7 @@ void DynamicTextureWindow::prepare_render_pass()
                     
     VkResult result;
     result = vkCreateRenderPass(device(), &rp_info, NULL, &m_renderPass);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 VkShaderModule DynamicTextureWindow::prepare_vs() {
@@ -679,10 +679,10 @@ void DynamicTextureWindow::prepare_pipeline() {
 
     result = vkCreatePipelineCache(device(), &pipelineCacheCreateInfo, NULL,
                                    &pipelineCache());
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
     result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1,
                                        &pipeline, NULL, &m_pipeline);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
 
@@ -705,7 +705,7 @@ void DynamicTextureWindow::prepare_descriptor_pool() {
              
     result = vkCreateDescriptorPool(device(), &descriptor_pool, NULL,
                                     &m_desc_pool);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 void DynamicTextureWindow::prepare_descriptor_set() {
@@ -721,7 +721,7 @@ void DynamicTextureWindow::prepare_descriptor_set() {
     alloc_info.pSetLayouts = &m_desc_layout;
         
     result = vkAllocateDescriptorSets(device(), &alloc_info, &m_desc_set);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     memset(&tex_descs, 0, sizeof(tex_descs));
     tex_descs[0].sampler = m_texture.sampler;
@@ -799,7 +799,7 @@ void DynamicTextureWindow::prepare_descriptor_layout() {
 
     result = vkCreateDescriptorSetLayout(device(), &descriptor_layout, NULL,
                                          &m_desc_layout);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
     pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -809,7 +809,7 @@ void DynamicTextureWindow::prepare_descriptor_layout() {
 
     result = vkCreatePipelineLayout(device(), &pPipelineLayoutCreateInfo, NULL,
                                     &m_pipeline_layout);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 #else

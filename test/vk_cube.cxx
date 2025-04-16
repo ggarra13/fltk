@@ -223,7 +223,7 @@ void cube_box::prepare_render_pass()
                     
     VkResult result;
     result = vkCreateRenderPass(device(), &rp_info, NULL, &m_renderPass);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 VkShaderModule cube_box::prepare_vs() {
@@ -464,18 +464,18 @@ void cube_box::prepare_pipeline() {
 
     result = vkCreatePipelineCache(device(), &pipelineCacheCreateInfo, NULL,
                                    &pipelineCache());
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     // Create fill pipeline
     rs.polygonMode = VK_POLYGON_MODE_FILL;
     pipeline.pRasterizationState = &rs;
     result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1, &pipeline, NULL, &m_pipeline);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     // Create wireframe pipeline
     rs.polygonMode = VK_POLYGON_MODE_LINE;
     result = vkCreateGraphicsPipelines(device(), pipelineCache(), 1, &pipeline, NULL, &m_wire_pipeline);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
     
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
 
@@ -516,7 +516,7 @@ void cube_box::prepare_vertices()
     index_buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
     result = vkCreateBuffer(device(), &index_buf_info, nullptr, &m_cube.indexBuffer);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     // Get memory requirements
     VkMemoryRequirements index_mem_reqs;
@@ -538,25 +538,25 @@ void cube_box::prepare_vertices()
     }
 
     result = vkAllocateMemory(device(), &index_alloc_info, nullptr, &m_cube.indexMem);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     // Upload data
     void* index_data = nullptr;
     result = vkMapMemory(device(), m_cube.indexMem, 0, index_alloc_info.allocationSize, 0, &index_data);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     memcpy(index_data, indices.data(), static_cast<size_t>(index_buffer_size));
     vkUnmapMemory(device(), m_cube.indexMem);
 
     // Bind buffer to memory
     result = vkBindBufferMemory(device(), m_cube.indexBuffer, m_cube.indexMem, 0);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_cube.buf);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     vkGetBufferMemoryRequirements(device(), m_cube.buf, &m_mem_reqs);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
     pass = memory_type_from_properties(gpu(),
@@ -566,18 +566,18 @@ void cube_box::prepare_vertices()
                                        &mem_alloc.memoryTypeIndex);
 
     result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_cube.mem);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     result = vkMapMemory(device(), m_cube.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
 	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
     vkUnmapMemory(device(), m_cube.mem);
 
     result = vkBindBufferMemory(device(), m_cube.buf, m_cube.mem, 0);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     memset(&m_cube.vi, 0, sizeof(m_cube.vi));
     m_cube.vi.sType =
@@ -639,7 +639,7 @@ void cube_box::prepare_descriptor_pool()
     poolInfo.maxSets = 1;
 
     VkResult result = vkCreateDescriptorPool(device(), &poolInfo, nullptr, &m_desc_pool);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 void cube_box::prepare_descriptor_set()
@@ -660,7 +660,7 @@ void cube_box::prepare_descriptor_set()
     layoutInfo.pBindings = &uboLayoutBinding;
 
     result = vkCreateDescriptorSetLayout(device(), &layoutInfo, nullptr, &m_desc_layout);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     // Allocate descriptor set
     VkDescriptorSetAllocateInfo alloc_info = {};
@@ -670,7 +670,7 @@ void cube_box::prepare_descriptor_set()
     alloc_info.pSetLayouts = &m_desc_layout;
 
     result = vkAllocateDescriptorSets(device(), &alloc_info, &m_desc_set);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 
     // Update descriptor set
     VkDescriptorBufferInfo bufferInfo = {};
@@ -700,7 +700,7 @@ void cube_box::prepare_descriptor_layout()
     pPipelineLayoutCreateInfo.pSetLayouts = &m_desc_layout;
 
     result = vkCreatePipelineLayout(device(), &pPipelineLayoutCreateInfo, nullptr, &m_pipeline_layout);
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 void cube_box::destroy_resources()
@@ -820,7 +820,7 @@ void cube_box::create_device() {
     deviceInfo.ppEnabledExtensionNames = ctx.device_extensions.data();
 
     result = vkCreateDevice(gpu(), &deviceInfo, NULL, &device());
-    VK_CHECK_RESULT(result);
+    VK_CHECK(result);
 }
 
 int cube_box::handle(int e) {
