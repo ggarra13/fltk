@@ -206,8 +206,22 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   }
 
   VkFormat depth_format = VK_FORMAT_D16_UNORM;
+  uint32_t aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
   if (has_stencil)
-    depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
+  {
+      if (has_depth)
+      {
+          depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
+          aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+      }
+      else
+      {
+        depth_format = VK_FORMAT_S8_UINT;
+        aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+      }
+  }
+
   VkImageCreateInfo image = {};
   image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image.pNext = NULL;
@@ -228,7 +242,7 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   mem_alloc.memoryTypeIndex = 0;
 
   VkImageSubresourceRange subresourceRange = {};
-  subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  subresourceRange.aspectMask = aspectMask;
   subresourceRange.baseMipLevel = 0;
   subresourceRange.levelCount = 1;
   subresourceRange.baseArrayLayer = 0;
@@ -278,7 +292,7 @@ void Fl_Vk_Window_Driver::prepare_depth() {
                    pWindow->commandPool(),
                    pWindow->queue(),
                    pWindow->m_depth.image,
-                   VK_IMAGE_ASPECT_DEPTH_BIT,
+                   aspectMask,
                    VK_IMAGE_LAYOUT_UNDEFINED,
                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                    0, VK_PIPELINE_STAGE_HOST_BIT,
