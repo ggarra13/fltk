@@ -80,6 +80,7 @@ public:
 #include <FL/math.h>
 
 #include <glm/glm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL 1
 #include <glm/gtx/transform.hpp>
 
 struct MVP

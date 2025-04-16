@@ -21,6 +21,7 @@
 
 #include <FL/vk.h>
 #include <FL/Fl_Vk_Window.H>
+#include <FL/vk_enum_string_helper.h>
 #include "Fl_Vk_Window_Driver.H"
 #include "Fl_Window_Driver.H"
 #include <FL/Fl_Graphics_Driver.H>
@@ -151,6 +152,10 @@ void Fl_Vk_Window::vk_draw_begin() {
     // Recreate swapchain if needed
     if (m_swapchain_needs_recreation) {
         recreate_swapchain();
+        if (m_swapchain == VK_NULL_HANDLE) {
+            fprintf(stderr, "Skipping vk_draw_begin: Swapchain recreation failed\n");
+            return;
+        }
     }
 
     // Get current frame data
@@ -869,6 +874,10 @@ void Fl_Vk_Window::init_vk_swapchain()
 void Fl_Vk_Window::init_vulkan() {
     VkResult result;
 
+    if (!shown()) {
+        return;
+    }
+
     // Initialize Vulkan instance and device
     if (ctx.instance == VK_NULL_HANDLE) {
         pVkWindowDriver->init_vk();
@@ -876,19 +885,25 @@ void Fl_Vk_Window::init_vulkan() {
     }
 
     pVkWindowDriver->create_surface();
+    if (!m_surface) {
+        fprintf(stderr, "Failed to create Vulkan surface in init_vulkan\n");
+        return;
+    }
     init_vk_swapchain();
     pVkWindowDriver->prepare();
-
-    // Verify swapchain is valid
     if (m_swapchain == VK_NULL_HANDLE) {
-        fprintf(stderr, "Failed to create swapchain in init_vulkan\n");
+        fprintf(stderr, "prepare() failed in init_vulkan\n");
+        //pVkWindowDriver->destroy_surface();
         return;
     }
 
     // Get swapchain image count
     result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
-    if (result != VK_SUCCESS) {
-        VK_CHECK(result);
+    if (result != VK_SUCCESS || m_swapchainImageCount == 0) {
+        fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
+        pVkWindowDriver->destroy_resources();
+        //pVkWindowDriver->destroy_surface();
+        m_swapchain = VK_NULL_HANDLE;
         return;
     }
 
@@ -898,7 +913,13 @@ void Fl_Vk_Window::init_vulkan() {
     cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
-    VK_CHECK(result);
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
+        pVkWindowDriver->destroy_resources();
+        // pVkWindowDriver->destroy_surface();
+        m_swapchain = VK_NULL_HANDLE;
+        return;
+    }
 
     // Allocate command buffer
     VkCommandBufferAllocateInfo cmd = {};
@@ -907,7 +928,15 @@ void Fl_Vk_Window::init_vulkan() {
     cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmd.commandBufferCount = 1;
     result = vkAllocateCommandBuffers(device(), &cmd, &m_draw_cmd);
-    VK_CHECK(result);
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vkAllocateCommandBuffers failed: %s\n", string_VkResult(result));
+        vkDestroyCommandPool(device(), commandPool(), nullptr);
+        commandPool() = VK_NULL_HANDLE;
+        pVkWindowDriver->destroy_resources();
+        // pVkWindowDriver->destroy_surface();
+        m_swapchain = VK_NULL_HANDLE;
+        return;
+    }
 
     // Initialize frame data to match swapchain image count
     uint32_t maxFramesInFlight = m_swapchainImageCount;
@@ -916,11 +945,24 @@ void Fl_Vk_Window::init_vulkan() {
     VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
     for (auto& frame : m_frames) {
         result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr, &frame.imageAcquiredSemaphore);
-        VK_CHECK(result);
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vkCreateSemaphore failed for imageAcquiredSemaphore: %s\n", string_VkResult(result));
+            shutdown_vulkan();
+            return;
+        }
         result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr, &frame.drawCompleteSemaphore);
-        VK_CHECK(result);
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vkCreateSemaphore failed for drawCompleteSemaphore: %s\n", string_VkResult(result));
+            shutdown_vulkan();
+            return;
+        }
         result = vkCreateFence(device(), &fenceInfo, nullptr, &frame.fence);
-        VK_CHECK(result);
+        
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vkCreateFence failed: %s\n", string_VkResult(result));
+            shutdown_vulkan();
+            return;
+        }
         frame.active = false;
     }
 

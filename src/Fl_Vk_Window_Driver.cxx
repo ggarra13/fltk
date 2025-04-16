@@ -84,7 +84,7 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
-// Uses m_swapchain, ctx.gpu, m_surface, m_format, m_buffers
+// Uses m_swapchain, gpu(), m_surface, format(), m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
   VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
@@ -111,7 +111,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       pWindow->m_swapchain = oldSwapchain;
       return;
   }
-
+  
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
