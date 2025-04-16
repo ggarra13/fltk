@@ -20,9 +20,9 @@ std::vector<uint32_t> compile_glsl_to_spirv(const std::string &source_code,
     options.SetOptimizationLevel(shaderc_optimization_level_performance);
   }
 
-  // Set target environment to Vulkan 1.3 (adjust as needed)
+  // Set target environment to Vulkan 1.2 (as that's the maximum on macOS)
   options.SetTargetEnvironment(shaderc_target_env_vulkan,
-                               shaderc_env_version_vulkan_1_3);
+                               shaderc_env_version_vulkan_1_2);
 
   // Compile the GLSL source
   shaderc::SpvCompilationResult result =
