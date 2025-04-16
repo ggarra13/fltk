@@ -104,10 +104,12 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchainExtent.height = CLAMP(swapchainExtent.height, surfCapabilities.minImageExtent.height,
                                  surfCapabilities.maxImageExtent.height);
 
-  // Check if extent matches request; if not, delay recreation
-  if (swapchainExtent.width != pWindow->w() || swapchainExtent.height != pWindow->h()) {
-    pWindow->m_swapchain = oldSwapchain; // Restore old swapchain
-    return;
+  // Skip recreation if extent matches current and old swapchain is valid
+  if (oldSwapchain != VK_NULL_HANDLE && 
+      swapchainExtent.width == pWindow->getCurrentExtent().width &&
+      swapchainExtent.height == pWindow->getCurrentExtent().height) {
+      pWindow->m_swapchain = oldSwapchain;
+      return;
   }
 
   VkSwapchainCreateInfoKHR swapchain = {};
@@ -144,18 +146,9 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   VK_CHECK(result);
   if (pWindow->m_swapchain == VK_NULL_HANDLE)
   {
-      fprintf(stderr, "swapchain creation failed and returned NULL HANDLE\n");
-  }
-
-  if (result != VK_SUCCESS && pWindow->mode() & FL_SINGLE) {
-    printf("Single buffering failed (%d), falling back to double buffering\n", result);
-    swapchain.minImageCount = 2;
-    swapchain.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    result = vkCreateSwapchainKHR(pWindow->device(), &swapchain, NULL, &pWindow->m_swapchain);
-  }
-  if (result != VK_SUCCESS) {
-    pWindow->m_swapchain = oldSwapchain;
-    return; // Exit early on failure
+      fprintf(stderr, "vkCreateSwapchainKHR failed: %s\n", string_VkResult(result));
+      pWindow->m_swapchain = oldSwapchain; // Restore old swapchain
+      return;
   }
 
   if (oldSwapchain != VK_NULL_HANDLE) {
@@ -163,34 +156,34 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   }
 
   // Get new swapchain images
-  uint32_t swapchainImageCount = 2;
+  uint32_t swapchainImageCount = 0;
   result = vkGetSwapchainImagesKHR(pWindow->device(), pWindow->m_swapchain,
                                    &swapchainImageCount, NULL);
   VK_CHECK(result);
 
-  VkImage *swapchainImages = (VkImage *)malloc(swapchainImageCount * sizeof(VkImage));
-  assert(swapchainImages);
+  std::vector<VkImage> swapchainImages(swapchainImageCount);
   result = vkGetSwapchainImagesKHR(pWindow->device(), pWindow->m_swapchain,
-                                   &swapchainImageCount, swapchainImages);
+                                   &swapchainImageCount,
+                                   swapchainImages.data());
   VK_CHECK(result);
 
   // Recreate buffers
   pWindow->m_buffers.resize(swapchainImageCount);
-  for (uint32_t i = 0; i < swapchainImageCount; i++) {
-    VkImageViewCreateInfo view_info = {};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image = swapchainImages[i];
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = pWindow->format();
-    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    view_info.subresourceRange.levelCount = 1;
-    view_info.subresourceRange.layerCount = 1;
-    result = vkCreateImageView(pWindow->device(), &view_info, NULL, &pWindow->m_buffers[i].view);
-    VK_CHECK(result);
-    pWindow->m_buffers[i].image = swapchainImages[i];
+  for (uint32_t i = 0; i < swapchainImageCount; i++)
+  {
+      VkImageViewCreateInfo view_info = {};
+      view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+      view_info.image = swapchainImages[i];
+      view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+      view_info.format = pWindow->format();
+      view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      view_info.subresourceRange.levelCount = 1;
+      view_info.subresourceRange.layerCount = 1;
+      result = vkCreateImageView(pWindow->device(), &view_info, NULL,
+                                 &pWindow->m_buffers[i].view);
+      VK_CHECK(result);
+      pWindow->m_buffers[i].image = swapchainImages[i];
   }
-
-  free(swapchainImages);
 }
 
 // Uses m_depth, ctx.device
@@ -881,10 +874,6 @@ void Fl_Vk_Window_Driver::destroy_resources() {
   uint32_t i;
   VkResult result;
 
-  // Wait for all GPU operations to complete before destroying resources
-  result = vkDeviceWaitIdle(pWindow->device());
-  VK_CHECK(result);
-
   // Destroy resources in reverse creation order (first, those of window)
   pWindow->destroy_resources();
 
@@ -895,6 +884,7 @@ void Fl_Vk_Window_Driver::destroy_resources() {
       // image belongs to the swapchain.
   }
   pWindow->m_buffers.clear();
+  
   pWindow->m_depth.destroy(pWindow->device());
 }
 

@@ -303,9 +303,9 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
 
+  void shutdown_vulkan();
   void recreate_swapchain();
   virtual void init_vk_swapchain();
-  void init_fences();
   
   virtual void vk_draw_begin();
   void draw() FL_OVERRIDE;
@@ -420,7 +420,12 @@ public:
   inline const VkPipeline&             pipeline() const { return m_pipeline; }
 
   //! @}
-  
+
+  VkExtent2D getCurrentExtent() const { return m_currentExtent; }
+  void updateExtent(uint32_t width, uint32_t height) {
+      m_currentExtent = {width, height};
+  }
+    
   // Application
   bool m_validate;  // if true, turns on validation layers
   static VkInstance m_instance; // this gets copied into ctx.instance for every
@@ -428,18 +433,24 @@ public:
   Fl_Vk_Context ctx;
 
   // Per Window
+  bool m_renderingActive = false;
   VkSurfaceKHR       m_surface;  // needed
   VkSurfaceFormatKHR m_surfaceFormat; //needed
   
   VkRenderPass       m_renderPass; // needed
 
   // Per swapchain
+  VkExtent2D m_currentExtent = {0, 0}; // Track current swapchain extent
+  VkFence                m_resizeFence;
   VkSwapchainKHR         m_swapchain;
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
 
   // HDR metadata information (passed during swap_buffers)
+  bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
+                             const VkHdrMetadataEXT& b);
   PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
   VkHdrMetadataEXT        m_hdr_metadata;
+  bool                    m_hdr_metadata_changed;
 
   uint32_t           m_queueFamilyIndex;
   Fl_Vk_Depth        m_depth;

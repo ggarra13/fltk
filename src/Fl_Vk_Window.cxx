@@ -30,8 +30,8 @@
 VkInstance Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
 
 
-static bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
-                                  const VkHdrMetadataEXT& b)
+bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
+                                         const VkHdrMetadataEXT& b)
 {
     return (a.displayPrimaryRed.x == b.displayPrimaryRed.x &&
             a.displayPrimaryRed.y == b.displayPrimaryRed.y &&
@@ -76,8 +76,20 @@ void Fl_Vk_Window::destroy_resources() {
 
 
 void Fl_Vk_Window::recreate_swapchain() {
-    // Waits for all queue on the device
-    vkDeviceWaitIdle(device()); 
+    VkResult result;
+    
+    // Wait for previous rendering operations (if any)
+    if (m_renderingActive) {
+        result = vkWaitForFences(device(), 1, &m_drawFence,
+                                 VK_TRUE, UINT64_MAX);
+        VK_CHECK(result);
+        vkResetFences(device(), 1, &m_drawFence);
+    }
+
+    // Wait for previous resize operations
+    result = vkWaitForFences(device(), 1, &m_resizeFence, VK_TRUE, UINT64_MAX);
+    VK_CHECK(result);
+    vkResetFences(device(), 1, &m_resizeFence);
 
     // Destroy window and driver resources
     pVkWindowDriver->destroy_resources(); 
@@ -86,29 +98,29 @@ void Fl_Vk_Window::recreate_swapchain() {
     pVkWindowDriver->prepare();
 
     set_hdr_metadata();
+    
+    // Update current extent
+    updateExtent(w(), h());
 
+    // Signal resize fence
+    VkSubmitInfo submit_info = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    result = vkQueueSubmit(queue(), 1, &submit_info, m_resizeFence);
+    VK_CHECK(result);
+    
     m_swapchain_needs_recreation = false; // Reset only if successful
 }
 
 void Fl_Vk_Window::vk_draw_begin() {
   VkResult result;
 
+  // Wait for previous frame's fence
+  vkWaitForFences(device(), 1, &m_drawFence, VK_TRUE, UINT64_MAX);
+  vkResetFences(device(), 1, &m_drawFence);
+    
   // Recreate swapchain if needed
   if (m_swapchain_needs_recreation) {
       recreate_swapchain();
   }
-
-
-  VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-  semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  semaphoreCreateInfo.pNext = NULL;
-  semaphoreCreateInfo.flags = 0;
-
-  result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_imageAcquiredSemaphore);
-  VK_CHECK(result);
-
-  result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_drawCompleteSemaphore);
-  VK_CHECK(result);
   
   // Get the index of the next available swapchain image:
   result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX, m_imageAcquiredSemaphore,
@@ -118,9 +130,6 @@ void Fl_Vk_Window::vk_draw_begin() {
     // m_swapchain is out of date (e.g. the window was resized) and
     // must be recreated:
     recreate_swapchain();
-    vkDestroySemaphore(device(), m_imageAcquiredSemaphore, NULL);
-    result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL,
-                               &m_imageAcquiredSemaphore);
     VK_CHECK(result);
     result = vkAcquireNextImageKHR(device(), m_swapchain, UINT64_MAX,
                                    m_imageAcquiredSemaphore,
@@ -128,8 +137,6 @@ void Fl_Vk_Window::vk_draw_begin() {
                                    &m_current_buffer);
     if (result != VK_SUCCESS)
     {
-        vkDestroySemaphore(device(), m_imageAcquiredSemaphore, NULL);
-        vkDestroySemaphore(device(), m_drawCompleteSemaphore, NULL);
         return;
     }
   } else if (result == VK_TIMEOUT) {
@@ -388,11 +395,10 @@ void Fl_Vk_Window::make_current() {
 
 void Fl_Vk_Window::set_hdr_metadata()
 {
-    if (!vkSetHdrMetadataEXT ||
-        m_hdr_metadata.sType != VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+    if (!vkSetHdrMetadataEXT || m_hdr_metadata.sType != VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
         return;
-    vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-    m_previous_hdr_metadata = m_hdr_metadata;
+    }
+    m_hdr_metadata_changed = true; // Mark as changed
 }
 
 /**
@@ -401,6 +407,11 @@ void Fl_Vk_Window::set_hdr_metadata()
 */
 void Fl_Vk_Window::swap_buffers() {
   VkResult result;
+  
+  // Ensure swapchain and command buffer are valid
+  if (m_swapchain == VK_NULL_HANDLE || m_draw_cmd == VK_NULL_HANDLE) {
+      return; // Skip if not initialized
+  }
   
   VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
   VkSubmitInfo submit_info = {};
@@ -413,41 +424,35 @@ void Fl_Vk_Window::swap_buffers() {
   submit_info.pCommandBuffers = &m_draw_cmd;
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = &m_drawCompleteSemaphore;
-
-  vkResetFences(device(), 1, &m_drawFence);
+  
+  // Submit with fence for CPU-GPU synchronization
   result = vkQueueSubmit(ctx.queue, 1, &submit_info, m_drawFence);
   VK_CHECK(result);
   
-  vkWaitForFences(device(), 1, &m_drawFence, VK_TRUE, UINT64_MAX);
-  vkResetFences(device(), 1, &m_drawFence);
 
-  if (!is_equal_hdr_metadata(m_previous_hdr_metadata,
-                             m_hdr_metadata))
-  {
-      set_hdr_metadata();
-  }
+  VkPresentInfoKHR present_info = {};
+  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  present_info.pNext = NULL;
+  present_info.waitSemaphoreCount = 1;
+  present_info.pWaitSemaphores = &m_drawCompleteSemaphore;
+  present_info.swapchainCount = 1;
+  present_info.pSwapchains = &m_swapchain;
+  present_info.pImageIndices = &m_current_buffer;
 
-  VkPresentInfoKHR present = {};
-  present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  present.pNext = NULL;
-  present.waitSemaphoreCount = 1;
-  present.pWaitSemaphores = &m_drawCompleteSemaphore;
-  present.swapchainCount = 1;
-  present.pSwapchains = &m_swapchain;
-  present.pImageIndices = &m_current_buffer;
-
-  result = vkQueuePresentKHR(ctx.queue, &present);
+  result = vkQueuePresentKHR(ctx.queue, &present_info);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     m_swapchain_needs_recreation = true;
   } else {
     VK_CHECK(result);
   }
-
-  result = vkQueueWaitIdle(ctx.queue);
-  VK_CHECK(result);
   
-  vkDestroySemaphore(device(), m_imageAcquiredSemaphore, NULL);
-  vkDestroySemaphore(device(), m_drawCompleteSemaphore, NULL);
+  // Update HDR metadata only if changed (cached in m_hdr_metadata_changed)
+  if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+      m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
+      vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+      m_previous_hdr_metadata = m_hdr_metadata;
+      m_hdr_metadata_changed = false;
+  }
   
   pVkWindowDriver->swap_buffers();
 }
@@ -575,7 +580,11 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
   Fl_Window::resize(X, Y, W, H);
 
   if (is_a_resize) {
-    m_swapchain_needs_recreation = true;
+      VkExtent2D currentExtent = getCurrentExtent();
+      if (static_cast<uint32_t>(W) != currentExtent.width || 
+          static_cast<uint32_t>(H) != currentExtent.height) {
+          m_swapchain_needs_recreation = true;
+      }
   }
 }
 
@@ -696,36 +705,68 @@ Fl_RGB_Image *Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int
   return nullptr;
 }
 
+void Fl_Vk_Window::shutdown_vulkan()
+{
+    if (device() == VK_NULL_HANDLE) {
+        return;
+    }
+
+    // Wait for rendering and resize operations
+    if (m_renderingActive) {
+        vkWaitForFences(device(), 1, &m_drawFence, VK_TRUE, UINT64_MAX);
+        vkResetFences(device(), 1, &m_drawFence);
+        m_renderingActive = false;
+    }
+    vkWaitForFences(device(), 1, &m_resizeFence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device(), 1, &m_resizeFence);
+
+    // Ensure queue is idle
+    vkQueueWaitIdle(queue());
+
+    // Destroy resources
+    if (m_draw_cmd != VK_NULL_HANDLE) {
+        vkFreeCommandBuffers(device(), commandPool(), 1, &m_draw_cmd);
+        m_draw_cmd = VK_NULL_HANDLE;
+    }
+
+    if (commandPool() != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(device(), commandPool(), nullptr);
+        commandPool() = VK_NULL_HANDLE;
+    }
+
+    if (m_drawFence != VK_NULL_HANDLE) {
+        vkDestroyFence(device(), m_drawFence, nullptr);
+        m_drawFence = VK_NULL_HANDLE;
+    }
+
+    if (m_resizeFence != VK_NULL_HANDLE) {
+        vkDestroyFence(device(), m_resizeFence, nullptr);
+        m_resizeFence = VK_NULL_HANDLE;
+    }
+
+    if (m_imageAcquiredSemaphore != VK_NULL_HANDLE) {
+        vkDestroySemaphore(device(), m_imageAcquiredSemaphore, nullptr);
+        m_imageAcquiredSemaphore = VK_NULL_HANDLE;
+    }
+
+    if (m_drawCompleteSemaphore != VK_NULL_HANDLE) {
+        vkDestroySemaphore(device(), m_drawCompleteSemaphore, nullptr);
+        m_drawCompleteSemaphore = VK_NULL_HANDLE;
+    }
+
+    destroy_resources();
+    pVkWindowDriver->destroy_resources();
+}
+
 /**
   The destructor removes the widget and destroys the Vulkan context
   associated with it.
 */
-Fl_Vk_Window::~Fl_Vk_Window() {
-  hide();
-
-  if (m_draw_cmd != VK_NULL_HANDLE)
-  {
-      vkFreeCommandBuffers(device(), commandPool(), 1, &m_draw_cmd);
-  }
-
-  if (commandPool() != VK_NULL_HANDLE)
-  {
-      vkDestroyCommandPool(device(), commandPool(), nullptr);
-  }
-  
-  // Clean up fences and semaphores
-  vkDestroyFence(device(), m_drawFence, nullptr);
-    
-  destroy_resources();
-  delete pVkWindowDriver;
-}
-
-void Fl_Vk_Window::init_fences()
+Fl_Vk_Window::~Fl_Vk_Window()
 {
-    // Initialize fences and semaphores once
-    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        nullptr, 0 };
-    vkCreateFence(device(), &fenceInfo, nullptr, &m_drawFence);
+    hide();
+    shutdown_vulkan();
+    delete pVkWindowDriver;
 }
 
 void Fl_Vk_Window::init_vk_swapchain()
@@ -770,7 +811,28 @@ void Fl_Vk_Window::init_vulkan()
     result = vkAllocateCommandBuffers(device(), &cmd, &m_draw_cmd);
     VK_CHECK(result);
     
-    init_fences();
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semaphoreCreateInfo.pNext = NULL;
+    semaphoreCreateInfo.flags = 0;
+
+    result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_imageAcquiredSemaphore);
+    VK_CHECK(result);
+    
+    result = vkCreateSemaphore(device(), &semaphoreCreateInfo, NULL, &m_drawCompleteSemaphore);
+    VK_CHECK(result);
+    
+    VkFenceCreateInfo fenceInfo = {
+        VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        nullptr,
+        VK_FENCE_CREATE_SIGNALED_BIT };
+    vkCreateFence(device(), &fenceInfo, nullptr, &m_drawFence);
+    
+    // Create resize fence
+    result = vkCreateFence(device(), &fenceInfo, nullptr, &m_resizeFence);
+    VK_CHECK(result);
+    
+    m_renderingActive = false;
 }
 
 std::vector<const char*> Fl_Vk_Window::get_device_extensions()
