@@ -71,7 +71,7 @@
 #  include <vulkan/vulkan.h>
 #endif
 
-#define VK_CHECK_RESULT(err) vk_check_result(err, __FILE__, __LINE__);
+#define VK_CHECK(err) vk_check_result(err, __FILE__, __LINE__);
 
 #define VK_ALLOC(x)  (void*)malloc(x)
 #define VK_ASSERT(x) assert(x)
