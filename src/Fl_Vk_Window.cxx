@@ -110,6 +110,20 @@ void Fl_Vk_Window::recreate_swapchain() {
     // Destroy old swapchain resources
     pVkWindowDriver->destroy_resources();
 
+    // Create new command pool
+    VkCommandPoolCreateInfo cmd_pool_info = {};
+    cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
+    cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
+        pVkWindowDriver->destroy_resources();
+        m_swapchain = VK_NULL_HANDLE;
+        m_swapchain_needs_recreation = true;
+        return;
+    }
+    
     // Recreate swapchain
     pVkWindowDriver->prepare();
     if (m_swapchain == VK_NULL_HANDLE)
@@ -124,20 +138,6 @@ void Fl_Vk_Window::recreate_swapchain() {
     if (result != VK_SUCCESS || m_swapchainImageCount == 0)
     {
         fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
-        pVkWindowDriver->destroy_resources();
-        m_swapchain = VK_NULL_HANDLE;
-        m_swapchain_needs_recreation = true;
-        return;
-    }
-
-    // Create new command pool
-    VkCommandPoolCreateInfo cmd_pool_info = {};
-    cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
-    cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
-    if (result != VK_SUCCESS) {
-        fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
         pVkWindowDriver->destroy_resources();
         m_swapchain = VK_NULL_HANDLE;
         m_swapchain_needs_recreation = true;
