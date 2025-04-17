@@ -826,6 +826,11 @@ Fl_Vk_Window::~Fl_Vk_Window()
     delete pVkWindowDriver;
 }
 
+void Fl_Vk_Window::init_colorspace()
+{
+    pVkWindowDriver->init_colorspace();
+}
+
 void Fl_Vk_Window::init_vulkan() {
     VkResult result;
 

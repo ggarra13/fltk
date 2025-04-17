@@ -303,6 +303,8 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
   void recreate_swapchain();
+
+  virtual void init_colorspace();
   
   virtual void vk_draw_begin();
   virtual void draw() FL_OVERRIDE;
@@ -516,6 +518,8 @@ protected:
   VkDebugUtilsMessengerEXT  m_debug_messenger;
 
   void init_vulkan();
+  
+public:
   
 public:
   

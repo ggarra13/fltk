@@ -63,7 +63,7 @@ protected:
     //! This is for holding one texture for the shader.
     Fl_Vk_Texture  m_texture;
 
-    //! Memory for descriptor sets
+    //! Memory for descriptor setsx
     VkDescriptorPool      m_desc_pool;
 
     //! Describe texture bindings whithin desc. set  
