@@ -8,12 +8,15 @@ if [[ -z "$VULKAN_SDK" ]]; then
 fi
 
 #
-# Due to SIM these seem not to work and produce issues with validation layers
-# Read below.
+# Due to Apple's annoying SIM these seem not to work and produce issues with validation layers
+# Read \@bug: below.
 #
 export DYLD_LIBRARY_PATH=$VULKAN_SDK/lib
 export DYLD_FALLBACK_LIBRARY_PATH=$VULKAN_SDK/lib
 
+#
+# Set MoltenVK's environment variables
+#
 export VK_LAYER_PATH=$VULKAN_SDK/opt/vulkan-profiles/share/vulkan/explicit_layer.d:$VULKAN_SDK/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d
 export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
 
@@ -22,7 +25,7 @@ export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
 #
 
 # \@bug:
-#      When using macOS (Intel at least) validationlayers, from the macOS
+#      When using macOS (Intel at least) validationlayers from the macOS brew
 #      distribution, the validation layer comes without a path, which breaks
 #      loading it when creating the instance.
 #
@@ -73,4 +76,8 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" 
 
-ninja && bin/test/vk_shape-shared && bin/test/vk_shape_textured-shared && bin/test/vk_cube-shared
+ninja
+
+bin/test/vk_shape-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared

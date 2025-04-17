@@ -18,7 +18,6 @@
 
 #if HAVE_VK
 
-
 #include <FL/vk.h>
 #include <FL/vk_enum_string_helper.h>
 #include <FL/Fl_Vk_Window.H>
@@ -29,6 +28,7 @@
 
 //! Instance is per application
 VkInstance Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
+uint32_t   Fl_Vk_Window::m_instance_counter = 0;
 
 
 bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
@@ -48,16 +48,19 @@ bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
             a.maxFrameAverageLightLevel == b.maxFrameAverageLightLevel);
 }
 
-void Fl_Vk_Window::destroy_resources() {
-  if (m_pipeline != VK_NULL_HANDLE) {
-    vkDestroyPipeline(device(), m_pipeline, NULL);
-    m_pipeline = VK_NULL_HANDLE;
-  }
-
-  if (m_renderPass != VK_NULL_HANDLE) {
-    vkDestroyRenderPass(device(), m_renderPass, NULL);
-    m_renderPass = VK_NULL_HANDLE;
-  }
+void Fl_Vk_Window::destroy_common_resources() {
+    // Destroy derived Window's resources
+    destroy_resources();
+    
+    if (m_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device(), m_pipeline, NULL);
+        m_pipeline = VK_NULL_HANDLE;
+    }
+    
+    if (m_renderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(device(), m_renderPass, NULL);
+        m_renderPass = VK_NULL_HANDLE;
+    }
 }
 
 void Fl_Vk_Window::recreate_swapchain() {
@@ -65,26 +68,32 @@ void Fl_Vk_Window::recreate_swapchain() {
 
     // Wait for all operations to complete
     result = vkDeviceWaitIdle(device());
-    if (result != VK_SUCCESS) {
+    if (result != VK_SUCCESS)
+    {
         fprintf(stderr, "vkDeviceWaitIdle failed: %s\n", string_VkResult(result));
         return;
     }
 
     // Free existing command buffers
-    for (auto& frame : m_frames) {
-        if (frame.commandBuffer != VK_NULL_HANDLE) {
+    for (auto& frame : m_frames)
+    {
+        if (frame.commandBuffer != VK_NULL_HANDLE)
+        {
             vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
             frame.commandBuffer = VK_NULL_HANDLE;
         }
-        if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE) {
+        if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE)
+        {
             vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
             frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
         }
-        if (frame.drawCompleteSemaphore != VK_NULL_HANDLE) {
+        if (frame.drawCompleteSemaphore != VK_NULL_HANDLE)
+        {
             vkDestroySemaphore(device(), frame.drawCompleteSemaphore, nullptr);
             frame.drawCompleteSemaphore = VK_NULL_HANDLE;
         }
-        if (frame.fence != VK_NULL_HANDLE) {
+        if (frame.fence != VK_NULL_HANDLE)
+        {
             vkDestroyFence(device(), frame.fence, nullptr);
             frame.fence = VK_NULL_HANDLE;
         }
@@ -92,7 +101,8 @@ void Fl_Vk_Window::recreate_swapchain() {
     }
 
     // Destroy old command pool
-    if (commandPool() != VK_NULL_HANDLE) {
+    if (commandPool() != VK_NULL_HANDLE)
+    {
         vkDestroyCommandPool(device(), commandPool(), nullptr);
         commandPool() = VK_NULL_HANDLE;
     }
@@ -102,7 +112,8 @@ void Fl_Vk_Window::recreate_swapchain() {
 
     // Recreate swapchain
     pVkWindowDriver->prepare();
-    if (m_swapchain == VK_NULL_HANDLE) {
+    if (m_swapchain == VK_NULL_HANDLE)
+    {
         fprintf(stderr, "recreate_swapchain: prepare() failed\n");
         m_swapchain_needs_recreation = true;
         return;
@@ -110,7 +121,8 @@ void Fl_Vk_Window::recreate_swapchain() {
 
     // Get swapchain image count
     result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
-    if (result != VK_SUCCESS || m_swapchainImageCount == 0) {
+    if (result != VK_SUCCESS || m_swapchainImageCount == 0)
+    {
         fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
         pVkWindowDriver->destroy_resources();
         m_swapchain = VK_NULL_HANDLE;
@@ -623,9 +635,9 @@ void Fl_Vk_Window::flush() {
     return;
 
   // Initialize Vulkan
-  if (!m_swapchain) {
+  if (m_swapchain == VK_NULL_HANDLE) {
       init_vulkan();
-      if (!m_swapchain) {
+      if (m_swapchain == VK_NULL_HANDLE) {
           fprintf(stderr, "Vulkan initialization failed\n");
           return;
       }
@@ -660,6 +672,7 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
   Hides the window and destroys the Vulkan context.
 */
 void Fl_Vk_Window::hide() {
+  shutdown_vulkan();
   Fl_Window::hide();
 }
 
@@ -771,11 +784,24 @@ Fl_RGB_Image *Fl_Vk_Window_Driver::capture_vk_rectangle(int x, int y, int w, int
 void Fl_Vk_Window::shutdown_vulkan() {
     if (device() == VK_NULL_HANDLE) return;
 
-    vkDeviceWaitIdle(device());
+    VkResult result;
+    
+    result = vkDeviceWaitIdle(device());
+    if (result != VK_SUCCESS)
+    {
+        fprintf(stderr, "vkDeviceWaitIdle failed: %s\n", string_VkResult(result));
+        return;
+    }
 
     // Free command buffers
     for (auto& frame : m_frames) {
         if (frame.commandBuffer != VK_NULL_HANDLE) {
+            // Reset command buffer to release any resource references
+            result = vkResetCommandBuffer(frame.commandBuffer, 0);
+            if (result != VK_SUCCESS) {
+                fprintf(stderr, "vkResetCommandBuffer failed for frame %p: %s\n",
+                        &frame, string_VkResult(result));
+            }
             vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
             frame.commandBuffer = VK_NULL_HANDLE;
         }
@@ -788,6 +814,12 @@ void Fl_Vk_Window::shutdown_vulkan() {
             frame.drawCompleteSemaphore = VK_NULL_HANDLE;
         }
         if (frame.fence != VK_NULL_HANDLE) {
+            // Wait for fence to ensure no pending operations
+            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+            if (result != VK_SUCCESS) {
+                fprintf(stderr, "vkWaitForFences failed for frame %p: %s\n",
+                        &frame, string_VkResult(result));
+            }
             vkDestroyFence(device(), frame.fence, nullptr);
             frame.fence = VK_NULL_HANDLE;
         }
@@ -810,8 +842,19 @@ void Fl_Vk_Window::shutdown_vulkan() {
     pVkWindowDriver->destroy_resources();
     pVkWindowDriver->destroy_surface();
 
-    m_swapchain = VK_NULL_HANDLE;
-    m_surface = VK_NULL_HANDLE;
+    ctx.destroy();
+
+    // Destroy instance
+    if (m_instance != VK_NULL_HANDLE)
+    {
+        --m_instance_counter;
+        if (m_instance_counter == 0)
+        {
+            vkDestroyInstance(m_instance, nullptr);
+            m_instance = VK_NULL_HANDLE;
+        }
+    }
+    
 }
 
 
@@ -821,9 +864,19 @@ void Fl_Vk_Window::shutdown_vulkan() {
 */
 Fl_Vk_Window::~Fl_Vk_Window()
 {
-    hide();
-    shutdown_vulkan();
     delete pVkWindowDriver;
+}
+
+void Fl_Vk_Window::wait_queue()
+{
+    VkResult result = vkQueueWaitIdle(queue());
+    VK_CHECK(result);
+}
+
+void Fl_Vk_Window::wait_device()
+{
+    VkResult result = vkDeviceWaitIdle(device());
+    VK_CHECK(result);
 }
 
 void Fl_Vk_Window::init_colorspace()
@@ -833,21 +886,21 @@ void Fl_Vk_Window::init_colorspace()
 
 void Fl_Vk_Window::init_vulkan() {
     VkResult result;
-
+    
     // Initialize Vulkan instance and device
     if (ctx.instance == VK_NULL_HANDLE) {
         pVkWindowDriver->init_vk();
         vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
         if (!ctx.instance) {
-            fprintf(stderr, "init_vk() failed to create Vulkan instance\n");
+            fprintf(stderr, "init_vulkan() failed to create Vulkan instance\n");
             return;
         }
     }
 
     // Create surface
     pVkWindowDriver->create_surface();
-    if (!m_surface) {
-        fprintf(stderr, "Failed to create Vulkan surface\n");
+    if (m_surface == VK_NULL_HANDLE) {
+        fprintf(stderr, "Failed to create Vulkan's Window surface\n");
         return;
     }
 
@@ -858,6 +911,20 @@ void Fl_Vk_Window::init_vulkan() {
     if (w() <= 0 || h() <= 0) {
         fprintf(stderr, "Invalid window size: w=%d, h=%d\n", w(), h());
         pVkWindowDriver->destroy_surface();
+        return;
+    }
+
+    // Create command pool
+    VkCommandPoolCreateInfo cmd_pool_info = {};
+    cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
+    cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
+        pVkWindowDriver->destroy_resources();
+        pVkWindowDriver->destroy_surface();
+        m_swapchain = VK_NULL_HANDLE;
         return;
     }
     
@@ -874,20 +941,6 @@ void Fl_Vk_Window::init_vulkan() {
     result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
     if (result != VK_SUCCESS || m_swapchainImageCount == 0) {
         fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
-        pVkWindowDriver->destroy_resources();
-        pVkWindowDriver->destroy_surface();
-        m_swapchain = VK_NULL_HANDLE;
-        return;
-    }
-
-    // Create command pool
-    VkCommandPoolCreateInfo cmd_pool_info = {};
-    cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
-    cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
-    if (result != VK_SUCCESS) {
-        fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
         pVkWindowDriver->destroy_resources();
         pVkWindowDriver->destroy_surface();
         m_swapchain = VK_NULL_HANDLE;
@@ -1009,7 +1062,7 @@ void Fl_Vk_Window::init() {
   m_debugSync = false;
 #else
   m_validate = true;
-  m_debugSync = true;
+  m_debugSync = false;
 #endif
 
   

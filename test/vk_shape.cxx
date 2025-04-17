@@ -35,16 +35,19 @@ public:
     int sides;
     vk_shape_window(int x,int y,int w,int h,const char *l=0);
     vk_shape_window(int w,int h,const char *l=0);
-    ~vk_shape_window();
 
     // Vulkan overrides
     const char* application_name()  FL_OVERRIDE { return "vk_shape"; }
+
     void prepare() FL_OVERRIDE;
-    void prepare_vertices();
     void destroy_resources() FL_OVERRIDE;
+
+
+    void destroy_mesh();
+    void prepare_mesh();
     
 protected:
-    //! Shaders used in GLFW demo
+    //! Shaders used in demo
     VkShaderModule m_vert_shader_module;
     VkShaderModule m_frag_shader_module;
     
@@ -56,32 +59,32 @@ protected:
     void prepare_pipeline();
     
 private:
+    void _init();
     VkShaderModule prepare_vs();
     VkShaderModule prepare_fs();
-
 };
 
-vk_shape_window::~vk_shape_window()
+void vk_shape_window::_init()
 {
-    vkDestroyShaderModule(device(), m_frag_shader_module, NULL);
-    vkDestroyShaderModule(device(), m_vert_shader_module, NULL);
+    mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
+    sides = 3;
+    // Turn on validations
+    m_validate = true;
+    m_vert_shader_module = VK_NULL_HANDLE;
+    m_frag_shader_module = VK_NULL_HANDLE;
 }
 
 vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
-    sides = 3;
-    m_vert_shader_module = VK_NULL_HANDLE;
-    m_frag_shader_module = VK_NULL_HANDLE;
+    _init();
 }
 
 vk_shape_window::vk_shape_window(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
-    sides = 3;
-    m_vert_shader_module = VK_NULL_HANDLE;
-    m_frag_shader_module = VK_NULL_HANDLE;
+    _init();
 }
 
-void vk_shape_window::prepare_vertices()
+void vk_shape_window::prepare_mesh()
 {
     // clang-format off
     struct Vertex
@@ -117,7 +120,7 @@ void vk_shape_window::prepare_vertices()
     }
     
             
-	VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+    VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
     
     // clang-format on
     VkBufferCreateInfo buf_info = {};
@@ -159,7 +162,7 @@ void vk_shape_window::prepare_vertices()
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK(result);
 
-	memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
+    memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
     vkUnmapMemory(device(), m_mesh.mem);
 
@@ -438,6 +441,7 @@ void vk_shape_window::prepare_pipeline() {
     VK_CHECK(result);
 
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
+    pipelineCache() = VK_NULL_HANDLE;
 
 }
 
@@ -461,7 +465,7 @@ void vk_shape_window::prepare_descriptor_layout() {
 
 void vk_shape_window::prepare()
 {
-    prepare_vertices();
+    prepare_mesh();
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
@@ -480,7 +484,6 @@ void vk_shape_window::draw() {
     if (!m_swapchain || !cmd || !isFrameActive()) {
         return;
     }
-
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
@@ -503,17 +506,18 @@ void vk_shape_window::draw() {
     vkCmdEndRenderPass(cmd);
 }
 
-
+void vk_shape_window::destroy_mesh()
+{
+    m_mesh.destroy(device());
+}
 
 void vk_shape_window::destroy_resources()
 {
-    if (device() == VK_NULL_HANDLE) return;
+    if (device() == VK_NULL_HANDLE)
+        return;
 
-    m_mesh.destroy(device());
-    if (m_pipeline != VK_NULL_HANDLE) {
-        vkDestroyPipeline(device(), m_pipeline, nullptr);
-        m_pipeline = VK_NULL_HANDLE;
-    }
+    destroy_mesh();
+    
     if (m_pipeline_layout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device(), m_pipeline_layout, nullptr);
         m_pipeline_layout = VK_NULL_HANDLE;
@@ -526,11 +530,6 @@ void vk_shape_window::destroy_resources()
         vkDestroyShaderModule(device(), m_frag_shader_module, nullptr);
         m_frag_shader_module = VK_NULL_HANDLE;
     }
-    if (m_renderPass != VK_NULL_HANDLE) {
-        vkDestroyRenderPass(device(), m_renderPass, nullptr);
-        m_renderPass = VK_NULL_HANDLE;
-    }
-    Fl_Vk_Window::destroy_resources();
 }
 
 #else
@@ -551,7 +550,9 @@ public:
 void sides_cb(Fl_Widget *o, void *p) {
   vk_shape_window *sw = (vk_shape_window *)p;
   sw->sides = int(((Fl_Slider *)o)->value());
-  sw->prepare_vertices();
+  sw->wait_queue();
+  sw->destroy_mesh();
+  sw->prepare_mesh();
   sw->redraw();
 }
 
@@ -560,14 +561,8 @@ int main(int argc, char **argv) {
 
     Fl_Window window(300, 330);
   
-// the shape window could be it's own window, but here we make it
-// a child window:
-        
     vk_shape_window sw(10, 10, 280, 280);
 
-// // make it resize:
-    //  window.size_range(300,330,0,0,1,1,1);
-    // add a knob to control it:
     Fl_Hor_Slider slider(50, 295, window.w()-60, 30, "Sides:");
     slider.align(FL_ALIGN_LEFT);
     slider.step(1);

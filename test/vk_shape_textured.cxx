@@ -13,6 +13,35 @@
 //
 //     https://www.fltk.org/bugs.php
 //
+/*
+ * Code based on:
+ *
+ * Copyright (c) 2015-2016 The Khronos Group Inc.
+ * Copyright (c) 2015-2016 Valve Corporation
+ * Copyright (c) 2015-2016 LunarG, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Author: Chia-I Wu <olvaffe@gmail.com>
+ * Author: Cody Northrop <cody@lunarg.com>
+ * Author: Courtney Goeltzenleuchter <courtney@LunarG.com>
+ * Author: Ian Elliott <ian@LunarG.com>
+ * Author: Jon Ashburn <jon@lunarg.com>
+ * Author: Piers Daniell <pdaniell@nvidia.com>
+ * Author: Gwan-gyeong Mun <elongbug@gmail.com>
+ * Author: Camilla Löwy <elmindreda@glfw.org>
+ * Porter: Gonzalo Garramuño <ggarra13@gmail.com>
+ */
 
 #include <config.h>
 #include <FL/platform.H>
@@ -28,36 +57,30 @@
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
 
-class DynamicTextureWindow : public Fl_Vk_Window {
-    void vk_draw_begin() FL_OVERRIDE;
+class vk_shape_window : public Fl_Vk_Window {
     void draw() FL_OVERRIDE;
 public:
     int sides;
-    DynamicTextureWindow(int x,int y,int w,int h,const char *l=0);
-    DynamicTextureWindow(int w,int h,const char *l=0);
-    ~DynamicTextureWindow();
+    vk_shape_window(int x,int y,int w,int h,const char *l=0);
+    vk_shape_window(int w,int h,const char *l=0);
 
     float depthIncrement = -0.01f;
     
-    const char* application_name() { return "vk_shape_textured"; };
+    const char* application_name() FL_OVERRIDE { return "vk_shape_textured"; };
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
-    void prepare_vertices();
-    void update_texture();
 
-    static void texture_cb(DynamicTextureWindow* w)
-        {
-            w->redraw();
-            Fl::repeat_timeout(1.0/60.0, (Fl_Timeout_Handler)texture_cb, w);
-        }
+
+    void destroy_mesh();
+    void prepare_mesh();
     
 protected:
-    //! Shaders used in GLFW demo
+    //! Shaders used in demo
     VkShaderModule m_vert_shader_module;
     VkShaderModule m_frag_shader_module;
     uint32_t frame_counter = 0;
     
-    //! This is for holding a mesh.
+    //! This is for holding a mesh
     Fl_Vk_Mesh m_mesh;
 
     //! This is for holding one texture for the shader.
@@ -73,15 +96,17 @@ protected:
     //! uniform buffers
     VkDescriptorSet       m_desc_set; 
     
+    void update_texture();
+    
+private:
+    void _init();
+    
     void prepare_textures();
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();
     void prepare_descriptor_pool();
     void prepare_descriptor_set();
-    
-private:
-    void _init();
     void prepare_texture_image(const uint32_t *tex_colors,
                                Fl_Vk_Texture* tex_obj,
                                VkImageTiling tiling,
@@ -92,11 +117,11 @@ private:
     VkShaderModule prepare_fs();
 };
 
-static void depth_stencil_cb(DynamicTextureWindow* w)
+static void depth_stencil_cb(vk_shape_window* w)
 {
     if (w->m_depthStencil > 0.99f)
         w->depthIncrement = -0.001f;
-    if (w->m_depthStencil < 0.8f)
+    if (w->m_depthStencil < 0.4f)
         w->depthIncrement = 0.001f;
 
     w->m_depthStencil += w->depthIncrement;
@@ -104,15 +129,16 @@ static void depth_stencil_cb(DynamicTextureWindow* w)
     Fl::repeat_timeout(0.001, (Fl_Timeout_Handler) depth_stencil_cb, w);
 }
 
-DynamicTextureWindow::~DynamicTextureWindow()
+
+static void texture_cb(vk_shape_window* w)
 {
-    vkDestroyShaderModule(device(), m_frag_shader_module, NULL);
-    vkDestroyShaderModule(device(), m_vert_shader_module, NULL);
+    w->redraw();
+    Fl::repeat_timeout(1.0/60.0, (Fl_Timeout_Handler)texture_cb, w);
 }
 
-void DynamicTextureWindow::_init()
+void vk_shape_window::_init()
 {
-    mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
+    mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH | FL_STENCIL);
     sides = 3;
     // Turn on validations
     m_validate = true;
@@ -120,21 +146,21 @@ void DynamicTextureWindow::_init()
     m_frag_shader_module = VK_NULL_HANDLE;
 }
 
-DynamicTextureWindow::DynamicTextureWindow(int x,int y,int w,int h,const char *l) :
+vk_shape_window::vk_shape_window(int x,int y,int w,int h,const char *l) :
 Fl_Vk_Window(x,y,w,h,l) {
     _init();
 }
 
-DynamicTextureWindow::DynamicTextureWindow(int w,int h,const char *l) :
+vk_shape_window::vk_shape_window(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
     _init();
 }
 
-void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
-                                                 Fl_Vk_Texture* tex_obj,
-                                                 VkImageTiling tiling,
-                                                 VkImageUsageFlags usage,
-                                                 VkFlags required_props) {
+void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
+                                            Fl_Vk_Texture* tex_obj,
+                                            VkImageTiling tiling,
+                                            VkImageUsageFlags usage,
+                                            VkFlags required_props) {
     const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
     const int32_t tex_width = 2;
     const int32_t tex_height = 2;
@@ -222,7 +248,7 @@ void DynamicTextureWindow::prepare_texture_image(const uint32_t *tex_colors,
 }
 
 
-void DynamicTextureWindow::prepare_textures()
+void vk_shape_window::prepare_textures()
 {
     VkResult result;
     const VkFormat tex_format = VK_FORMAT_B8G8R8A8_UNORM;
@@ -288,9 +314,8 @@ void DynamicTextureWindow::prepare_textures()
     VK_CHECK(result);
 }
 
-void DynamicTextureWindow::update_texture()
+void vk_shape_window::update_texture()
 {
-
     // Transition to GENERAL for CPU writes
     set_image_layout(device(), commandPool(), queue(), m_texture.image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
@@ -321,10 +346,8 @@ void DynamicTextureWindow::update_texture()
 }
 
 
-void DynamicTextureWindow::prepare_vertices()
+void vk_shape_window::prepare_mesh()
 {
-    VkResult result;
-
     // clang-format off
     struct Vertex
     {
@@ -366,12 +389,15 @@ void DynamicTextureWindow::prepare_vertices()
         vertices.push_back(outerVertices[(i + 1) % sides]);
     }
     
+    VkResult result;
+    VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+    
     // clang-format on
     VkBufferCreateInfo buf_info = {};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.pNext = NULL;
-    buf_info.size = sizeof(Vertex) * vertices.size();
-    buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT; 
+    buf_info.size = buffer_size;
+    buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     buf_info.flags = 0;
 
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
@@ -402,14 +428,15 @@ void DynamicTextureWindow::prepare_vertices()
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK(result);
 
-    memcpy(data, vertices.data(), sizeof(Vertex) * vertices.size());
+    memcpy(data, vertices.data(), static_cast<size_t>(buffer_size));
 
     vkUnmapMemory(device(), m_mesh.mem);
 
     result = vkBindBufferMemory(device(), m_mesh.buf, m_mesh.mem, 0);
     VK_CHECK(result);
 
-    m_mesh.vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    m_mesh.vi.sType =
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     m_mesh.vi.pNext = NULL;
     m_mesh.vi.vertexBindingDescriptionCount = 1;
     m_mesh.vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
@@ -428,11 +455,11 @@ void DynamicTextureWindow::prepare_vertices()
     m_mesh.vi_attrs[1].binding = 0;
     m_mesh.vi_attrs[1].location = 1;
     m_mesh.vi_attrs[1].format = VK_FORMAT_R32G32_SFLOAT;
-    m_mesh.vi_attrs[1].offset = sizeof(float) * 3;
+    m_mesh.vi_attrs[1].offset = sizeof(float) * 3;  // skip 3 vertex coords
 }
 
 // m_depth (optionally) -> creates m_renderPass
-void DynamicTextureWindow::prepare_render_pass() 
+void vk_shape_window::prepare_render_pass() 
 {
     bool has_depth = mode() & FL_DEPTH;
     bool has_stencil = mode() & FL_STENCIL;
@@ -508,7 +535,7 @@ void DynamicTextureWindow::prepare_render_pass()
     VK_CHECK(result);
 }
 
-VkShaderModule DynamicTextureWindow::prepare_vs() {
+VkShaderModule vk_shape_window::prepare_vs() {
     if (m_vert_shader_module != VK_NULL_HANDLE)
         return m_vert_shader_module;
     
@@ -539,7 +566,7 @@ VkShaderModule DynamicTextureWindow::prepare_vs() {
     return m_vert_shader_module;
 }
 
-VkShaderModule DynamicTextureWindow::prepare_fs() {
+VkShaderModule vk_shape_window::prepare_fs() {
     if (m_frag_shader_module != VK_NULL_HANDLE)
         return m_frag_shader_module;
     
@@ -573,11 +600,12 @@ VkShaderModule DynamicTextureWindow::prepare_fs() {
     
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
+        m_frag_shader_module = VK_NULL_HANDLE;
     }
     return m_frag_shader_module;
 }
 
-void DynamicTextureWindow::prepare_pipeline() {
+void vk_shape_window::prepare_pipeline() {
     VkGraphicsPipelineCreateInfo pipeline;
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo;
 
@@ -611,7 +639,7 @@ void DynamicTextureWindow::prepare_pipeline() {
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rs.polygonMode = VK_POLYGON_MODE_FILL;
-    rs.cullMode = VK_CULL_MODE_NONE;
+    rs.cullMode = VK_CULL_MODE_BACK_BIT;
     rs.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs.depthClampEnable = VK_FALSE;
     rs.rasterizerDiscardEnable = VK_FALSE;
@@ -693,11 +721,12 @@ void DynamicTextureWindow::prepare_pipeline() {
     VK_CHECK(result);
 
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
+    pipelineCache() = VK_NULL_HANDLE;
 
 }
 
 
-void DynamicTextureWindow::prepare_descriptor_pool() {
+void vk_shape_window::prepare_descriptor_pool() {
     VkDescriptorPoolSize type_count = {};
     type_count.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     type_count.descriptorCount = 1;  // one texture
@@ -716,10 +745,9 @@ void DynamicTextureWindow::prepare_descriptor_pool() {
     VK_CHECK(result);
 }
 
-void DynamicTextureWindow::prepare_descriptor_set() {
+void vk_shape_window::prepare_descriptor_set() {
     VkDescriptorImageInfo tex_descs[1];
     VkResult result;
-    uint32_t i;
 
     VkDescriptorSetAllocateInfo alloc_info = {};
     alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -746,27 +774,20 @@ void DynamicTextureWindow::prepare_descriptor_set() {
     vkUpdateDescriptorSets(device(), 1, &write, 0, NULL);
 }
 
-void DynamicTextureWindow::prepare()
+void vk_shape_window::prepare()
 {
     prepare_textures();
-    prepare_vertices();
+    prepare_mesh();
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
     prepare_descriptor_pool();
     prepare_descriptor_set();
-
-    Fl::add_timeout(1.0/60.0, (Fl_Timeout_Handler)texture_cb, this);
 }
 
-void DynamicTextureWindow::vk_draw_begin()
-{
-    // Background color (black)
-    m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
-    Fl_Vk_Window::vk_draw_begin();
-}
-
-void DynamicTextureWindow::draw() {
+void vk_shape_window::draw() {
+    if (!shown() || w() <= 0 || h() <= 0)
+        return;
     
     update_texture();
 
@@ -798,15 +819,54 @@ void DynamicTextureWindow::draw() {
     vkCmdEndRenderPass(cmd);
 }
 
-void DynamicTextureWindow::destroy_resources() {
+void vk_shape_window::destroy_mesh()
+{
     m_mesh.destroy(device());
+}
+
+void vk_shape_window::destroy_resources()
+{
+    if (device() == VK_NULL_HANDLE)
+        return;
+
+    destroy_mesh();
+
     m_texture.destroy(device());
     
-    Fl_Vk_Window::destroy_resources();
+    if (m_pipeline_layout != VK_NULL_HANDLE)
+    {
+        vkDestroyPipelineLayout(device(), m_pipeline_layout, nullptr);
+        m_pipeline_layout = VK_NULL_HANDLE;
+    }
+    
+    if (m_desc_layout != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorSetLayout(device(), m_desc_layout, nullptr);
+        m_desc_layout = VK_NULL_HANDLE;
+    }
+    
+    if (m_desc_pool != VK_NULL_HANDLE)
+    {
+        vkDestroyDescriptorPool(device(), m_desc_pool, nullptr);
+        m_desc_pool = VK_NULL_HANDLE;
+    }
+    
+    if (m_vert_shader_module != VK_NULL_HANDLE)
+    {
+        vkDestroyShaderModule(device(), m_vert_shader_module, nullptr);
+        m_vert_shader_module = VK_NULL_HANDLE;
+    }
+    
+    if (m_frag_shader_module != VK_NULL_HANDLE)
+    {
+        vkDestroyShaderModule(device(), m_frag_shader_module, nullptr);
+        m_frag_shader_module = VK_NULL_HANDLE;
+    }
 }
 
 
-void DynamicTextureWindow::prepare_descriptor_layout() {
+void vk_shape_window::prepare_descriptor_layout()
+{
     VkDescriptorSetLayoutBinding layout_binding = {};
     layout_binding.binding = 0;
     layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -840,10 +900,10 @@ void DynamicTextureWindow::prepare_descriptor_layout() {
 #else
 
 #include <FL/Fl_Box.H>
-class DynamicTextureWindow : public Fl_Box {
+class vk_shape_window : public Fl_Box {
 public:
   int sides;
-  DynamicTextureWindow(int x,int y,int w,int h,const char *l=0)
+  vk_shape_window(int x,int y,int w,int h,const char *l=0)
     :Fl_Box(FL_DOWN_BOX,x,y,w,h,l){
       label("This demo does\nnot work without Vulkan");
   }
@@ -853,38 +913,21 @@ public:
 
 // when you change the data, as in this callback, you must call redraw():
 void sides_cb(Fl_Widget *o, void *p) {
-  DynamicTextureWindow *sw = (DynamicTextureWindow *)p;
+  vk_shape_window *sw = (vk_shape_window *)p;
   sw->sides = int(((Fl_Slider *)o)->value());
-  sw->prepare_vertices();
+  sw->wait_queue();
+  sw->destroy_mesh();
+  sw->prepare_mesh();
   sw->redraw();
 }
 
 int main(int argc, char **argv) {
     Fl::use_high_res_VK(1);
 
-#ifdef _WIN32
-    char* term = fl_getenv("TERM");
-    if (!term || strlen(term) == 0)
-    {
-        BOOL ok = AttachConsole(ATTACH_PARENT_PROCESS);
-        if (ok)
-        {
-            freopen("conout$", "w", stdout);
-            freopen("conout$", "w", stderr);
-        }
-    }
-#endif
-  
     Fl_Window window(300, 330);
   
-// the shape window could be it's own window, but here we make it
-// a child window:
-        
-    DynamicTextureWindow sw(10, 10, 280, 280);
+    vk_shape_window sw(10, 10, 280, 280);
 
-// // make it resize:
-    //  window.size_range(300,330,0,0,1,1,1);
-// add a knob to control it:
     Fl_Hor_Slider slider(50, 295, window.w()-60, 30, "Sides:");
     slider.align(FL_ALIGN_LEFT);
     slider.step(1);
@@ -895,8 +938,12 @@ int main(int argc, char **argv) {
     slider.callback(sides_cb,&sw);
     window.end();
     window.show(argc,argv);
-    
+
+    // Add a timer to change depth/stencil to mask the shape
     Fl::add_timeout(0.05, (Fl_Timeout_Handler)depth_stencil_cb, &sw);
+
+    // Add a timer to fade in a portion of the texture
+    Fl::add_timeout(1.0/60.0, (Fl_Timeout_Handler)texture_cb, &sw);
         
     return Fl::run();
 }
