@@ -565,10 +565,6 @@ protected:
   bool               m_use_break = false;
   VkDebugUtilsMessengerEXT  m_debug_messenger;
 
-  void init_vulkan();
-  
-public:
-  
 public:
   
   void make_current();
