@@ -60,23 +60,19 @@ public:
   virtual float pixels_per_unit() { return 1; }
   virtual void before_show(int &) {}
   virtual void after_show() {}
+  virtual void swap_interval(int) {};
+  virtual int swap_interval() const {return 1;};
+  virtual int flush_begin() { return 0; };
   virtual void invalidate();
   virtual int mode_(int /*m*/, const int * /*a*/) { return 0; }
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers() {};
   virtual void prepare();
-  virtual char swap_type();
-  virtual void swap_interval(int) {}
-  virtual int swap_interval() const { return -1; }
-  virtual int flush_begin() { return 0; }
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);
   // Return one of these structures for a given vk mode.
   virtual Fl_Vk_Choice *find(int /*mode*/, const int * /*alistp*/) { return NULL; }
-  virtual void waitVK() {}                  // support for vk_finish() function
-  virtual void vk_visual(Fl_Vk_Choice *) {} // support for Fl::vk_visual() function
-  virtual void vk_start() {}                // support for vk_start() function
   virtual void *GetProcAddress(const char *procName) { return nullptr; }
   virtual void get_list(Fl_Font_Descriptor *, int) {} // support for gl_draw() without textures
   static void draw_string_with_texture(const char *str, int n); // cross-platform
@@ -96,9 +92,10 @@ public:
   // Vulkan specific methods.
   virtual std::vector<const char*> get_instance_extensions() = 0;
   virtual void create_surface() = 0;
+  virtual void destroy_surface();
   virtual void destroy_resources();
 
-  void init_vk_swapchain();
+  void init_colorspace();
   void init_vk();
 
 protected:

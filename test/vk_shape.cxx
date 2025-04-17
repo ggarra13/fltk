@@ -37,7 +37,8 @@ public:
     vk_shape_window(int w,int h,const char *l=0);
     ~vk_shape_window();
 
-    const char* application_name() { return "vk_shape"; };
+    // Vulkan overrides
+    const char* application_name()  FL_OVERRIDE { return "vk_shape"; }
     void prepare() FL_OVERRIDE;
     void prepare_vertices();
     void destroy_resources() FL_OVERRIDE;
@@ -53,8 +54,6 @@ protected:
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();
-    void prepare_descriptor_pool();
-    void prepare_descriptor_set();
     
 private:
     VkShaderModule prepare_vs();
@@ -443,18 +442,12 @@ void vk_shape_window::prepare_pipeline() {
 }
 
 
-void vk_shape_window::prepare_descriptor_pool() {
-    // No textures so no descriptor pool
-}
-
-void vk_shape_window::prepare_descriptor_set() {
-    // No textures so no descriptor set
-}
 
 
 void vk_shape_window::prepare_descriptor_layout() {
     VkResult result;
-    
+
+    // These shaders don't have UBO parameters
     VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
     pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pPipelineLayoutCreateInfo.pNext = NULL;
@@ -472,36 +465,73 @@ void vk_shape_window::prepare()
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
-    prepare_descriptor_pool();
-    prepare_descriptor_set();
 }
 
-
-void vk_shape_window::vk_draw_begin()
-{
-    // Background color
-    m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
-
+void vk_shape_window::vk_draw_begin() {
+    m_clearColor = { 1.0, 0, 0, 0 };  // Red background
     Fl_Vk_Window::vk_draw_begin();
 }
 
 void vk_shape_window::draw() {
-    if (!shown() || w() <= 0 || h() <= 0) return;
+    if (!shown() || w() <= 0 || h() <= 0)
+        return;
+    
+    VkCommandBuffer cmd = getCurrentCommandBuffer();
+    if (!m_swapchain || !cmd || !isFrameActive()) {
+        return;
+    }
 
-    // Draw the shape
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+    VkViewport viewport = {};
+    viewport.width = static_cast<float>(w());
+    viewport.height = static_cast<float>(h());
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.extent.width = w();
+    scissor.extent.height = h();
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
     VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
-                           &m_mesh.buf, offsets);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_mesh.buf, offsets);
+    vkCmdDraw(cmd, 3 * sides, 1, 0, 0); // Draw shape
 
-    vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
+    vkCmdEndRenderPass(cmd);
 }
 
-void vk_shape_window::destroy_resources() {
-    m_mesh.destroy(device());
 
+
+void vk_shape_window::destroy_resources()
+{
+    if (device() == VK_NULL_HANDLE) return;
+
+    m_mesh.destroy(device());
+    if (m_pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device(), m_pipeline, nullptr);
+        m_pipeline = VK_NULL_HANDLE;
+    }
+    if (m_pipeline_layout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(device(), m_pipeline_layout, nullptr);
+        m_pipeline_layout = VK_NULL_HANDLE;
+    }
+    if (m_vert_shader_module != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device(), m_vert_shader_module, nullptr);
+        m_vert_shader_module = VK_NULL_HANDLE;
+    }
+    if (m_frag_shader_module != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(device(), m_frag_shader_module, nullptr);
+        m_frag_shader_module = VK_NULL_HANDLE;
+    }
+    if (m_renderPass != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(device(), m_renderPass, nullptr);
+        m_renderPass = VK_NULL_HANDLE;
+    }
     Fl_Vk_Window::destroy_resources();
 }
-
 
 #else
 

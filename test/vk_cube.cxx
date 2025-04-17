@@ -92,6 +92,7 @@ struct MVP
 
 class cube_box : public Fl_Vk_Window {
     void vk_draw_begin() FL_OVERRIDE;
+    void vk_draw_end() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
     int handle(int) FL_OVERRIDE;
 
@@ -112,7 +113,17 @@ class cube_box : public Fl_Vk_Window {
     //! This is for holding a mesh
     Fl_Vk_Mesh m_cube;
     
-    VkPipeline m_wire_pipeline; // Pipeline for wireframe mode
+    VkPipeline m_wire_pipeline; // Additional Pipeline for wireframe mode
+
+    
+    VkDescriptorPool      m_desc_pool; // memory for descriptor sets
+
+    // Describe texture bindings whithin desc. set  
+    VkDescriptorSetLayout m_desc_layout;
+
+    // Actual data bound to shaders like texture or
+    // uniform buffers
+    VkDescriptorSet       m_desc_set; 
 public:
     double lasttime;
     int wire;
@@ -211,16 +222,26 @@ void cube_box::prepare_render_pass()
     {
         subpass.pDepthStencilAttachment = NULL; // Explicitly set to NULL when no depth/stencil
     }
+    
+    // Add subpass self-dependency
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = 0; // Current subpass
+    dependency.dstSubpass = 0; // Same subpass (self-dependency)
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency.dependencyFlags = 0;
 
     VkRenderPassCreateInfo rp_info = {};
     rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     rp_info.pNext = NULL;
-    rp_info.attachmentCount = (has_depth || has_stencil) ? 2: 1;
+    rp_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
     rp_info.pAttachments = attachments;
     rp_info.subpassCount = 1;
     rp_info.pSubpasses = &subpass;
-    rp_info.dependencyCount = 0;
-    rp_info.pDependencies = NULL;
+    rp_info.dependencyCount = 1; // Now we have one dependency
+    rp_info.pDependencies = &dependency;
                     
     VkResult result;
     result = vkCreateRenderPass(device(), &rp_info, NULL, &m_renderPass);
@@ -716,6 +737,8 @@ void cube_box::destroy_resources()
         vkDestroyDescriptorPool(device(), m_desc_pool, nullptr);
         m_desc_pool = VK_NULL_HANDLE;
     }
+    // m_desc_set is destroyed by the pool.
+    
     Fl_Vk_Window::destroy_resources();
 }
 
@@ -735,7 +758,6 @@ void cube_box::vk_draw_begin()
 {
     // Background color
     m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
-
     Fl_Vk_Window::vk_draw_begin();
 }
 
@@ -762,29 +784,56 @@ void cube_box::draw() {
     memcpy(data, &ubo, sizeof(ubo));
     vkUnmapMemory(device(), m_cube.uniformMemory);
     
+    VkCommandBuffer cmd = getCurrentCommandBuffer();
+    if (!m_swapchain || !cmd || !isFrameActive()) {
+        return;
+    }
+    
+    // Set viewport
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = (float)w();
+    viewport.height = (float)h();
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    // Set scissor
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = {(uint32_t)w(), (uint32_t)h()};
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+    
     // Bind pipeline based on wire
-    vkCmdBindPipeline(m_draw_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       wire ? m_wire_pipeline : m_pipeline);
 
     
-    vkCmdBindDescriptorSets(
-        m_draw_cmd,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        m_pipeline_layout,
-        0, 1, &m_desc_set,
-        0, nullptr);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline_layout,
+                            0, 1, &m_desc_set,
+                            0, nullptr);
 
     // Draw the cube
     VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
+    vkCmdBindVertexBuffers(cmd, 0, 1,
                            &m_cube.buf, offsets);
 
-    vkCmdBindIndexBuffer(m_draw_cmd, m_cube.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-    vkCmdDrawIndexed(m_draw_cmd, 6*3*2, 1, 0, 0, 0);
+    vkCmdBindIndexBuffer(cmd, m_cube.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdDrawIndexed(cmd, 6*3*2, 1, 0, 0, 0); // 6 sides * 2 triangles * 3 verts
 }
 
+void cube_box::vk_draw_end()
+{
+    VkCommandBuffer cmd = getCurrentCommandBuffer();
+    if (!m_swapchain || !cmd || !isFrameActive()) {
+        return;
+    }
 
-
+    vkCmdEndRenderPass(cmd);
+    Fl_Vk_Window::vk_draw_end();
+}
 
 void cube_box::create_device() {
     VkResult result;
@@ -945,10 +994,6 @@ void wire_cb(Fl_Widget *w, void *) {
   int wire = ((Fl_Light_Button *)w)->value();
   lt_cube->wire = wire;
   rt_cube->wire = 1 - wire;
-  lt_cube->destroy_resources();
-  rt_cube->destroy_resources();
-  lt_cube->prepare();
-  rt_cube->prepare();
 }
 
 // print screen demo

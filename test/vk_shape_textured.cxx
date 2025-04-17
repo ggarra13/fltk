@@ -57,9 +57,21 @@ protected:
     VkShaderModule m_frag_shader_module;
     uint32_t frame_counter = 0;
     
-    //! This is for holding a mesh
+    //! This is for holding a mesh.
     Fl_Vk_Mesh m_mesh;
+
+    //! This is for holding one texture for the shader.
     Fl_Vk_Texture  m_texture;
+
+    //! Memory for descriptor sets
+    VkDescriptorPool      m_desc_pool;
+
+    //! Describe texture bindings whithin desc. set  
+    VkDescriptorSetLayout m_desc_layout;
+
+    //! Actual data bound to shaders like texture or
+    //! uniform buffers
+    VkDescriptorSet       m_desc_set; 
     
     void prepare_textures();
     void prepare_descriptor_layout();
@@ -749,9 +761,8 @@ void DynamicTextureWindow::prepare()
 
 void DynamicTextureWindow::vk_draw_begin()
 {
-    // Background color
-    m_clearColor = { 0.0, 0.0, 1.0, 1.0 };
-    
+    // Background color (black)
+    m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
     Fl_Vk_Window::vk_draw_begin();
 }
 
@@ -759,14 +770,32 @@ void DynamicTextureWindow::draw() {
     
     update_texture();
 
-    // Draw the shape
+    VkCommandBuffer cmd = getCurrentCommandBuffer();
+    if (!m_swapchain || !cmd || !isFrameActive()) {
+        return;
+    }
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            m_pipeline_layout, 0, 1, &m_desc_set, 0, nullptr);
+
+    VkViewport viewport = {};
+    viewport.width = static_cast<float>(w());
+    viewport.height = static_cast<float>(h());
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmd, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.extent.width = w();
+    scissor.extent.height = h();
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+
     VkDeviceSize offsets[1] = {0};
-    vkCmdBindVertexBuffers(m_draw_cmd, 0, 1,
-                           &m_mesh.buf, offsets);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &m_mesh.buf, offsets);
+    vkCmdDraw(cmd, 3 * sides, 1, 0, 0); // Draw shape
 
-    vkCmdDraw(m_draw_cmd, sides * 3, 1, 0, 0);
-
-    Fl_Window::draw();
+    vkCmdEndRenderPass(cmd);
 }
 
 void DynamicTextureWindow::destroy_resources() {

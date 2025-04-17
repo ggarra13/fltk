@@ -302,13 +302,10 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   static int can_do(int, const int *);
   int mode(int, const int *);
 protected:
-
-  void shutdown_vulkan();
   void recreate_swapchain();
-  virtual void init_vk_swapchain();
   
   virtual void vk_draw_begin();
-  void draw() FL_OVERRIDE;
+  virtual void draw() FL_OVERRIDE;
   virtual void vk_draw_end();
 
   void set_hdr_metadata();
@@ -421,37 +418,47 @@ public:
 
   //! @}
 
-  VkExtent2D getCurrentExtent() const { return m_currentExtent; }
-  void updateExtent(uint32_t width, uint32_t height) {
-      m_currentExtent = {width, height};
-  }
-    
   // Application
   bool m_validate;  // if true, turns on validation layers
-
-    
+  bool m_debugSync;
   static VkInstance m_instance; // this gets copied into ctx.instance for every
-                                // window.
+
+  // window.
   Fl_Vk_Context ctx;
 
   // Per Window
-  bool m_renderingActive = false;
-  VkSurfaceKHR       m_surface;  // needed
-  VkSurfaceFormatKHR m_surfaceFormat; //needed
-  
-  VkRenderPass       m_renderPass; // needed
 
+  // For clearing the background
+  VkClearColorValue  m_clearColor;
+
+  // For clearing the stencil
+  float              m_depthStencil;
+
+  //! The surface and its format gotten from the Window driver.
+  VkSurfaceKHR       m_surface;
+  VkSurfaceFormatKHR m_surfaceFormat;
+
+  //! For drawing (one pipeline and one render pass by default)
+  VkRenderPass m_renderPass;
+  VkPipeline   m_pipeline;
+  
+  //! Interface between shaders and desc.sets
+  VkPipelineLayout      m_pipeline_layout;
+
+private:
   // Per frame
   struct FrameData {
       VkSemaphore imageAcquiredSemaphore;
       VkSemaphore drawCompleteSemaphore;
       VkFence fence;
+      VkCommandBuffer commandBuffer;
       bool active;
 
       FrameData() :
           imageAcquiredSemaphore(VK_NULL_HANDLE),
           drawCompleteSemaphore(VK_NULL_HANDLE),
           fence(VK_NULL_HANDLE),
+          commandBuffer(VK_NULL_HANDLE),
           active(false)
           {
           }
@@ -461,49 +468,31 @@ public:
   uint32_t m_currentFrameIndex;
 
   // Swapchain
-  VkExtent2D             m_currentExtent; // Track current swapchain extent
-  VkFence                m_resizeFence;
-  VkSwapchainKHR         m_swapchain;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
+  VkFence                m_resizeFence;
+  VkExtent2D             m_currentExtent; // Track current swapchain exten
+  //! Flag used to handle resizes (swapchain and other resources recreation)
+
+protected:
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
-
+  bool                   m_swapchain_needs_recreation;
+  VkSwapchainKHR         m_swapchain;
+  
   // HDR metadata information (passed during swap_buffers)
   bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
                              const VkHdrMetadataEXT& b);
   PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
   VkHdrMetadataEXT        m_hdr_metadata;
   bool                    m_hdr_metadata_changed;
-
+  
+  Fl_Vk_Depth             m_depth;
   uint32_t           m_queueFamilyIndex;
-  Fl_Vk_Depth        m_depth;
+
 
   // For drawing
-  VkPipeline         m_pipeline;  
-  VkDescriptorPool   m_desc_pool; // memory for descriptor sets
-    
-  VkCommandBuffer    m_draw_cmd;  // Command Buffer for drawing commands
-  bool m_draw_cmd_pending; // Track if m_draw_cmd is pending
-  uint32_t m_draw_cmd_last_frame; // Last frame that used m_draw_cmd
-
-  VkSemaphore        m_imageAcquiredSemaphore;
-  VkSemaphore        m_drawCompleteSemaphore;
-
-  // For clearing the background
-  VkClearColorValue  m_clearColor;
-
-  // For clearing the stencil
-  float              m_depthStencil;
-
-  
-  VkPipelineLayout      m_pipeline_layout;  // interface between shaders and desc.sets
-  VkDescriptorSetLayout m_desc_layout; // describe texture bindings whithin desc. set
-  VkDescriptorSet       m_desc_set; // actual data bound to shaders like texture or
-                                    // uniform buffers
   
 
-  //! Flag used to handle resizes (swapchain and other resources recreation)
-  bool               m_swapchain_needs_recreation;
 
   // Auxiliary variable for multiple memory requirements use
   VkMemoryRequirements m_mem_reqs;
@@ -535,6 +524,23 @@ public:
 
   void init_vulkan();
   
+public:
+    void shutdown_vulkan();
+    VkExtent2D getCurrentExtent() const { return m_currentExtent; }
+    void updateExtent(uint32_t width, uint32_t height) {
+        m_currentExtent = {width, height};
+    }
+    void setDebugSync(bool enable) { m_debugSync = enable; }
+    VkCommandBuffer getCurrentCommandBuffer() const {
+        return m_frames[m_currentFrameIndex].commandBuffer;
+    }
+    bool isFrameActive() const {
+        return m_frames[m_currentFrameIndex].active;
+    }
+    uint32_t getCurrentBufferIndex() const {
+        return m_current_buffer;
+    }
+    
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
   Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }

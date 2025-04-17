@@ -33,8 +33,8 @@ class Fl_X11_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   void make_current_after() FL_OVERRIDE;
   void swap_interval(int) FL_OVERRIDE;
   int swap_interval() const FL_OVERRIDE;
-  void invalidate() FL_OVERRIDE {}
   int flush_begin() FL_OVERRIDE;
+  void invalidate() FL_OVERRIDE {}
   Fl_Vk_Choice *find(int m, const int *alistp) FL_OVERRIDE;
   void get_list(Fl_Font_Descriptor *fd, int r) FL_OVERRIDE;
   int genlistsize() FL_OVERRIDE;

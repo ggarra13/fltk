@@ -84,7 +84,7 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
-// Uses m_swapchain, gpu(), m_surface, format(), m_buffers
+// Recreates m_swapchain and m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
   VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
@@ -111,7 +111,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       pWindow->m_swapchain = oldSwapchain;
       return;
   }
-  
+
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
@@ -630,7 +630,7 @@ void Fl_Vk_Window_Driver::init_vk()
 
 }
 
-void Fl_Vk_Window_Driver::init_vk_swapchain() {
+void Fl_Vk_Window_Driver::init_colorspace() {
     VkResult result;
     uint32_t i;
 
@@ -845,25 +845,18 @@ void Fl_Vk_Window_Driver::prepare() {
                                &pWindow->commandPool());
   VK_CHECK(result);
 
-
-  VkCommandBufferAllocateInfo cmd = {};
-  cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmd.pNext = NULL;
-  cmd.commandPool = pWindow->commandPool();
-  cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cmd.commandBufferCount = 1;
-
-  result = vkAllocateCommandBuffers(pWindow->device(), &cmd, &pWindow->m_draw_cmd);
-  VK_CHECK(result);
-
   prepare_buffers();
-  if (pWindow->m_swapchain == VK_NULL_HANDLE) {
-    printf("Swapchain recreation failed in resize\n");
-    return; // Skip further setup if swapchain fails
-  }
   prepare_depth();
   pWindow->prepare();
   prepare_framebuffers(); // can be kept in driver
+}
+
+void Fl_Vk_Window_Driver::destroy_surface() {
+  if (!pWindow || !pWindow->instance())
+    return;
+  
+  vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
+  pWindow->m_surface = VK_NULL_HANDLE;
 }
 
 // Uses: ctx.device, m_framebuffers, m_buffers, m_depth
@@ -886,5 +879,11 @@ void Fl_Vk_Window_Driver::destroy_resources() {
   pWindow->m_buffers.clear();
   
   pWindow->m_depth.destroy(pWindow->device());
+  
+  // Destroy swapchain
+  if (pWindow->m_swapchain != VK_NULL_HANDLE) {
+      vkDestroySwapchainKHR(pWindow->device(), pWindow->m_swapchain, nullptr);
+      pWindow->m_swapchain = VK_NULL_HANDLE;
+  }
 }
 
