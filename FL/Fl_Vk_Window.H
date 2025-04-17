@@ -69,12 +69,58 @@ struct Fl_Vk_Context
         commandPool(VK_NULL_HANDLE)
         {
         };
+
+    void destroy()
+        {
+            VkResult result = vkDeviceWaitIdle(device);
+            VK_CHECK(result);
+            
+            if (pipelineCache != VK_NULL_HANDLE)
+            {
+                vkDestroyPipelineCache(device, pipelineCache, nullptr);
+                pipelineCache = VK_NULL_HANDLE;
+            }
+            if (commandPool != VK_NULL_HANDLE)
+            {
+                vkDestroyCommandPool(device, commandPool, nullptr);
+                commandPool = VK_NULL_HANDLE;
+            }
+            if (device != VK_NULL_HANDLE)
+            {
+                vkDestroyDevice(device, nullptr);
+                device = VK_NULL_HANDLE;
+            }
+        }
 };
 
 struct Fl_Vk_SwapchainBuffer {
     VkImage image;
     VkImageView view;
     VkFramebuffer framebuffer;
+
+    Fl_Vk_SwapchainBuffer() :
+        image(VK_NULL_HANDLE),
+        view(VK_NULL_HANDLE),
+        framebuffer(VK_NULL_HANDLE)
+        {
+        }
+    
+    void destroy(VkDevice& device)
+        {
+            if (framebuffer != VK_NULL_HANDLE)
+            {
+                vkDestroyFramebuffer(device, framebuffer, NULL);
+                framebuffer = VK_NULL_HANDLE;
+            }
+
+            if (view != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(device, view, NULL);
+                view = VK_NULL_HANDLE;
+            }
+            
+            // image belongs to the swapchain (must not destroy).
+        }
 };
 
 struct Fl_Vk_Mesh {
@@ -106,7 +152,7 @@ struct Fl_Vk_Mesh {
             memset(&vi, 0, sizeof(VkPipelineVertexInputStateCreateInfo));
         }
 
-    void destroy(VkDevice device)
+    void destroy(VkDevice& device)
         {
             if (buf != VK_NULL_HANDLE)
             {
@@ -202,7 +248,7 @@ struct Fl_Vk_Texture {
         {
         }
 
-    void destroy(VkDevice device)
+    void destroy(VkDevice& device)
         {
             if (sampler != VK_NULL_HANDLE)
             {
@@ -303,6 +349,7 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   int mode(int, const int *);
 protected:
   void recreate_swapchain();
+  void destroy_common_resources();
 
   virtual void init_colorspace();
   
@@ -378,7 +425,7 @@ public:
   
   //! Main entry point for Vulkan render pass creation and destruction.
   virtual void prepare() = 0;
-  virtual void destroy_resources();  
+  virtual void destroy_resources() {};  
 
   //! Required and optional instance extensions
   virtual std::vector<const char*> get_instance_extensions();
@@ -423,6 +470,7 @@ public:
   // Application
   bool m_validate;  // if true, turns on validation layers
   bool m_debugSync;
+  static uint32_t   m_instance_counter;
   static VkInstance m_instance; // this gets copied into ctx.instance for every
 
   // window.
@@ -527,6 +575,9 @@ public:
   int can_do_overlay() { return false; }
 
   void init_vulkan();
+
+  void wait_queue();
+  void wait_device();
   
   void shutdown_vulkan();
   VkExtent2D getCurrentExtent() const { return m_currentExtent; }

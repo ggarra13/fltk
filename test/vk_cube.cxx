@@ -1,7 +1,7 @@
 //
-// OpenGL test program for the Fast Light Tool Kit (FLTK).
+// Vulkan test program for the Fast Light Tool Kit (FLTK).
 //
-// Modified to have 2 cubes to test multiple OpenGL contexts
+// Modified to have 2 cubes to test multiple Vulkan contexts
 //
 // Copyright 1998-2024 by Bill Spitzak and others.
 //
@@ -15,7 +15,6 @@
 //
 //     https://www.fltk.org/bugs.php
 //
-
 
 #ifndef HAVE_VK
 #include <config.h> // needed only for 'HAVE_VK'
@@ -107,8 +106,8 @@ class cube_box : public Fl_Vk_Window {
     VkShaderModule prepare_fs();
     
     //! Shaders
-    VkShaderModule m_vert_shader_module;
-    VkShaderModule m_frag_shader_module;
+    VkShaderModule m_vert_shader;
+    VkShaderModule m_frag_shader;
     
     //! This is for holding a mesh
     Fl_Vk_Mesh m_cube;
@@ -133,29 +132,22 @@ public:
     void create_device() FL_OVERRIDE;
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
-
-    const char* application_name() { return "vk_cube"; };
+    const char* application_name() FL_OVERRIDE { return "vk_cube"; };
     
     cube_box(int x,int y,int w,int h,const char *l=0) : Fl_Vk_Window(x,y,w,h,l) {
         end();
         mode(FL_RGB | FL_DOUBLE | FL_ALPHA | FL_DEPTH);
         lasttime = 0.0;
-        m_vert_shader_module = VK_NULL_HANDLE;
-        m_frag_shader_module = VK_NULL_HANDLE;
+        m_vert_shader = VK_NULL_HANDLE;
+        m_frag_shader = VK_NULL_HANDLE;
         m_wire_pipeline = VK_NULL_HANDLE; 
         // Turn on validations
         m_validate = true;
     
     }
-    ~cube_box();
 };
 
 
-cube_box::~cube_box()
-{
-    vkDestroyShaderModule(device(), m_frag_shader_module, NULL);
-    vkDestroyShaderModule(device(), m_vert_shader_module, NULL);
-}
 
 // m_format, m_depth (optionally) -> creates m_renderPass
 void cube_box::prepare_render_pass() 
@@ -231,7 +223,7 @@ void cube_box::prepare_render_pass()
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
     dependency.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dependencyFlags = 0;
+    dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
     VkRenderPassCreateInfo rp_info = {};
     rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -249,8 +241,8 @@ void cube_box::prepare_render_pass()
 }
 
 VkShaderModule cube_box::prepare_vs() {
-    if (m_vert_shader_module != VK_NULL_HANDLE)
-        return m_vert_shader_module;
+    if (m_vert_shader != VK_NULL_HANDLE)
+        return m_vert_shader;
     
     // Example GLSL vertex shader
     std::string vertex_shader_glsl = R"(
@@ -279,17 +271,17 @@ VkShaderModule cube_box::prepare_vs() {
             "vertex_shader.glsl"    // Filename for error reporting
         );
 
-        m_vert_shader_module = create_shader_module(device(), spirv);
+        m_vert_shader = create_shader_module(device(), spirv);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
-        m_vert_shader_module = VK_NULL_HANDLE;
+        m_vert_shader = VK_NULL_HANDLE;
     }
-    return m_vert_shader_module;
+    return m_vert_shader;
 }
 
 VkShaderModule cube_box::prepare_fs() {
-    if (m_frag_shader_module != VK_NULL_HANDLE)
-        return m_frag_shader_module;
+    if (m_frag_shader != VK_NULL_HANDLE)
+        return m_frag_shader;
     
     // Example GLSL vertex shader
     std::string frag_shader_glsl = R"(
@@ -312,12 +304,12 @@ VkShaderModule cube_box::prepare_fs() {
             "frag_shader.glsl"    // Filename for error reporting
         );
         // Assuming you have a VkDevice 'device' already created
-        m_frag_shader_module = create_shader_module(device(), spirv);
+        m_frag_shader = create_shader_module(device(), spirv);
     
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
-    return m_frag_shader_module;
+    return m_frag_shader;
 }
 
 // clang-format off
@@ -409,7 +401,7 @@ void cube_box::prepare_pipeline() {
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rs.polygonMode = VK_POLYGON_MODE_FILL;
-    rs.cullMode = VK_CULL_MODE_NONE;
+    rs.cullMode = VK_CULL_MODE_BACK_BIT;
     rs.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs.depthClampEnable = VK_FALSE;
     rs.rasterizerDiscardEnable = VK_FALSE;
@@ -500,6 +492,7 @@ void cube_box::prepare_pipeline() {
     VK_CHECK(result);
     
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
+    pipelineCache() = VK_NULL_HANDLE;
 
 }
 
@@ -728,18 +721,42 @@ void cube_box::prepare_descriptor_layout()
 void cube_box::destroy_resources()
 {
     m_cube.destroy(device());
+
+    if (m_wire_pipeline != VK_NULL_HANDLE)
+    {
+        vkDestroyPipeline(device(), m_wire_pipeline, nullptr);
+        m_wire_pipeline = VK_NULL_HANDLE;
+    }
     
-    if (m_desc_layout != VK_NULL_HANDLE) {
+    if (m_desc_layout != VK_NULL_HANDLE)
+    {
         vkDestroyDescriptorSetLayout(device(), m_desc_layout, nullptr);
         m_desc_layout = VK_NULL_HANDLE;
     }
-    if (m_desc_pool != VK_NULL_HANDLE) {
+    
+    if (m_desc_pool != VK_NULL_HANDLE)
+    {
         vkDestroyDescriptorPool(device(), m_desc_pool, nullptr);
         m_desc_pool = VK_NULL_HANDLE;
     }
+
+    if (m_pipeline_layout != VK_NULL_HANDLE)
+    {
+        vkDestroyPipelineLayout(device(), m_pipeline_layout, nullptr);
+        m_pipeline_layout = VK_NULL_HANDLE;
+    }
+
     // m_desc_set is destroyed by the pool.
+
+    if (m_frag_shader != VK_NULL_HANDLE)
+    {
+        vkDestroyShaderModule(device(), m_frag_shader, nullptr);
+    }
+    if (m_vert_shader != VK_NULL_HANDLE)
+    {
+        vkDestroyShaderModule(device(), m_vert_shader, nullptr);
+    }
     
-    Fl_Vk_Window::destroy_resources();
 }
 
 void cube_box::prepare()

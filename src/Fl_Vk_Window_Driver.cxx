@@ -135,9 +135,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   // Destroy old buffers
   for (auto& buffer : pWindow->m_buffers)
   {
-      vkDestroyFramebuffer(pWindow->device(), buffer.framebuffer, NULL);
-      vkDestroyImageView(pWindow->device(), buffer.view, NULL);
-      // image belongs to the swapchain.
+      buffer.destroy(pWindow->device());
   }
   pWindow->m_buffers.clear();
 
@@ -512,7 +510,9 @@ void Fl_Vk_Window_Driver::init_vk()
     
     if (pWindow->m_instance == VK_NULL_HANDLE)
         init_instance();
-    
+
+    // Increment instance (window) counter
+    pWindow->m_instance_counter++;
     pWindow->ctx.instance = pWindow->m_instance;
 
     // Make initial call to query gpu_count, then second call for gpu info
@@ -833,18 +833,6 @@ void Fl_Vk_Window_Driver::init_colorspace() {
 }
 
 void Fl_Vk_Window_Driver::prepare() {
-  VkResult result;
-
-  VkCommandPoolCreateInfo cmd_pool_info = {};
-  cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  cmd_pool_info.pNext = NULL;
-  cmd_pool_info.queueFamilyIndex = pWindow->m_queueFamilyIndex;
-  cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-  result = vkCreateCommandPool(pWindow->device(), &cmd_pool_info, NULL,
-                               &pWindow->commandPool());
-  VK_CHECK(result);
-
   prepare_buffers();
   prepare_depth();
   pWindow->prepare();
@@ -853,31 +841,35 @@ void Fl_Vk_Window_Driver::prepare() {
 
 void Fl_Vk_Window_Driver::destroy_surface() {
   if (!pWindow || !pWindow->instance())
-    return;
+      return;
   
   vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
   pWindow->m_surface = VK_NULL_HANDLE;
 }
 
-// Uses: ctx.device, m_framebuffers, m_buffers, m_depth
-void Fl_Vk_Window_Driver::destroy_resources() {
-  if (!pWindow || !pWindow->device())
-    return;
-
+// Uses: device(), m_buffers, m_depth
+void Fl_Vk_Window_Driver::destroy_resources()
+{
+  if (!pWindow || pWindow->device() == VK_NULL_HANDLE)
+  {
+      fprintf(stderr, "destroy_resources: Invalid device\n");
+      return;
+  }
+  
   uint32_t i;
   VkResult result;
 
   // Destroy resources in reverse creation order (first, those of window)
-  pWindow->destroy_resources();
+  pWindow->destroy_common_resources();
 
+  // Destroy the buffers
   for (auto& buffer : pWindow->m_buffers)
   {
-      vkDestroyFramebuffer(pWindow->device(), buffer.framebuffer, NULL);
-      vkDestroyImageView(pWindow->device(), buffer.view, NULL);
-      // image belongs to the swapchain.
+      buffer.destroy(pWindow->device());
   }
   pWindow->m_buffers.clear();
-  
+
+  // Then, depth/stencils if present
   pWindow->m_depth.destroy(pWindow->device());
   
   // Destroy swapchain

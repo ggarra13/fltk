@@ -3,13 +3,15 @@
 mkdir -p build_x11/
 cd build_x11
 
+set +e
+
 if [[ -z "$VULKAN_SDK" ]]; then
     export VULKAN_SDK=/usr/
 fi
 
 cmake .. \
       -G Ninja \
-      -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
@@ -47,6 +49,8 @@ cmake .. \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH=""
 
-#ninja && bin/test/vk_shape-shared
-#ninja && bin/test/vk_shape_textured-shared
-ninja && bin/test/vk_cube-shared
+ninja
+
+bin/test/vk_shape-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared

@@ -4,6 +4,8 @@
 mkdir -p build_win32/
 cd build_win32
 
+set +e
+
 if [[ -z "$VULKAN_SDK" ]]; then
     export VULKAN_SDK=/C/VulkanSDK/
 fi
@@ -50,5 +52,8 @@ cmake .. \
 
 export PATH=$PWD/lib:$PATH
 
-ninja && bin/test/vk_shape-shared.exe && bin/test/vk_shape_textured-shared.exe && bin/test/vk_cube-shared.exe
+ninja
 
+bin/test/vk_shape-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared
