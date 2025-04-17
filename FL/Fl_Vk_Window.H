@@ -514,6 +514,10 @@ protected:
 
   bool               m_use_break = false;
   VkDebugUtilsMessengerEXT  m_debug_messenger;
+
+  void init_vulkan();
+  
+public:
   
   void make_current();
   void swap_buffers();
@@ -521,26 +525,23 @@ protected:
   int swap_interval() const;
 
   int can_do_overlay() { return false; }
-
-  void init_vulkan();
   
-public:
-    void shutdown_vulkan();
-    VkExtent2D getCurrentExtent() const { return m_currentExtent; }
-    void updateExtent(uint32_t width, uint32_t height) {
-        m_currentExtent = {width, height};
-    }
-    void setDebugSync(bool enable) { m_debugSync = enable; }
-    VkCommandBuffer getCurrentCommandBuffer() const {
-        return m_frames[m_currentFrameIndex].commandBuffer;
-    }
-    bool isFrameActive() const {
-        return m_frames[m_currentFrameIndex].active;
-    }
-    uint32_t getCurrentBufferIndex() const {
-        return m_current_buffer;
-    }
-    
+  void shutdown_vulkan();
+  VkExtent2D getCurrentExtent() const { return m_currentExtent; }
+  void updateExtent(uint32_t width, uint32_t height) {
+      m_currentExtent = {width, height};
+  }
+  void setDebugSync(bool enable) { m_debugSync = enable; }
+  VkCommandBuffer getCurrentCommandBuffer() const {
+      return m_frames[m_currentFrameIndex].commandBuffer;
+  }
+  bool isFrameActive() const {
+      return m_frames[m_currentFrameIndex].active;
+  }
+  uint32_t getCurrentBufferIndex() const {
+      return m_current_buffer;
+  }
+  
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
   Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }
