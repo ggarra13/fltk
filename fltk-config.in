@@ -69,7 +69,7 @@ STATICIMAGELIBS="@STATICIMAGELIBS@"
 SHAREDSUFFIX="@SHAREDSUFFIX@"
 CAIROLIBS="@CAIROLIBS@"
 GLLIBS="@GLLIBS@"
-VKLIBS="@VKLIBS@"x
+VKLIBS="@VKLIBS@"
 
 # Check bundled image libraries in source tree
 if test -f "$libdir/libfltk_jpeg.a" -a -d $includedir/jpeg; then
