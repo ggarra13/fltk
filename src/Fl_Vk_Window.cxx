@@ -586,29 +586,12 @@ void Fl_Vk_Window::swap_buffers() {
         vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
         m_previous_hdr_metadata = m_hdr_metadata;
         m_hdr_metadata_changed = false;
-
-        const auto& fix = m_hdr_metadata;
-        fprintf(stderr, "apply metadata\n");
-        fprintf(stderr, "r=%f %f\n", fix.displayPrimaryRed.x,
-                fix.displayPrimaryRed.y);
-        fprintf(stderr, "g=%f %f\n", fix.displayPrimaryGreen.x,
-                fix.displayPrimaryGreen.y);
-        fprintf(stderr, "g=%f %f\n", fix.displayPrimaryBlue.x,
-                fix.displayPrimaryBlue.y);
-        fprintf(stderr, "w=%f %f\n", fix.whitePoint.x,
-                fix.whitePoint.y);
-        fprintf(stderr, "maxLuminance=%f\n", fix.maxLuminance);
-        fprintf(stderr, "minLuminance=%f\n", fix.minLuminance);
-        fprintf(stderr, "minCLL=%f\n", fix.maxContentLightLevel);
-        fprintf(stderr, "minFALL=%f\n", fix.maxFrameAverageLightLevel);
     }
 
-    fprintf(stderr, "pVkwindowDriver->swap_buffers\n");
     pVkWindowDriver->swap_buffers();
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
-    fprintf(stderr, "swap buffer DONE\n");
 }
 
 /**
@@ -927,10 +910,22 @@ void Fl_Vk_Window::init_vulkan() {
 
     if (!vkSetHdrMetadataEXT)
     {
-        vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
-        if (!vkSetHdrMetadataEXT)
+        bool found_hdr = false;
+        for (auto extension : ctx.device_extensions)
         {
-            fprintf(stderr, "Failed to initialize vkSetHDRMetadataEXT - no HDR extension will be used.\n");
+            if (strcmp(extension, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0)
+            {
+                found_hdr = true;
+            }
+        }
+
+        if (found_hdr)
+        {
+            vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+            if (!vkSetHdrMetadataEXT)
+            {
+                fprintf(stderr, "Failed to initialize vkSetHDRMetadataEXT - no HDR extension will be used.\n");
+            }
         }
     }
 
