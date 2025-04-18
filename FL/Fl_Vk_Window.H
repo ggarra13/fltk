@@ -451,11 +451,8 @@ public:
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
   inline VkFormat&                 format() { return ctx.format; }
   inline VkColorSpaceKHR&      colorSpace() { return ctx.colorSpace; }
-  inline std::vector<const char*> instance_extensions() { return ctx.instance_extensions; }
-  inline std::vector<const char*> device_extensions() { return ctx.device_extensions; }
 
   //! Required device extensions
-  virtual std::vector<const char*> get_device_extensions();
   inline VkRenderPass&         renderPass() { return m_renderPass; }
   inline VkPipeline&             pipeline() { return m_pipeline; }
       
@@ -470,6 +467,10 @@ public:
   inline const VkColorSpaceKHR&      colorSpace() const { return ctx.colorSpace; }
   inline const VkRenderPass&         renderPass() const { return m_renderPass; }
   inline const VkPipeline&             pipeline() const { return m_pipeline; }
+  inline const std::vector<const char*>
+      instance_extensions() const { return ctx.instance_extensions; }
+  inline const std::vector<const char*>
+      device_extensions() const { return ctx.device_extensions; }
 
   //! @}
 
