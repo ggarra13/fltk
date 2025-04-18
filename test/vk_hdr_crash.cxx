@@ -39,6 +39,8 @@ public:
     // Vulkan overrides
     const char* application_name()  FL_OVERRIDE { return "vk_shape"; }
 
+    std::vector<const char*> get_device_extensions() FL_OVERRIDE;
+    
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
 
@@ -83,6 +85,14 @@ Fl_Vk_Window(x,y,w,h,l) {
 vk_shape_window::vk_shape_window(int w,int h,const char *l) :
 Fl_Vk_Window(w,h,l) {
     _init();
+}
+
+std::vector<const char*> vk_shape_windoew::get_device_extensions()
+{
+    std::vector<const char*> out;
+    out = Fl_Vk_Window::get_device_extensions();
+    out.push_back(VK_EXT_HDR_METADATA_EXTENSION_NAME);
+    return out;
 }
 
 void vk_shape_window::prepare_mesh()
