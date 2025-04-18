@@ -565,6 +565,14 @@ void Fl_Vk_Window::swap_buffers() {
         fprintf(stderr, "Presenting image index %u for frame %u\n",
                 m_current_buffer, m_currentFrameIndex);
     }
+
+    // Update HDR metadata if changed
+    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
+        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+        m_previous_hdr_metadata = m_hdr_metadata;
+        m_hdr_metadata_changed = false;
+    }
     
     result = vkQueuePresentKHR(queue(), &present_info);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
@@ -578,14 +586,6 @@ void Fl_Vk_Window::swap_buffers() {
                 string_VkResult(result));
         frame.active = false;
         return;
-    }
-
-    // Update HDR metadata if changed
-    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
-        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-        m_previous_hdr_metadata = m_hdr_metadata;
-        m_hdr_metadata_changed = false;
     }
 
     pVkWindowDriver->swap_buffers();
