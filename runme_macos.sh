@@ -80,7 +80,7 @@ ninja
 
 export NSZombieEnabled=YES
 
-bin/test/vk_shape_hdr-shared
+bin/test/vk_hdr_crash-shared
 # bin/test/vk_shape-shared
 # bin/test/vk_shape_textured-shared
 # bin/test/vk_cube-shared
