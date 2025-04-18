@@ -87,7 +87,7 @@ Fl_Vk_Window(w,h,l) {
     _init();
 }
 
-std::vector<const char*> vk_shape_windoew::get_device_extensions()
+std::vector<const char*> vk_shape_window::get_device_extensions()
 {
     std::vector<const char*> out;
     out = Fl_Vk_Window::get_device_extensions();
