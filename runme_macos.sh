@@ -38,7 +38,7 @@ export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
 
 cmake .. \
       -G Ninja \
-      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_BUILD_TYPE=Debug \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
