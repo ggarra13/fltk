@@ -495,6 +495,9 @@ public:
   //! Interface between shaders and desc.sets
   VkPipelineLayout      m_pipeline_layout;
 
+  //! Allocator callback (unused for now).
+  const VkAllocationCallbacks*    m_allocator;
+
 private:
   // Per frame
   struct FrameData {
@@ -558,7 +561,6 @@ protected:
   //! @}
   
   // (Optional) Allocation, Debugging.
-  const VkAllocationCallbacks*    m_allocator;
   void                            (*CheckVkResultFn)(VkResult err);
   VkDeviceSize                    MinAllocationSize;      // Minimum allocatio
 
