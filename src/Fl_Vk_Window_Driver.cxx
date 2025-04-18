@@ -467,7 +467,7 @@ void Fl_Vk_Window_Driver::init_instance()
     app.applicationVersion = 0;
     app.pEngineName = pWindow->engine_name();
     app.engineVersion = 0;
-    app.apiVersion = VK_API_VERSION_1_3;
+    app.apiVersion = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo inst_info = {};
     inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
