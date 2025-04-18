@@ -553,6 +553,8 @@ void vk_shape_window::set_hdr()
     m_hdr_metadata.maxFrameAverageLightLevel = 400.F;
 
     m_hdr_metadata_changed = true; // Mark as changed
+
+    redraw();
 }
 
 #else
