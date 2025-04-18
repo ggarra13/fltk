@@ -30,7 +30,8 @@ class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
 
-
+// We keep this in a context struct, so we can pass them to some other library
+// easily.
 struct Fl_Vk_Context
 {
     VkInstance         instance; 
@@ -427,11 +428,11 @@ public:
   virtual void prepare() = 0;
   virtual void destroy_resources() {};  
 
-  //! Required and optional instance extensions
+  //! Required and optional instance extensions used on creation (overload it)
   virtual std::vector<const char*> get_instance_extensions();
   virtual std::vector<const char*> get_optional_extensions();
 
-  //! Required device extensions
+  //! Required device extensions used on creation (overload it)
   virtual std::vector<const char*> get_device_extensions();
 
   //! Log level of Vulkan API
@@ -450,6 +451,11 @@ public:
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
   inline VkFormat&                 format() { return ctx.format; }
   inline VkColorSpaceKHR&      colorSpace() { return ctx.colorSpace; }
+  inline std::vector<const char*> instance_extensions() { return ctx.instance_extensions; }
+  inline std::vector<const char*> device_extensions() { return ctx.device_extensions; }
+
+  //! Required device extensions
+  virtual std::vector<const char*> get_device_extensions();
   inline VkRenderPass&         renderPass() { return m_renderPass; }
   inline VkPipeline&             pipeline() { return m_pipeline; }
       
@@ -470,8 +476,10 @@ public:
   // Application
   bool m_validate;  // if true, turns on validation layers
   bool m_debugSync;
-  static uint32_t   m_instance_counter;
-  static VkInstance m_instance; // this gets copied into ctx.instance for every
+  
+  static uint32_t   m_instance_counter;  // when this reaches 0, we destroy m_instance
+  static VkInstance m_instance; // this gets copied into ctx.instance for every window
+  static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 
   // window.
   Fl_Vk_Context ctx;
@@ -535,7 +543,6 @@ protected:
   // HDR metadata information (passed during swap_buffers)
   bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
                              const VkHdrMetadataEXT& b);
-  PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;
   VkHdrMetadataEXT        m_hdr_metadata;
   bool                    m_hdr_metadata_changed;
   

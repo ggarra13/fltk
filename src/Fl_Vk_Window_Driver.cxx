@@ -642,240 +642,243 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     // Iterate over each queue to learn whether it supports presenting:
     VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
                                                      sizeof(VkBool32));
-    for (i = 0; i < numQueues; i++) {
+    for (i = 0; i < numQueues; i++)
+    {
         vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
                                              pWindow->m_surface,
-                                         &supportsPresent[i]);
-  }
-
-  // Search for a graphics and a present queue in the array of queue
-  // families, try to find one that supports both
-  uint32_t graphicsQueueNodeIndex = UINT32_MAX;
-  uint32_t presentQueueNodeIndex = UINT32_MAX;
-  for (i = 0; i < numQueues; i++) {
-    if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
-      if (graphicsQueueNodeIndex == UINT32_MAX) {
-        graphicsQueueNodeIndex = i;
-      }
-
-      if (supportsPresent[i] == VK_TRUE) {
-        graphicsQueueNodeIndex = i;
-        presentQueueNodeIndex = i;
-        break;
-      }
+                                             &supportsPresent[i]);
     }
-  }
-  if (presentQueueNodeIndex == UINT32_MAX) {
-    // If didn't find a queue that supports both graphics and present, then
-    // find a separate present queue.
-    for (i = 0; i < numQueues; ++i) {
-      if (supportsPresent[i] == VK_TRUE) {
-        presentQueueNodeIndex = i;
-        break;
-      }
+
+    // Search for a graphics and a present queue in the array of queue
+    // families, try to find one that supports both
+    uint32_t graphicsQueueNodeIndex = UINT32_MAX;
+    uint32_t presentQueueNodeIndex = UINT32_MAX;
+    for (i = 0; i < numQueues; i++) {
+        if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+            if (graphicsQueueNodeIndex == UINT32_MAX) {
+                graphicsQueueNodeIndex = i;
+            }
+
+            if (supportsPresent[i] == VK_TRUE) {
+                graphicsQueueNodeIndex = i;
+                presentQueueNodeIndex = i;
+                break;
+            }
+        }
     }
-  }
-  free(supportsPresent);
+    if (presentQueueNodeIndex == UINT32_MAX) {
+        // If didn't find a queue that supports both graphics and present, then
+        // find a separate present queue.
+        for (i = 0; i < numQueues; ++i) {
+            if (supportsPresent[i] == VK_TRUE) {
+                presentQueueNodeIndex = i;
+                break;
+            }
+        }
+    }
+    free(supportsPresent);
 
-  // Generate result or if could not find both a graphics and a present queue
-  if (graphicsQueueNodeIndex == UINT32_MAX ||
-      presentQueueNodeIndex == UINT32_MAX) {
-    Fl::fatal("Could not find a graphics and a present queue\n",
-              "Swapchain Initialization Failure");
-  }
+    // Generate result or if could not find both a graphics and a present queue
+    if (graphicsQueueNodeIndex == UINT32_MAX ||
+        presentQueueNodeIndex == UINT32_MAX) {
+        Fl::fatal("Could not find a graphics and a present queue\n",
+                  "Swapchain Initialization Failure");
+    }
 
-  // \@note: It is possible for an application to use a separate graphics
-  //         and a present queues.  Here we assume not.
-  if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
-    Fl::fatal("Could not find a common graphics and a present queue\n",
-              "Swapchain Initialization Failure");
-  }
+    // \@note: It is possible for an application to use a separate graphics
+    //         and a present queues.  Here we assume not.
+    if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
+        Fl::fatal("Could not find a common graphics and a present queue\n",
+                  "Swapchain Initialization Failure");
+    }
 
-  pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
+    pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
   
-  if (pWindow->device() == VK_NULL_HANDLE)
-      pWindow->create_device();
+    if (pWindow->device() == VK_NULL_HANDLE)
+        pWindow->create_device();
 
-  vkGetDeviceQueue(pWindow->device(),
-                   pWindow->m_queueFamilyIndex, 0,
-                   &pWindow->ctx.queue);
+    vkGetDeviceQueue(pWindow->device(),
+                     pWindow->m_queueFamilyIndex, 0,
+                     &pWindow->ctx.queue);
 
-  uint32_t formatCount;
-  result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-      pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
-  VK_CHECK(result);
+    uint32_t formatCount;
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+        pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
+    VK_CHECK(result);
 
-  std::vector<VkSurfaceFormatKHR> formats(formatCount);
-  result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-      pWindow->gpu(), pWindow->m_surface, &formatCount, formats.data());
-  VK_CHECK(result);
+    std::vector<VkSurfaceFormatKHR> formats(formatCount);
+    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+        pWindow->gpu(), pWindow->m_surface, &formatCount, formats.data());
+    VK_CHECK(result);
 
-  // Look for HDR10 or HLG if present
-  bool hdrMonitorFound = false;
-  VkColorSpaceKHR color_space;
-  std::vector<int> scores(formats.size());
-  for (const auto& format : formats)
-  {
-      scores[i] = 0;
-      if (pWindow->log_level() > 5)
-      {
-          printf("[%d] format = %s color space = %s\n",
-                 i, string_VkFormat(format.format),
-                 string_VkColorSpaceKHR(format.colorSpace));
-      }
-      switch (format.colorSpace)
-      {
-      case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-          scores[i] += 4000;
-          hdrMonitorFound = true;
-          break;
-      case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-          scores[i] += 3000;
-          hdrMonitorFound = true;
-          break;
-      case VK_COLOR_SPACE_HDR10_HLG_EXT:
-          scores[i] += 2000;
-          hdrMonitorFound = true;
-          break;
-      case VK_COLOR_SPACE_DOLBYVISION_EXT:
-          scores[i] += 1000;
-          hdrMonitorFound = true;
-          break;
-      case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-          scores[i] += 500; // SDR baseline
-          break;
-      default:
-          break;
-      }
+    // Look for HDR10 or HLG if present
+    bool hdrMonitorFound = false;
+    VkColorSpaceKHR color_space;
+    std::vector<int> scores(formats.size());
+    for (const auto& format : formats)
+    {
+        scores[i] = 0;
+        if (pWindow->log_level() > 5)
+        {
+            printf("[%d] format = %s color space = %s\n",
+                   i, string_VkFormat(format.format),
+                   string_VkColorSpaceKHR(format.colorSpace));
+        }
+        switch (format.colorSpace)
+        {
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+            scores[i] += 4000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:
+            scores[i] += 3000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 2000;
+            hdrMonitorFound = true;
+            break;
+        //! We don't handle Dolbyvision yet, so it gets a low score for now.
+        case VK_COLOR_SPACE_DOLBYVISION_EXT:
+            scores[i] += 1000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            scores[i] += 500; // SDR baseline
+            break;
+        default:
+            break;
+        }
 
-      switch (format.format)
-      {
-          // Accept 16-bit formats for everything
-      case VK_FORMAT_R16G16B16_UNORM:
-      case VK_FORMAT_R16G16B16A16_UNORM:
-          scores[i] += 2000;
-          break;
-      case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
-      case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-          scores[i] += 1500;
-          break;
-      case VK_FORMAT_R8G8B8A8_UNORM:
-      case VK_FORMAT_B8G8R8A8_UNORM:
-      case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-          scores[i] += 500;
-          break;
-      default:
-          break;
-      }
+        switch (format.format)
+        {
+            // Accept 16-bit formats for everything
+        case VK_FORMAT_R16G16B16_UNORM:
+        case VK_FORMAT_R16G16B16A16_UNORM:
+            scores[i] += 2000;
+            break;
+        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+            scores[i] += 1500;
+            break;
+        case VK_FORMAT_R8G8B8A8_UNORM:
+        case VK_FORMAT_B8G8R8A8_UNORM:
+        case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+            scores[i] += 500;
+            break;
+        default:
+            break;
+        }
 
-      ++i;
-  }
+        ++i;
+    }
 
-  VkFormat view_format;
-  if (!hdrMonitorFound)
-  {
-      bool foundLinear = false;
-      for (const auto& format : formats)
-      {
-          // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
-          if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
-              format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-          {
-              view_format = VK_FORMAT_B8G8R8A8_UNORM;
-              color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-              foundLinear = true;
-              break;
-          }
-      }
-      if (!foundLinear)
-      {
-          // Fallback to first supported format (usually works)
-          view_format = formats[0].format;
-          color_space = formats[0].colorSpace;
-          if (pWindow->log_level() > 2)
-          {
-              fprintf(stderr, "No ideal linear format found, using fallback\n");
-          }
-      }
-  }
-  else
-  {
-      // Default clips and washed out colors
-      int best_score = 0;
-      for (unsigned i = 0; i < formats.size(); ++i)
-      {
-          if (scores[i] > best_score)
-          {
-              best_score = scores[i];
-              view_format = formats[i].format;
-              color_space = formats[i].colorSpace;
-          }
-      }
-  }
+    VkFormat view_format;
+    if (!hdrMonitorFound)
+    {
+        bool foundLinear = false;
+        for (const auto& format : formats)
+        {
+            // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
+            if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
+                format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+            {
+                view_format = VK_FORMAT_B8G8R8A8_UNORM;
+                color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+                foundLinear = true;
+                break;
+            }
+        }
+        if (!foundLinear)
+        {
+            // Fallback to first supported format (usually works)
+            view_format = formats[0].format;
+            color_space = formats[0].colorSpace;
+            if (pWindow->log_level() > 2)
+            {
+                fprintf(stderr, "No ideal linear format found, using fallback\n");
+            }
+        }
+    }
+    else
+    {
+        // Default clips and washed out colors
+        int best_score = 0;
+        for (unsigned i = 0; i < formats.size(); ++i)
+        {
+            if (scores[i] > best_score)
+            {
+                best_score = scores[i];
+                view_format = formats[i].format;
+                color_space = formats[i].colorSpace;
+            }
+        }
+    }
 
-  // Handle undefined format case
-  if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
-  {
-      view_format = VK_FORMAT_B8G8R8A8_UNORM;
-      color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-  }
+    // Handle undefined format case
+    if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
+    {
+        view_format = VK_FORMAT_B8G8R8A8_UNORM;
+        color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    }
 
-  pWindow->ctx.format = view_format;
-  pWindow->ctx.colorSpace = color_space;
+    pWindow->ctx.format = view_format;
+    pWindow->ctx.colorSpace = color_space;
 
-  if (pWindow->log_level() > 2)
-  {
-      printf("%p\tSelected window format = %s\n"
-             "%p\tSelected window color space = %s\n",
-             pWindow, string_VkFormat(view_format),
-             pWindow, string_VkColorSpaceKHR(color_space));
-  }
+    if (pWindow->log_level() > 2)
+    {
+        printf("%p\tSelected window format = %s\n"
+               "%p\tSelected window color space = %s\n",
+               pWindow, string_VkFormat(view_format),
+               pWindow, string_VkColorSpaceKHR(color_space));
+    }
 }
 
 void Fl_Vk_Window_Driver::prepare() {
-  prepare_buffers();
-  prepare_depth();
-  pWindow->prepare();
-  prepare_framebuffers(); // can be kept in driver
+    prepare_buffers();
+    prepare_depth();
+    pWindow->prepare();
+    prepare_framebuffers(); // can be kept in driver
 }
 
 void Fl_Vk_Window_Driver::destroy_surface() {
-  if (!pWindow || !pWindow->instance())
-      return;
+    if (!pWindow || !pWindow->instance())
+        return;
   
-  vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
-  pWindow->m_surface = VK_NULL_HANDLE;
+    vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
+    pWindow->m_surface = VK_NULL_HANDLE;
 }
 
 // Uses: device(), m_buffers, m_depth
 void Fl_Vk_Window_Driver::destroy_resources()
 {
-  if (!pWindow || pWindow->device() == VK_NULL_HANDLE)
-  {
-      fprintf(stderr, "destroy_resources: Invalid device\n");
-      return;
-  }
+    if (!pWindow || pWindow->device() == VK_NULL_HANDLE)
+    {
+        fprintf(stderr, "destroy_resources: Invalid device\n");
+        return;
+    }
   
-  uint32_t i;
-  VkResult result;
+    uint32_t i;
+    VkResult result;
 
-  // Destroy resources in reverse creation order (first, those of window)
-  pWindow->destroy_common_resources();
+    // Destroy resources in reverse creation order (first, those of window)
+    pWindow->destroy_common_resources();
 
-  // Destroy the buffers
-  for (auto& buffer : pWindow->m_buffers)
-  {
-      buffer.destroy(pWindow->device());
-  }
-  pWindow->m_buffers.clear();
+    // Destroy the buffers
+    for (auto& buffer : pWindow->m_buffers)
+    {
+        buffer.destroy(pWindow->device());
+    }
+    pWindow->m_buffers.clear();
 
-  // Then, depth/stencils if present
-  pWindow->m_depth.destroy(pWindow->device());
+    // Then, depth/stencils if present
+    pWindow->m_depth.destroy(pWindow->device());
   
-  // Destroy swapchain
-  if (pWindow->m_swapchain != VK_NULL_HANDLE) {
-      vkDestroySwapchainKHR(pWindow->device(), pWindow->m_swapchain, nullptr);
-      pWindow->m_swapchain = VK_NULL_HANDLE;
-  }
+    // Destroy swapchain
+    if (pWindow->m_swapchain != VK_NULL_HANDLE)
+    {
+        vkDestroySwapchainKHR(pWindow->device(), pWindow->m_swapchain, nullptr);
+        pWindow->m_swapchain = VK_NULL_HANDLE;
+    }
 }
 

@@ -26,9 +26,10 @@
 #include <FL/Fl_Graphics_Driver.H>
 #include <FL/fl_utf8.h>
 
-//! Instance is per application
-VkInstance Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
-uint32_t   Fl_Vk_Window::m_instance_counter = 0;
+//! Per application variables (statics).
+VkInstance              Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
+uint32_t                Fl_Vk_Window::m_instance_counter = 0;
+PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
 
 
 bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
@@ -585,12 +586,29 @@ void Fl_Vk_Window::swap_buffers() {
         vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
         m_previous_hdr_metadata = m_hdr_metadata;
         m_hdr_metadata_changed = false;
+
+        const auto& fix = m_hdr_metadata;
+        fprintf(stderr, "apply metadata\n");
+        fprintf(stderr, "r=%f %f\n", fix.displayPrimaryRed.x,
+                fix.displayPrimaryRed.y);
+        fprintf(stderr, "g=%f %f\n", fix.displayPrimaryGreen.x,
+                fix.displayPrimaryGreen.y);
+        fprintf(stderr, "g=%f %f\n", fix.displayPrimaryBlue.x,
+                fix.displayPrimaryBlue.y);
+        fprintf(stderr, "w=%f %f\n", fix.whitePoint.x,
+                fix.whitePoint.y);
+        fprintf(stderr, "maxLuminance=%f\n", fix.maxLuminance);
+        fprintf(stderr, "minLuminance=%f\n", fix.minLuminance);
+        fprintf(stderr, "minCLL=%f\n", fix.maxContentLightLevel);
+        fprintf(stderr, "minFALL=%f\n", fix.maxFrameAverageLightLevel);
     }
 
+    fprintf(stderr, "pVkwindowDriver->swap_buffers\n");
     pVkWindowDriver->swap_buffers();
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
+    fprintf(stderr, "swap buffer DONE\n");
 }
 
 /**
@@ -890,8 +908,8 @@ void Fl_Vk_Window::init_vulkan() {
     // Initialize Vulkan instance and device
     if (ctx.instance == VK_NULL_HANDLE) {
         pVkWindowDriver->init_vk();
-        vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
-        if (!ctx.instance) {
+        if (!ctx.instance)
+        {
             fprintf(stderr, "init_vulkan() failed to create Vulkan instance\n");
             return;
         }
@@ -905,7 +923,16 @@ void Fl_Vk_Window::init_vulkan() {
     }
 
     // Initialize colorspace
-    pVkWindowDriver->init_colorspace();
+    init_colorspace();
+
+    if (!vkSetHdrMetadataEXT)
+    {
+        vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+        if (!vkSetHdrMetadataEXT)
+        {
+            fprintf(stderr, "Failed to initialize vkSetHDRMetadataEXT - no HDR extension will be used.\n");
+        }
+    }
 
     // Verify window size
     if (w() <= 0 || h() <= 0) {
@@ -1067,6 +1094,7 @@ void Fl_Vk_Window::init() {
 
   
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class
+  m_allocator = nullptr;
 
   // HDR metadata
   m_hdr_metadata = {};
