@@ -401,7 +401,7 @@ void cube_box::prepare_pipeline() {
     memset(&rs, 0, sizeof(rs));
     rs.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rs.polygonMode = VK_POLYGON_MODE_FILL;
-    rs.cullMode = VK_CULL_MODE_BACK_BIT;
+    rs.cullMode = VK_CULL_MODE_NONE;
     rs.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs.depthClampEnable = VK_FALSE;
     rs.rasterizerDiscardEnable = VK_FALSE;
@@ -541,16 +541,10 @@ void cube_box::prepare_vertices()
     VkMemoryAllocateInfo index_alloc_info = {};
     index_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     index_alloc_info.allocationSize = index_mem_reqs.size;
-
-    bool index_mem_type_found = memory_type_from_properties(
-        gpu(),
-        index_mem_reqs.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        &index_alloc_info.memoryTypeIndex);
-    
-    if (!index_mem_type_found) {
-        throw std::runtime_error("Failed to find suitable memory type for index buffer");
-    }
+    index_alloc_info.memoryTypeIndex = findMemoryType(gpu(),
+                                                      index_mem_reqs.memoryTypeBits,
+                                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     result = vkAllocateMemory(device(), &index_alloc_info, nullptr, &m_cube.indexMem);
     VK_CHECK(result);
@@ -574,11 +568,10 @@ void cube_box::prepare_vertices()
     VK_CHECK(result);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
-    pass = memory_type_from_properties(gpu(),
-                                       m_mem_reqs.memoryTypeBits,
-                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                       &mem_alloc.memoryTypeIndex);
+    mem_alloc.memoryTypeIndex = findMemoryType(gpu(),
+                                               m_mem_reqs.memoryTypeBits,
+                                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_cube.mem);
     VK_CHECK(result);
@@ -632,10 +625,10 @@ void cube_box::prepare_uniform_buffer()
     VkMemoryAllocateInfo ubo_alloc_info = {};
     ubo_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     ubo_alloc_info.allocationSize = m_mem_reqs.size;
-    memory_type_from_properties(gpu(), m_mem_reqs.memoryTypeBits,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                &ubo_alloc_info.memoryTypeIndex);
+    ubo_alloc_info.memoryTypeIndex = findMemoryType(gpu(),
+                                                    m_mem_reqs.memoryTypeBits,
+                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
     vkAllocateMemory(device(), &ubo_alloc_info, nullptr, &m_cube.uniformMemory);
     vkBindBufferMemory(device(), m_cube.uniformBuffer, m_cube.uniformMemory, 0);

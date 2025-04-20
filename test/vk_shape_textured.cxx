@@ -196,10 +196,9 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
     vkGetImageMemoryRequirements(device(), tex_obj->image, &m_mem_reqs);
 
     mem_alloc.allocationSize = m_mem_reqs.size;
-    pass = memory_type_from_properties(gpu(),
-                                       m_mem_reqs.memoryTypeBits,
-                                       required_props,
-                                       &mem_alloc.memoryTypeIndex);
+    mem_alloc.memoryTypeIndex = findMemoryType(gpu(),
+                                               m_mem_reqs.memoryTypeBits,
+                                               required_props);
 
     /* allocate memory */
     result = vkAllocateMemory(device(), &mem_alloc, NULL, &tex_obj->mem);
@@ -411,19 +410,15 @@ void vk_shape_window::prepare_mesh()
     mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     mem_alloc.pNext = NULL;
     mem_alloc.allocationSize = vertex_mem_reqs.size;
-    mem_alloc.memoryTypeIndex = 0;
     
-    bool pass;
-    void *data;
+    mem_alloc.memoryTypeIndex = findMemoryType(gpu(),
+                                                vertex_mem_reqs.memoryTypeBits,
+                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     
-    memory_type_from_properties(gpu(),
-                                vertex_mem_reqs.memoryTypeBits,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                                &mem_alloc.memoryTypeIndex);
-
     result = vkAllocateMemory(device(), &mem_alloc, NULL, &m_mesh.mem);
     VK_CHECK(result);
 
+    void *data;
     result = vkMapMemory(device(), m_mesh.mem, 0,
                          mem_alloc.allocationSize, 0, &data);
     VK_CHECK(result);

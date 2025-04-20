@@ -265,29 +265,15 @@ bool memory_type_from_properties(VkPhysicalDevice gpu,
 VkDeviceMemory allocateAndBindImageMemory(VkDevice device,
                                           VkPhysicalDevice gpu,
                                           VkImage image,
-                                          VkFlags requirementsMask)
+                                          VkMemoryPropertyFlags
+                                          requirementsMask)
 {
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(device, image, &memRequirements);
 
-
-    uint32_t memoryTypeIndex = 0;
-    bool ok = memory_type_from_properties(gpu, memRequirements.memoryTypeBits,
-                                          requirementsMask, &memoryTypeIndex);
-    if (!ok)
-    {
-        throw std::runtime_error("No memory types matched");
-    }
-    // for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i)
-    // {
-    //     if ((memRequirements.memoryTypeBits & (1 << i)) &&
-    //         (memProperties.memoryTypes[i].propertyFlags &
-    //          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
-    //     {
-    //         memoryTypeIndex = i;
-    //         break;
-    //     }
-    // }
+    uint32_t memoryTypeIndex = findMemoryType(gpu,
+                                              memRequirements.memoryTypeBits,
+                                              requirementsMask);
 
     VkMemoryAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -387,6 +373,23 @@ VkSampler createSampler(VkDevice device,
         throw std::runtime_error("Failed to create sampler");
     }
     return sampler;
+}
+
+uint32_t findMemoryType(VkPhysicalDevice physicalDevice,
+                        uint32_t typeFilter,
+                        VkMemoryPropertyFlags properties)
+{
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+        if ((typeFilter & (1 << i)) &&
+            (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
 }
 
 void uploadTextureData(VkDevice device,

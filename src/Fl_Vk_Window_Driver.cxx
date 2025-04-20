@@ -266,8 +266,8 @@ void Fl_Vk_Window_Driver::prepare_depth() {
 
   /* select memory size and type */
   mem_alloc.allocationSize = mem_reqs.size;
-  pass = memory_type_from_properties(pWindow->gpu(), mem_reqs.memoryTypeBits, 0, /* No requirements */
-                                     &mem_alloc.memoryTypeIndex);
+  mem_alloc.memoryTypeIndex = findMemoryType(pWindow->gpu(),
+                                             mem_reqs.memoryTypeBits, 0);
   assert(pass);
 
   /* allocate memory */

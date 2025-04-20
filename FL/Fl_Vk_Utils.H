@@ -41,9 +41,9 @@ FL_EXPORT VkImage createImage(VkDevice device,
                               VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT |
                               VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
-FL_EXPORT bool memory_type_from_properties(VkPhysicalDevice gpu,
-                                           uint32_t typeBits, VkFlags requirements_mask,
-                                           uint32_t *typeIndex);
+FL_EXPORT uint32_t findMemoryType(VkPhysicalDevice physicalDevice,
+                                  uint32_t typeFilter,
+                                  VkMemoryPropertyFlags properties);
 
 FL_EXPORT VkDeviceMemory allocateAndBindImageMemory(VkDevice device,
                                                     VkPhysicalDevice gpu,
