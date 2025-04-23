@@ -313,17 +313,6 @@ void Fl_Cocoa_Vk_Window_Driver::create_surface()
                                               &surfaceInfo,
                                               pWindow->m_allocator,
                                               &pWindow->m_surface);
-    
-    // VkMacOSSurfaceCreateInfoMVK surfaceInfo = {};
-    // surfaceInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
-    // surfaceInfo.pNext = nullptr;
-    // surfaceInfo.flags = 0;
-    // surfaceInfo.pView = (__bridge void*)view; // Bridge NSView to void* for Vulkan
-    
-    // VkResult result = vkCreateMacOSSurfaceMVK(pWindow->ctx.instance,
-    //                                           &surfaceInfo,
-    //                                           pWindow->m_allocator,
-    //                                           &pWindow->m_surface);
     if (result != VK_SUCCESS)
     {
         Fl::fatal("Failed to create macOS Vulkan surface");
