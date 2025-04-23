@@ -19,7 +19,7 @@
 #include <FL/platform.H>
 
 #include <vulkan/vulkan.h>
-#include <vulkan/vulkan_macos.h> // For vkCreateMacOSSurfaceMVK
+#include <vulkan/vulkan_metal.h> // For vkCreateMetalSurfaceEXT
 #include <AppKit/AppKit.h>       // For NSView
 #include <Metal/Metal.h>         // For CAMetalLayer
 #include <QuartzCore/QuartzCore.h> // For CAMetalLayer
@@ -286,7 +286,7 @@ std::vector<const char*> Fl_Cocoa_Vk_Window_Driver::get_instance_extensions()
 {
     std::vector<const char*> out;
     out.push_back("VK_KHR_surface");
-    out.push_back(VK_MVK_MACOS_SURFACE_EXTENSION_NAME);
+    out.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
     return out;
 }
 
@@ -301,17 +301,29 @@ void Fl_Cocoa_Vk_Window_Driver::create_surface()
     CAMetalLayer* metalLayer = [CAMetalLayer layer];
     [view setLayer:metalLayer];
     [view setWantsLayer:YES]; // Enable layer-backing for the NSView
-
-    VkMacOSSurfaceCreateInfoMVK surfaceInfo = {};
-    surfaceInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+    
+    VkMetalSurfaceCreateInfoEXT surfaceInfo = {};
+    surfaceInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
     surfaceInfo.pNext = nullptr;
     surfaceInfo.flags = 0;
-    surfaceInfo.pView = (__bridge void*)view; // Bridge NSView to void* for Vulkan
-    
-    VkResult result = vkCreateMacOSSurfaceMVK(pWindow->ctx.instance,
+    surfaceInfo.pLayer = (__bridge CAMetalLayer*)[view layer]; // Use the layer instead of the view
+
+    // Use vkCreateMetalSurfaceEXT instead of vkCreateMacOSSurfaceMVK
+    VkResult result = vkCreateMetalSurfaceEXT(pWindow->ctx.instance,
                                               &surfaceInfo,
                                               pWindow->m_allocator,
                                               &pWindow->m_surface);
+    
+    // VkMacOSSurfaceCreateInfoMVK surfaceInfo = {};
+    // surfaceInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+    // surfaceInfo.pNext = nullptr;
+    // surfaceInfo.flags = 0;
+    // surfaceInfo.pView = (__bridge void*)view; // Bridge NSView to void* for Vulkan
+    
+    // VkResult result = vkCreateMacOSSurfaceMVK(pWindow->ctx.instance,
+    //                                           &surfaceInfo,
+    //                                           pWindow->m_allocator,
+    //                                           &pWindow->m_surface);
     if (result != VK_SUCCESS)
     {
         Fl::fatal("Failed to create macOS Vulkan surface");
