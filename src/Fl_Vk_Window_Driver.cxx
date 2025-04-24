@@ -250,9 +250,8 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   view.viewType = VK_IMAGE_VIEW_TYPE_2D;
 
   VkMemoryRequirements mem_reqs;
-  VkResult result;
-  bool pass;
 
+  VkResult result;
   pWindow->m_depth.format = depth_format;
 
   /* create image */
@@ -268,7 +267,6 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   mem_alloc.allocationSize = mem_reqs.size;
   mem_alloc.memoryTypeIndex = findMemoryType(pWindow->gpu(),
                                              mem_reqs.memoryTypeBits, 0);
-  assert(pass);
 
   /* allocate memory */
   result = vkAllocateMemory(pWindow->device(), &mem_alloc, NULL,
