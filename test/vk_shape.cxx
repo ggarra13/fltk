@@ -503,8 +503,6 @@ void vk_shape_window::draw() {
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(cmd, 0, 1, &m_mesh.buf, offsets);
     vkCmdDraw(cmd, 3 * sides, 1, 0, 0); // Draw shape
-
-    vkCmdEndRenderPass(cmd);
 }
 
 void vk_shape_window::destroy_mesh()

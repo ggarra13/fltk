@@ -91,7 +91,6 @@ struct MVP
 
 class cube_box : public Fl_Vk_Window {
     void vk_draw_begin() FL_OVERRIDE;
-    void vk_draw_end() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
     int handle(int) FL_OVERRIDE;
 
@@ -836,16 +835,6 @@ void cube_box::draw() {
 
 }
 
-void cube_box::vk_draw_end()
-{
-    VkCommandBuffer cmd = getCurrentCommandBuffer();
-    if (!m_swapchain || !cmd || !isFrameActive()) {
-        return;
-    }
-
-    vkCmdEndRenderPass(cmd);
-    Fl_Vk_Window::vk_draw_end();
-}
 
 void cube_box::create_device() {
     VkResult result;

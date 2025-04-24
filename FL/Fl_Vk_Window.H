@@ -507,6 +507,9 @@ protected:
   bool               m_use_break = false;
   VkDebugUtilsMessengerEXT  m_debug_messenger;
 
+  void init_vulkan();
+  void begin_render_pass();
+
 public:
   
   void make_current();
@@ -515,8 +518,6 @@ public:
   int swap_interval() const;
 
   int can_do_overlay() { return false; }
-
-  void init_vulkan();
 
   void wait_queue();
   void wait_device();

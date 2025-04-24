@@ -196,6 +196,28 @@ void Fl_Vk_Window::recreate_swapchain() {
 
 }
 
+void Fl_Vk_Window::begin_render_pass()
+{    
+    VkCommandBuffer cmd = getCurrentCommandBuffer();
+    
+    VkClearValue clear_values[2];
+    clear_values[0].color = m_clearColor;
+    clear_values[1].depthStencil = {m_depthStencil, 0};
+
+    VkRenderPassBeginInfo rp_begin = {};
+    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    rp_begin.renderPass = m_renderPass;
+    rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
+    rp_begin.renderArea.offset.x = 0;
+    rp_begin.renderArea.offset.y = 0;
+    rp_begin.renderArea.extent.width = w();
+    rp_begin.renderArea.extent.height = h();
+    rp_begin.clearValueCount = (mode() & FL_DEPTH || mode() & FL_STENCIL) ? 2 : 1;
+    rp_begin.pClearValues = clear_values;
+
+    vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+}
+
 void Fl_Vk_Window::vk_draw_begin() {
     VkResult result;
 
@@ -352,27 +374,10 @@ void Fl_Vk_Window::vk_draw_begin() {
                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
     }
+    
+    begin_render_pass();
 
     frame.active = true;
-    
-    VkCommandBuffer cmd = getCurrentCommandBuffer();
-    
-    VkClearValue clear_values[2];
-    clear_values[0].color = m_clearColor;
-    clear_values[1].depthStencil = {m_depthStencil, 0};
-
-    VkRenderPassBeginInfo rp_begin = {};
-    rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    rp_begin.renderPass = m_renderPass;
-    rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
-    rp_begin.renderArea.offset.x = 0;
-    rp_begin.renderArea.offset.y = 0;
-    rp_begin.renderArea.extent.width = w();
-    rp_begin.renderArea.extent.height = h();
-    rp_begin.clearValueCount = (mode() & FL_DEPTH || mode() & FL_STENCIL) ? 2 : 1;
-    rp_begin.pClearValues = clear_values;
-
-    vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 /**
@@ -412,6 +417,9 @@ void Fl_Vk_Window::vk_draw_end() {
         return;
     }
 
+    
+    vkCmdEndRenderPass(frame.commandBuffer);
+    
     VkResult result = vkEndCommandBuffer(frame.commandBuffer);
     if (result != VK_SUCCESS)
     {
