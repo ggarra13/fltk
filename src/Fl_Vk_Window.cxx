@@ -324,22 +324,6 @@ void Fl_Vk_Window::vk_draw_begin() {
         return;
     }
 
-    // Transition swapchain image
-    VkImageMemoryBarrier image_memory_barrier = {};
-    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    image_memory_barrier.srcAccessMask = 0;
-    image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_memory_barrier.image = m_buffers[m_current_buffer].image;
-    image_memory_barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    vkCmdPipelineBarrier(frame.commandBuffer,
-                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         0, 0, nullptr, 0, nullptr, 1, &image_memory_barrier);
-
     // Handle depth/stencil
     bool has_depth = mode() & FL_DEPTH;
     bool has_stencil = mode() & FL_STENCIL;
@@ -428,26 +412,7 @@ void Fl_Vk_Window::vk_draw_end() {
         return;
     }
 
-    VkResult result;
-
-    // Transition swapchain image to PRESENT_SRC_KHR
-    VkImageMemoryBarrier prePresentBarrier = {};
-    prePresentBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    prePresentBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    prePresentBarrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    prePresentBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    prePresentBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    prePresentBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prePresentBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    prePresentBarrier.image = m_buffers[m_current_buffer].image;
-    prePresentBarrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-
-    vkCmdPipelineBarrier(frame.commandBuffer,
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                         0, 0, nullptr, 0, nullptr, 1, &prePresentBarrier);
-
-    result = vkEndCommandBuffer(frame.commandBuffer);
+    VkResult result = vkEndCommandBuffer(frame.commandBuffer);
     if (result != VK_SUCCESS)
     {
         fprintf(stderr, "vkEndCommandBuffer failed: %s\n", string_VkResult(result));

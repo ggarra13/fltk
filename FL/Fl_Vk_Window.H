@@ -456,18 +456,20 @@ private:
           }
   };
   
-  std::vector<FrameData> m_frames;
-  uint32_t m_currentFrameIndex;
 
   // Swapchain
-  uint32_t               m_swapchainImageCount; // Track swapchain image count
   VkFence                m_resizeFence;
   VkExtent2D             m_currentExtent; // Track current swapchain exten
   //! Flag used to handle resizes (swapchain and other resources recreation)
 
 protected:
+  uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
+  
+  std::vector<FrameData>  m_frames;
+  uint32_t                m_currentFrameIndex;
+
   bool                   m_swapchain_needs_recreation;
   VkSwapchainKHR         m_swapchain;
   
