@@ -23,76 +23,11 @@
 #include <string>
 #include <vector>
 
-#include "FL/vk.h"
+#include "Fl_Vk_Context.H"
 #include "Fl_Window.H"
 
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
-
-
-// We keep this in a context struct, so we can pass them to some other library
-// easily.
-struct Fl_Vk_Context
-{
-    VkInstance         instance; 
-
-    VkPhysicalDevice   gpu;
-    VkPhysicalDeviceProperties gpu_props;
-    VkPhysicalDeviceFeatures gpu_features;
-    
-    VkDevice           device;
-    VkPipelineCache    pipelineCache; 
-    VkQueueFamilyProperties* queue_props;
-    uint32_t                queue_count;
-    VkQueue                       queue;
-    VkCommandPool           commandPool;  // memory for command buffers
-
-    VkFormat                     format;   // for depth and color formats
-    VkColorSpaceKHR          colorSpace; // sRGB, HDR10 or HLG for example
-
-    // List of enabled layers
-    std::vector<const char*> enabled_layers;
-
-    // List of instance extensions
-    std::vector<const char*> instance_extensions;
-
-    // List of device extensions
-    std::vector<const char*> device_extensions;
-
-    Fl_Vk_Context() :
-        instance(VK_NULL_HANDLE),
-        gpu(VK_NULL_HANDLE),
-        device(VK_NULL_HANDLE),
-        pipelineCache(VK_NULL_HANDLE),
-        queue_props(nullptr),
-        queue_count(0),
-        queue(VK_NULL_HANDLE),
-        commandPool(VK_NULL_HANDLE)
-        {
-        };
-
-    void destroy()
-        {
-            VkResult result = vkDeviceWaitIdle(device);
-            VK_CHECK(result);
-            
-            if (pipelineCache != VK_NULL_HANDLE)
-            {
-                vkDestroyPipelineCache(device, pipelineCache, nullptr);
-                pipelineCache = VK_NULL_HANDLE;
-            }
-            if (commandPool != VK_NULL_HANDLE)
-            {
-                vkDestroyCommandPool(device, commandPool, nullptr);
-                commandPool = VK_NULL_HANDLE;
-            }
-            if (device != VK_NULL_HANDLE)
-            {
-                vkDestroyDevice(device, nullptr);
-                device = VK_NULL_HANDLE;
-            }
-        }
-};
 
 struct Fl_Vk_SwapchainBuffer {
     VkImage image;
@@ -137,8 +72,7 @@ struct Fl_Vk_Mesh {
     VkDeviceMemory uniformMemory;
     VkBuffer uniformBuffer;
     
-    // Actual Vulkan Data
-    VkPipelineVertexInputStateCreateInfo vi;
+    // Vertex bindings (hard coded for demos with two attributes only).
     VkVertexInputBindingDescription vi_bindings[1];
     VkVertexInputAttributeDescription vi_attrs[2];
 
@@ -150,7 +84,6 @@ struct Fl_Vk_Mesh {
         uniformBuffer(VK_NULL_HANDLE),
         uniformMemory(VK_NULL_HANDLE)
         {
-            memset(&vi, 0, sizeof(VkPipelineVertexInputStateCreateInfo));
         }
 
     void destroy(VkDevice& device)
@@ -482,15 +415,15 @@ public:
   static VkInstance m_instance; // this gets copied into ctx.instance for every window
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 
-  // window.
+  // Window's Vulkan context.
   Fl_Vk_Context ctx;
 
-  // Per Window
+  // Per Window variables
 
-  // For clearing the background
+  // For clearing the background (should be set in vk_draw_begin())
   VkClearColorValue  m_clearColor;
 
-  // For clearing the stencil
+  // For clearing the stencil    (should be set in vk_draw_begin())
   float              m_depthStencil;
 
   //! The surface and its format gotten from the Window driver.
@@ -500,9 +433,6 @@ public:
   //! For drawing (one pipeline and one render pass by default)
   VkRenderPass m_renderPass;
   VkPipeline   m_pipeline;
-  
-  //! Interface between shaders and desc.sets
-  VkPipelineLayout      m_pipeline_layout;
 
   //! Allocator callback (unused for now).
   const VkAllocationCallbacks*    m_allocator;

@@ -19,9 +19,14 @@ export DYLD_FALLBACK_LIBRARY_PATH=$VULKAN_SDK/lib
 #
 export VK_LAYER_PATH=$VULKAN_SDK/opt/vulkan-profiles/share/vulkan/explicit_layer.d:$VULKAN_SDK/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d
 export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
+# export VK_LOADER_DEBUG=all  # Use this to debug configuration issues.
 
 #
-# export VK_LOADER_DEBUG=all  # Use this to debug configuration issues.
+# Used to debug Cocoa .mm code.
+#
+# export NSZombieEnabled=YES
+
+#
 #
 
 # \@bug:
@@ -78,9 +83,7 @@ cmake .. \
 
 ninja
 
-export NSZombieEnabled=YES
 
-bin/test/vk_hdr_crash-shared
-# bin/test/vk_shape-shared
-# bin/test/vk_shape_textured-shared
-# bin/test/vk_cube-shared
+bin/test/vk_shape-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared

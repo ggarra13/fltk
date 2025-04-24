@@ -1,5 +1,6 @@
 //
 // Tiny Vulkan demo program for the Fast Light Tool Kit (FLTK).
+// This demo relies on GLM, the matrix library.
 //
 // Copyright 1998-2010 by Bill Spitzak and others.
 //
@@ -53,6 +54,9 @@ protected:
     
     //! This is for holding a mesh
     Fl_Vk_Mesh m_mesh;
+    
+    //! Interface between shaders and desc.sets
+    VkPipelineLayout      m_pipeline_layout;
     
     void prepare_descriptor_layout();
     void prepare_render_pass();
@@ -167,14 +171,6 @@ void vk_shape_window::prepare_mesh()
 
     result = vkBindBufferMemory(device(), m_mesh.buf, m_mesh.mem, 0);
     VK_CHECK(result);
-
-    m_mesh.vi.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    m_mesh.vi.pNext = NULL;
-    m_mesh.vi.vertexBindingDescriptionCount = 1;
-    m_mesh.vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
-    m_mesh.vi.vertexAttributeDescriptionCount = 1;
-    m_mesh.vi.pVertexAttributeDescriptions = m_mesh.vi_attrs;
 
     m_mesh.vi_bindings[0].binding = 0;
     m_mesh.vi_bindings[0].stride = sizeof(vertices[0]);
@@ -328,15 +324,15 @@ void vk_shape_window::prepare_pipeline() {
     VkGraphicsPipelineCreateInfo pipeline;
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo;
 
-    VkPipelineVertexInputStateCreateInfo vi;
-    VkPipelineInputAssemblyStateCreateInfo ia;
-    VkPipelineRasterizationStateCreateInfo rs;
-    VkPipelineColorBlendStateCreateInfo cb;
-    VkPipelineDepthStencilStateCreateInfo ds;
-    VkPipelineViewportStateCreateInfo vp;
-    VkPipelineMultisampleStateCreateInfo ms;
+    VkPipelineVertexInputStateCreateInfo vi = {};
+    VkPipelineInputAssemblyStateCreateInfo ia = {};
+    VkPipelineRasterizationStateCreateInfo rs = {};
+    VkPipelineColorBlendStateCreateInfo cb = {};
+    VkPipelineDepthStencilStateCreateInfo ds = {};
+    VkPipelineViewportStateCreateInfo vp = {};
+    VkPipelineMultisampleStateCreateInfo ms = {};
     VkDynamicState dynamicStateEnables[(VK_DYNAMIC_STATE_STENCIL_REFERENCE - VK_DYNAMIC_STATE_VIEWPORT + 1)];
-    VkPipelineDynamicStateCreateInfo dynamicState;
+    VkPipelineDynamicStateCreateInfo dynamicState = {};
 
     VkResult result;
     
@@ -349,7 +345,13 @@ void vk_shape_window::prepare_pipeline() {
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline.layout = m_pipeline_layout;
 
-    vi = m_mesh.vi;
+    memset(&vi, 0, sizeof(vi));
+    vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vi.pNext = NULL;
+    vi.vertexBindingDescriptionCount = 1;
+    vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
+    vi.vertexAttributeDescriptionCount = 1;
+    vi.pVertexAttributeDescriptions = m_mesh.vi_attrs;
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

@@ -112,10 +112,14 @@ class cube_box : public Fl_Vk_Window {
     //! This is for holding a mesh
     Fl_Vk_Mesh m_cube;
     
-    VkPipeline m_wire_pipeline; // Additional Pipeline for wireframe mode
+    //! Interface between shaders and desc.sets
+    VkPipelineLayout      m_pipeline_layout;
 
+    //! Additional Pipeline for wireframe mode
+    VkPipeline m_wire_pipeline;
     
-    VkDescriptorPool      m_desc_pool; // memory for descriptor sets
+    //! Memory for descriptor sets
+    VkDescriptorPool      m_desc_pool; 
 
     // Describe texture bindings whithin desc. set  
     VkDescriptorSetLayout m_desc_layout;
@@ -392,7 +396,13 @@ void cube_box::prepare_pipeline() {
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline.layout = m_pipeline_layout;
 
-    vi = m_cube.vi;
+    memset(&vi, 0, sizeof(vi));
+    vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vi.pNext = NULL;
+    vi.vertexBindingDescriptionCount = 1;
+    vi.pVertexBindingDescriptions = m_cube.vi_bindings;
+    vi.vertexAttributeDescriptionCount = 2;
+    vi.pVertexAttributeDescriptions = m_cube.vi_attrs;
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -587,15 +597,6 @@ void cube_box::prepare_vertices()
     result = vkBindBufferMemory(device(), m_cube.buf, m_cube.mem, 0);
     VK_CHECK(result);
 
-    memset(&m_cube.vi, 0, sizeof(m_cube.vi));
-    m_cube.vi.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    m_cube.vi.pNext = NULL;
-    m_cube.vi.vertexBindingDescriptionCount = 1;
-    m_cube.vi.pVertexBindingDescriptions = m_cube.vi_bindings;
-    m_cube.vi.vertexAttributeDescriptionCount = 2;
-    m_cube.vi.pVertexAttributeDescriptions = m_cube.vi_attrs;
-
     m_cube.vi_bindings[0].binding = 0;
     m_cube.vi_bindings[0].stride = sizeof(Vertex);
     m_cube.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -767,7 +768,7 @@ void cube_box::prepare()
 void cube_box::vk_draw_begin()
 {
     // Background color
-    m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
+    m_clearColor = { 0.4f, 0.4f, 0.4f, 0.0 };
     Fl_Vk_Window::vk_draw_begin();
 }
 
@@ -832,6 +833,7 @@ void cube_box::draw() {
 
     vkCmdBindIndexBuffer(cmd, m_cube.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     vkCmdDrawIndexed(cmd, 6*3*2, 1, 0, 0, 0); // 6 sides * 2 triangles * 3 verts
+
 }
 
 void cube_box::vk_draw_end()
@@ -1124,7 +1126,7 @@ int main(int argc, char **argv) {
   wire->value(0);
   wire->callback(wire_cb);
 
-  form->label("Cube Demo");
+  form->label("Vulkan Cube Demo");
   form->show(argc,argv);
   lt_cube->show();
   rt_cube->show();

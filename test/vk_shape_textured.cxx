@@ -85,6 +85,9 @@ protected:
 
     //! This is for holding one texture for the shader.
     Fl_Vk_Texture  m_texture;
+    
+    //! Interface between shaders and desc.sets
+    VkPipelineLayout      m_pipeline_layout;
 
     //! Memory for descriptor setsx
     VkDescriptorPool      m_desc_pool;
@@ -430,14 +433,6 @@ void vk_shape_window::prepare_mesh()
     result = vkBindBufferMemory(device(), m_mesh.buf, m_mesh.mem, 0);
     VK_CHECK(result);
 
-    m_mesh.vi.sType =
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    m_mesh.vi.pNext = NULL;
-    m_mesh.vi.vertexBindingDescriptionCount = 1;
-    m_mesh.vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
-    m_mesh.vi.vertexAttributeDescriptionCount = 2;
-    m_mesh.vi.pVertexAttributeDescriptions = m_mesh.vi_attrs;
-
     m_mesh.vi_bindings[0].binding = 0;
     m_mesh.vi_bindings[0].stride = sizeof(vertices[0]);
     m_mesh.vi_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
@@ -625,7 +620,13 @@ void vk_shape_window::prepare_pipeline() {
     pipeline.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline.layout = m_pipeline_layout;
 
-    vi = m_mesh.vi;
+    memset(&vi, 0, sizeof(vi));
+    vi.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vi.pNext = NULL;
+    vi.vertexBindingDescriptionCount = 1;
+    vi.pVertexBindingDescriptions = m_mesh.vi_bindings;
+    vi.vertexAttributeDescriptionCount = 2;
+    vi.pVertexAttributeDescriptions = m_mesh.vi_attrs;
 
     memset(&ia, 0, sizeof(ia));
     ia.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
