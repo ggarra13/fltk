@@ -22,6 +22,8 @@
 
 #include "FL/vk.h"
 
+#include <vector>
+
 // We keep this in a context struct, so we can pass them to some other library
 // or functions easily.
 struct Fl_Vk_Context
