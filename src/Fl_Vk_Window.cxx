@@ -68,12 +68,7 @@ void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
 
     // Wait for all operations to complete
-    result = vkDeviceWaitIdle(device());
-    if (result != VK_SUCCESS)
-    {
-        fprintf(stderr, "vkDeviceWaitIdle failed: %s\n", string_VkResult(result));
-        return;
-    }
+    wait_queue(); // was wait_device() ?
 
     // Free existing command buffers
     for (auto& frame : m_frames)

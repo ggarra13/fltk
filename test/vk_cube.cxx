@@ -244,9 +244,6 @@ void cube_box::prepare_render_pass()
 }
 
 VkShaderModule cube_box::prepare_vs() {
-    if (m_vert_shader != VK_NULL_HANDLE)
-        return m_vert_shader;
-    
     // Example GLSL vertex shader
     std::string vertex_shader_glsl = R"(
         #version 450
@@ -283,9 +280,6 @@ VkShaderModule cube_box::prepare_vs() {
 }
 
 VkShaderModule cube_box::prepare_fs() {
-    if (m_frag_shader != VK_NULL_HANDLE)
-        return m_frag_shader;
-    
     // Example GLSL vertex shader
     std::string frag_shader_glsl = R"(
         #version 450
@@ -744,10 +738,12 @@ void cube_box::destroy_resources()
     if (m_frag_shader != VK_NULL_HANDLE)
     {
         vkDestroyShaderModule(device(), m_frag_shader, nullptr);
+        m_frag_shader = VK_NULL_HANDLE;
     }
     if (m_vert_shader != VK_NULL_HANDLE)
     {
         vkDestroyShaderModule(device(), m_vert_shader, nullptr);
+        m_vert_shader = VK_NULL_HANDLE;
     }
     
 }
