@@ -508,7 +508,10 @@ protected:
   VkDebugUtilsMessengerEXT  m_debug_messenger;
 
   void init_vulkan();
+
+  // Auxiliary functions to begin and end the main render pass.
   void begin_render_pass();
+  void end_render_pass();
 
 public:
   

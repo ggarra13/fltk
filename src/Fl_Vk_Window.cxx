@@ -218,6 +218,21 @@ void Fl_Vk_Window::begin_render_pass()
     vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
 }
 
+void Fl_Vk_Window::end_render_pass()
+{
+    FrameData& frame = m_frames[m_currentFrameIndex];
+    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
+        || !frame.active) {
+        if (m_debugSync) {
+            fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
+        }
+        frame.active = false;
+        return;
+    }
+
+    vkCmdEndRenderPass(frame.commandBuffer);
+}
+
 void Fl_Vk_Window::vk_draw_begin() {
     VkResult result;
 
@@ -405,7 +420,9 @@ void Fl_Vk_Window::vk_draw_begin() {
  To be used as a match for a previous call to Fl_Vk_Window::vk_draw_begin().
  \see \ref vulkan_with_fltk_widgets
  */
-void Fl_Vk_Window::vk_draw_end() {
+void Fl_Vk_Window::vk_draw_end()
+{
+    end_render_pass();
     
     FrameData& frame = m_frames[m_currentFrameIndex];
     if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
@@ -416,9 +433,6 @@ void Fl_Vk_Window::vk_draw_end() {
         frame.active = false;
         return;
     }
-
-    
-    vkCmdEndRenderPass(frame.commandBuffer);
     
     VkResult result = vkEndCommandBuffer(frame.commandBuffer);
     if (result != VK_SUCCESS)
