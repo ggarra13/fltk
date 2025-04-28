@@ -699,6 +699,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                      pWindow->m_queueFamilyIndex, 0,
                      &pWindow->ctx.queue);
 
+    
     uint32_t formatCount;
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(
         pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
@@ -724,6 +725,29 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         }
         switch (format.colorSpace)
         {
+#ifdef __APPLE__
+#ifdef __x86_64__ // macOS Intel
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 5000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+            scores[i] += 4000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:
+            scores[i] += 3000;
+            hdrMonitorFound = true;
+            break;
+        //! We don't handle Dolbyvision yet, so it gets a low score for now.
+        case VK_COLOR_SPACE_DOLBYVISION_EXT:
+            scores[i] += 1000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            scores[i] += 500; // SDR baseline
+            break;
+#elif __aarch64__ // macOS Apple Silicon
         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
             scores[i] += 4000;
             hdrMonitorFound = true;
@@ -744,6 +768,36 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
             scores[i] += 500; // SDR baseline
             break;
+#else
+        // Other Apple architectures (future-proofing)
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            scores[i] += 500; // Default to SDR
+            break;
+#endif
+#else
+            
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+            scores[i] += 4000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:
+            scores[i] += 3000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 2000;
+            hdrMonitorFound = true;
+            break;
+        //! We don't handle Dolbyvision yet, so it gets a low score for now.
+        case VK_COLOR_SPACE_DOLBYVISION_EXT:
+            scores[i] += 1000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            scores[i] += 500; // SDR baseline
+            break;
+#endif
+            
         default:
             break;
         }
