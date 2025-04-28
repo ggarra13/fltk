@@ -281,9 +281,10 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
     
   static int can_do(int, const int *);
   int mode(int, const int *);
+  void destroy_common_resources();
+  
 protected:
   void recreate_swapchain();
-  void destroy_common_resources();
 
   virtual void init_colorspace();
   
@@ -406,7 +407,7 @@ public:
       device_extensions() const { return ctx.device_extensions; }
 
   //! @}
-
+  
   // Application
   bool m_validate;  // if true, turns on validation layers
   bool m_debugSync;
@@ -458,9 +459,10 @@ private:
   
 
   // Swapchain
+private:
+  bool                   m_in_render_pass = false;
   VkFence                m_resizeFence;
   VkExtent2D             m_currentExtent; // Track current swapchain exten
-  //! Flag used to handle resizes (swapchain and other resources recreation)
 
 protected:
   uint32_t               m_swapchainImageCount; // Track swapchain image count
@@ -470,6 +472,7 @@ protected:
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;
 
+  //! Flag used to handle resizes (swapchain and other resources recreation)
   bool                   m_swapchain_needs_recreation;
   VkSwapchainKHR         m_swapchain;
   

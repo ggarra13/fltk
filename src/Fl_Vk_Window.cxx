@@ -211,6 +211,8 @@ void Fl_Vk_Window::begin_render_pass()
     rp_begin.pClearValues = clear_values;
 
     vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+
+    m_in_render_pass = true;
 }
 
 void Fl_Vk_Window::end_render_pass()
@@ -226,6 +228,7 @@ void Fl_Vk_Window::end_render_pass()
     }
 
     vkCmdEndRenderPass(frame.commandBuffer);
+    m_in_render_pass = false;
 }
 
 void Fl_Vk_Window::vk_draw_begin() {
@@ -417,7 +420,10 @@ void Fl_Vk_Window::vk_draw_begin() {
  */
 void Fl_Vk_Window::vk_draw_end()
 {
-    end_render_pass();
+    if (m_in_render_pass)
+    {
+        end_render_pass();
+    }
     
     FrameData& frame = m_frames[m_currentFrameIndex];
     if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
