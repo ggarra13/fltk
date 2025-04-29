@@ -513,6 +513,9 @@ protected:
   void init_vulkan();
 
   // Auxiliary functions to begin and end the main render pass.
+  // Note that FLTK will call begin_render_pass() in vk_draw_begin()
+  // and end_render_pass() in vk_draw_end().
+  // That is: draw() is called with an active render pass by default.
   void begin_render_pass(VkCommandBuffer&);
   void begin_render_pass();
   void end_render_pass(VkCommandBuffer&);
