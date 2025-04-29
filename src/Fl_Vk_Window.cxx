@@ -191,10 +191,8 @@ void Fl_Vk_Window::recreate_swapchain() {
 
 }
 
-void Fl_Vk_Window::begin_render_pass()
+void Fl_Vk_Window::begin_render_pass(VkCommandBuffer& cmd)
 {    
-    VkCommandBuffer cmd = getCurrentCommandBuffer();
-    
     VkClearValue clear_values[2];
     clear_values[0].color = m_clearColor;
     clear_values[1].depthStencil = {m_depthStencil, 0};
@@ -215,6 +213,18 @@ void Fl_Vk_Window::begin_render_pass()
     m_in_render_pass = true;
 }
 
+void Fl_Vk_Window::begin_render_pass()
+{    
+    VkCommandBuffer cmd = getCurrentCommandBuffer();
+    begin_render_pass(cmd);
+}
+
+void Fl_Vk_Window::end_render_pass(VkCommandBuffer& cmd)
+{
+    vkCmdEndRenderPass(cmd);
+    m_in_render_pass = false;
+}
+
 void Fl_Vk_Window::end_render_pass()
 {
     FrameData& frame = m_frames[m_currentFrameIndex];
@@ -226,9 +236,7 @@ void Fl_Vk_Window::end_render_pass()
         frame.active = false;
         return;
     }
-
-    vkCmdEndRenderPass(frame.commandBuffer);
-    m_in_render_pass = false;
+    end_render_pass(frame.commandBuffer);
 }
 
 void Fl_Vk_Window::vk_draw_begin() {
@@ -388,7 +396,7 @@ void Fl_Vk_Window::vk_draw_begin() {
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
     }
     
-    begin_render_pass();
+    begin_render_pass(frame.commandBuffer);
 
     frame.active = true;
 }
