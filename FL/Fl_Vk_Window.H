@@ -358,7 +358,7 @@ public:
   virtual const char* application_name() { return "FLTK"; }
   virtual const char* engine_name() { return "FLTK"; }
   
-  //! Main entry point for Vulkan render pass creation and destruction.
+  //! Main entry point for Vulkan elements pass creation and destruction.
   virtual void prepare() = 0;
   virtual void destroy_resources() {};  
 

@@ -277,7 +277,9 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   result = vkBindImageMemory(pWindow->device(), pWindow->m_depth.image, pWindow->m_depth.mem, 0);
   VK_CHECK(result);
 
-  set_image_layout(pWindow->device(),
+  VkCommandBuffer cmd = beginSingleTimeCommands(pWindow->device(),
+                                                pWindow->commandPool());
+  set_image_layout(cmd, pWindow->device(),
                    pWindow->commandPool(),
                    pWindow->queue(),
                    pWindow->m_depth.image,
@@ -286,6 +288,9 @@ void Fl_Vk_Window_Driver::prepare_depth() {
                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                    0, VK_PIPELINE_STAGE_HOST_BIT,
                    0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+  endSingleTimeCommands(cmd, pWindow->device(),
+                        pWindow->commandPool(),
+                        pWindow->queue());
 
   /* create image view */
   view.image = pWindow->m_depth.image;

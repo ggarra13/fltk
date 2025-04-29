@@ -100,7 +100,8 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer,
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
-void set_image_layout(VkDevice device,
+void set_image_layout(VkCommandBuffer cmd,
+                      VkDevice device,
                       VkCommandPool commandPool,
                       VkQueue queue,
                       VkImage image,
@@ -112,9 +113,6 @@ void set_image_layout(VkDevice device,
                       VkAccessFlags dstAccessMask,
                       VkPipelineStageFlags dstStageMask)
 {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands(device,
-                                                            commandPool);
-    
     VkImageMemoryBarrier barrier = {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.pNext = NULL;
@@ -125,14 +123,14 @@ void set_image_layout(VkDevice device,
     barrier.image = image;
     barrier.subresourceRange = {aspectMask, 0, 1, 0, 1};
 
-    vkCmdPipelineBarrier(commandBuffer,
+    vkCmdPipelineBarrier(cmd,
                          srcStageMask, dstStageMask, 0, 0, NULL,
                          0, NULL, 1, &barrier);
-    
-    endSingleTimeCommands(commandBuffer, device, commandPool, queue);
 }
 
+// Helper function to transition an image's layout
 FL_EXPORT void transitionImageLayout(
+    VkCommandBuffer cmd,
     VkDevice device,
     VkCommandPool commandPool,
     VkQueue queue,
@@ -143,29 +141,76 @@ FL_EXPORT void transitionImageLayout(
     VkPipelineStageFlags destinationStage;
     VkAccessFlags srcAccessMask, dstAccessMask;
 
+    // Determine the appropriate source and destination access masks and
+    // pipeline stages
+    // based on the old and new layouts. This is crucial for synchronization.
+
     if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
         newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
     {
+        // Transitioning from undefined to transfer destination
+        // Useful for initial data uploads
+        srcAccessMask = 0; // No prior access
+        dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; // Will be written by transfer
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT; // Can happen very early
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT; // Transfer stage writes
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        // Transitioning from transfer destination to shader read
+        // After uploading data, prepare for reading in shaders
+        srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT; // Transfer writes must complete
+        dstAccessMask = VK_ACCESS_SHADER_READ_BIT; // Will be read by shaders
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT; // Wait for transfer to finish
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT; // Or other shader stages that read from it
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+        // Transitioning from color attachment to transfer source
+        // Prepare to read from a rendered image
+        srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Writes to color attachment must complete
+        dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT; // Will be read by transfer
+        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Wait for rendering to finish
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT; // Transfer stage reads
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+    {
+        // Transitioning from transfer source to color attachment
+        // After reading, prepare to render to the image again
+        srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT; // Transfer reads must complete
+        dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // Will be written as color attachment
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT; // Wait for transfer to finish
+        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Color attachment writes
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+               newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+        // Initial transition for a render target
         srcAccessMask = 0;
-        dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     }
-    else if (
-        oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-        newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-    {
-        srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    // Add more transitions as needed for your application
+
+    else {
+        // Handle other transitions or assert/log an error
+        // For simplicity, we'll use a generic barrier that might be overly strong
+        // and potentially hurt performance if not precise.
+        // A robust implementation would cover all expected transitions.
+        srcAccessMask = 0; // Fallback: assume no specific prior access needed to complete
+        dstAccessMask = 0; // Fallback: assume no specific future access needs to wait
+        sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        // You might want to add specific handling for common layouts like
+        // VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, etc.
+        // Example: if oldLayout is DEPTH_STENCIL, aspectMask should be VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
     }
-    else
-    {
-        throw std::runtime_error("Unsupported layout transition");
-    }
-    
-    set_image_layout(device,
+
+    set_image_layout(cmd,
+                     device,
                      commandPool,
                      queue,
                      image,

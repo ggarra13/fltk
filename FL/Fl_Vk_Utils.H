@@ -60,7 +60,8 @@ FL_EXPORT void createBuffer(VkDevice device,
                             VkMemoryPropertyFlags properties, VkBuffer& buffer,
                             VkDeviceMemory& bufferMemory);
 
-FL_EXPORT void set_image_layout(VkDevice device,
+FL_EXPORT void set_image_layout(VkCommandBuffer cmd,
+                                VkDevice device,
                                 VkCommandPool commandPool,
                                 VkQueue queue,
                                 VkImage image,
@@ -73,7 +74,8 @@ FL_EXPORT void set_image_layout(VkDevice device,
                                 VkPipelineStageFlags dstStageMask);
 
 //! Helper function to transition an image from an old layout to a new one.
-FL_EXPORT void transitionImageLayout(VkDevice device,
+FL_EXPORT void transitionImageLayout(VkCommandBuffer cmd,
+                                     VkDevice device,
                                      VkCommandPool commandPool,
                                      VkQueue queue,
                                      VkImage image,
