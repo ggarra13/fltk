@@ -242,8 +242,10 @@ void Fl_Vk_Window::end_render_pass()
 {
     FrameData& frame = m_frames[m_currentFrameIndex];
     if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
-        || !frame.active) {
-        if (m_debugSync) {
+        || !frame.active)
+    {
+        if (m_debugSync)
+        {
             fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
         }
         frame.active = false;

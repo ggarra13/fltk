@@ -7,6 +7,8 @@
 #include "FL/Fl.H"
 #include "FL/vk.h"
 
+#include <cstdlib>  // for abort
+
 
 void vk_check_result(VkResult err, const char* file, const int line)
 {
@@ -14,7 +16,7 @@ void vk_check_result(VkResult err, const char* file, const int line)
     if (err == VK_SUCCESS)
         return;
     fprintf(stderr, "Vulkan: %s (%u) at %s, line %d", errorName, err, file, line);
-#ifdef NDEBUG
+#ifndef NDEBUG
     abort();
 #endif
 }
