@@ -476,14 +476,6 @@ void Fl_Vk_Window::show() {
   int need_after = 0;
   if (!shown()) {
     Fl_Window::default_size_range();
-    if (!g) {
-      g = pVkWindowDriver->find(mode_, alist);
-      if (!g && (mode_ & FL_DOUBLE) == FL_SINGLE) {
-        g = pVkWindowDriver->find(mode_ | FL_DOUBLE, alist);
-        if (g)
-          mode_ |= FL_FAKE_SINGLE;
-      }
-    }
     pVkWindowDriver->before_show(need_after);
   }
   Fl_Window::show();

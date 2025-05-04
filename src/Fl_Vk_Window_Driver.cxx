@@ -112,10 +112,11 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       return;
   }
 
+  const bool isImmediate = !(pWindow->mode() & FL_DOUBLE);
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
-  swapchain.minImageCount = (pWindow->mode() & FL_SINGLE) ? 1 : 2;
+  swapchain.minImageCount = isImmediate ? 1 : 2;
   if (swapchain.minImageCount < surfCapabilities.minImageCount) {
     swapchain.minImageCount = surfCapabilities.minImageCount;
   }
@@ -127,8 +128,9 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchain.preTransform = surfCapabilities.currentTransform;
   swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchain.presentMode =
-      (swapchain.minImageCount == 1) ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR;
+  swapchain.presentMode = isImmediate ?
+                          VK_PRESENT_MODE_IMMEDIATE_KHR :
+                          VK_PRESENT_MODE_FIFO_KHR;
   swapchain.oldSwapchain = oldSwapchain;
   swapchain.clipped = VK_TRUE;
 
