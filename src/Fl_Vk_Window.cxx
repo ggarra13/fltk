@@ -26,9 +26,22 @@
 #include <FL/Fl_Graphics_Driver.H>
 #include <FL/fl_utf8.h>
 
+#include <iostream>
+
+static bool all_windows_invisible()
+{
+    for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
+    {
+        if (win->visible())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 //! Per application variables (statics).
 VkInstance              Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
-uint32_t                Fl_Vk_Window::m_instance_counter = 0;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
 
 
@@ -276,7 +289,7 @@ void Fl_Vk_Window::vk_draw_begin() {
             fprintf(stderr, "Waiting for frame %u fence\n", m_currentFrameIndex);
         }
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
-                                 1000000000); // 1s timeout
+                                 UINT64_MAX); 
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkWaitForFences failed: %s\n", string_VkResult(result));
             frame.active = false;
@@ -468,18 +481,13 @@ void Fl_Vk_Window::show() {
         if (g)
           mode_ |= FL_FAKE_SINGLE;
       }
-
-      // \@bug: fails on macOS
-      // if (!g) {
-      //   Fl::error("Insufficient Vulkan support");
-      //   return;
-      // }
     }
     pVkWindowDriver->before_show(need_after);
   }
   Fl_Window::show();
   if (need_after)
     pVkWindowDriver->after_show();
+
 }
 
 int Fl_Vk_Window::mode(int m, const int *a) {
@@ -656,7 +664,7 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
 
   Fl_Window::resize(X, Y, W, H);
 
-  if (is_a_resize) {
+  if (is_a_resize && visible_r()) {
       VkExtent2D currentExtent = getCurrentExtent();
       if (static_cast<uint32_t>(W) != currentExtent.width || 
           static_cast<uint32_t>(H) != currentExtent.height) {
@@ -841,11 +849,12 @@ void Fl_Vk_Window::shutdown_vulkan() {
 
     ctx.destroy();
 
+    m_swapchain = VK_NULL_HANDLE;
+
     // Destroy instance
     if (m_instance != VK_NULL_HANDLE)
     {
-        --m_instance_counter;
-        if (m_instance_counter == 0)
+        if (all_windows_invisible())
         {
             vkDestroyInstance(m_instance, nullptr);
             m_instance = VK_NULL_HANDLE;
@@ -866,12 +875,16 @@ Fl_Vk_Window::~Fl_Vk_Window()
 
 void Fl_Vk_Window::wait_queue()
 {
+    if (queue() == VK_NULL_HANDLE)
+        return;
     VkResult result = vkQueueWaitIdle(queue());
     VK_CHECK(result);
 }
 
 void Fl_Vk_Window::wait_device()
 {
+    if (device() == VK_NULL_HANDLE)
+        return;
     VkResult result = vkDeviceWaitIdle(device());
     VK_CHECK(result);
 }

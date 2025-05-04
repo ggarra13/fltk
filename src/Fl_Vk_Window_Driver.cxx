@@ -515,7 +515,6 @@ void Fl_Vk_Window_Driver::init_vk()
         init_instance();
 
     // Increment instance (window) counter
-    pWindow->m_instance_counter++;
     pWindow->ctx.instance = pWindow->m_instance;
 
     // Make initial call to query gpu_count, then second call for gpu info
@@ -917,6 +916,8 @@ void Fl_Vk_Window_Driver::destroy_resources()
   
     uint32_t i;
     VkResult result;
+
+    vkDeviceWaitIdle(pWindow->device());
 
     // Destroy resources in reverse creation order (first, those of window)
     pWindow->destroy_common_resources();

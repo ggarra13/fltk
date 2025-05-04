@@ -6,6 +6,7 @@
 #include <FL/vk.h>
 #include <shaderc/shaderc.hpp>
 
+#include <iostream>
 #include <string>
 #include <vector>
 

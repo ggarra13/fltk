@@ -412,7 +412,6 @@ public:
   bool m_validate;  // if true, turns on validation layers
   bool m_debugSync;
   
-  static uint32_t   m_instance_counter;  // when this reaches 0, we destroy m_instance
   static VkInstance m_instance; // this gets copied into ctx.instance for every window
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 

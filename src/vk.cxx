@@ -14,4 +14,7 @@ void vk_check_result(VkResult err, const char* file, const int line)
     if (err == VK_SUCCESS)
         return;
     fprintf(stderr, "Vulkan: %s (%u) at %s, line %d", errorName, err, file, line);
+#ifdef NDEBUG
+    abort();
+#endif
 }
