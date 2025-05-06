@@ -62,6 +62,26 @@ VkShaderModule create_shader_module(VkDevice device,
 }
 
 
+// Example usage in your Vulkan code
+VkShaderModule create_shader_module(VkDevice device,
+                                    const uint8_t* spirv_code,
+                                    const std::size_t spirv_len)
+{
+  VkShaderModuleCreateInfo create_info = {};
+  create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  create_info.codeSize = spirv_len;
+  create_info.pCode = reinterpret_cast<const uint32_t*>(spirv_code);
+
+  VkShaderModule shader_module;
+  VkResult result = vkCreateShaderModule(device, &create_info, nullptr, &shader_module);
+  if (result != VK_SUCCESS)
+  {
+    std::cerr << "Shader module creation failed: " << result << std::endl;
+    return VK_NULL_HANDLE;
+  }
+  return shader_module;
+}
+
 VkCommandBuffer beginSingleTimeCommands(VkDevice device,
                                         VkCommandPool commandPool)
 {

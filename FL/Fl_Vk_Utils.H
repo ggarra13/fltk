@@ -24,6 +24,13 @@ VkShaderModule
 create_shader_module(VkDevice device,
                      const std::vector<uint32_t>& spirv_code);
 
+//! Function to create a shader module from SPIRV byte code in a C array with length.
+FL_EXPORT
+VkShaderModule
+create_shader_module(VkDevice device,
+                     const uint8_t* spirv_code,
+                     const std::size_t spirv_byte_length);
+
 //! Command buffer functions (creates a single throw-away command).
 FL_EXPORT VkCommandBuffer beginSingleTimeCommands(VkDevice device,
                                                   VkCommandPool commandPool);
