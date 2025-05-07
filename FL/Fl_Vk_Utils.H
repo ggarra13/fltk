@@ -28,7 +28,7 @@ create_shader_module(VkDevice device,
 FL_EXPORT
 VkShaderModule
 create_shader_module(VkDevice device,
-                     const uint8_t* spirv_code,
+                     const uint32_t* spirv_code,
                      const std::size_t spirv_byte_length);
 
 //! Command buffer functions (creates a single throw-away command).

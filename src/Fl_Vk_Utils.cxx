@@ -64,7 +64,7 @@ VkShaderModule create_shader_module(VkDevice device,
 
 // Example usage in your Vulkan code
 VkShaderModule create_shader_module(VkDevice device,
-                                    const uint8_t* spirv_code,
+                                    const uint32_t* spirv_code,
                                     const std::size_t spirv_len)
 {
   VkShaderModuleCreateInfo create_info = {};
