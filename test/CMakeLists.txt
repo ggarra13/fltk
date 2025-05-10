@@ -221,7 +221,9 @@ fl_create_example(wizard wizard.cxx fltk::fltk)
 
 if(NOT FLTK_BUILD_SHARED_LIBS)
   fl_create_example(blocks "blocks.cxx;blocks.plist;blocks.icns" "fltk::fltk;${AUDIOLIBS}")
-  fl_create_example(checkers "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" fltk::images)
+  if (FLTK_BUILD_FLUID)
+      fl_create_example(checkers "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" fltk::images)
+  endif()
   fl_create_example(sudoku "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "fltk::images;${AUDIOLIBS}")
 endif()
 
@@ -344,10 +346,10 @@ if(FLTK_BUILD_SHARED_LIBS)
 
   # Games
   fl_create_example(blocks-shared "blocks.cxx;blocks.plist;blocks.icns" "${FLTK_SHARED};${AUDIOLIBS}")
-  fl_create_example(checkers-shared "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" "${IMAGES_SHARED}")
+  if (FLTK_BUILD_FLUID)
+      fl_create_example(checkers-shared "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" "${IMAGES_SHARED}")
+  endif()
   fl_create_example(sudoku-shared "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "${IMAGES_SHARED};${AUDIOLIBS}")
-
-  add_library (call_main OBJECT EXCLUDE_FROM_ALL ../src/fl_call_main.c)
 
   # define a list of shared targets so we can set COMPILE_DEFINITIONS in a loop
   set(SHARED_TARGETS "")

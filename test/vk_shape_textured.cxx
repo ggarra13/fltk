@@ -43,6 +43,7 @@
  * Porter: Gonzalo Garramuño <ggarra13@gmail.com>
  */
 
+#define NOMINMAX
 #include <config.h>
 #include <FL/platform.H>
 #include <FL/Fl.H>

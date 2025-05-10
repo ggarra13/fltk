@@ -56,4 +56,6 @@ ninja
 
 bin/test/vk_shape-shared
 bin/test/vk_shape_textured-shared
-bin/test/vk_cube-shared
+
+# GLM will probably not be found on Windows
+# bin/test/vk_cube-shared

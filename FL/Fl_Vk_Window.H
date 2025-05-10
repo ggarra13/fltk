@@ -410,6 +410,7 @@ public:
   bool m_debugSync;
   
   static VkInstance m_instance; // this gets copied into ctx.instance for every window
+  static VkDevice   m_device;
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 
   // Window's Vulkan context.

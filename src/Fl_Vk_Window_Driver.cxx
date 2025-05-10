@@ -738,7 +738,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         create_device();
     }
     
-    pWindow->device() = m_device;
+    pWindow->device() = pWindow->m_device = m_device;
     pWindow->queue() =  m_queue;
     
     uint32_t formatCount;
