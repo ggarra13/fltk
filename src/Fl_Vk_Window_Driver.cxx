@@ -541,7 +541,7 @@ void Fl_Vk_Window_Driver::init_vk()
     }
 
     // Assign the first GPU handle and free the array
-    pWindow->gpu() = physicalDevices[0];
+    pWindow->gpu() = m_gpu = physicalDevices[0];
     VK_FREE(physicalDevices);
 
     // Look for device extensions
@@ -634,6 +634,41 @@ void Fl_Vk_Window_Driver::init_vk()
 
 }
 
+void Fl_Vk_Window_Driver::create_device()
+{
+    VkResult result;
+
+     // Assuming m_physicalDevice is set
+    VkPhysicalDeviceFeatures features = {};
+    vkGetPhysicalDeviceFeatures(gpu(), &features);
+    features.fillModeNonSolid = VK_TRUE;
+
+
+    float queue_priorities = 1.0;
+    VkDeviceQueueCreateInfo queueCreateInfo = {};
+    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo.pNext = NULL;
+    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
+    queueCreateInfo.queueCount = 1;
+    queueCreateInfo.pQueuePriorities = &queue_priorities;
+
+    VkDeviceCreateInfo deviceInfo = {};
+    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceInfo.pNext = NULL;
+    deviceInfo.queueCreateInfoCount = 1;
+    deviceInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceInfo.pEnabledFeatures = &features;
+    deviceInfo.enabledLayerCount = pWindow->ctx.enabled_layers.size();
+    deviceInfo.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
+    deviceInfo.enabledExtensionCount = pWindow->ctx.device_extensions.size();
+    deviceInfo.ppEnabledExtensionNames = pWindow->ctx.device_extensions.data();
+
+    result = vkCreateDevice(gpu(), &deviceInfo, NULL, &m_device);
+    VK_CHECK(result);
+
+    vkGetDeviceQueue(m_device, m_queueFamilyIndex, 0, &m_queue);
+}
+
 void Fl_Vk_Window_Driver::init_colorspace() {
     VkResult result;
     uint32_t i;
@@ -696,15 +731,15 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                   "Swapchain Initialization Failure");
     }
 
-    pWindow->m_queueFamilyIndex = graphicsQueueNodeIndex;
+    pWindow->m_queueFamilyIndex = m_queueFamilyIndex = graphicsQueueNodeIndex;
   
-    if (pWindow->device() == VK_NULL_HANDLE)
-        pWindow->create_device();
-
-    vkGetDeviceQueue(pWindow->device(),
-                     pWindow->m_queueFamilyIndex, 0,
-                     &pWindow->ctx.queue);
-
+    if (m_device == VK_NULL_HANDLE)
+    {
+        create_device();
+    }
+    
+    pWindow->device() = m_device;
+    pWindow->queue() =  m_queue;
     
     uint32_t formatCount;
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(
@@ -942,3 +977,16 @@ void Fl_Vk_Window_Driver::destroy_resources()
     }
 }
 
+
+Fl_Vk_Window_Driver::Fl_Vk_Window_Driver(Fl_Vk_Window* win) :
+    pWindow(win)
+{
+    m_instance = VK_NULL_HANDLE;
+    m_gpu      = VK_NULL_HANDLE;
+    m_device   = VK_NULL_HANDLE;
+    m_queue    = VK_NULL_HANDLE;
+}
+
+Fl_Vk_Window_Driver::~Fl_Vk_Window_Driver()
+{
+}

@@ -52,9 +52,8 @@ public:
   const int *alist() { return pWindow->alist; }
   void alist(const int *l) { pWindow->alist = l; }
 
-  Fl_Vk_Window_Driver(Fl_Vk_Window *win)
-    : pWindow(win) {}
-  virtual ~Fl_Vk_Window_Driver() {}
+  Fl_Vk_Window_Driver(Fl_Vk_Window *win);
+  virtual ~Fl_Vk_Window_Driver();
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
   static Fl_Vk_Window_Driver *global();
   virtual float pixels_per_unit() { return 1; }
@@ -98,11 +97,24 @@ public:
   void init_colorspace();
   void init_vk();
 
+  VkInstance instance() { return m_instance; }
+  VkPhysicalDevice gpu() { return m_gpu; }
+  VkDevice device() { return m_device; }
+  VkQueue queue() { return m_queue; }
+  uint32_t queueFamily() { return m_queueFamilyIndex; }
+
 protected:
+  void create_device();
   void init_instance();
   void prepare_buffers();
   void prepare_depth();
   void prepare_framebuffers();
+
+  VkInstance m_instance;
+  VkPhysicalDevice m_gpu;
+  VkDevice m_device;
+  VkQueue m_queue;
+  uint32_t m_queueFamilyIndex;
 };
 
 #endif /* Fl_Vk_Window_Driver_H */

@@ -132,7 +132,6 @@ public:
     double size;
     double speed;
 
-    void create_device() FL_OVERRIDE;
     void prepare() FL_OVERRIDE;
     void destroy_resources() FL_OVERRIDE;
     const char* application_name() FL_OVERRIDE { return "vk_cube"; };
@@ -832,43 +831,6 @@ void cube_box::draw() {
 }
 
 
-void cube_box::create_device() {
-    VkResult result;
-
-    // Assuming m_physicalDevice is set
-    VkPhysicalDeviceFeatures features = {};
-    vkGetPhysicalDeviceFeatures(gpu(), &features);
-    if (!features.fillModeNonSolid)
-    {
-        fprintf(stderr, "Warning: fillModeNonSolid not supported, wireframe unavailable\n");
-    }
-    else
-    {
-        features.fillModeNonSolid = VK_TRUE;
-    }
-    
-    float queue_priorities[1] = {0.0};
-    VkDeviceQueueCreateInfo queueCreateInfo = {};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.pNext = NULL;
-    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = queue_priorities;
-
-    VkDeviceCreateInfo deviceInfo = {};
-    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceInfo.pNext = NULL;
-    deviceInfo.queueCreateInfoCount = 1;
-    deviceInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceInfo.pEnabledFeatures = &features;
-    deviceInfo.enabledLayerCount = ctx.enabled_layers.size();
-    deviceInfo.ppEnabledLayerNames = ctx.enabled_layers.data();
-    deviceInfo.enabledExtensionCount = ctx.device_extensions.size();
-    deviceInfo.ppEnabledExtensionNames = ctx.device_extensions.data();
-
-    result = vkCreateDevice(gpu(), &deviceInfo, NULL, &device());
-    VK_CHECK(result);
-}
 
 int cube_box::handle(int e) {
   switch (e) {

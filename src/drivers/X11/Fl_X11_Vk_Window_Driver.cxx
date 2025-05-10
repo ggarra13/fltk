@@ -28,6 +28,7 @@
 
 #include "Fl_X11_Vk_Window_Driver.H"
 #include "../../Fl_Vk_Choice.H"
+#include "../../Fl_Scalable_Graphics_Driver.H" // Fl_Font_Descriptor
 #include "Fl_X11_Window_Driver.H"
 #if !(USE_XFT || FLTK_USE_CAIRO)
 #include "../Xlib/Fl_Font.H"

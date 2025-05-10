@@ -372,9 +372,6 @@ public:
   //! Log level of Vulkan API
   virtual int log_level() const { return 0; }
 
-  //! Create the logical device.
-  virtual void create_device();
-  
   //! @{ Accessors to Vulkan elements
   inline VkInstance&             instance() { return m_instance; }
   inline VkPhysicalDevice&            gpu() { return ctx.gpu; }
