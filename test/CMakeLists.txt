@@ -1,7 +1,7 @@
 #
 # CMakeLists.txt used to build test and demo apps by the CMake build system
 #
-# Copyright 2004-2024 by Bill Spitzak and others.
+# Copyright 2004-2025 by Bill Spitzak and others.
 #
 # This library is free software. Distribution and use rights are outlined in
 # the file "COPYING" which should have been included with this file.  If this
@@ -54,19 +54,31 @@ endif(WIN32)
 # w/o OpenGL as well. These demos show an alternate GUI or a warning
 # when built w/o OpenGL.
 #
-# Note: use "${GLDEMO_LIBS}" for their library parameter
-#        or "${GLDEMO_SHARED}" to build with shared FLTK libraries
+# For building with Visual Studio (MSVC) we also include the special
+# object library 'call_main' when linking with the shared libraries.
+# Setting the correct library variants as CMake variables may appear
+# confusing but simplifies the build instructions below (makes them
+# platform independent).
+#
+# Note that all CMake variables for libraries can be "CMake lists"
+# and must therefore be quoted when used in fl_create_example().
+#######################################################################
 
 if(OPENGL_FOUND)
   set(GLDEMO_LIBS fltk::gl)
   if(MSVC)
-    set(GLDEMO_SHARED fltk::fltk-shared)
+    set(GLDEMO_SHARED "call_main;fltk::fltk-shared")
   else()
     set(GLDEMO_SHARED fltk::gl-shared)
   endif()
 else()
+  # build w/o OpenGL libraries
   set(GLDEMO_LIBS fltk::fltk)
-  set(GLDEMO_SHARED fltk::fltk-shared)
+  if(MSVC)
+    set(GLDEMO_SHARED "call_main;fltk::fltk-shared")
+  else()
+    set(GLDEMO_SHARED "fltk::fltk-shared")
+  endif()
 endif()
 
 #######################################################################
@@ -88,7 +100,17 @@ else()
   set(VKDEMO_SHARED fltk::fltk-shared)
 endif()
 
-# Similar approach for the 'forms' demo (shared lib not supported)
+# set FLTK_SHARED and IMAGES_SHARED depending on the platform (MSVC or ...)
+
+if(MSVC)
+  set(FLTK_SHARED "call_main;fltk::fltk-shared")
+  set(IMAGES_SHARED "${FLTK_SHARED}")
+else()
+  set(FLTK_SHARED "fltk::fltk-shared")
+  set(IMAGES_SHARED "fltk::images-shared")
+endif()
+
+# similar for the 'forms' demo (shared lib not supported)
 
 if(FLTK_BUILD_FORMS)
   set(FORMS_LIBS fltk::forms)
@@ -103,14 +125,12 @@ fl_create_example(arc arc.cxx fltk::fltk)
 fl_create_example(animated animated.cxx fltk::fltk)
 fl_create_example(ask ask.cxx fltk::fltk)
 fl_create_example(bitmap bitmap.cxx fltk::fltk)
-fl_create_example(blocks "blocks.cxx;blocks.plist;blocks.icns" "fltk::fltk;${AUDIOLIBS}")
 fl_create_example(boxtype boxtype.cxx fltk::fltk)
 fl_create_example(browser browser.cxx fltk::fltk)
 fl_create_example(button button.cxx fltk::fltk)
 fl_create_example(buttons buttons.cxx fltk::fltk)
 # Cairo demo, built with and w/o Cairo (libcairo is linked implicitly - or not at all)
 fl_create_example(cairo_test cairo_test.cxx fltk::fltk)
-fl_create_example(checkers "checkers.cxx;checkers_pieces.fl;checkers.icns" fltk::images)
 fl_create_example(clipboard clipboard.cxx fltk::images)
 fl_create_example(clock clock.cxx fltk::fltk)
 fl_create_example(colbrowser colbrowser.cxx fltk::fltk)
@@ -180,7 +200,6 @@ fl_create_example(resize-example5c "resize-example5c.cxx;resize-arrows.cxx" fltk
 fl_create_example(rotated_text rotated_text.cxx fltk::fltk)
 fl_create_example(scroll scroll.cxx fltk::fltk)
 fl_create_example(subwindow subwindow.cxx fltk::fltk)
-fl_create_example(sudoku "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "fltk::images;${AUDIOLIBS}")
 fl_create_example(symbols symbols.cxx fltk::fltk)
 fl_create_example(tabs tabs.fl fltk::fltk)
 fl_create_example(table table.cxx fltk::fltk)
@@ -194,6 +213,14 @@ fl_create_example(utf8 utf8.cxx fltk::fltk)
 # fl_create_example(valuators valuators.fl fltk::fltk) # not building on macOS
 fl_create_example(windowfocus windowfocus.cxx fltk::fltk)
 fl_create_example(wizard wizard.cxx fltk::fltk)
+
+# games w/o shared libs
+
+if(NOT FLTK_BUILD_SHARED_LIBS)
+  fl_create_example(blocks "blocks.cxx;blocks.plist;blocks.icns" "fltk::fltk;${AUDIOLIBS}")
+  fl_create_example(checkers "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" fltk::images)
+  fl_create_example(sudoku "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "fltk::images;${AUDIOLIBS}")
+endif()
 
 # unittests uses multiple source files and can be built with or w/o OpenGL and "shared"
 
@@ -224,6 +251,20 @@ if(extra_tests)
     fl_create_example(${name} ${name}.cxx "fltk::images;${GLDEMO_LIBS}")
   endforeach()
 endif()
+
+# OpenGL demos. These programs can't be built w/o OpenGL
+
+if(OPENGL_FOUND)
+  fl_create_example(CubeView "CubeMain.cxx;CubeView.cxx;CubeViewUI.fl" "${GLDEMO_LIBS}")
+  fl_create_example(cube cube.cxx "${GLDEMO_LIBS}")
+  fl_create_example(fractals "fractals.cxx;fracviewer.cxx" "${GLDEMO_LIBS}")
+  fl_create_example(glut_test glut_test.cxx "${GLDEMO_LIBS}")
+  if(NOT FLTK_BUILD_SHARED_LIBS)
+    fl_create_example(glpuzzle glpuzzle.cxx "${GLDEMO_LIBS}")
+  endif()
+  fl_create_example(gl_overlay gl_overlay.cxx "${GLDEMO_LIBS}")
+  fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
+endif(OPENGL_FOUND)
 
 # Test FLTK headers for variable shadowing [-Wshadow] (STR 2728)
 #
@@ -275,43 +316,36 @@ if(CMAKE_CXX_COMPILER_ID IN_LIST _compilers)
 endif() # GNU or Clang (-Wshadow test)
 unset(_compilers)
 
-
-# *** EXPERIMENTAL ***
-# Build some of the demo programs linked against the shared FLTK lib(s).
-# This is currently pretty complicated and should be improved.
-# It will be simplified significantly when we use more "modern CMake".
+#########################################################################
+# Build some of the demo programs linked against the shared FLTK lib(s)
+#########################################################################
 
 find_file(HAS_GLM glm/glm.hpp)
 
 if(FLTK_BUILD_SHARED_LIBS)
 
-  if(MSVC) # MS Visual C++ aka. Visual Studio
+  fl_create_example(cairo_test-shared cairo_test.cxx "${FLTK_SHARED}")
+  fl_create_example(hello-shared hello.cxx "${FLTK_SHARED}")
+  fl_create_example(pixmap_browser-shared pixmap_browser.cxx "${IMAGES_SHARED}")
+  fl_create_example(unittests-shared "${UNITTEST_SRCS}" "${GLDEMO_SHARED}")
 
-    # We need to link with fl_call_main.c, but this must not be compiled with
-    # macro FL_DLL, whereas the other source file(s) must be compiled with FL_DLL
-    # to link against the shared libs.
-    #
-    #  ;-)  I *love* Visual Studio (MSVC)  ;-)
-    #
-    # Trick: build an object library with just this one file and link the executable
-    # against the shared library plus this object library. Another way would be to
-    # add the extra source file fl_call_main.c to the source files of all targets
-    # and set the FL_DLL compile_definition property only on the main *source* files
-    # but this doesn't work since the same file must be compiled for the "static"
-    # and the "shared" target, for instance hello.cxx for "hello" and "hello-shared".
+  # Games
+  fl_create_example(blocks-shared "blocks.cxx;blocks.plist;blocks.icns" "${FLTK_SHARED};${AUDIOLIBS}")
+  fl_create_example(checkers-shared "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" "${IMAGES_SHARED}")
+  fl_create_example(sudoku-shared "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "${IMAGES_SHARED};${AUDIOLIBS}")
 
-    add_library (CALL_MAIN OBJECT EXCLUDE_FROM_ALL ../src/fl_call_main.c)
+  add_library (CALL_MAIN OBJECT EXCLUDE_FROM_ALL ../src/fl_call_main.c)
 
-    # define a list of shared targets so we can set COMPILE_DEFINITIONS in a loop
-    set(SHARED_TARGETS "")
+  # define a list of shared targets so we can set COMPILE_DEFINITIONS in a loop
+  set(SHARED_TARGETS "")
 
-    fl_create_example(hello-shared hello.cxx "CALL_MAIN;fltk::fltk-shared")
-    fl_create_example(pixmap_browser-shared pixmap_browser.cxx "CALL_MAIN;fltk::fltk-shared")
-    fl_create_example(unittests-shared "${UNITTEST_SRCS}" "CALL_MAIN;${GLDEMO_SHARED}")
+  fl_create_example(hello-shared hello.cxx "CALL_MAIN;fltk::fltk-shared")
+  fl_create_example(pixmap_browser-shared pixmap_browser.cxx "CALL_MAIN;fltk::fltk-shared")
+  fl_create_example(unittests-shared "${UNITTEST_SRCS}" "CALL_MAIN;${GLDEMO_SHARED}")
 
-    list(APPEND SHARED_TARGETS hello pixmap_browser unittests)
+  list(APPEND SHARED_TARGETS hello pixmap_browser unittests)
 
-    if(OPENGL_FOUND)
+  if(OPENGL_FOUND)
       fl_create_example(glpuzzle-shared glpuzzle.cxx "CALL_MAIN;${GLDEMO_SHARED}")
       fl_create_example(shape-shared shape.cxx "CALL_MAIN;${GLDEMO_SHARED}")
       list(APPEND SHARED_TARGETS glpuzzle shape)
@@ -326,12 +360,7 @@ if(FLTK_BUILD_SHARED_LIBS)
 	endif()
     endif(VULKAN_FOUND)
     
-    # apply property COMPILE_DEFINITIONS "-D FL_DLL" in a loop for all necessary source files
-    foreach(tgt ${SHARED_TARGETS})
-      target_compile_definitions (${tgt}-shared PRIVATE "FL_DLL")
-    endforeach()
-
-  else() # not MSVC
+else() # not MSVC
 
     fl_create_example(cairo_test-shared cairo_test.cxx fltk::fltk-shared)
     fl_create_example(hello-shared hello.cxx fltk::fltk-shared)

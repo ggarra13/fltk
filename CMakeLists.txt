@@ -1,5 +1,5 @@
 #
-# Main CMakeLists.txt to build the FLTK project using CMake (www.cmake.org)
+# Main CMakeLists.txt to build the FLTK project using CMake
 # Originally written by Michael Surette
 #
 # Copyright 1998-2025 by Bill Spitzak and others.
@@ -132,6 +132,29 @@ include(CMake/resources.cmake)
 include(CMake/options.cmake)
 
 #######################################################################
+# generate version numbers and config headers
+#######################################################################
+
+include(CMake/gen_config.cmake)
+
+#######################################################################
+# Disable automatic code signing on macOS when using Xcode.
+# This *MUST* be done after including CMake/options.cmake.
+# Users can still enable code signing if they have a valid certificate.
+# Details about code signing are beyond the scope of this document.
+#######################################################################
+# FIXME: some of the conditions below may be redundant, and the code
+# below should be improved in a later version.
+#######################################################################
+
+if(APPLE) # AND NOT FLTK_BACKEND_X11 AND CMAKE_GENERATOR STREQUAL "Xcode")
+  if(NOT DEFINED CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED)
+    set(CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED OFF CACHE BOOL
+        "Allow Code Signing when using Xcode")
+  endif()
+endif()
+
+#######################################################################
 # print (debug) several build variables and options
 #######################################################################
 
@@ -162,6 +185,52 @@ unset(debug_build)
 #######################################################################
 
 add_subdirectory(src)
+
+#######################################################################
+# MSVC only: build a special object library for shared libs
+#######################################################################
+
+# When linking programs against the shared FLTK libraries we need to
+# compile and link with fl_call_main.c, but this must not be compiled
+# with macro FL_DLL, whereas all the other source file(s) *must* be
+# compiled with macro FL_DLL to link against the shared libs.
+# The latter is ensured by CMake properties of the shared libraries.
+#
+# Solution: build an extra object library with just this one file and
+# link all the "shared" executables additionally against this object
+# library to resolve the symbol 'WinMain()'.
+#
+# The object library is called 'call_main' and is available for fluid,
+# fltk-options, and all test programs that link against shared FLTK
+# libraries when using MSVC (Microsoft Visual Studio).
+#
+#  ;-)  I *love* Visual Studio  ;-)
+
+if(FLTK_BUILD_SHARED_LIBS AND MSVC)
+  add_library(call_main OBJECT EXCLUDE_FROM_ALL src/fl_call_main.c)
+endif()
+
+#######################################################################
+# set CMAKE_INSTALL_RPATH for shared libraries on macOS before
+# building executables. This assumes standard install locations like
+#  - prefix/bin   executable (path part 2) or bundle (path part 3)
+#  - prefix/lib   shared library
+# These RPATH settings are effective when executables and shared libs
+# are *installed*, they don't affect executables in the build folder.
+# Affected executables (when linked against the shared FLTK libs):
+#  - fluid
+#  - fltk-options
+#  - test/* (e.g. games)
+# Note: Path part 1 ("@loader_path") is used to find shared libraries
+#       in the same folder as the executable file (everywhere).
+#######################################################################
+
+if(FLTK_BUILD_SHARED_LIBS AND APPLE AND NOT FLTK_BACKEND_X11)
+  set(CMAKE_INSTALL_RPATH
+      @loader_path
+      @loader_path/../lib
+      @loader_path/../../../../lib)
+endif()
 
 #######################################################################
 # build fluid (optional)
@@ -202,12 +271,6 @@ include(CMake/variables.cmake)
 #######################################################################
 
 include(CMake/export.cmake)
-
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/fl_config.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/FL/fl_config.h
-  @ONLY
-)
 
 #######################################################################
 # options to build test/demo and example programs
@@ -315,22 +378,23 @@ fl_summary_build("The OpenGL library"  lib  FLTK_USE_GL              FLTK_BUILD_
 fl_summary_build("The Vulkan library"  lib  FLTK_USE_VK              FLTK_BUILD_VK)
 fl_summary_build("fluid"               bin  FLTK_BUILD_FLUID         FLTK_BUILD_FLUID)
 fl_summary_build("fltk-options"        bin  FLTK_BUILD_FLTK_OPTIONS  FLTK_BUILD_FLTK_OPTIONS)
-
 fl_summary_build("Test programs"     bin/test      FLTK_BUILD_TEST      FLTK_BUILD_TEST)
 fl_summary_build("Example programs"  bin/examples  FLTK_BUILD_EXAMPLES  FLTK_BUILD_EXAMPLES)
 
 message(STATUS "")
 
-if(CMAKE_BUILD_TYPE STREQUAL "")
-  fl_summary("Build configuration" "<unspecified>")
-else()
-  fl_summary("Build configuration" "${CMAKE_BUILD_TYPE}")
-endif()
+fl_summary("FLTK Library (API) version"   "${FLTK_VERSION}")
+fl_summary("ABI version (FL_ABI_VERSION)" "${FL_ABI_VERSION}")
 
-fl_summary("Installation prefix" "${CMAKE_INSTALL_PREFIX}")
+if(CMAKE_BUILD_TYPE STREQUAL "")
+  fl_summary("Build configuration"        "<unspecified>")
+else()
+  fl_summary("Build configuration"        "${CMAKE_BUILD_TYPE}")
+endif()
+fl_summary("Installation prefix"          "${CMAKE_INSTALL_PREFIX}")
 
 message("")
-#                "title"           name  system library if used
+#                "title"             name  system library if used
 fl_summary_image("Bundled Libraries" JPEG  LIB_jpeg)
 fl_summary_image(""                  PNG   LIB_png)
 fl_summary_image(""                  ZLIB  LIB_zlib)
