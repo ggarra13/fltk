@@ -80,11 +80,9 @@ struct Fl_Vk_Context
                 vkDestroyCommandPool(device, commandPool, nullptr);
                 commandPool = VK_NULL_HANDLE;
             }
-            if (device != VK_NULL_HANDLE)
-            {
-                vkDestroyDevice(device, nullptr);
-                device = VK_NULL_HANDLE;
-            }
+
+            // Queue and Device are statics shared across all windows.
+            // They are destroyed on program exit.
         }
 };
 

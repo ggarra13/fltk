@@ -732,14 +732,16 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     }
 
     pWindow->m_queueFamilyIndex = m_queueFamilyIndex = graphicsQueueNodeIndex;
-  
-    if (m_device == VK_NULL_HANDLE)
+
+    if (pWindow->m_device == VK_NULL_HANDLE)
     {
         create_device();
+        pWindow->m_device = m_device;
+        pWindow->m_queue  = m_queue;
     }
     
-    pWindow->device() = pWindow->m_device = m_device;
-    pWindow->queue() =  m_queue;
+    pWindow->device() = pWindow->m_device;
+    pWindow->queue() =  pWindow->m_queue;
     
     uint32_t formatCount;
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(

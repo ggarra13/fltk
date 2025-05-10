@@ -409,8 +409,11 @@ public:
   bool m_validate;  // if true, turns on validation layers
   bool m_debugSync;
   
-  static VkInstance m_instance; // this gets copied into ctx.instance for every window
+  // These get copied into ctx for every window
+  static VkInstance m_instance; 
   static VkDevice   m_device;
+  static VkQueue    m_queue;
+  
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 
   // Window's Vulkan context.
