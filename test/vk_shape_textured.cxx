@@ -239,7 +239,8 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
 
     
     // Initial transition to shader-readable layout
-    set_image_layout(device(), commandPool(), queue(), tex_obj->image,
+    VkCommandBuffer cmd = beginSingleTimeCommands(device(), commandPool());
+    set_image_layout(cmd, device(), commandPool(), queue(), tex_obj->image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_UNDEFINED,   // Initial layout
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -247,6 +248,7 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
                      VK_PIPELINE_STAGE_HOST_BIT, // Host stage
                      VK_ACCESS_SHADER_READ_BIT,  // Shader read
                      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+    endSingleTimeCommands(cmd, device(), commandPool(), queue());
 }
 
 
@@ -318,8 +320,10 @@ void vk_shape_window::prepare_textures()
 
 void vk_shape_window::update_texture()
 {
+    VkCommandBuffer cmd = beginSingleTimeCommands(device(), commandPool());
+    
     // Transition to GENERAL for CPU writes
-    set_image_layout(device(), commandPool(), queue(), m_texture.image,
+    set_image_layout(cmd, device(), commandPool(), queue(), m_texture.image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      VK_IMAGE_LAYOUT_GENERAL,
@@ -339,12 +343,13 @@ void vk_shape_window::update_texture()
     vkUnmapMemory(device(), m_texture.mem);
 
     // Transition back to SHADER_READ_ONLY_OPTIMAL
-    set_image_layout(device(), commandPool(), queue(),
+    set_image_layout(cmd, device(), commandPool(), queue(),
                      m_texture.image, VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_GENERAL,
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
                      VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+    endSingleTimeCommands(cmd, device(), commandPool(), queue());
 }
 
 
@@ -785,12 +790,12 @@ void vk_shape_window::draw() {
     if (!shown() || w() <= 0 || h() <= 0)
         return;
     
-    update_texture();
-
     VkCommandBuffer cmd = getCurrentCommandBuffer();
     if (!m_swapchain || !cmd || !isFrameActive()) {
         return;
     }
+    
+    update_texture();
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,

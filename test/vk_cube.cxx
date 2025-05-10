@@ -1083,6 +1083,7 @@ void makeform(const char *name) {
   grid->widget(size,         2, 2,  1,  1, FL_GRID_VERTICAL);
   grid->widget(exit_button,  3, 1,  1,  2);
   grid->widget(rt_cube,      0, 3,  4,  1);
+  grid->layout();
 
 #if HAVE_VK
   //overlay_button(lt_cube);  // overlay a button onto the Vulkan window

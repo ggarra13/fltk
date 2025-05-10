@@ -91,13 +91,16 @@ endif()
 if(VULKAN_FOUND)
   set(VKDEMO_LIBS fltk::vk)
   if(MSVC)
-    set(VKDEMO_SHARED fltk::fltk-shared)
+    set(VKDEMO_SHARED "call_main;fltk::fltk-shared")
   else()
     set(VKDEMO_SHARED fltk::vk-shared Vulkan::shaderc_combined)
   endif()
 else()
-  set(VKDEMO_LIBS fltk::fltk)
-  set(VKDEMO_SHARED fltk::fltk-shared)
+  if(MSVC)
+    set(VKDEMO_SHARED "call_main;fltk::fltk-shared")
+  else()
+    set(VKDEMO_SHARED "fltk::fltk-shared")
+  endif()
 endif()
 
 # set FLTK_SHARED and IMAGES_SHARED depending on the platform (MSVC or ...)
@@ -266,6 +269,17 @@ if(OPENGL_FOUND)
   fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
 endif(OPENGL_FOUND)
 
+# Vulkan demos. These programs can't be built w/o Vulkan
+if(VULKAN_FOUND)
+    find_file(HAS_GLM glm/glm.hpp)
+    
+    fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
+    fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
+    if (HAS_GLM)
+	fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
+    endif()
+endif(VULKAN_FOUND)
+    
 # Test FLTK headers for variable shadowing [-Wshadow] (STR 2728)
 #
 # The following test program is added only for GNU or Clang compilers which
@@ -320,7 +334,6 @@ unset(_compilers)
 # Build some of the demo programs linked against the shared FLTK lib(s)
 #########################################################################
 
-find_file(HAS_GLM glm/glm.hpp)
 
 if(FLTK_BUILD_SHARED_LIBS)
 
@@ -334,77 +347,27 @@ if(FLTK_BUILD_SHARED_LIBS)
   fl_create_example(checkers-shared "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" "${IMAGES_SHARED}")
   fl_create_example(sudoku-shared "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "${IMAGES_SHARED};${AUDIOLIBS}")
 
-  add_library (CALL_MAIN OBJECT EXCLUDE_FROM_ALL ../src/fl_call_main.c)
+  add_library (call_main OBJECT EXCLUDE_FROM_ALL ../src/fl_call_main.c)
 
   # define a list of shared targets so we can set COMPILE_DEFINITIONS in a loop
   set(SHARED_TARGETS "")
 
-  fl_create_example(hello-shared hello.cxx "CALL_MAIN;fltk::fltk-shared")
-  fl_create_example(pixmap_browser-shared pixmap_browser.cxx "CALL_MAIN;fltk::fltk-shared")
-  fl_create_example(unittests-shared "${UNITTEST_SRCS}" "CALL_MAIN;${GLDEMO_SHARED}")
-
   list(APPEND SHARED_TARGETS hello pixmap_browser unittests)
 
   if(OPENGL_FOUND)
-      fl_create_example(glpuzzle-shared glpuzzle.cxx "CALL_MAIN;${GLDEMO_SHARED}")
-      fl_create_example(shape-shared shape.cxx "CALL_MAIN;${GLDEMO_SHARED}")
-      list(APPEND SHARED_TARGETS glpuzzle shape)
-    endif(OPENGL_FOUND)
+    fl_create_example(glpuzzle-shared glpuzzle.cxx "${GLDEMO_SHARED}")
+    fl_create_example(shape-shared shape.cxx "${GLDEMO_SHARED}")
+    list(APPEND SHARED_TARGETS glpuzzle shape)
+  endif(OPENGL_FOUND)
 
-    if(VULKAN_FOUND)
-	fl_create_example(vk_shape-shared vk_shape.cxx "CALL_MAIN;${VKDEMO_SHARED}")
-	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "CALL_MAIN;${VKDEMO_SHARED}")
+  if(VULKAN_FOUND)
+    fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
+    fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
 
-	if (HAS_GLM)
-	    fl_create_example(vk_cube-shared vk_cube.cxx "CALL_MAIN;${VKDEMO_SHARED}")
-	endif()
-    endif(VULKAN_FOUND)
-    
-else() # not MSVC
-
-    fl_create_example(cairo_test-shared cairo_test.cxx fltk::fltk-shared)
-    fl_create_example(hello-shared hello.cxx fltk::fltk-shared)
-    fl_create_example(pixmap_browser-shared pixmap_browser.cxx fltk::images-shared)
-    fl_create_example(unittests-shared "${UNITTEST_SRCS}" "${GLDEMO_SHARED}")
-
-    if(OPENGL_FOUND)
-      fl_create_example(glpuzzle-shared glpuzzle.cxx "${GLDEMO_SHARED}")
-      fl_create_example(shape-shared shape.cxx "${GLDEMO_SHARED}")
-    endif(OPENGL_FOUND)
-
-    if(VULKAN_FOUND)
-	fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
-	fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
-	if (HAS_GLM)
-	    fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
-	endif()
-    endif(VULKAN_FOUND)
-
-  endif(MSVC) # (not MSVC)
-else() # not FLTK_BUILD_SHARED_LIBS
-    
-
-    # OpenGL demos. These programs can't be built w/o OpenGL
-
-    if(OPENGL_FOUND)
-	fl_create_example(CubeView "CubeMain.cxx;CubeView.cxx;CubeViewUI.fl" "${GLDEMO_LIBS}")
-	fl_create_example(cube cube.cxx "${GLDEMO_LIBS}")
-	fl_create_example(fractals "fractals.cxx;fracviewer.cxx" "${GLDEMO_LIBS}")
-	fl_create_example(glut_test glut_test.cxx "${GLDEMO_LIBS}")
-	fl_create_example(glpuzzle glpuzzle.cxx "${GLDEMO_LIBS}")
-	fl_create_example(gl_overlay gl_overlay.cxx "${GLDEMO_LIBS}")
-	fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
-    endif(OPENGL_FOUND)
-
-    # Vulkan demos. These programs can't be built w/o Vulkan
-    if(VULKAN_FOUND)
-	fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
-	fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
-	if (HAS_GLM)
-	    fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
-	endif()
-    endif(VULKAN_FOUND)
-
+    if (HAS_GLM)
+      fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
+    endif()
+  endif(VULKAN_FOUND)
 endif(FLTK_BUILD_SHARED_LIBS)
 
 #####################################################

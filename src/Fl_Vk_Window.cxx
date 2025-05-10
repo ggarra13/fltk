@@ -23,6 +23,7 @@
 #include <FL/Fl_Vk_Window.H>
 #include "Fl_Vk_Window_Driver.H"
 #include "Fl_Window_Driver.H"
+#include "Fl_Scalable_Graphics_Driver.H" // Fl_Fontdesc
 #include <FL/Fl_Graphics_Driver.H>
 #include <FL/fl_utf8.h>
 

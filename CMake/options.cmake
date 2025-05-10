@@ -747,14 +747,14 @@ if(VULKAN_FOUND)
 	  Vulkan::shaderc_combined
       )
       if(UNIX AND NOT APPLE)
-	  list(APPEND VULKAN_LIBRARIES
-	      Vulkan::SPIRV-Tools
-	      Vulkan::glslang
-	      )
 	  find_library(SPIRV_Tools_opt_LIBRARY SPIRV-Tools-opt)
 	  if(SPIRV_Tools_opt_LIBRARY)
 	      list(APPEND VULKAN_LIBRARIES ${SPIRV_Tools_opt_LIBRARY})
 	  endif()
+	  list(APPEND VULKAN_LIBRARIES
+	      Vulkan::SPIRV-Tools
+	      Vulkan::glslang
+	      )
       endif()
       
   else()

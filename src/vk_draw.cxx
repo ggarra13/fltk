@@ -65,44 +65,44 @@ extern float vk_start_scale; // in vk_start.cxx
  \see Fl::draw_GL_text_with_textures(int val)
   */
 void  vk_font(int fontid, int size) {
-  static bool once = true;
-  if (once) {
-    once = false;
-    has_texture_rectangle = true;
-  }
-  fl_font(fontid, size);
-  Fl_Font_Descriptor *fl_fontsize = fl_graphics_driver->font_descriptor();
-  vk_fontsize = fl_fontsize;
+  // static bool once = true;
+  // if (once) {
+  //   once = false;
+  //   has_texture_rectangle = true;
+  // }
+  // fl_font(fontid, size);
+  // Fl_Font_Descriptor *fl_fontsize = fl_graphics_driver->font_descriptor();
+  // vk_fontsize = fl_fontsize;
 }
 
 void vk_remove_displaylist_fonts()
 {
-  // clear variables used mostly in fl_font
-  fl_graphics_driver->font(0, 0);
+  // // clear variables used mostly in fl_font
+  // fl_graphics_driver->font(0, 0);
 
-  for (int j = 0 ; j < FL_FREE_FONT ; ++j)
-  {
-    Fl_Font_Descriptor *prevDesc = 0L, *nextDesc = 0L;
-    Fl_Font_Descriptor *&firstDesc = *Fl_Vk_Window_Driver::global()->fontnum_to_fontdescriptor(j);
-    for (Fl_Font_Descriptor *desc = firstDesc; desc; desc = nextDesc)
-    {
-      nextDesc = desc->next;
-      if(desc->listbase) {
-        // remove descriptor from a single-linked list
-        if(desc == firstDesc) {
-          firstDesc = desc->next;
-        } else if (prevDesc) {
-          // prevDesc should not be NULL, but this test will make static analysis shut up
-          prevDesc->next = desc->next;
-        }
-        // It would be nice if this next line was in a destructor somewhere
-        // glDeleteLists(desc->listbase, Fl_Vk_Window_Driver::global()->genlistsize());
-        delete desc;
-      } else {
-        prevDesc = desc;
-      }
-    }
-  }
+  // for (int j = 0 ; j < FL_FREE_FONT ; ++j)
+  // {
+  //   Fl_Font_Descriptor *prevDesc = 0L, *nextDesc = 0L;
+  //   Fl_Font_Descriptor *&firstDesc = *Fl_Vk_Window_Driver::global()->fontnum_to_fontdescriptor(j);
+  //   for (Fl_Font_Descriptor *desc = firstDesc; desc; desc = nextDesc)
+  //   {
+  //     nextDesc = desc->next;
+  //     if(desc->listbase) {
+  //       // remove descriptor from a single-linked list
+  //       if(desc == firstDesc) {
+  //         firstDesc = desc->next;
+  //       } else if (prevDesc) {
+  //         // prevDesc should not be NULL, but this test will make static analysis shut up
+  //         prevDesc->next = desc->next;
+  //       }
+  //       // It would be nice if this next line was in a destructor somewhere
+  //       // glDeleteLists(desc->listbase, Fl_Vk_Window_Driver::global()->genlistsize());
+  //       delete desc;
+  //     } else {
+  //       prevDesc = desc;
+  //     }
+  //   }
+  // }
 }
 
 
@@ -264,33 +264,33 @@ public:
 
 vk_texture_fifo::vk_texture_fifo(int max)
 {
-  size_ = max;
-  last = current = -1;
-  textures_generated = 0;
-  fifo = (data*)calloc(size_, sizeof(data));
+  // size_ = max;
+  // last = current = -1;
+  // textures_generated = 0;
+  // fifo = (data*)calloc(size_, sizeof(data));
 }
 
 vk_texture_fifo::~vk_texture_fifo()
 {
-  for (int i = 0; i < size_; i++) {
-    if (fifo[i].utf8) free(fifo[i].utf8);
-    // if (textures_generated) glDeleteTextures(1, &fifo[i].texName);
-  }
-  free(fifo);
+  // for (int i = 0; i < size_; i++) {
+  //   if (fifo[i].utf8) free(fifo[i].utf8);
+  //   // if (textures_generated) glDeleteTextures(1, &fifo[i].texName);
+  // }
+  // free(fifo);
 }
 
 // returns rank of pre-computed texture for a string if it exists
 int vk_texture_fifo::already_known(const char *str, int n)
 {
-  int rank;
-  for ( rank = 0; rank <= last; rank++) {
-    if ((fifo[rank].str_len == n) &&
-        (fifo[rank].fdesc == vk_fontsize) &&
-        (fifo[rank].scale == Fl_Vk_Window_Driver::vk_scale) &&
-        (memcmp(str, fifo[rank].utf8, n) == 0)) {
-      return rank;
-    }
-  }
+  // int rank;
+  // for ( rank = 0; rank <= last; rank++) {
+  //   if ((fifo[rank].str_len == n) &&
+  //       (fifo[rank].fdesc == vk_fontsize) &&
+  //       (fifo[rank].scale == Fl_Vk_Window_Driver::vk_scale) &&
+  //       (memcmp(str, fifo[rank].utf8, n) == 0)) {
+  //     return rank;
+  //   }
+  // }
   return -1; // means no texture exists yet for that string
 }
 
@@ -379,26 +379,26 @@ void vk_texture_fifo::display_texture(int rank)
 // pre-computes a string texture
 int vk_texture_fifo::compute_texture(const char* str, int n)
 {
-  current = (current + 1) % size_;
-  if (current > last) last = current;
-  if ( fifo[current].utf8 ) free(fifo[current].utf8);
-  fifo[current].utf8 = (char *)malloc(n + 1);
-  memcpy(fifo[current].utf8, str, n);
-  fifo[current].utf8[n] = 0;
-  fifo[current].str_len = n; // record length of text in utf8
-  Fl_Fontsize fs = fl_size();
-  float s = fl_graphics_driver->scale();
-  fl_graphics_driver->Fl_Graphics_Driver::scale(1); // temporarily remove scaling factor
-  fl_font(fl_font(), int(fs * Fl_Vk_Window_Driver::vk_scale)); // the font size to use in the GL scene
-  int w = (int)ceil( fl_width(fifo[current].utf8, n) );
-  w = ((w + 3) / 4) * 4; // make w a multiple of 4
-  int h = fl_height();
-  fl_graphics_driver->Fl_Graphics_Driver::scale(s); // re-install scaling factor
-  fl_font(fl_font(), fs);
-  fs = int(fs * Fl_Vk_Window_Driver::vk_scale);
-  fifo[current].scale = Fl_Vk_Window_Driver::vk_scale;
-  fifo[current].fdesc = vk_fontsize;
-  char *alpha_buf = Fl_Vk_Window_Driver::global()->alpha_mask_for_string(str, n, w, h, fs);
+  // current = (current + 1) % size_;
+  // if (current > last) last = current;
+  // if ( fifo[current].utf8 ) free(fifo[current].utf8);
+  // fifo[current].utf8 = (char *)malloc(n + 1);
+  // memcpy(fifo[current].utf8, str, n);
+  // fifo[current].utf8[n] = 0;
+  // fifo[current].str_len = n; // record length of text in utf8
+  // Fl_Fontsize fs = fl_size();
+  // float s = fl_graphics_driver->scale();
+  // fl_graphics_driver->Fl_Graphics_Driver::scale(1); // temporarily remove scaling factor
+  // fl_font(fl_font(), int(fs * Fl_Vk_Window_Driver::vk_scale)); // the font size to use in the GL scene
+  // int w = (int)ceil( fl_width(fifo[current].utf8, n) );
+  // w = ((w + 3) / 4) * 4; // make w a multiple of 4
+  // int h = fl_height();
+  // fl_graphics_driver->Fl_Graphics_Driver::scale(s); // re-install scaling factor
+  // fl_font(fl_font(), fs);
+  // fs = int(fs * Fl_Vk_Window_Driver::vk_scale);
+  // fifo[current].scale = Fl_Vk_Window_Driver::vk_scale;
+  // fifo[current].fdesc = vk_fontsize;
+  // char *alpha_buf = Fl_Vk_Window_Driver::global()->alpha_mask_for_string(str, n, w, h, fs);
 
   // // save GL parameters VK_UNPACK_ROW_LENGTH and VK_UNPACK_ALIGNMENT
   // GLint row_length, alignment;
@@ -416,13 +416,15 @@ int vk_texture_fifo::compute_texture(const char* str, int n)
   // /* For the record: texture construction if an alpha-only-texture is not possible
   //  glTexImage2D(VK_TEXTURE_RECTANGLE_ARB, 0, VK_RGBA8, w, h, 0, VK_BGRA_EXT, VK_UNSIGNED_INT_8_8_8_8_REV, rgba_buf);
   //  and also, replace VK_SRC_ALPHA by VK_ONE in glBlendFunc() call of display_texture()
-  //  */
-  delete[] alpha_buf; // free the buffer now we have copied it into the GL texture
+  // //  */
+  // delete[] alpha_buf; // free the buffer now we have copied it into the GL texture
   // glPopAttrib();
   // // restore saved GL parameters
   // glPixelStorei(VK_UNPACK_ROW_LENGTH, row_length);
   // glPixelStorei(VK_UNPACK_ALIGNMENT, alignment);
-  return current;
+  // return current;
+
+    return 0;
 }
 
 #endif  // ! defined(FL_DOXYGEN)
@@ -449,8 +451,6 @@ int vk_texture_pile_height(void)
 */
 void vk_texture_pile_height(int max)
 {
-  if (vk_fifo) delete vk_fifo;
-  vk_fifo = new vk_texture_fifo(max);
 }
 
 /** To call after VK operations that may invalidate textures used to draw text in VK scenes
@@ -458,7 +458,6 @@ void vk_texture_pile_height(int max)
  */
 void vk_texture_reset()
 {
-  if (vk_fifo) vk_texture_pile_height(vk_texture_pile_height());
 }
 
 
@@ -471,58 +470,12 @@ void vk_texture_reset()
 /** draws a utf8 string using a Vulkan texture */
 void Fl_Vk_Window_Driver::draw_string_with_texture(const char* str, int n)
 {
-  // Check if the raster pos is valid.
-  // If it's not, then drawing it results in undefined behaviour (#1006, #1007).
-  // VKint valid;
-  // vkGetIntegerv(VK_CURRENT_RASTER_POSITION_VALID, &valid);
-  // if (!valid) return;
-  Fl_Vk_Window *gwin = Fl_Window::current()->as_vk_window();
-  vk_scale = (gwin ? gwin->pixels_per_unit() : 1);
-  if (!vk_fifo) vk_fifo = new vk_texture_fifo();
-  if (!vk_fifo->textures_generated) {
-      // \@todo:
-    // if (has_texture_rectangle) for (int i = 0; i < vk_fifo->size_; i++) vkGenTextures(1, &(vk_fifo->fifo[i].texName));
-    vk_fifo->textures_generated = 1;
-  }
-  int index = vk_fifo->already_known(str, n);
-  if (index == -1) {
-    index = vk_fifo->compute_texture(str, n);
-  }
-  vk_fifo->display_texture(index);
 }
 
 
 char *Fl_Vk_Window_Driver::alpha_mask_for_string(const char *str, int n, int w, int h, Fl_Fontsize fs)
 {
-  // write str to a bitmap that is just big enough
-  // create an Fl_Image_Surface object
-  Fl_Image_Surface *image_surface = new Fl_Image_Surface(w, h);
-  Fl_Font fnt = fl_font(); // get the current font
-  // direct all further graphics requests to the image
-  Fl_Surface_Device::push_current(image_surface);
-  // fill the background with black, which we will interpret as transparent
-  fl_color(0,0,0);
-  fl_rectf(0, 0, w, h);
-  // set up the text colour as white, which we will interpret as opaque
-  fl_color(255,255,255);
-  // Fix the font scaling
-  fl_font (fnt, fs); // resize "fltk" font to current GL view scaling
-  int desc = fl_descent();
-  // Render the text to the buffer
-  fl_draw(str, n, 0, h - desc);
-  // get the resulting image
-  Fl_RGB_Image* image = image_surface->image();
-  // direct graphics requests back to previous state
-  Fl_Surface_Device::pop_current();
-  delete image_surface;
-  // This gives us an RGB rendering of the text. We build an alpha channel from that.
-  char *alpha_buf = new char [w * h];
-  for (int idx = 0; idx < w * h; ++idx)
-  { // Fake up the alpha component using the green component's value
-    alpha_buf[idx] = image->array[idx * 3 + 1];
-  }
-  delete image;
-  return alpha_buf;
+    return nullptr;
 }
 
 
