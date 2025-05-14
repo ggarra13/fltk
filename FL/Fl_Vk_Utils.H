@@ -39,7 +39,8 @@ FL_EXPORT VkCommandBuffer beginSingleTimeCommands(VkDevice device,
 FL_EXPORT void endSingleTimeCommands(VkCommandBuffer commandBuffer,
                                      VkDevice device,
                                      VkCommandPool commandPool,
-                                     VkQueue queue);
+                                     VkQueue queue,
+                                     VkFence fence = VK_NULL_HANDLE);
 
 //! Image functions
 FL_EXPORT VkImage createImage(VkDevice device,

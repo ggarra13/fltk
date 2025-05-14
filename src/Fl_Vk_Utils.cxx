@@ -105,7 +105,8 @@ VkCommandBuffer beginSingleTimeCommands(VkDevice device,
 void endSingleTimeCommands(VkCommandBuffer commandBuffer,
                            VkDevice device,
                            VkCommandPool commandPool,
-                           VkQueue queue)
+                           VkQueue queue,
+                           VkFence fence)
 {
     vkEndCommandBuffer(commandBuffer);
     
@@ -114,7 +115,7 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer,
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
     
-    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueSubmit(queue, 1, &submitInfo, fence);
     vkQueueWaitIdle(queue);
 
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
