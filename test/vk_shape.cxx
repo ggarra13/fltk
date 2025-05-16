@@ -1,6 +1,5 @@
 //
 // Tiny Vulkan demo program for the Fast Light Tool Kit (FLTK).
-// This demo relies on GLM, the matrix library.
 //
 // Copyright 1998-2010 by Bill Spitzak and others.
 //
@@ -28,6 +27,7 @@
 #include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
+#include <Fl_Vk_Demos.H>   // Useless classes used for demo purposes only
 
 class vk_shape_window : public Fl_Vk_Window {
     void vk_draw_begin() FL_OVERRIDE;
@@ -41,7 +41,7 @@ public:
     const char* application_name()  FL_OVERRIDE { return "vk_shape"; }
 
     void prepare() FL_OVERRIDE;
-    void destroy_resources() FL_OVERRIDE;
+    void destroy() FL_OVERRIDE;
 
 
     void destroy_mesh();
@@ -149,12 +149,13 @@ void vk_shape_window::prepare_mesh()
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
     VK_CHECK(result);
 
-    vkGetBufferMemoryRequirements(device(), m_mesh.buf, &m_mem_reqs);
+    VkMemoryRequirements mem_reqs;
+    vkGetBufferMemoryRequirements(device(), m_mesh.buf, &mem_reqs);
     VK_CHECK(result);
 
-    mem_alloc.allocationSize = m_mem_reqs.size;
+    mem_alloc.allocationSize = mem_reqs.size;
     mem_alloc.memoryTypeIndex = findMemoryType(gpu(),
-                                               m_mem_reqs.memoryTypeBits,
+                                               mem_reqs.memoryTypeBits,
                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -510,7 +511,7 @@ void vk_shape_window::destroy_mesh()
     m_mesh.destroy(device());
 }
 
-void vk_shape_window::destroy_resources()
+void vk_shape_window::destroy()
 {
     if (device() == VK_NULL_HANDLE)
         return;

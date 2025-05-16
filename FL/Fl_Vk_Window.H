@@ -59,154 +59,6 @@ struct Fl_Vk_SwapchainBuffer {
         }
 };
 
-struct Fl_Vk_Mesh {
-    // Memory and Buffer used for the actual mesh
-    VkBuffer buf;
-    VkDeviceMemory mem;
-
-    // Memory and Buffer used for indices (optional)
-    VkDeviceMemory indexMem;
-    VkBuffer indexBuffer;
-
-    // Memory and Buffer used for UBO (matrix transforms)
-    VkDeviceMemory uniformMemory;
-    VkBuffer uniformBuffer;
-    
-    // Vertex bindings (hard coded for demos with two attributes only).
-    VkVertexInputBindingDescription vi_bindings[1];
-    VkVertexInputAttributeDescription vi_attrs[2];
-
-    Fl_Vk_Mesh() :
-        buf(VK_NULL_HANDLE),
-        mem(VK_NULL_HANDLE),
-        indexBuffer(VK_NULL_HANDLE),
-        indexMem(VK_NULL_HANDLE),
-        uniformBuffer(VK_NULL_HANDLE),
-        uniformMemory(VK_NULL_HANDLE)
-        {
-        }
-
-    void destroy(VkDevice& device)
-        {
-            if (buf != VK_NULL_HANDLE)
-            {
-                vkDestroyBuffer(device, buf, NULL);
-                buf = VK_NULL_HANDLE;
-            }
-
-            if (mem != VK_NULL_HANDLE)
-            {
-                vkFreeMemory(device, mem, NULL);
-                mem = VK_NULL_HANDLE;
-            }
-            
-            if (indexBuffer != VK_NULL_HANDLE)
-            {
-                vkDestroyBuffer(device, indexBuffer, NULL);
-                indexBuffer = VK_NULL_HANDLE;
-            }
-
-            if (indexMem != VK_NULL_HANDLE)
-            {
-                vkFreeMemory(device, indexMem, NULL);
-                indexMem = VK_NULL_HANDLE;
-            }
-            
-            if (uniformBuffer != VK_NULL_HANDLE)
-            {
-                vkDestroyBuffer(device, uniformBuffer, NULL);
-                uniformBuffer = VK_NULL_HANDLE;
-            }
-
-            if (uniformMemory != VK_NULL_HANDLE)
-            {
-                vkFreeMemory(device, uniformMemory, NULL);
-                uniformMemory = VK_NULL_HANDLE;
-            }
-        }
-};
-
-  
-struct Fl_Vk_Texture {
-    VkImageType type;           // VK_IMAGE_TYPE_1D, 2D or 3D
-
-    VkFormat format;
-    
-    VkImage image;              // Vulkan image handle
-    VkImageView view;           // View for shader access
-    VkSampler sampler;          // Sampler for texture sampling
-
-    uint32_t    binding;
-    std::string samplerName;        // name of sampler
-
-    VkDeviceMemory mem;             // Allocated memory for texture
-    uint32_t width, height, depth;  // texture width/height/depth
-
-    Fl_Vk_Texture() :
-        type(VK_IMAGE_TYPE_2D),
-        format(VK_FORMAT_B8G8R8A8_UNORM),
-        image(VK_NULL_HANDLE),
-        view(VK_NULL_HANDLE),
-        sampler(VK_NULL_HANDLE),
-        mem(VK_NULL_HANDLE),
-        samplerName("sampler1"),
-        binding(0),
-        width(1),
-        height(1),
-        depth(1)
-        {
-        }
-    
-    Fl_Vk_Texture(VkImageType type,
-                  VkFormat    format,
-                  VkImage     image,
-                  VkImageView view,
-                  VkSampler sampler,
-                  VkDeviceMemory mem,
-                  std::string samplerName = "sampler1",
-                  uint32_t binding = 0,
-                  uint32_t width = 1,
-                  uint32_t height = 1,
-                  uint32_t depth = 1) :
-        type(type),
-        format(format),
-        image(image),
-        view(view),
-        sampler(sampler),
-        mem(mem),
-        samplerName(samplerName),
-        binding(binding),
-        width(width),
-        height(height),
-        depth(depth)
-        {
-        }
-
-    void destroy(VkDevice& device)
-        {
-            if (sampler != VK_NULL_HANDLE)
-            {
-                vkDestroySampler(device, sampler, NULL);
-                sampler = VK_NULL_HANDLE;
-            }
-            if (view != VK_NULL_HANDLE)
-            {
-                vkDestroyImageView(device, view, NULL);
-                view = VK_NULL_HANDLE;
-            }
-            if (mem != VK_NULL_HANDLE)
-            {
-                vkFreeMemory(device, mem, NULL);
-                mem = VK_NULL_HANDLE;
-            }
-            if (image != VK_NULL_HANDLE)
-            {
-                vkDestroyImage(device, image, NULL);
-                image = VK_NULL_HANDLE;
-            }
-        }
-};
-
   
 struct Fl_Vk_Depth {
     VkFormat format;
@@ -247,25 +99,12 @@ struct Fl_Vk_Depth {
 /**
   The Fl_Vk_Window widget sets things up so Vulkan works.
 
-  It also keeps an Vulkan "context" for that window, so that changes to the
-  lighting and projection may be reused between redraws. Fl_Vk_Window
-  also flushes the Vulkan streams and swaps buffers after draw() returns.
+  It also keeps an Vulkan "context" for that window.
 
   Please note that the FLTK drawing and clipping functions
   will not work inside an Fl_Vk_Window. All drawing
   should be done using Vulkan calls exclusively.
 
-  \see \ref vulkan_highdpi
-
-  \note FLTK 1.4 introduces a driver system for graphic calls. It is now possible
-  to add a selection of widgets to an Vulkan window. The widgets will draw on top
-  of any Vulkan rendering. The number of supported widgets will increase as the
-  driver development improves. Program test/cube.cxx illustrates how to do that.
-
-  \note FLTK expects that when an Fl_Vk_Window is a child of a parent Fl_Window,
-  the child window lies entirely inside its parent window. If that's not the case, what
-  happens to the part of the Vulkan subwindow which leaks outside its parent is undefined
-  and susceptible to be platform-specific.
 */
 class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   friend class Fl_Vk_Window_Driver;
@@ -278,6 +117,14 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
+  //! Tracking variable to know if begin_render_pass()/end_render_pass() has
+  //! been called.
+  bool                   m_in_render_pass = false;
+
+  //! Fence used to handle resizes.
+  VkFence                m_resizeFence;
+  VkExtent2D             m_currentExtent; // Track current swapchain extend
+
     
   static int can_do(int, const int *);
   int mode(int, const int *);
@@ -286,14 +133,28 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
 protected:
   void recreate_swapchain();
 
+  //! Called on initialization of the swapchain to set up the swapchain
+  //! format and color space.
   virtual void init_colorspace();
-  
+
+  //! Called before begin_render_pass.  Allows setting up a color or depth.
+  //! The default function will call begin_render_pass().  Override this if
+  //! you don't want that behavior.
   virtual void vk_draw_begin();
+
+  //! Main function to use for drawing with Vulkan.  Note that by default
+  //! FLTK calls this after calling vk_draw_begin() and begin_render_pass();
   virtual void draw() FL_OVERRIDE;
+
+  //! Called after draw()
   virtual void vk_draw_end();
 
+  //! Called in case 
   void set_hdr_metadata();
 
+  //! Called to clean up resources when shutting down vulkan.
+  void shutdown_vulkan();
+  
 public:
   void show() FL_OVERRIDE;
   /** Same as Fl_Window::show(int a, char **b) */
@@ -358,9 +219,9 @@ public:
   virtual const char* application_name() { return "FLTK"; }
   virtual const char* engine_name() { return "FLTK"; }
   
-  //! Main entry point for Vulkan elements pass creation and destruction.
+  //! Main entry point for Vulkan elements creation and destruction.
   virtual void prepare() = 0;
-  virtual void destroy_resources() {};  
+  virtual void destroy() {};  
 
   //! Required and optional instance extensions used on creation (overload it)
   virtual std::vector<const char*> get_instance_extensions();
@@ -398,15 +259,24 @@ public:
   inline const VkColorSpaceKHR&      colorSpace() const { return ctx.colorSpace; }
   inline const VkRenderPass&         renderPass() const { return m_renderPass; }
   inline const VkPipeline&             pipeline() const { return m_pipeline; }
-  inline const std::vector<const char*>
-      instance_extensions() const { return ctx.instance_extensions; }
-  inline const std::vector<const char*>
-      device_extensions() const { return ctx.device_extensions; }
 
+  // Returns a vector with currently used insance extensions
+  inline const std::vector<const char*>
+      getCurrentInstanceExtensions() const { return ctx.instance_extensions; }
+  inline const std::vector<const char*>
+      getCurrentDeviceExtensions() const { return ctx.device_extensions; }
+
+  inline void setValidationLayers(bool v) { v = m_validate; }
+  
   //! @}
   
   // Application
-  bool m_validate;  // if true, turns on validation layers
+
+  // if true, turns on validation layers.  Default is to have it on on Debug
+  // builds and off on Release or RelWithDebInfo builds.
+  bool m_validate;
+
+  // Traces the use of the swapchain.  You probably don't need use it.
   bool m_debugSync;
   
   // These get copied into ctx for every window
@@ -439,7 +309,7 @@ public:
   const VkAllocationCallbacks*    m_allocator;
 
 private:
-  // Per frame
+  // Per frame data used internally.
   struct FrameData {
       VkSemaphore imageAcquiredSemaphore;
       VkSemaphore drawCompleteSemaphore;
@@ -460,9 +330,6 @@ private:
 
   // Swapchain
 private:
-  bool                   m_in_render_pass = false;
-  VkFence                m_resizeFence;
-  VkExtent2D             m_currentExtent; // Track current swapchain exten
 
 protected:
   uint32_t               m_swapchainImageCount; // Track swapchain image count
@@ -489,27 +356,11 @@ protected:
   // For drawing
   
 
-
-  // Auxiliary variable for multiple memory requirements use
-  VkMemoryRequirements m_mem_reqs;
-
   
   
   VkPhysicalDeviceMemoryProperties m_memory_properties;
 
   
-
-    
-
-  //! @}
-  
-  // (Optional) Allocation, Debugging.
-  void                            (*CheckVkResultFn)(VkResult err);
-  VkDeviceSize                    MinAllocationSize;      // Minimum allocatio
-
-  bool               m_use_break = false;
-  VkDebugUtilsMessengerEXT  m_debug_messenger;
-
   void init_vulkan();
 
   // Auxiliary functions to begin and end the main render pass.
@@ -520,24 +371,24 @@ protected:
   void begin_render_pass();
   void end_render_pass(VkCommandBuffer&);
   void end_render_pass();
+  
+  void swap_buffers();
 
 public:
   
-  void make_current();
-  void swap_buffers();
   void swap_interval(int);
   int swap_interval() const;
 
   int can_do_overlay() { return false; }
 
+  //! Call this to wait on the Window's queue.
   void wait_queue();
+
+  //! Call this to wait on the Vulkan device.  This will wait for all GPUs
+  //! operations to finish.
   void wait_device();
   
-  void shutdown_vulkan();
   VkExtent2D getCurrentExtent() const { return m_currentExtent; }
-  void updateExtent(uint32_t width, uint32_t height) {
-      m_currentExtent = {width, height};
-  }
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
       return m_frames[m_currentFrameIndex].commandBuffer;

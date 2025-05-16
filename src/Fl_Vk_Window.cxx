@@ -67,7 +67,7 @@ bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
 
 void Fl_Vk_Window::destroy_common_resources() {
     // Destroy derived Window's resources
-    destroy_resources();
+    destroy();
     
     if (m_pipeline != VK_NULL_HANDLE) {
         vkDestroyPipeline(device(), m_pipeline, NULL);
@@ -493,18 +493,6 @@ int Fl_Vk_Window::mode(int m, const int *a) {
   return pVkWindowDriver->mode_(m, a);
 }
 
-/**
-  The make_current() method selects the Vulkan context for the
-  widget.  It is called automatically prior to the draw() method
-  being called and can also be used to implement feedback and/or
-  selection within the handle() method.
-*/
-
-void Fl_Vk_Window::make_current() {
-  pVkWindowDriver->make_current_before();
-  pVkWindowDriver->make_current_after();
-  current_ = this;
-}
 
 void Fl_Vk_Window::set_hdr_metadata()
 {

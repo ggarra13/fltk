@@ -57,6 +57,7 @@
 #include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
+#include <Fl_Vk_Demos.H>  // Useless classes used for demo purposes only
 
 class vk_shape_window : public Fl_Vk_Window {
     void draw() FL_OVERRIDE;
@@ -69,7 +70,7 @@ public:
     
     const char* application_name() FL_OVERRIDE { return "vk_shape_textured"; };
     void prepare() FL_OVERRIDE;
-    void destroy_resources() FL_OVERRIDE;
+    void destroy() FL_OVERRIDE;
 
 
     void destroy_mesh();
@@ -80,6 +81,8 @@ protected:
     VkShaderModule m_vert_shader_module;
     VkShaderModule m_frag_shader_module;
     uint32_t frame_counter = 0;
+
+    //! Hold the image's memory requirements.
     
     //! This is for holding a mesh
     Fl_Vk_Mesh m_mesh;
@@ -197,11 +200,12 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
     result = vkCreateImage(device(), &image_create_info, NULL, &tex_obj->image);
     VK_CHECK(result);
 
-    vkGetImageMemoryRequirements(device(), tex_obj->image, &m_mem_reqs);
+    VkMemoryRequirements mem_reqs;
+    vkGetImageMemoryRequirements(device(), tex_obj->image, &mem_reqs);
 
-    mem_alloc.allocationSize = m_mem_reqs.size;
+    mem_alloc.allocationSize = mem_reqs.size;
     mem_alloc.memoryTypeIndex = findMemoryType(gpu(),
-                                               m_mem_reqs.memoryTypeBits,
+                                               mem_reqs.memoryTypeBits,
                                                required_props);
 
     /* allocate memory */
@@ -332,7 +336,7 @@ void vk_shape_window::update_texture()
                      VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT);
 
     void* data;
-    vkMapMemory(device(), m_texture.mem, 0, m_mem_reqs.size, 0, &data);
+    vkMapMemory(device(), m_texture.mem, 0, VK_WHOLE_SIZE, 0, &data);
     
     uint32_t* pixels = (uint32_t*)data;
     uint8_t intensity = (frame_counter++ % 255);
@@ -411,7 +415,6 @@ void vk_shape_window::prepare_mesh()
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
     VK_CHECK(result);
     
-    // Use a local variable instead of overwriting m_mem_reqs
     VkMemoryRequirements vertex_mem_reqs;
     vkGetBufferMemoryRequirements(device(), m_mesh.buf, &vertex_mem_reqs);
     
@@ -824,7 +827,7 @@ void vk_shape_window::destroy_mesh()
     m_mesh.destroy(device());
 }
 
-void vk_shape_window::destroy_resources()
+void vk_shape_window::destroy()
 {
     if (device() == VK_NULL_HANDLE)
         return;

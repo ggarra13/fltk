@@ -1,8 +1,6 @@
 //
 // Vulkan test program for the Fast Light Tool Kit (FLTK).
 //
-// Modified to have 2 cubes to test multiple Vulkan contexts
-//
 // Copyright 1998-2024 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
@@ -72,10 +70,13 @@ public:
     label("This demo does\nnot work without VK");
   }
 };
+
 #else
+
 #include <FL/Fl_Vk_Utils.H>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/vk.h>
+#include <Fl_Vk_Demos.H>   // Useless classes used for demo purposes only
 #include <FL/math.h>
 
 #include <glm/glm.hpp>
@@ -133,7 +134,7 @@ public:
     double speed;
 
     void prepare() FL_OVERRIDE;
-    void destroy_resources() FL_OVERRIDE;
+    void destroy() FL_OVERRIDE;
     const char* application_name() FL_OVERRIDE { return "vk_cube"; };
     
     cube_box(int x,int y,int w,int h,const char *l=0) : Fl_Vk_Window(x,y,w,h,l) {
@@ -566,12 +567,13 @@ void cube_box::prepare_vertices()
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_cube.buf);
     VK_CHECK(result);
 
-    vkGetBufferMemoryRequirements(device(), m_cube.buf, &m_mem_reqs);
+    VkMemoryRequirements mem_reqs;
+    vkGetBufferMemoryRequirements(device(), m_cube.buf, &mem_reqs);
     VK_CHECK(result);
 
-    mem_alloc.allocationSize = m_mem_reqs.size;
+    mem_alloc.allocationSize = mem_reqs.size;
     mem_alloc.memoryTypeIndex = findMemoryType(gpu(),
-                                               m_mem_reqs.memoryTypeBits,
+                                               mem_reqs.memoryTypeBits,
                                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -613,13 +615,15 @@ void cube_box::prepare_uniform_buffer()
     ubo_buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     
     vkCreateBuffer(device(), &ubo_buf_info, nullptr, &m_cube.uniformBuffer);
-    vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &m_mem_reqs);
+    
+    VkMemoryRequirements mem_reqs;
+    vkGetBufferMemoryRequirements(device(), m_cube.uniformBuffer, &mem_reqs);
     
     VkMemoryAllocateInfo ubo_alloc_info = {};
     ubo_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    ubo_alloc_info.allocationSize = m_mem_reqs.size;
+    ubo_alloc_info.allocationSize = mem_reqs.size;
     ubo_alloc_info.memoryTypeIndex = findMemoryType(gpu(),
-                                                    m_mem_reqs.memoryTypeBits,
+                                                    mem_reqs.memoryTypeBits,
                                                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
 
@@ -704,7 +708,7 @@ void cube_box::prepare_descriptor_layout()
     VK_CHECK(result);
 }
 
-void cube_box::destroy_resources()
+void cube_box::destroy()
 {
     m_cube.destroy(device());
 

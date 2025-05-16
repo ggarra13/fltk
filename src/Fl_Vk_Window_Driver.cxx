@@ -1,31 +1,20 @@
-/*
- * Copyright (c) 2015-2016 The Khronos Group Inc.
- * Copyright (c) 2015-2016 Valve Corporation
- * Copyright (c) 2015-2016 LunarG, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * Author: Chia-I Wu <olvaffe@gmail.com>
- * Author: Cody Northrop <cody@lunarg.com>
- * Author: Courtney Goeltzenleuchter <courtney@LunarG.com>
- * Author: Ian Elliott <ian@LunarG.com>
- * Author: Jon Ashburn <jon@lunarg.com>
- * Author: Piers Daniell <pdaniell@nvidia.com>
- * Author: Gwan-gyeong Mun <elongbug@gmail.com>
- * Author: Camilla Löwy <elmindreda@glfw.org>
- * Porter: Gonzalo Garramuño <ggarra13@gmail.com>
- *
- */
+//
+// Implementation of class Fl_Vk_Window_Driver, and of its platform-specific derived classes
+// for the Fast Light Tool Kit (FLTK).
+//
+// Copyright 2016-2018 by Bill Spitzak and others.
+//
+// This library is free software. Distribution and use rights are outlined in
+// the file "COPYING" which should have been included with this file.  If this
+// file is missing or damaged, see the license at:
+//
+//     https://www.fltk.org/COPYING.php
+//
+// Please see the following page on how to report bugs and issues:
+//
+//     https://www.fltk.org/bugs.php
+//
+
 #include <FL/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
@@ -37,8 +26,8 @@
 #include <stdexcept>
 #include <vector>
 
-// macros
-#define CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
+// Ugly macros
+#define FLTK_CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
 
 
 //! Returns true or false if extension name is supported.
@@ -99,10 +88,12 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   // Set swapchain extent to match window size, clamped to capabilities
   VkExtent2D swapchainExtent = {(uint32_t)pWindow->w(), (uint32_t)pWindow->h()};
-  swapchainExtent.width = CLAMP(swapchainExtent.width, surfCapabilities.minImageExtent.width,
-                                surfCapabilities.maxImageExtent.width);
-  swapchainExtent.height = CLAMP(swapchainExtent.height, surfCapabilities.minImageExtent.height,
-                                 surfCapabilities.maxImageExtent.height);
+  swapchainExtent.width = FLTK_CLAMP(swapchainExtent.width,
+                                     surfCapabilities.minImageExtent.width,
+                                     surfCapabilities.maxImageExtent.width);
+  swapchainExtent.height = FLTK_CLAMP(swapchainExtent.height,
+                                      surfCapabilities.minImageExtent.height,
+                                      surfCapabilities.maxImageExtent.height);
 
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
@@ -112,6 +103,8 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       return;
   }
 
+  // If not a double window, try to create a swapchain in
+  // VK_PRESENT_MODE_IMMEDIATE_KHR.
   const bool isImmediate = !(pWindow->mode() & FL_DOUBLE);
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -186,7 +179,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   }
 }
 
-// Uses m_depth, ctx.device
+// Prepare depth/stencil resources for window
 void Fl_Vk_Window_Driver::prepare_depth() {
   bool has_depth = pWindow->mode() & FL_DEPTH;
   bool has_stencil = pWindow->mode() & FL_STENCIL;
