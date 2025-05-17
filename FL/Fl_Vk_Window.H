@@ -268,7 +268,26 @@ public:
       getCurrentDeviceExtensions() const { return ctx.device_extensions; }
 
   inline void setValidationLayers(bool v) { v = m_validate; }
-  
+
+  // Access the current back buffer (the one you're rendering to)
+  VkImage get_back_buffer_image() const {
+      return m_buffers[m_current_buffer].image;
+  }
+
+  VkImageView get_back_buffer_view() const {
+      return m_buffers[m_current_buffer].view;
+  }
+
+  VkFramebuffer get_back_buffer_framebuffer() const {
+      return m_buffers[m_current_buffer].framebuffer;
+  }
+
+  // Simulates access to the "front buffer" (read-only!) and not
+  // guaranteed to work post-presentation.
+  VkImage get_front_buffer_image() const {
+      return m_buffers[m_last_presented_buffer].image;
+  }
+
   //! @}
   
   // Application
@@ -327,15 +346,12 @@ private:
           {
           }
   };
-  
-
-  // Swapchain
-private:
 
 protected:
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
+  uint32_t                m_last_presented_buffer;
   
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;
@@ -349,16 +365,14 @@ protected:
                              const VkHdrMetadataEXT& b);
   VkHdrMetadataEXT        m_hdr_metadata;
   bool                    m_hdr_metadata_changed;
-  
+
+  // Optional depth buffer information
   Fl_Vk_Depth             m_depth;
+
+  
   uint32_t           m_queueFamilyIndex;
 
-
-  // For drawing
-  
-
-  
-  
+  // This will problably be removed or moved into Fl_Vk_Context.
   VkPhysicalDeviceMemoryProperties m_memory_properties;
 
   
