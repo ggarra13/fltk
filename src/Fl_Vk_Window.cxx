@@ -533,48 +533,52 @@ void Fl_Vk_Window::swap_buffers() {
         fprintf(stderr, "Submitting frame %u for image index %u\n",
                 m_currentFrameIndex, m_current_buffer);
     }
-    
-    result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
-    if (result != VK_SUCCESS) {
-        fprintf(stderr, "vkQueueSubmit failed: %s\n", string_VkResult(result));
-        frame.active = false;
-        return;
-    }
 
-    // Present swapchain image
-    VkPresentInfoKHR present_info = {};
-    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
-    present_info.swapchainCount = 1;
-    present_info.pSwapchains = &m_swapchain;
-    present_info.pImageIndices = &m_current_buffer;
-
-    if (m_debugSync) {
-        fprintf(stderr, "Presenting image index %u for frame %u\n",
-                m_current_buffer, m_currentFrameIndex);
-    }
-
-    // Update HDR metadata if changed
-    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
-        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-        m_previous_hdr_metadata = m_hdr_metadata;
-        m_hdr_metadata_changed = false;
-    }
-    
-    result = vkQueuePresentKHR(queue(), &present_info);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        m_swapchain_needs_recreation = true;
-        frame.active = false;
-        return;
-    }
-    else if (result != VK_SUCCESS)
     {
-        fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
-                string_VkResult(result));
-        frame.active = false;
-        return;
+        std::lock_guard<std::mutex> lock(queue_mutex());
+        result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vkQueueSubmit failed: %s\n",
+                    string_VkResult(result));
+            frame.active = false;
+            return;
+        }
+
+        // Present swapchain image
+        VkPresentInfoKHR present_info = {};
+        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present_info.waitSemaphoreCount = 1;
+        present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
+        present_info.swapchainCount = 1;
+        present_info.pSwapchains = &m_swapchain;
+        present_info.pImageIndices = &m_current_buffer;
+
+        if (m_debugSync) {
+            fprintf(stderr, "Presenting image index %u for frame %u\n",
+                    m_current_buffer, m_currentFrameIndex);
+        }
+
+        // Update HDR metadata if changed
+        if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+            m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT) {
+            vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+            m_previous_hdr_metadata = m_hdr_metadata;
+            m_hdr_metadata_changed = false;
+        }
+    
+        result = vkQueuePresentKHR(queue(), &present_info);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            m_swapchain_needs_recreation = true;
+            frame.active = false;
+            return;
+        }
+        else if (result != VK_SUCCESS)
+        {
+            fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
+                    string_VkResult(result));
+            frame.active = false;
+            return;
+        }
     }
 
     pVkWindowDriver->swap_buffers();
@@ -775,13 +779,8 @@ void Fl_Vk_Window::shutdown_vulkan() {
     if (device() == VK_NULL_HANDLE) return;
 
     VkResult result;
-    
-    result = vkDeviceWaitIdle(device());
-    if (result != VK_SUCCESS)
-    {
-        fprintf(stderr, "vkDeviceWaitIdle failed: %s\n", string_VkResult(result));
-        return;
-    }
+
+    wait_device();
 
     // Free command buffers
     for (auto& frame : m_frames) {
@@ -868,6 +867,8 @@ void Fl_Vk_Window::wait_queue()
 {
     if (queue() == VK_NULL_HANDLE)
         return;
+    
+    std::lock_guard<std::mutex> lock(queue_mutex());
     VkResult result = vkQueueWaitIdle(queue());
     VK_CHECK(result);
 }

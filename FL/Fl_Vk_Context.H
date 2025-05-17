@@ -22,6 +22,7 @@
 
 #include "FL/vk.h"
 
+#include <mutex>
 #include <vector>
 
 // We keep this in a context struct, so we can pass them to some other library
@@ -36,9 +37,12 @@ struct Fl_Vk_Context
     
     VkDevice           device;
     VkPipelineCache    pipelineCache; 
+
     VkQueueFamilyProperties* queue_props;
     uint32_t                queue_count;
+    std::mutex              queue_mutex;
     VkQueue                       queue;
+    
     VkCommandPool           commandPool;  // memory for command buffers
 
     VkFormat                     format;   // for depth and color formats

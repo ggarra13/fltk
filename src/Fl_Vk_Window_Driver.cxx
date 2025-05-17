@@ -23,6 +23,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 #include <vector>
 
@@ -274,18 +275,21 @@ void Fl_Vk_Window_Driver::prepare_depth() {
 
   VkCommandBuffer cmd = beginSingleTimeCommands(pWindow->device(),
                                                 pWindow->commandPool());
-  set_image_layout(cmd, pWindow->device(),
-                   pWindow->commandPool(),
-                   pWindow->queue(),
-                   pWindow->m_depth.image,
-                   aspectMask,
-                   VK_IMAGE_LAYOUT_UNDEFINED,
-                   VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                   0, VK_PIPELINE_STAGE_HOST_BIT,
-                   0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
-  endSingleTimeCommands(cmd, pWindow->device(),
-                        pWindow->commandPool(),
-                        pWindow->queue());
+  {
+      std::lock_guard<std::mutex> lock(pWindow->queue_mutex());
+      set_image_layout(cmd, pWindow->device(),
+                       pWindow->commandPool(),
+                       pWindow->queue(),
+                       pWindow->m_depth.image,
+                       aspectMask,
+                       VK_IMAGE_LAYOUT_UNDEFINED,
+                       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                       0, VK_PIPELINE_STAGE_HOST_BIT,
+                       0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+      endSingleTimeCommands(cmd, pWindow->device(),
+                            pWindow->commandPool(),
+                            pWindow->queue());
+  }
 
   /* create image view */
   view.image = pWindow->m_depth.image;
@@ -949,8 +953,11 @@ void Fl_Vk_Window_Driver::destroy_resources()
     uint32_t i;
     VkResult result;
 
-    vkDeviceWaitIdle(pWindow->device());
-
+    {
+        std::lock_guard<std::mutex> lock(pWindow->queue_mutex());
+        vkDeviceWaitIdle(pWindow->device());
+    }
+    
     // Destroy resources in reverse creation order (first, those of window)
     pWindow->destroy_common_resources();
 

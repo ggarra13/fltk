@@ -240,6 +240,7 @@ public:
   inline VkDevice&                 device() { return ctx.device; }
   inline VkPipelineCache&   pipelineCache() { return ctx.pipelineCache; }
   inline VkQueue&                   queue() { return ctx.queue; }
+  inline std::mutex&          queue_mutex() { return ctx.queue_mutex; }
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
   inline VkFormat&                 format() { return ctx.format; }
   inline VkColorSpaceKHR&      colorSpace() { return ctx.colorSpace; }
