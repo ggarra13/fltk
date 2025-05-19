@@ -728,7 +728,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                   "Swapchain Initialization Failure");
     }
 
-    pWindow->m_queueFamilyIndex = m_queueFamilyIndex = graphicsQueueNodeIndex;
+    pWindow->ctx.queueFamilyIndex = m_queueFamilyIndex = graphicsQueueNodeIndex;
 
     if (pWindow->m_device == VK_NULL_HANDLE)
     {

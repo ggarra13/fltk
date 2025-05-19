@@ -125,7 +125,7 @@ void Fl_Vk_Window::recreate_swapchain() {
     // Create new command pool
     VkCommandPoolCreateInfo cmd_pool_info = {};
     cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
+    cmd_pool_info.queueFamilyIndex = ctx.queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
     if (result != VK_SUCCESS) {
@@ -941,7 +941,7 @@ void Fl_Vk_Window::init_vulkan() {
     // Create command pool
     VkCommandPoolCreateInfo cmd_pool_info = {};
     cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmd_pool_info.queueFamilyIndex = m_queueFamilyIndex;
+    cmd_pool_info.queueFamilyIndex = ctx.queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
     if (result != VK_SUCCESS) {

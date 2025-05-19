@@ -239,6 +239,7 @@ public:
   inline VkPhysicalDevice& physicalDevice() { return ctx.gpu; }
   inline VkDevice&                 device() { return ctx.device; }
   inline VkPipelineCache&   pipelineCache() { return ctx.pipelineCache; }
+  inline uint32_t&       queueFamilyIndex() { return ctx.queueFamilyIndex; }
   inline VkQueue&                   queue() { return ctx.queue; }
   inline std::mutex&          queue_mutex() { return ctx.queue_mutex; }
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
@@ -255,6 +256,7 @@ public:
   inline const VkDevice&                 device() const { return ctx.device; }
   inline const VkPipelineCache&   pipelineCache() const { return ctx.pipelineCache; }
   inline const VkQueue&                   queue() const { return ctx.queue; }
+  inline const uint32_t&       queueFamilyIndex() const { return ctx.queueFamilyIndex; }
   inline const VkCommandPool&       commandPool() const { return ctx.commandPool; }
   inline const VkFormat&                 format() const { return ctx.format; }
   inline const VkColorSpaceKHR&      colorSpace() const { return ctx.colorSpace; }
@@ -368,9 +370,6 @@ protected:
 
   // Optional depth buffer information
   Fl_Vk_Depth             m_depth;
-
-  
-  uint32_t           m_queueFamilyIndex;
 
   // This will problably be removed or moved into Fl_Vk_Context.
   VkPhysicalDeviceMemoryProperties m_memory_properties;

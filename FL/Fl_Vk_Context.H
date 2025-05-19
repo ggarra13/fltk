@@ -42,6 +42,7 @@ struct Fl_Vk_Context
     uint32_t                queue_count;
     std::mutex              queue_mutex;
     VkQueue                       queue;
+    uint32_t           queueFamilyIndex;
     
     VkCommandPool           commandPool;  // memory for command buffers
 
