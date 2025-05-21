@@ -122,9 +122,6 @@ void endSingleTimeCommands(VkCommandBuffer commandBuffer,
 }
 
 void set_image_layout(VkCommandBuffer cmd,
-                      VkDevice device,
-                      VkCommandPool commandPool,
-                      VkQueue queue,
                       VkImage image,
                       VkImageAspectFlags aspectMask,
                       VkImageLayout oldLayout,
@@ -152,9 +149,6 @@ void set_image_layout(VkCommandBuffer cmd,
 // Helper function to transition an image's layout
 FL_EXPORT void transitionImageLayout(
     VkCommandBuffer cmd,
-    VkDevice device,
-    VkCommandPool commandPool,
-    VkQueue queue,
     VkImage image,
     VkImageLayout oldLayout, VkImageLayout newLayout)
 {
@@ -231,9 +225,6 @@ FL_EXPORT void transitionImageLayout(
     }
 
     set_image_layout(cmd,
-                     device,
-                     commandPool,
-                     queue,
                      image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      oldLayout,

@@ -277,10 +277,7 @@ void Fl_Vk_Window_Driver::prepare_depth() {
                                                 pWindow->commandPool());
   {
       std::lock_guard<std::mutex> lock(pWindow->queue_mutex());
-      set_image_layout(cmd, pWindow->device(),
-                       pWindow->commandPool(),
-                       pWindow->queue(),
-                       pWindow->m_depth.image,
+      set_image_layout(cmd, pWindow->m_depth.image,
                        aspectMask,
                        VK_IMAGE_LAYOUT_UNDEFINED,
                        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,

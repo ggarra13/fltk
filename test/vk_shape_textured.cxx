@@ -245,7 +245,7 @@ void vk_shape_window::prepare_texture_image(const uint32_t *tex_colors,
     
     // Initial transition to shader-readable layout
     VkCommandBuffer cmd = beginSingleTimeCommands(device(), commandPool());
-    set_image_layout(cmd, device(), commandPool(), queue(), tex_obj->image,
+    set_image_layout(cmd, tex_obj->image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_UNDEFINED,   // Initial layout
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -328,7 +328,7 @@ void vk_shape_window::update_texture()
     VkCommandBuffer cmd = beginSingleTimeCommands(device(), commandPool());
     
     // Transition to GENERAL for CPU writes
-    set_image_layout(cmd, device(), commandPool(), queue(), m_texture.image,
+    set_image_layout(cmd, m_texture.image,
                      VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      VK_IMAGE_LAYOUT_GENERAL,
@@ -348,8 +348,7 @@ void vk_shape_window::update_texture()
     vkUnmapMemory(device(), m_texture.mem);
 
     // Transition back to SHADER_READ_ONLY_OPTIMAL
-    set_image_layout(cmd, device(), commandPool(), queue(),
-                     m_texture.image, VK_IMAGE_ASPECT_COLOR_BIT,
+    set_image_layout(cmd, m_texture.image, VK_IMAGE_ASPECT_COLOR_BIT,
                      VK_IMAGE_LAYOUT_GENERAL,
                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                      VK_ACCESS_HOST_WRITE_BIT, VK_PIPELINE_STAGE_HOST_BIT,
