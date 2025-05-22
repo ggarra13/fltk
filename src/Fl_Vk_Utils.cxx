@@ -170,6 +170,14 @@ FL_EXPORT void transitionImageLayout(
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT; // Can happen very early
         destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT; // Transfer stage writes
     }
+    else if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+             newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    {
+        srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
     else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
              newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
     {
