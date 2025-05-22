@@ -109,8 +109,6 @@ struct Fl_Vk_Depth {
 class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   friend class Fl_Vk_Window_Driver;
   Fl_Vk_Window_Driver *pVkWindowDriver;
-
-  VkHdrMetadataEXT        m_previous_hdr_metadata;
   int mode_;
   const int *alist;
   Fl_Vk_Choice *g; // needed ?  we may need to use it translate
@@ -366,6 +364,7 @@ protected:
   bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
                              const VkHdrMetadataEXT& b);
   VkHdrMetadataEXT        m_hdr_metadata;
+  VkHdrMetadataEXT        m_previous_hdr_metadata;
   bool                    m_hdr_metadata_changed;
 
   // Optional depth buffer information
