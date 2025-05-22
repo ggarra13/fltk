@@ -118,7 +118,9 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchain.imageColorSpace = pWindow->colorSpace();
   swapchain.imageExtent = swapchainExtent;
   swapchain.imageArrayLayers = 1;
-  swapchain.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  swapchain.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchain.preTransform = surfCapabilities.currentTransform;
   swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
