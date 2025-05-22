@@ -1081,6 +1081,7 @@ void Fl_Vk_Window::init() {
   m_currentExtent = {0, 0};
 
   // For drawing
+  m_in_render_pass = false;
   m_clearColor = { 0.F, 0.F, 0.F, 0.F };
   m_depthStencil = 1.0;
   

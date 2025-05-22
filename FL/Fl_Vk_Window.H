@@ -115,10 +115,6 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
-  //! Tracking variable to know if begin_render_pass()/end_render_pass() has
-  //! been called.
-  bool                   m_in_render_pass = false;
-
   //! Fence used to handle resizes.
   VkFence                m_resizeFence;
   VkExtent2D             m_currentExtent; // Track current swapchain extend
@@ -310,6 +306,10 @@ public:
   Fl_Vk_Context ctx;
 
   // Per Window variables
+
+  //! Tracking variable to know if begin_render_pass()/end_render_pass() has
+  //! been called.
+  bool                   m_in_render_pass;
 
   // For clearing the background (should be set in vk_draw_begin())
   VkClearColorValue  m_clearColor;
