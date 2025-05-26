@@ -44,7 +44,7 @@ static bool all_windows_invisible()
 //! Per application variables (statics).
 VkInstance              Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
 VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
-VkQueue                 Fl_Vk_Window::m_queue = VK_NULL_HANDLE;
+Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
 
 
@@ -843,6 +843,9 @@ void Fl_Vk_Window::shutdown_vulkan() {
     {
         if (all_windows_invisible())
         {
+            delete m_queue;
+            m_queue = nullptr;
+            
             if (m_device != VK_NULL_HANDLE)
             {
                 vkDestroyDevice(m_device, nullptr);
@@ -1064,6 +1067,10 @@ void Fl_Vk_Window::init() {
   m_debugSync = false;
 #endif
 
+  // Allocate a dummy safe thread queue
+  // (will probably get overwritten by Fl_Vk_Window_Driver)
+  if (m_queue == nullptr)
+      m_queue = new Fl_Vk_Queue();
   
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class
   m_allocator = nullptr;

@@ -234,8 +234,8 @@ public:
   inline VkDevice&                 device() { return ctx.device; }
   inline VkPipelineCache&   pipelineCache() { return ctx.pipelineCache; }
   inline uint32_t&       queueFamilyIndex() { return ctx.queueFamilyIndex; }
-  inline VkQueue&                   queue() { return ctx.queue; }
-  inline std::mutex&          queue_mutex() { return ctx.queue_mutex; }
+  inline VkQueue&                   queue() { return ctx.safe_thread_queue->queue; }
+  inline std::mutex&          queue_mutex() { return ctx.safe_thread_queue->mutex; }
   inline VkCommandPool&       commandPool() { return ctx.commandPool; }
   inline VkFormat&                 format() { return ctx.format; }
   inline VkColorSpaceKHR&      colorSpace() { return ctx.colorSpace; }
@@ -249,7 +249,7 @@ public:
   inline const VkPhysicalDevice& physicalDevice() const { return ctx.gpu; }
   inline const VkDevice&                 device() const { return ctx.device; }
   inline const VkPipelineCache&   pipelineCache() const { return ctx.pipelineCache; }
-  inline const VkQueue&                   queue() const { return ctx.queue; }
+  inline const VkQueue&                   queue() const { return ctx.safe_thread_queue->queue; }
   inline const uint32_t&       queueFamilyIndex() const { return ctx.queueFamilyIndex; }
   inline const VkCommandPool&       commandPool() const { return ctx.commandPool; }
   inline const VkFormat&                 format() const { return ctx.format; }
@@ -296,9 +296,9 @@ public:
   bool m_debugSync;
   
   // These get copied into ctx for every window
-  static VkInstance m_instance; 
-  static VkDevice   m_device;
-  static VkQueue    m_queue;
+  static VkInstance   m_instance; 
+  static VkDevice     m_device;
+  static Fl_Vk_Queue* m_queue;
   
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 

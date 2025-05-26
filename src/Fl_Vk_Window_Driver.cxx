@@ -732,12 +732,15 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     if (pWindow->m_device == VK_NULL_HANDLE)
     {
         create_device();
+
+        // Create global resources
         pWindow->m_device = m_device;
-        pWindow->m_queue  = m_queue;
     }
-    
+
+    // Populate window with global resources
     pWindow->device() = pWindow->m_device;
-    pWindow->queue() =  pWindow->m_queue;
+    pWindow->ctx.safe_thread_queue = pWindow->m_queue;
+    pWindow->m_queue->queue = m_queue;
     
     uint32_t formatCount;
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(

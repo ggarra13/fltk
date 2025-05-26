@@ -25,23 +25,35 @@
 #include <mutex>
 #include <vector>
 
+//! Wrapper to keep a queue and a mutex for safe use in multithreading.
+//! Each FLTK window receives a pointer to it.
+struct Fl_Vk_Queue
+{
+    std::mutex                    mutex;
+    VkQueue                       queue;
+
+    Fl_Vk_Queue() :
+        queue(VK_NULL_HANDLE)
+        {
+        }
+};
+
 // We keep this in a context struct, so we can pass them to some other library
 // or functions easily.
 struct Fl_Vk_Context
 {
-    VkInstance         instance; 
+    VkInstance         instance;   // created once and filled later from Fl_Vk_Window_Driver
 
     VkPhysicalDevice   gpu;
     VkPhysicalDeviceProperties gpu_props;
     VkPhysicalDeviceFeatures gpu_features;
     
-    VkDevice           device;
+    VkDevice           device;   // created once and filled later from Fl_Vk_Window_Driver
     VkPipelineCache    pipelineCache; 
 
     VkQueueFamilyProperties* queue_props;
+    Fl_Vk_Queue*      safe_thread_queue;
     uint32_t                queue_count;
-    std::mutex              queue_mutex;
-    VkQueue                       queue;
     uint32_t           queueFamilyIndex;
     
     VkCommandPool           commandPool;  // memory for command buffers
@@ -58,14 +70,17 @@ struct Fl_Vk_Context
     // List of device extensions
     std::vector<const char*> device_extensions;
 
+    VkQueue& queue() { return safe_thread_queue->queue; }
+    std::mutex& queue_mutex() { return safe_thread_queue->mutex; }
+    
     Fl_Vk_Context() :
         instance(VK_NULL_HANDLE),
         gpu(VK_NULL_HANDLE),
         device(VK_NULL_HANDLE),
         pipelineCache(VK_NULL_HANDLE),
         queue_props(nullptr),
+        safe_thread_queue(nullptr),
         queue_count(0),
-        queue(VK_NULL_HANDLE),
         commandPool(VK_NULL_HANDLE)
         {
         };
