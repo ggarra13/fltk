@@ -1071,6 +1071,7 @@ void Fl_Vk_Window::init() {
   // (will probably get overwritten by Fl_Vk_Window_Driver)
   if (m_queue == nullptr)
       m_queue = new Fl_Vk_Queue();
+  ctx.safe_thread_queue = m_queue;
   
   m_surface = VK_NULL_HANDLE; // not really needed to keep in class
   m_allocator = nullptr;
