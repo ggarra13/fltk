@@ -128,7 +128,8 @@ void Fl_Vk_Window::recreate_swapchain() {
     cmd_pool_info.queueFamilyIndex = ctx.queueFamilyIndex;
     cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
-    if (result != VK_SUCCESS) {
+    if (result != VK_SUCCESS)
+    {
         fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
         pVkWindowDriver->destroy_resources();
         m_swapchain = VK_NULL_HANDLE;
@@ -296,7 +297,7 @@ void Fl_Vk_Window::vk_draw_begin() {
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
                                  UINT64_MAX); 
         if (result != VK_SUCCESS) {
-            fprintf(stderr, "vkWaitForFences failed: %s\n", string_VkResult(result));
+            fprintf(stderr, "Fl_Vk_Window - vkWaitForFences failed: %s\n", string_VkResult(result));
             frame.active = false;
             return;
         }
