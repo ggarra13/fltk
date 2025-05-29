@@ -865,7 +865,7 @@ double Fl_Darwin_System_Driver::wait(double time_to_wait)
   Fl::flush();
   if (fl_mac_os_version < 101100) NSEnableScreenUpdates(); // deprecated 10.11
 #pragma clang diagnostic pop
-  if (Fl::idle) // 'idle' may have been set within flush()
+  if (Fl::idle()) // 'idle' may have been set within flush()
     time_to_wait = 0.0;
   int retval = do_queued_events(time_to_wait);
 
@@ -2515,6 +2515,14 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
 - (BOOL)performKeyEquivalent:(NSEvent*)theEvent
 {
   //NSLog(@"performKeyEquivalent:");
+  /* The condition below is always false (and therefore the return statement doesn't run)
+   for the FLTK library unless it contains class Fl_Native_Input with which FLTK windows
+   may contain subviews inside their contentView. When such subview has focus, the condition
+   below becomes true.
+   */
+  if ([[self window] firstResponder] != self) {
+    return NO;
+  }
   fl_lock_function();
   cocoaKeyboardHandler(theEvent);
   BOOL handled;
