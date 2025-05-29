@@ -320,7 +320,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     {
         fprintf(stderr, "Acquiring image for frame %u\n", m_currentFrameIndex);
     }
-    const uint64_t timeout = 100000000; // 100ms
+    const uint64_t timeout = UINT64_MAX;
     result = vkAcquireNextImageKHR(device(), m_swapchain, timeout,
                                    frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
                                    &m_current_buffer);
