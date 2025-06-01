@@ -311,7 +311,7 @@ void Fl_Cocoa_Vk_Window_Driver::create_surface()
     // Use vkCreateMetalSurfaceEXT instead of vkCreateMacOSSurfaceMVK
     VkResult result = vkCreateMetalSurfaceEXT(pWindow->ctx.instance,
                                               &surfaceInfo,
-                                              pWindow->m_allocator,
+                                              nullptr,
                                               &pWindow->m_surface);
     if (result != VK_SUCCESS)
     {
