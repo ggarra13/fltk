@@ -71,6 +71,7 @@
 #  include <vulkan/vulkan.h>
 #endif
 
+#define VMA_CALL_PRE FL_EXPORT
 
 #define VMA_VULKAN_VERSION 1002000 // Vulkan 1.2
 #include "FL/vk_mem_alloc.h"
