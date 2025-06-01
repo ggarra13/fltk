@@ -15,11 +15,17 @@
 //     https://www.fltk.org/bugs.php
 //
 
+#define VMA_IMPLEMENTATION
+#define VMA_VULKAN_VERSION 1002000 
+#include "FL/vk_mem_alloc.h"
+
 #include <FL/vk_enum_string_helper.h>
 #include <vulkan/vulkan.h>
 
 #include "FL/Fl_Vk_Utils.H"
 #include "Fl_Vk_Window_Driver.H"
+
+
 
 #include <cassert>
 #include <iostream>
@@ -736,11 +742,19 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         // Create global resources
         pWindow->m_device = m_device;
         pWindow->m_queue->queue = m_queue;
+        
+        // Create Vma allocator
+        VmaAllocatorCreateInfo allocatorInfo = {};
+        allocatorInfo.physicalDevice = pWindow->gpu();
+        allocatorInfo.device = m_device;
+        allocatorInfo.instance = pWindow->instance();
+        vmaCreateAllocator(&allocatorInfo, &pWindow->m_allocator);
     }
 
     // Populate window with global resources
     pWindow->device() = pWindow->m_device;
     pWindow->ctx.safe_thread_queue = pWindow->m_queue;
+    pWindow->ctx.allocator = pWindow->m_allocator;
     
     uint32_t formatCount;
     result = vkGetPhysicalDeviceSurfaceFormatsKHR(

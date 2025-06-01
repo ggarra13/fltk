@@ -61,6 +61,8 @@ struct Fl_Vk_Context
     VkFormat                     format;   // for depth and color formats
     VkColorSpaceKHR          colorSpace; // sRGB, HDR10 or HLG for example
 
+    VmaAllocator             allocator;
+    
     // List of enabled layers
     std::vector<const char*> enabled_layers;
 
@@ -81,7 +83,8 @@ struct Fl_Vk_Context
         queue_props(nullptr),
         safe_thread_queue(nullptr),
         queue_count(0),
-        commandPool(VK_NULL_HANDLE)
+        commandPool(VK_NULL_HANDLE),
+        allocator(VK_NULL_HANDLE)
         {
         };
 
@@ -101,7 +104,7 @@ struct Fl_Vk_Context
                 commandPool = VK_NULL_HANDLE;
             }
 
-            // Queue and Device are statics shared across all windows.
+            // Queue, device and allocator are statics shared across all windows.
             // They are destroyed on program exit.
         }
 };

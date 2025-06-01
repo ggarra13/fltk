@@ -299,6 +299,7 @@ public:
   static VkInstance   m_instance; 
   static VkDevice     m_device;
   static Fl_Vk_Queue* m_queue;
+  static VmaAllocator m_allocator;
   
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
 
@@ -324,9 +325,6 @@ public:
   //! For drawing (one pipeline and one render pass by default)
   VkRenderPass m_renderPass;
   VkPipeline   m_pipeline;
-
-  //! Allocator callback (unused for now).
-  const VkAllocationCallbacks*    m_allocator;
 
 private:
   // Per frame data used internally.

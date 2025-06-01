@@ -44,6 +44,7 @@ static bool all_windows_invisible()
 //! Per application variables (statics).
 VkInstance              Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
 VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
+VmaAllocator            Fl_Vk_Window::m_allocator = VK_NULL_HANDLE;
 Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
 
@@ -845,6 +846,12 @@ void Fl_Vk_Window::shutdown_vulkan() {
         {
             delete m_queue;
             m_queue = nullptr;
+            
+            if (m_allocator != VK_NULL_HANDLE)
+            {
+                vmaDestroyAllocator(m_allocator);
+                m_allocator = VK_NULL_HANDLE;
+            }
             
             if (m_device != VK_NULL_HANDLE)
             {

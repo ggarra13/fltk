@@ -71,6 +71,10 @@
 #  include <vulkan/vulkan.h>
 #endif
 
+
+#define VMA_VULKAN_VERSION 1002000 // Vulkan 1.2
+#include "FL/vk_mem_alloc.h"
+
 #define VK_CHECK(err) vk_check_result(err, __FILE__, __LINE__);
 
 #define VK_ALLOC(x)  (void*)malloc(x)
