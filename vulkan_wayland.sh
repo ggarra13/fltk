@@ -9,6 +9,7 @@ export VULKAN_SDK=/usr/
 
 cmake .. \
       -G Ninja \
+      -D CMAKE_CXX_STANDARD=17 \
       -D CMAKE_BUILD_TYPE=Debug \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \

@@ -13,6 +13,7 @@ fi
 cmake .. \
       -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_CXX_STANDARD=17 \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
