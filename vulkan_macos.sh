@@ -67,13 +67,17 @@ cmake .. \
       -D FLTK_USE_SYSTEM_LIBPNG=OFF \
       -D FLTK_USE_SYSTEM_ZLIB=OFF \
       -D FLTK_USE_SYSTEM_LIBDECOR=OFF \
+<<<<<<< Updated upstream
       -D GLU_LIB="" \
       -D LIB_GL="" \
       -D LIB_MesaGL="" \
       -D OPENGL_INCLUDE_DIR="" \
       -D X11_xcb_xcb_INCLUDE_PATH="" 
+=======
+      -D FLTK_USE_LIBDECOR_GTK=OFF
+>>>>>>> Stashed changes
 
-ninja
+ninja -v -v &> compile.log
 
 
 bin/test/vk_shape-shared
