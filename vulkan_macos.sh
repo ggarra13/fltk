@@ -43,6 +43,7 @@ export VK_ICD_FILENAMES=$VULKAN_SDK/etc/vulkan/icd.d/MoltenVK_icd.json
 
 cmake .. \
       -G Ninja \
+      -D CMAKE_VERBOSE_MAKEFILE=ON \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
@@ -67,17 +68,9 @@ cmake .. \
       -D FLTK_USE_SYSTEM_LIBPNG=OFF \
       -D FLTK_USE_SYSTEM_ZLIB=OFF \
       -D FLTK_USE_SYSTEM_LIBDECOR=OFF \
-<<<<<<< Updated upstream
-      -D GLU_LIB="" \
-      -D LIB_GL="" \
-      -D LIB_MesaGL="" \
-      -D OPENGL_INCLUDE_DIR="" \
-      -D X11_xcb_xcb_INCLUDE_PATH="" 
-=======
       -D FLTK_USE_LIBDECOR_GTK=OFF
->>>>>>> Stashed changes
 
-ninja -v -v &> compile.log
+ninja &> compile.log
 
 
 bin/test/vk_shape-shared
