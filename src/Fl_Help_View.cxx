@@ -17,30 +17,7 @@
 //
 //     https://www.fltk.org/bugs.php
 //
-// Contents:
-//
-//   Fl_Help_View::add_block()       - Add a text block to the list.
-//   Fl_Help_View::add_link()        - Add a new link to the list.
-//   Fl_Help_View::add_target()      - Add a new target to the list.
-//   Fl_Help_View::compare_targets() - Compare two targets.
-//   Fl_Help_View::do_align()        - Compute the alignment for a line in a block.
-//   Fl_Help_View::draw()            - Draw the Fl_Help_View widget.
-//   Fl_Help_View::format()          - Format the help text.
-//   Fl_Help_View::format_table()    - Format a table...
-//   Fl_Help_View::free_data()       - Free memory used for the document.
-//   Fl_Help_View::get_align()       - Get an alignment attribute.
-//   Fl_Help_View::get_attr()        - Get an attribute value from the string.
-//   Fl_Help_View::get_color()       - Get an alignment attribute.
-//   Fl_Help_View::handle()          - Handle events in the widget.
-//   Fl_Help_View::Fl_Help_View()    - Build a Fl_Help_View widget.
-//   Fl_Help_View::~Fl_Help_View()   - Destroy a Fl_Help_View widget.
-//   Fl_Help_View::load()            - Load the specified file.
-//   Fl_Help_View::resize()          - Resize the help widget.
-//   Fl_Help_View::topline()         - Set the top line to the named target.
-//   Fl_Help_View::topline()         - Set the top line by number.
-//   Fl_Help_View::value()           - Set the help text directly.
-//   scrollbar_callback()            - A callback for the scrollbar.
-//
+
 
 //
 // Include necessary header files...
@@ -51,7 +28,6 @@
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Pixmap.H>
 #include <FL/Fl_Menu_Item.H>
-#include "Fl_Int_Vector.H"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,6 +60,26 @@ static int      quote_char(const char *);
 static void     scrollbar_callback(Fl_Widget *s, void *);
 static void     hscrollbar_callback(Fl_Widget *s, void *);
 
+// The following function is used to make anchors in a link (the part after
+// the '#') case insensitive. As it is, the function handles only ASCII
+// characters. Should it be extended to handle UTF-8 characters as well?
+//
+// UTF8 is allowed in anchors, but only when it is encoded between '%', so
+// `https://example.com/page#%C3%BCber` is valid, but
+// `https://example.com/page#über is *not*.
+//
+// But as with everything in HTML, nobody cares and everybody does what they
+// want anyway ;-) .
+
+static std::string to_lower(const std::string &str) {
+  std::string lower_str;
+  lower_str.reserve(str.size());
+  for (char c : str) {
+    lower_str += fl_tolower(c);
+  }
+  return lower_str;
+}
+
 // This function skips 'n' bytes *within* a string, i.e. it checks
 // for a NUL byte as string terminator.
 // If a NUL byte is found before 'n' bytes have been scanned it returns
@@ -101,6 +97,38 @@ static char *skip_bytes(const char *p, int n) {
   }
   return const_cast<char *>(p);
 }
+
+
+/**
+ \brief Check if a URL is starting with a scheme (e.g. ftp:).
+ \param[in] url the URL to check.
+ \return 0 if not found, otherwise the length of the scheme string including
+     the following '/' characters.
+ */
+static size_t url_scheme(const std::string &url, bool skip_slashes=false)
+{
+  // First skip all ascii letters and digits
+  size_t pos = 0;
+  while ( (pos < url.size()) && ( isalnum(url[pos]) || (url[pos] == '+') || (url[pos] == '-') || (url[pos] == '.') )) {
+    pos++;
+  }
+  // Next, check for the ':' character
+  if ( (pos < url.size()) && (url[pos] == ':') ) {
+    pos++; // Skip the ':' character
+    if (skip_slashes) {
+      // If found, skip up to two '/' characters as well
+      if ( (pos < url.size()) && (url[pos] == '/') ) {
+        pos++; // Skip the first '/' character
+        if ( (pos < url.size()) && (url[pos] == '/') ) {
+          pos++; // Skip the second '/' character
+        }
+      }
+    }
+    return pos; // Return the length of the scheme including the following '/' characters
+  }
+  return 0; // No scheme found
+}
+
 
 //
 // global flag for image loading (see get_image).
@@ -144,94 +172,183 @@ static const char * const broken_xpm[] =
                   "@              @",
                   "@              @",
                   "@@@@@@@@@@@@@@@@",
-                  NULL
+                  nullptr
                 };
 
 static Fl_Pixmap broken_image(broken_xpm);
 
-/** [this text may be customized at run-time] */
+/** This text may be customized at run-time. */
 const char *Fl_Help_View::copy_menu_text = "Copy";
 
 static Fl_Menu_Item rmb_menu[] = {
-  { NULL, 0, NULL, (void*)1 },  // Copy
-  { NULL }
+  { nullptr, 0, nullptr, (void*)1 },  // Copy
+  { nullptr }
 };
+
 
 //
 // Simple margin stack for Fl_Help_View::format()...
 //
+class Margin_Stack
+{
+  std::vector<int> margins_;
 
-struct fl_margins {
-  int depth_;
-  int margins_[100];
-
-  fl_margins() { clear();  }
-
-  int clear() {
-    // puts("fl_margins::clear()");
-    depth_ = 0;
-    return margins_[0] = 4;
+public:
+  Margin_Stack() = default;
+  void clear() {
+    margins_.clear();
+    margins_.push_back(4); // default margin
   }
-
-  int current() { return margins_[depth_]; }
-
+  int current() {
+    return margins_.back();
+  }
   int pop() {
-    // printf("fl_margins::pop(): depth_=%d, xx=%d\n", depth_,
-    //        depth_ > 0 ? margins_[depth_ - 1] : 4);
-
-    if (depth_ > 0) {
-      depth_ --;
-      return margins_[depth_];
-    } else return 4;
-  }
-
-  int push(int indent) {
-    int xx;
-
-    xx = margins_[depth_] + indent;
-
-    // printf("fl_margins::push(indent=%d): depth_=%d, xx=%d\n", indent,
-    //        depth_ + 1, xx);
-
-    if (depth_ < 99) {
-      depth_ ++;
-      margins_[depth_] = xx;
+    if (margins_.size() > 1) {
+      margins_.pop_back();
     }
-
+    return margins_.back();
+  }
+  int push(int indent) {
+    int xx = current() + indent;
+    margins_.push_back(xx);
     return xx;
   }
 };
+
+
+/**
+  \brief Constructs a Font_Style object with the specified font, size, and color.
+  \param afont The font to use.
+  \param asize The font size.
+  \param acolor The font color.
+*/
+Fl_Help_View::Font_Style::Font_Style(Fl_Font afont, Fl_Fontsize asize, Fl_Color acolor) {
+  set(afont, asize, acolor);
+}
+
+
+/**
+  \brief Retrieves the font, font size, and color settings from this Font_Style instance.
+  \param[out] afont  Reference to a variable where the font will be stored.
+  \param[out] asize  Reference to a variable where the font size will be stored.
+  \param[out] acolor Reference to a variable where the font color will be stored.
+ */
+void Fl_Help_View::Font_Style::get(Fl_Font &afont, Fl_Fontsize &asize, Fl_Color &acolor) {
+  afont=f; asize=s; acolor=c;
+}
+
+
+/**
+  \brief Sets the font, font size, and color for the Font_Style.
+  This only set the members of the class, but does not change the current
+  rendering settings.
+  \param afont   The font to be used.
+  \param asize   The font size to be set.
+  \param acolor  The color to be applied to the font.
+*/
+void Fl_Help_View::Font_Style::set(Fl_Font afont, Fl_Fontsize asize, Fl_Color acolor) {
+  f=afont; s=asize; c=acolor;
+}
+
+
+/**
+ \brief Initializes the font stack with a default font, size, and color.
+ Clears the stack and pushes one element with a default font, size, and color.
+ \param[in] f font to apply
+ \param[in] s font size to apply
+ \param[in] c color to apply
+ */
+void Fl_Help_View::Font_Stack::init(Fl_Font f, Fl_Fontsize s, Fl_Color c) {
+  elts_.clear();
+  push(f, s, c);
+}
+
+
+/**
+  \brief Gets the top (current) element on the stack.
+  \param[out] f font to apply
+  \param[out] s font size to apply
+  \param[out] c color to apply
+  \note This function does not pop the stack, it just returns the top element.
+  */
+void Fl_Help_View::Font_Stack::top(Fl_Font &f, Fl_Fontsize &s, Fl_Color &c) {
+  elts_.back().get(f, s, c);
+}
+
+
+/**
+ \brief Push the font style triplet on the stack.
+ Also calls fl_font() and fl_color() adequately
+ \param[in] f font to apply
+ \param[in] s font size to apply
+ \param[in] c color to apply
+ */
+void Fl_Help_View::Font_Stack::push(Fl_Font f, Fl_Fontsize s, Fl_Color c) {
+  elts_.push_back(Font_Style(f, s, c));
+  fl_font(f, s);
+  fl_color(c);
+}
+
+
+/**
+  \brief Pop style form the stack and apply new top style.
+  Pops from the stack the font style triplet and calls fl_font()
+  and fl_color() adequately
+  \param[out] f font to apply
+  \param[out] s font size to apply
+  \param[out] c color to apply
+  \note If the stack has only one element left, that element will not be popped,
+      but the top element will be applied again.
+ */
+void Fl_Help_View::Font_Stack::pop(Fl_Font &f, Fl_Fontsize &s, Fl_Color &c) {
+  if (elts_.size() > 1)
+    elts_.pop_back();
+  top(f, s, c);
+  fl_font(f, s);
+  fl_color(c);
+}
+
+
+/**
+  \brief Gets the current count of font style elements in the stack.
+  \return stack size in number of elements
+  */
+size_t Fl_Help_View::Font_Stack::count() const {
+  return elts_.size();
+}
+
 
 //
 // All the stuff needed to implement text selection in Fl_Help_View
 //
 
 /* matt:
- * We are trying to keep binary compatibility with previous versions
- * of FLTK. This means that we are limited to adding static variables
- * only to not enlarge the Fl_Help_View class. Lucky for us, only one
- * text can be selected system wide, so we can remember the selection
- * in a single set of variables.
- *
- * Still to do:
- * - &word; style characters mess up our count inside a word boundary
- * - we can only select words, no individual characters
- * - no dragging of the selection into another widget
- * - selection must be cleared if another widget get focus!
- * - write a comment for every new function
+  The selection code was implemented with binary compatibility within 1.4
+  in mind. This means that I was limited to adding static variables
+  only to not enlarge the Fl_Help_View class.
+
+  The implementation of selection should be change to use class local variables
+  so text in multiple Fl_Help_View widgets can be selected independently.
+
+  Still to do:
+  - &word; style characters mess up our count inside a word boundary
+  - we can only select words, no individual characters
+  - no dragging of the selection into another widget
+  - selection must be cleared if another widget get focus!
+  - write a comment for every new function
  */
 
 /*
-The following functions are also used to draw stuff and should be replaced with
-local copies that are much faster when merely counting:
+  The following functions are also used to draw stuff and should be replaced with
+  local copies that are much faster when merely counting:
 
-fl_color(Fl_Color);
-fl_rectf(int, int, int, int);
-fl_push_clip(int, int, int, int);
-fl_xyline(int, int, int);
-fl_rect()
-fl_line()
-img->draw()
+  fl_color(Fl_Color);
+  fl_rectf(int, int, int, int);
+  fl_push_clip(int, int, int, int);
+  fl_xyline(int, int, int);
+  fl_rect()
+  fl_line()
+  img->draw()
 */
 
 // We don't put the offscreen buffer in the help view class because
@@ -252,8 +369,17 @@ Fl_Help_View *Fl_Help_View::current_view_ = 0L;
 Fl_Color Fl_Help_View::hv_selection_color_;
 Fl_Color Fl_Help_View::hv_selection_text_color_;
 
-/*
- * This function must be optimized for speed!
+
+/**
+  \brief Draws a text string in the help view.
+
+  This function draws the text string \p t at position (\p x, \p y) in the help view.
+  If the text is selected, it draws a selection rectangle around it and changes the text color.
+
+  \param[in] t Text to draw
+  \param[in] x X position to draw at
+  \param[in] y Y position to draw at
+  \param[in] entity_extra_length (unclear)
  */
 void Fl_Help_View::hv_draw(const char *t, int x, int y, int entity_extra_length)
 {
@@ -287,6 +413,7 @@ void Fl_Help_View::hv_draw(const char *t, int x, int y, int entity_extra_length)
     }
   }
 }
+
 
 // [Internal class HV_Edit_Buffer]
 
@@ -364,33 +491,30 @@ void HV_Edit_Buffer::print(const char *text) {
 // [End of internal class HV_Edit_Buffer]
 
 
-/** Adds a text block to the list. */
-Fl_Help_Block *                                 // O - Pointer to new block
-Fl_Help_View::add_block(const char   *s,        // I - Pointer to start of block text
-                        int           xx,       // I - X position of block
-                        int           yy,       // I - Y position of block
-                        int           ww,       // I - Right margin of block
-                        int           hh,       // I - Height of block
-                        unsigned char border)   // I - Draw border?
+/**
+  \brief Adds a text block to the list.
+  \param[in] s Pointer to start of block text
+  \param[in] xx X position of block
+  \param[in] yy Y position of block
+  \param[in] ww Right margin of block
+  \param[in] hh Height of block
+  \param[in] border Draw border?
+  \return Pointer to the new block in the list.
+  */
+Fl_Help_View::Text_Block *Fl_Help_View::add_block(
+  const char *s,
+  int xx, int yy, int ww, int hh,
+  unsigned char border)
 {
-  Fl_Help_Block *temp;                          // New block
-
+  Text_Block *temp;                          // New block
 
   // printf("add_block(s = %p, xx = %d, yy = %d, ww = %d, hh = %d, border = %d)\n",
   //        s, xx, yy, ww, hh, border);
 
-  if (nblocks_ >= ablocks_)
-  {
-    ablocks_ += 16;
+  blocks_.push_back(Text_Block()); // Add a new block to the vector
+  temp = &blocks_.back();
 
-    if (ablocks_ == 16)
-      blocks_ = (Fl_Help_Block *)malloc(sizeof(Fl_Help_Block) * ablocks_);
-    else
-      blocks_ = (Fl_Help_Block *)realloc(blocks_, sizeof(Fl_Help_Block) * ablocks_);
-  }
-
-  temp = blocks_ + nblocks_;
-  memset(temp, 0, sizeof(Fl_Help_Block));
+  memset(temp, 0, sizeof(Text_Block));
   temp->start   = s;
   temp->end     = s;
   temp->x       = xx;
@@ -399,107 +523,76 @@ Fl_Help_View::add_block(const char   *s,        // I - Pointer to start of block
   temp->h       = hh;
   temp->border  = border;
   temp->bgcolor = bgcolor_;
-  nblocks_ ++;
 
   return (temp);
 }
 
 
-/** Adds a new link to the list. */
-void Fl_Help_View::add_link(const char *n,      // I - Name of link
-                      int        xx,    // I - X position of link
-                      int        yy,    // I - Y position of link
-                      int        ww,    // I - Width of link text
-                      int        hh)    // I - Height of link text
+/**
+  \brief Add a new link and its postion on screen to the link list.
+  \param[in] link a filename, followed by a hash and a target. All parts are optional.
+  \param[in] xx, yy, ww, hh bounding box of the link text on screen
+ */
+void Fl_Help_View::add_link(const std::string &link, int xx, int yy, int ww, int hh)
 {
-  Fl_Help_Link  *temp;                  // New link
-  char          *target;                // Pointer to target name
+  auto new_link = std::make_shared<Link>(); // Create a new link storage object.
 
+  new_link->box = { xx, yy, ww, hh };
 
-  if (nlinks_ >= alinks_)
-  {
-    alinks_ += 16;
-
-    if (alinks_ == 16)
-      links_ = (Fl_Help_Link *)malloc(sizeof(Fl_Help_Link) * alinks_);
-    else
-      links_ = (Fl_Help_Link *)realloc(links_, sizeof(Fl_Help_Link) * alinks_);
+  size_t hash_pos = link.find('#'); // Find the hash character
+  if (hash_pos != std::string::npos) {
+    // If a '#' is found, split the link into filename and target
+    new_link->filename_ = link.substr(0, hash_pos);
+    new_link->target = link.substr(hash_pos + 1);
+  } else {
+    // No '#' found, use the whole link as filename
+    new_link->filename_ = link;
+    new_link->target.clear();
   }
 
-  temp = links_ + nlinks_;
-
-  temp->x       = xx;
-  temp->y       = yy;
-  temp->w       = xx + ww;
-  temp->h       = yy + hh;
-
-  strlcpy(temp->filename, n, sizeof(temp->filename));
-
-  if ((target = strrchr(temp->filename, '#')) != NULL)
-  {
-    *target++ = '\0';
-    strlcpy(temp->name, target, sizeof(temp->name));
-  }
-  else
-    temp->name[0] = '\0';
-
-  nlinks_ ++;
+  link_list_.push_back(new_link);  // Add the link to the list.
 }
 
 
-/** Adds a new target to the list. */
-void Fl_Help_View::add_target(const char *n,    // I - Name of target
-                              int        yy)    // I - Y position of target
+/**
+  \brief Adds a new target to the list.
+  \param[in] n  Name of target (string)
+  \param[in] yy line number of target position
+ */
+void Fl_Help_View::add_target(const std::string &n, int yy)
 {
-  Fl_Help_Target        *temp;                  // New target
-
-
-  if (ntargets_ >= atargets_)
-  {
-    atargets_ += 16;
-
-    if (atargets_ == 16)
-      targets_ = (Fl_Help_Target *)malloc(sizeof(Fl_Help_Target) * atargets_);
-    else
-      targets_ = (Fl_Help_Target *)realloc(targets_, sizeof(Fl_Help_Target) * atargets_);
-  }
-
-  temp = targets_ + ntargets_;
-
-  temp->y = yy;
-  strlcpy(temp->name, n, sizeof(temp->name));
-
-  ntargets_ ++;
+  std::string target = to_lower(n); // Convert target name to lower case
+  target_line_map_[target] = yy; // Store the target line in the map
 }
 
-/** Compares two targets.*/
-int                                                     // O - Result of comparison
-Fl_Help_View::compare_targets(const Fl_Help_Target *t0, // I - First target
-                             const Fl_Help_Target *t1)  // I - Second target
-{
-  return (strcasecmp(t0->name, t1->name));
-}
 
-/** Computes the alignment for a line in a block.*/
-int                                             // O - New line
-Fl_Help_View::do_align(Fl_Help_Block *block,    // I - Block to add to
-                      int          line,        // I - Current line
-                      int          xx,          // I - Current X position
-                      int          a,           // I - Current alignment
-                      int          &l)          // IO - Starting link
+/**
+  \brief Computes the alignment for a line in a block.
+  \param[in] block Pointer to the block to add to
+  \param[in] line Current line number in the block
+  \param[in] xx Current X position in the block
+  \param[in] a Current alignment
+  \param[in,out] l Starting link index for alignment adjustment
+  \return The new line number after alignment adjustment
+ */
+int Fl_Help_View::do_align(
+  Text_Block *block,
+  int line,
+  int xx,
+  Align a,
+  int &l)
 {
   int   offset;                                 // Alignment offset
 
-
   switch (a)
   {
-    case RIGHT :        // Right align
+    case Align::RIGHT:        // Right align
         offset = block->w - xx;
         break;
-    case CENTER :       // Center
+    case Align::CENTER:       // Center
         offset = (block->w - xx) / 2;
         break;
-    default :           // Left align
+    default:           // Left align
         offset = 0;
         break;
   }
@@ -509,22 +602,22 @@ Fl_Help_View::do_align(Fl_Help_Block *block,    // I - Block to add to
   if (line < 31)
     line ++;
 
-  while (l < nlinks_)
-  {
-    links_[l].x += offset;
-    links_[l].w += offset;
-    l ++;
+  while (l < (int)link_list_.size()) {
+    link_list_[l]->box.x( link_list_[l]->box.x() + offset);
+    l++;
   }
 
   return (line);
 }
 
-/** Draws the Fl_Help_View widget. */
-void
-Fl_Help_View::draw()
+
+/**
+  \brief Draws the Fl_Help_View widget.
+*/
+void Fl_Help_View::draw()
 {
   int                   i;              // Looping var
-  const Fl_Help_Block   *block;         // Pointer to current block
+  const Text_Block   *block;         // Pointer to current block
   const char            *ptr,           // Pointer to text in block
                         *attrs;         // Pointer to start of element attributes
   HV_Edit_Buffer        buf;            // Text buffer
@@ -595,7 +688,7 @@ Fl_Help_View::draw()
   fl_color(textcolor_);
 
   // Draw all visible blocks...
-  for (i = 0, block = blocks_; i < nblocks_; i ++, block ++)
+  for (i = 0, block = &blocks_[0]; i < (int)blocks_.size(); i ++, block ++)
     if ((block->y + block->h) >= topline_ && block->y < (topline_ + h()))
     {
       line      = 0;
@@ -712,7 +805,7 @@ Fl_Help_View::draw()
           {
             // Comment...
             ptr += 3;
-            if ((ptr = strstr(ptr, "-->")) != NULL)
+            if ((ptr = strstr(ptr, "-->")) != nullptr)
             {
               ptr += 3;
               continue;
@@ -805,7 +898,7 @@ Fl_Help_View::draw()
             buf.clear();
           }
           else if (buf.cmp("A") &&
-                   get_attr(attrs, "HREF", attr, sizeof(attr)) != NULL)
+                   get_attr(attrs, "HREF", attr, sizeof(attr)) != nullptr)
           {
             fl_color(linkcolor_);
             underline = 1;
@@ -817,11 +910,11 @@ Fl_Help_View::draw()
           }
           else if (buf.cmp("FONT"))
           {
-            if (get_attr(attrs, "COLOR", attr, sizeof(attr)) != NULL) {
+            if (get_attr(attrs, "COLOR", attr, sizeof(attr)) != nullptr) {
               textcolor_ = get_color(attr, textcolor_);
             }
 
-            if (get_attr(attrs, "FACE", attr, sizeof(attr)) != NULL) {
+            if (get_attr(attrs, "FACE", attr, sizeof(attr)) != nullptr) {
               if (!strncasecmp(attr, "helvetica", 9) ||
                   !strncasecmp(attr, "arial", 5) ||
                   !strncasecmp(attr, "sans", 4)) font = FL_HELVETICA;
@@ -831,7 +924,7 @@ Fl_Help_View::draw()
               else font = FL_COURIER;
             }
 
-            if (get_attr(attrs, "SIZE", attr, sizeof(attr)) != NULL) {
+            if (get_attr(attrs, "SIZE", attr, sizeof(attr)) != nullptr) {
               if (isdigit(attr[0] & 255)) {
                 // Absolute size
                 fsize = (int)(textsize_ * pow(1.2, atof(attr) - 3.0));
@@ -945,7 +1038,7 @@ Fl_Help_View::draw()
             }
 
             if (!width || !height) {
-              if (get_attr(attrs, "ALT", attr, sizeof(attr)) == NULL) {
+              if (get_attr(attrs, "ALT", attr, sizeof(attr)) == nullptr) {
                 strcpy(attr, "IMG");
               }
             }
@@ -1070,15 +1163,21 @@ Fl_Help_View::draw()
   fl_pop_clip();
 } // draw()
 
-// In an html style text, set the character pointer p, skipping anything from a
-// leading '<' up to and including the closing '>'. If the end of the buffer is
-// reached, the function returns `end`.
-// No need to handle UTF-8 here.
-//
-// \param[in] p pointer to html text, UTF-8 characters possible
-// \param[in] end pointer to the end of the text (need nut be NUL)
-// \return new pointer to text after skipping over '<...>' blocks, or `end`
-//    if NUL was found or a '<...>' block was not closed.
+
+/**
+ \brief Skips over HTML tags in a text.
+
+  In an html style text, set the character pointer p, skipping anything from a
+  leading '<' up to and including the closing '>'. If the end of the buffer is
+  reached, the function returns `end`.
+
+  No need to handle UTF-8 here.
+
+  \param[in] p pointer to html text, UTF-8 characters possible
+  \param[in] end pointer to the end of the text (need nut be NUL)
+  \return new pointer to text after skipping over '<...>' blocks, or `end`
+    if NUL was found or a '<...>' block was not closed.
+*/
 static const char *vanilla(const char *p, const char *end) {
   if (*p == '\0' || p >= end) return end;
   for (;;) {
@@ -1092,7 +1191,9 @@ static const char *vanilla(const char *p, const char *end) {
   }
 }
 
-/** Finds the specified string \p s at starting position \p p.
+
+/**
+  \brief Finds the specified string \p s at starting position \p p.
 
   The argument \p p and the return value are offsets in Fl_Help_View::value(),
   counting from 0. If \p p is out of range, 0 is used.
@@ -1105,18 +1206,15 @@ static const char *vanilla(const char *p, const char *end) {
   - every newline (LF, '\\n') in value() is treated like a single space
   - all other strings are compared as-is (byte by byte)
 
-  \param[in]  s   search string in UTF-8 encoding
-  \param[in]  p   starting position for search (0,...), Default = 0
-
+  \param[in] s search string in UTF-8 encoding
+  \param[in] p starting position for search (0,...), Default = 0
   \return the matching position or -1 if not found
 */
-int                                             // O - Matching position or -1 if not found
-Fl_Help_View::find(const char *s,               // I - String to find
-                   int        p)                // I - Starting position
+int Fl_Help_View::find(const char *s, int p)
 {
   int           i,                              // Looping var
                 c;                              // Current character
-  Fl_Help_Block *b;                             // Current block
+  Text_Block *b;                             // Current block
   const char    *bp,                            // Block matching pointer
                 *bs,                            // Start of current comparison
                 *sp;                            // Search string pointer
@@ -1129,7 +1227,7 @@ Fl_Help_View::find(const char *s,               // I - String to find
   if (p < 0 || p >= (int)strlen(value_)) p = 0;
 
   // Look for the string...
-  for (i = nblocks_, b = blocks_; i > 0; i--, b++) {
+  for (i = (int)blocks_.size(), b = &blocks_[0]; i > 0; i--, b++) {
     if (b->end < (value_ + p))
       continue;
 
@@ -1177,7 +1275,7 @@ Fl_Help_View::find(const char *s,               // I - String to find
         //printf("%ld text match %c/%c\n", bp-value_, *sp, c);
         sp++;
         bp = vanilla(bp+1, b->end);
-      } else if (is_html_entity && fl_utf8decode(sp, NULL, &utf_len) == (unsigned int)c ) {
+      } else if (is_html_entity && fl_utf8decode(sp, nullptr, &utf_len) == (unsigned int)c ) {
         // Check if a &lt; entity ini html matches a UTF-8 character in the
         // search string.
         //printf("%ld unicode match 0x%02X 0x%02X\n", bp-value_, *sp, c);
@@ -1206,11 +1304,13 @@ Fl_Help_View::find(const char *s,               // I - String to find
   return (-1);
 }
 
-/** Formats the help text. */
+/**
+  \brief Formats the help text.
+*/
 void Fl_Help_View::format() {
   int           i;              // Looping var
   int           done;           // Are we done yet?
-  Fl_Help_Block *block,         // Current block
+  Text_Block *block,         // Current block
                 *cell;          // Current table cell
   int           cells[MAX_COLUMNS],
                                 // Cells in the current row...
@@ -1230,9 +1330,9 @@ void Fl_Help_View::format() {
   Fl_Fontsize   fsize;          // Current font and size
   Fl_Color      fcolor;         // Current font color
   unsigned char border;         // Draw border?
-  int           talign,         // Current alignment
-                newalign,       // New alignment
-                head,           // In the <HEAD> section?
+  Align talign;         // Current alignment
+  Align newalign;       // New alignment
+  int           head,           // In the <HEAD> section?
                 pre,            // <PRE> text?
                 needspace;      // Do we need whitespace?
   int           table_width,    // Width of table
@@ -1243,8 +1343,8 @@ void Fl_Help_View::format() {
   Fl_Color      tc, rc;         // Table/row background color
   Fl_Boxtype    b = box() ? box() : FL_DOWN_BOX;
                                 // Box to draw...
-  fl_margins    margins;        // Left margin stack...
-  Fl_Int_Vector OL_num;         // if nonnegative, in OL mode and this is the item number
+  Margin_Stack  margins;        // Left margin stack...
+  std::vector<int> OL_num;         // if nonnegative, in OL mode and this is the item number
 
   OL_num.push_back(-1);
 
@@ -1259,9 +1359,9 @@ void Fl_Help_View::format() {
   {
     // Reset state variables...
     done       = 1;
-    nblocks_   = 0;
-    nlinks_    = 0;
-    ntargets_  = 0;
+    blocks_.clear();
+    link_list_.clear();
+    target_line_map_.clear();
     size_      = 0;
     bgcolor_   = color();
     textcolor_ = textcolor();
@@ -1269,7 +1369,7 @@ void Fl_Help_View::format() {
 
     tc = rc = bgcolor_;
 
-    strcpy(title_, "Untitled");
+    title_ = "Untitled";
 
     if (!value_)
       return;
@@ -1279,7 +1379,8 @@ void Fl_Help_View::format() {
 
     line         = 0;
     links        = 0;
-    xx           = margins.clear();
+    margins.clear();
+    xx           = 4;
     yy           = fsize + 2;
     ww           = 0;
     column       = 0;
@@ -1289,8 +1390,8 @@ void Fl_Help_View::format() {
     row          = 0;
     head         = 0;
     pre          = 0;
-    talign       = LEFT;
-    newalign     = LEFT;
+    talign       = Align::LEFT;
+    newalign     = Align::LEFT;
     needspace    = 0;
     linkdest[0]  = '\0';
     table_offset = 0;
@@ -1397,7 +1498,7 @@ void Fl_Help_View::format() {
         {
           // Comment...
           ptr += 3;
-          if ((ptr = strstr(ptr, "-->")) != NULL)
+          if ((ptr = strstr(ptr, "-->")) != nullptr)
           {
             ptr += 3;
             continue;
@@ -1423,20 +1524,18 @@ void Fl_Help_View::format() {
         else if (buf.cmp("TITLE"))
         {
           // Copy the title in the document...
-          char *st;
-          for (st = title_;
-               *ptr != '<' && *ptr && st < (title_ + sizeof(title_) - 1);
-               *st++ = *ptr++) {/*empty*/}
-
-          *st = '\0';
+          title_.clear();
+          for ( ; *ptr != '<' && *ptr; ptr++) {
+            title_.push_back(*ptr);
+          }
           buf.clear();
         }
         else if (buf.cmp("A"))
         {
-          if (get_attr(attrs, "NAME", attr, sizeof(attr)) != NULL)
+          if (get_attr(attrs, "NAME", attr, sizeof(attr)) != nullptr)
             add_target(attr, yy - fsize - 2);
 
-          if (get_attr(attrs, "HREF", attr, sizeof(attr)) != NULL)
+          if (get_attr(attrs, "HREF", attr, sizeof(attr)) != nullptr)
             strlcpy(linkdest, attr, sizeof(linkdest));
         }
         else if (buf.cmp("/A"))
@@ -1478,13 +1577,13 @@ void Fl_Help_View::format() {
         {
           block->end = start;
           line       = do_align(block, line, xx, newalign, links);
-          newalign   = buf.cmp("CENTER") ? CENTER : LEFT;
+          newalign   = buf.cmp("CENTER") ? Align::CENTER : Align::LEFT;
           xx         = block->x;
           block->h   += hh;
 
           if (buf.cmp("OL")) {
             int ol_num = 1;
-            if (get_attr(attrs, "START", attr, sizeof(attr)) != NULL) {
+            if (get_attr(attrs, "START", attr, sizeof(attr)) != nullptr) {
               errno = 0;
               char *endptr = 0;
               ol_num = (int)strtol(attr, &endptr, 10);
@@ -1532,11 +1631,11 @@ void Fl_Help_View::format() {
                   table_offset = 0;
                   break;
 
-              case CENTER :
+              case Align::CENTER :
                   table_offset = (hsize_ - table_width) / 2 - textsize_;
                   break;
 
-              case RIGHT :
+              case Align::RIGHT :
                   table_offset = hsize_ - table_width - textsize_;
                   break;
             }
@@ -1589,11 +1688,10 @@ void Fl_Help_View::format() {
 
           if (buf.cmp("LI")) {
             block->ol = 0;
-            if (OL_num.size() && OL_num.back()>=0) {
+            if (OL_num.size() && (OL_num.back() >= 0)) {
               block->ol = 1;
-              block->ol_num = (int)OL_num.back();
-              int nnum = OL_num.pop_back() + 1;
-              OL_num.push_back(nnum);
+              block->ol_num = OL_num.back();
+              OL_num.back()++;
             }
           }
 
@@ -1601,7 +1699,7 @@ void Fl_Help_View::format() {
           line      = 0;
 
           if (buf.cmp("CENTER"))
-            newalign = talign = CENTER;
+            newalign = talign = Align::CENTER;
           else
             newalign = get_align(attrs, talign);
         }
@@ -1646,7 +1744,7 @@ void Fl_Help_View::format() {
             hh  = 0;
           }
           else if (buf.cmp("/CENTER"))
-            talign = LEFT;
+            talign = Align::LEFT;
 
           popfont(font, fsize, fcolor);
 
@@ -1683,18 +1781,18 @@ void Fl_Help_View::format() {
           {
             yy = blocks_[row].y + blocks_[row].h;
 
-            for (cell = blocks_ + row + 1; cell <= block; cell ++)
+            for (cell = &blocks_[row + 1]; cell <= block; cell ++)
               if ((cell->y + cell->h) > yy)
                 yy = cell->y + cell->h;
 
-            block = blocks_ + row;
+            block = &blocks_[row];
 
             block->h = yy - block->y + 2;
 
             for (i = 0; i < column; i ++)
               if (cells[i])
               {
-                cell = blocks_ + cells[i];
+                cell = &blocks_[cells[i]];
                 cell->h = block->h;
               }
           }
@@ -1704,7 +1802,7 @@ void Fl_Help_View::format() {
           yy        = block->y + block->h - 4;
           hh        = 0;
           block     = add_block(start, xx, yy, hsize_, 0);
-          row       = (int) (block - blocks_);
+          row       = (int) (block - &blocks_[0]);
           needspace = 0;
           column    = 0;
           line      = 0;
@@ -1716,23 +1814,23 @@ void Fl_Help_View::format() {
           line       = do_align(block, line, xx, newalign, links);
           block->end = start;
           block->h   += hh;
-          talign     = LEFT;
+          talign     = Align::LEFT;
 
           xx = blocks_[row].x;
           yy = blocks_[row].y + blocks_[row].h;
 
-          for (cell = blocks_ + row + 1; cell <= block; cell ++)
+          for (cell = &blocks_[row + 1]; cell <= block; cell ++)
             if ((cell->y + cell->h) > yy)
               yy = cell->y + cell->h;
 
-          block = blocks_ + row;
+          block = &blocks_[row];
 
           block->h = yy - block->y + 2;
 
           for (i = 0; i < column; i ++)
             if (cells[i])
             {
-              cell = blocks_ + cells[i];
+              cell = &blocks_[cells[i]];
               cell->h = block->h;
             }
 
@@ -1765,7 +1863,7 @@ void Fl_Help_View::format() {
 
           margins.push(xx - margins.current());
 
-          if (get_attr(attrs, "COLSPAN", attr, sizeof(attr)) != NULL)
+          if (get_attr(attrs, "COLSPAN", attr, sizeof(attr)) != nullptr)
             colspan = atoi(attr);
           else
             colspan = 1;
@@ -1773,9 +1871,9 @@ void Fl_Help_View::format() {
           for (i = 0, ww = -6; i < colspan; i ++)
             ww += columns[column + i] + 6;
 
-          if (block->end == block->start && nblocks_ > 1)
+          if (block->end == block->start && blocks_.size() > 1)
           {
-            nblocks_ --;
+            blocks_.pop_back();
             block --;
           }
 
@@ -1786,10 +1884,10 @@ void Fl_Help_View::format() {
           block     = add_block(start, xx, yy, xx + ww, 0, border);
           needspace = 0;
           line      = 0;
-          newalign  = get_align(attrs, tolower(buf[1]) == 'h' ? CENTER : LEFT);
+          newalign  = get_align(attrs, tolower(buf[1]) == 'h' ? Align::CENTER : Align::LEFT);
           talign    = newalign;
 
-          cells[column] = (int) (block - blocks_);
+          cells[column] = (int) (block - &blocks_[0]);
 
           column += colspan;
 
@@ -1802,11 +1900,11 @@ void Fl_Help_View::format() {
           line = do_align(block, line, xx, newalign, links);
           popfont(font, fsize, fcolor);
           xx = margins.pop();
-          talign = LEFT;
+          talign = Align::LEFT;
         }
         else if (buf.cmp("FONT"))
         {
-          if (get_attr(attrs, "FACE", attr, sizeof(attr)) != NULL) {
+          if (get_attr(attrs, "FACE", attr, sizeof(attr)) != nullptr) {
             if (!strncasecmp(attr, "helvetica", 9) ||
                 !strncasecmp(attr, "arial", 5) ||
                 !strncasecmp(attr, "sans", 4)) font = FL_HELVETICA;
@@ -1816,7 +1914,7 @@ void Fl_Help_View::format() {
             else font = FL_COURIER;
           }
 
-          if (get_attr(attrs, "SIZE", attr, sizeof(attr)) != NULL) {
+          if (get_attr(attrs, "SIZE", attr, sizeof(attr)) != nullptr) {
             if (isdigit(attr[0] & 255)) {
               // Absolute size
               fsize = (int)(textsize_ * pow(1.2, atoi(attr) - 3.0));
@@ -1992,10 +2090,6 @@ void Fl_Help_View::format() {
 
 //  printf("margins.depth_=%d\n", margins.depth_);
 
-  if (ntargets_ > 1)
-    qsort(targets_, ntargets_, sizeof(Fl_Help_Target),
-          (compare_func_t)compare_targets);
-
   int dx = Fl::box_dw(b) - Fl::box_dx(b);
   int dy = Fl::box_dh(b) - Fl::box_dy(b);
   int ss = scrollbar_size_ ? scrollbar_size_ : Fl::scrollbar_size();
@@ -2045,11 +2139,16 @@ void Fl_Help_View::format() {
 }
 
 
-/** Formats a table */
-void
-Fl_Help_View::format_table(int        *table_width,     // O - Total table width
-                           int        *columns,         // O - Column widths
-                           const char *table)           // I - Pointer to start of table
+/**
+  \brief Format a table
+  \param[out] table_width Total width of the table
+  \param[out] columns Array of column widths
+  \param[in] table Pointer to the start of the table in the HTML text
+  */
+void Fl_Help_View::format_table(
+  int *table_width,
+  int *columns,
+  const char *table)
 {
   int           column,                                 // Current column
                 num_columns,                            // Number of columns
@@ -2255,7 +2354,7 @@ Fl_Help_View::format_table(int        *table_width,     // O - Total table width
         else
           column ++;
 
-        if (get_attr(attrs, "COLSPAN", attr, sizeof(attr)) != NULL)
+        if (get_attr(attrs, "COLSPAN", attr, sizeof(attr)) != nullptr)
           colspan = atoi(attr);
         else
           colspan = 1;
@@ -2279,7 +2378,7 @@ Fl_Help_View::format_table(int        *table_width,     // O - Total table width
 
         pushfont(font, fsize);
 
-        if (get_attr(attrs, "WIDTH", attr, sizeof(attr)) != NULL)
+        if (get_attr(attrs, "WIDTH", attr, sizeof(attr)) != nullptr)
           max_width = get_length(attr);
         else
           max_width = 0;
@@ -2467,9 +2566,10 @@ Fl_Help_View::format_table(int        *table_width,     // O - Total table width
 }
 
 
-/** Frees memory used for the document. */
-void
-Fl_Help_View::free_data() {
+/**
+  \brief Frees memory used for the document.
+  */
+void Fl_Help_View::free_data() {
   // Release all images...
   if (value_) {
     const char  *ptr,           // Pointer into block
@@ -2491,7 +2591,7 @@ Fl_Help_View::free_data() {
         {
           // Comment...
           ptr += 3;
-          if ((ptr = strstr(ptr, "-->")) != NULL)
+          if ((ptr = strstr(ptr, "-->")) != nullptr)
           {
             ptr += 3;
             continue;
@@ -2533,65 +2633,54 @@ Fl_Help_View::free_data() {
         }
       }
       else
-        ptr ++;
+        ptr++;
     }
 
     free((void *)value_);
     value_ = 0;
   }
 
-  // Free all of the arrays...
-  if (nblocks_) {
-    free(blocks_);
-
-    ablocks_ = 0;
-    nblocks_ = 0;
-    blocks_  = 0;
-  }
-
-  if (nlinks_) {
-    free(links_);
-
-    alinks_ = 0;
-    nlinks_ = 0;
-    links_  = 0;
-  }
-
-  if (ntargets_) {
-    free(targets_);
-
-    atargets_ = 0;
-    ntargets_ = 0;
-    targets_  = 0;
-  }
-} // free_data()
-
-/** Gets an alignment attribute. */
-int                                     // O - Alignment
-Fl_Help_View::get_align(const char *p,  // I - Pointer to start of attrs
-                        int        a)   // I - Default alignment
-{
-  char  buf[255];                       // Alignment value
-
-
-  if (get_attr(p, "ALIGN", buf, sizeof(buf)) == NULL)
-    return (a);
-
-  if (strcasecmp(buf, "CENTER") == 0)
-    return (CENTER);
-  else if (strcasecmp(buf, "RIGHT") == 0)
-    return (RIGHT);
-  else
-    return (LEFT);
+  blocks_ .clear();
+  link_list_.clear();
+  target_line_map_.clear();
 }
 
 
-/** Gets an attribute value from the string. */
-const char *                                    // O - Pointer to buf or NULL
-Fl_Help_View::get_attr(const char *p,           // I - Pointer to start of attributes
-                      const char *n,            // I - Name of attribute
-                      char       *buf,          // O - Buffer for attribute value
-                      int        bufsize)       // I - Size of buffer
+/**
+  \brief Gets an alignment attribute.
+  \param[in] p Pointer to start of attributes.
+  \param[in] a Default alignment.
+  \return Alignment value, either CENTER, RIGHT, or LEFT.
+*/
+Fl_Help_View::Align Fl_Help_View::get_align(const char *p, Align a)
+{
+  char  buf[255];                       // Alignment value
+
+  if (get_attr(p, "ALIGN", buf, sizeof(buf)) == nullptr)
+    return (a);
+
+  if (strcasecmp(buf, "CENTER") == 0)
+    return Align::CENTER;
+  else if (strcasecmp(buf, "RIGHT") == 0)
+    return Align::RIGHT;
+  else
+    return Align::LEFT;
+}
+
+
+/**
+  \brief Gets an attribute value from the string.
+  \param[in] p Pointer to start of attributes.
+  \param[in] n Name of attribute.
+  \param[out] buf Buffer for attribute value.
+  \param[in] bufsize Size of buffer.
+  \return Pointer to buf or nullptr if not found.
+  */
+const char *Fl_Help_View::get_attr(
+  const char *p,
+  const char *n,
+  char *buf,
+  int bufsize)
 {
   char  name[255],                              // Name from string
         *ptr,                                   // Pointer into name or value
@@ -2606,7 +2695,7 @@ Fl_Help_View::get_attr(const char *p,           // I - Pointer to start of attri
       p ++;
 
     if (*p == '>' || !*p)
-      return (NULL);
+      return (nullptr);
 
     for (ptr = name; *p && !isspace((*p)&255) && *p != '=' && *p != '>';)
       if (ptr < (name + sizeof(name) - 1))
@@ -2651,17 +2740,20 @@ Fl_Help_View::get_attr(const char *p,           // I - Pointer to start of attri
       buf[0] = '\0';
 
     if (*p == '>')
-      return (NULL);
+      return (nullptr);
   }
 
-  return (NULL);
+  return (nullptr);
 }
 
 
-/** Gets a color attribute. */
-Fl_Color                                // O - Color value
-Fl_Help_View::get_color(const char *n,  // I - Color name
-                        Fl_Color   c)   // I - Default color value
+/**
+  \brief Gets a color attribute.
+  \param[in] n the color name, either a name or a hex value.
+  \param[in] c the default color value.
+  \return the color value, either the color from the name or the default value.
+  */
+Fl_Color Fl_Help_View::get_color(const char *n, Fl_Color c)
 {
   int   i;                              // Looping var
   int   rgb, r, g, b;                   // RGB values
@@ -2695,7 +2787,7 @@ Fl_Help_View::get_color(const char *n,  // I - Color name
 
   if (n[0] == '#') {
     // Do hex color lookup
-    rgb = (int)strtol(n + 1, NULL, 16);
+    rgb = (int)strtol(n + 1, nullptr, 16);
 
     if (strlen(n) > 4) {
       r = rgb >> 16;
@@ -2716,19 +2808,6 @@ Fl_Help_View::get_color(const char *n,  // I - Color name
   }
 }
 
-
-/** Gets an inline image.
-
-  The image reference count is maintained accordingly, such that
-  the image can be released exactly once when the document is closed.
-
-  \return a pointer to a cached Fl_Shared_Image, if the image can be loaded,
-          otherwise a pointer to an internal Fl_Pixmap (broken_image).
-
-  \todo Fl_Help_View::get_image() returns a pointer to the internal
-  Fl_Pixmap broken_image, but this is _not_ compatible with the
-  return type Fl_Shared_Image (release() must not be called).
-*/
 
 /* Implementation note: (A.S. Apr 05, 2009)
 
@@ -2759,53 +2838,79 @@ Fl_Help_View::get_color(const char *n,  // I - Color name
   a new document is loaded: see free_data().
 */
 
-Fl_Shared_Image *
-Fl_Help_View::get_image(const char *name, int W, int H) {
-  const char    *localname;             // Local filename
-  char          dir[FL_PATH_MAX];       // Current directory
-  char          temp[3 * FL_PATH_MAX],  // Temporary filename
-                *tempptr;               // Pointer into temporary name
+/**
+  \brief Gets an inline image.
+
+  The image reference count is maintained accordingly, such that
+  the image can be released exactly once when the document is closed.
+
+  \param[in] name the image name, either a local filename or a URL.
+  \param[in] W, H the size of the image, or 0 if not specified.
+  \return a pointer to a cached Fl_Shared_Image, if the image can be loaded,
+          otherwise a pointer to an internal Fl_Pixmap (broken_image).
+
+  \todo Fl_Help_View::get_image() returns a pointer to the internal
+  Fl_Pixmap broken_image, but this is _not_ compatible with the
+  return type Fl_Shared_Image (release() must not be called).
+*/
+Fl_Shared_Image *Fl_Help_View::get_image(const char *name, int W, int H)
+{
+  std::string url;
   Fl_Shared_Image *ip;                  // Image pointer...
 
+  if (!name || !name[0]) {
+    // No image name given, return broken image
+    return (Fl_Shared_Image *)&broken_image;
+  }
+  std::string imagename = name;
+
+  size_t directory_scheme_length = url_scheme(directory_);
+  size_t imagename_scheme_length = url_scheme(imagename);
+
   // See if the image can be found...
-  if (strchr(directory_, ':') != NULL && strchr(name, ':') == NULL) {
-    if (name[0] == '/') {
-      strlcpy(temp, directory_, sizeof(temp));
-      // the following search (strchr) will always succeed, see condition above!
-      tempptr = skip_bytes(strchr(temp, ':'), 3);
-      if ((tempptr = strrchr(tempptr, '/')) != NULL) {
-        strlcpy(tempptr, name, sizeof(temp) - (tempptr - temp));
-      } else {
-        strlcat(temp, name, sizeof(temp));
-      }
+  if ( (directory_scheme_length > 0) && (imagename_scheme_length == 0) ) {
+    // If directory_ starts with a scheme (e.g.ftp:), but linkp->filename_ does not:
+    if (imagename[0] == '/') {
+      // If linkp->filename_ is absolute...
+      url = directory_.substr(0, directory_scheme_length) + imagename;;
     } else {
-      snprintf(temp, sizeof(temp), "%s/%s", directory_, name);
+      // If linkp->filename_ is relative, the URL is the directory_ plus the filename
+      url = directory_ + "/" + imagename;
     }
-
-    if (link_) localname = (*link_)(this, temp);
-    else localname = temp;
-  } else if (name[0] != '/' && strchr(name, ':') == NULL) {
-    if (directory_[0]) snprintf(temp, sizeof(temp), "%s/%s", directory_, name);
-    else {
+  } else if (imagename[0] != '/' && (imagename_scheme_length == 0)) {
+    // If the filename is relative and does not start with a scheme (ftp: , etc.)...
+    if (!directory_.empty()) {
+      // If we have a current directory, use that as the base for the URL
+      url = directory_ + "/" + imagename;
+    } else {
+      // If we do not have a current directory, use the application's current working directory
+      char dir[FL_PATH_MAX];       // Current directory (static size ok until we have fl_getcwd_std()
       fl_getcwd(dir, sizeof(dir));
-      snprintf(temp, sizeof(temp), "file:%s/%s", dir, name);
+      url = "file:" + std::string(dir) + "/" + imagename;
     }
+  } else {
+    // If the filename is absolute or starts with a protocol (e.g.ftp:), use it as is
+    url = imagename;
+  }
+  if (link_) {
+    const char *n = (*link_)(this, url.c_str());
+    if (n == nullptr)
+      return 0;
+    url = n;
+  }
+  if (url.empty()) return 0;
 
-    if (link_) localname = (*link_)(this, temp);
-    else localname = temp;
-  } else if (link_) localname = (*link_)(this, name);
-  else localname = name;
-
-  if (!localname) return 0;
-
-  if (strncmp(localname, "file:", 5) == 0) localname += 5;
+  // If the URL starts with "file:", remove it
+  if (url.find("file:") == 0) {
+    url = url.substr(5);
+  }
 
   if (initial_load) {
-    if ((ip = Fl_Shared_Image::get(localname, W, H)) == NULL) {
+    if ((ip = Fl_Shared_Image::get(url.c_str(), W, H)) == nullptr) {
       ip = (Fl_Shared_Image *)&broken_image;
     }
   } else { // draw or resize
-    if ((ip = Fl_Shared_Image::find(localname, W, H)) == NULL) {
+    if ((ip = Fl_Shared_Image::find(url.c_str(), W, H)) == nullptr) {
       ip = (Fl_Shared_Image *)&broken_image;
     } else {
       ip->release();
@@ -2816,10 +2921,13 @@ Fl_Help_View::get_image(const char *name, int W, int H) {
 }
 
 
-/** Gets a length value, either absolute or %. */
-int
-Fl_Help_View::get_length(const char *l) {       // I - Value
-  int   val;                                    // Integer value
+/**
+  \brief Gets a length value, either absolute or %.
+  \param[in] l string containing the length value
+  \return the length in pixels, or 0 if the string is empty.
+*/
+int Fl_Help_View::get_length(const char *l) {
+  int val;
 
   if (!l[0]) return 0;
 
@@ -2836,86 +2944,86 @@ Fl_Help_View::get_length(const char *l) {       // I - Value
 }
 
 
-Fl_Help_Link *Fl_Help_View::find_link(int xx, int yy)
+std::shared_ptr<Fl_Help_View::Link> Fl_Help_View::find_link(int xx, int yy)
 {
-  int           i;
-  Fl_Help_Link  *linkp;
-  for (i = nlinks_, linkp = links_; i > 0; i --, linkp ++) {
-    if (xx >= linkp->x && xx < linkp->w &&
-        yy >= linkp->y && yy < linkp->h)
-      break;
+  for (auto &link : link_list_) {
+    if (link->box.contains(xx, yy)) {
+      return link;
+    }
   }
-  return i ? linkp : 0L;
+  return nullptr;
 }
 
-void Fl_Help_View::follow_link(Fl_Help_Link *linkp)
+
+void Fl_Help_View::follow_link(std::shared_ptr<Link> linkp)
 {
-  char          target[32];     // Current target
-
   clear_selection();
-
-  strlcpy(target, linkp->name, sizeof(target));
-
   set_changed();
+  std::string target = linkp->target;;     // Current target
 
-  if (strcmp(linkp->filename, filename_) != 0 && linkp->filename[0])
-  {
-    char        dir[FL_PATH_MAX];       // Current directory
-    char        temp[3 * FL_PATH_MAX],  // Temporary filename
-               *tempptr;                // Pointer into temporary filename
-
-
-    if (strchr(directory_, ':') != NULL &&
-        strchr(linkp->filename, ':') == NULL)
-    {
-      if (linkp->filename[0] == '/')
-      {
-        strlcpy(temp, directory_, sizeof(temp));
-        // the following search (strchr) will always succeed, see condition above!
-        tempptr = skip_bytes(strchr(temp, ':'), 3);
-        if ((tempptr = strrchr(tempptr, '/')) != NULL) {
-          strlcpy(tempptr, linkp->filename, sizeof(temp) - (tempptr - temp));
-        } else {
-          strlcat(temp, linkp->filename, sizeof(temp));
-        }
+  if ( (linkp->filename_ != filename_) && !linkp->filename_.empty() ) {
+    // Load the new document, if the filename is different
+    std::string url;
+    size_t directory_scheme_length = url_scheme(directory_);
+    size_t filename_scheme_length = url_scheme(linkp->filename_);
+    if ( (directory_scheme_length > 0) && (filename_scheme_length == 0) ) {
+      // If directory_ starts with a scheme (e.g.ftp:), but linkp->filename_ does not:
+      if (linkp->filename_[0] == '/') {
+        // If linkp->filename_ is absolute...
+        url = directory_.substr(0, directory_scheme_length) + linkp->filename_;;
+      } else {
+        // If linkp->filename_ is relative, the URL is the directory_ plus the filename
+        url = directory_ + "/" + linkp->filename_;
       }
-      else
-        snprintf(temp, sizeof(temp), "%s/%s", directory_, linkp->filename);
-    }
-    else if (linkp->filename[0] != '/' && strchr(linkp->filename, ':') == NULL)
-    {
-      if (directory_[0])
-        snprintf(temp, sizeof(temp), "%s/%s", directory_, linkp->filename);
-      else
-      {
-          fl_getcwd(dir, sizeof(dir));
-        snprintf(temp, sizeof(temp), "file:%s/%s", dir, linkp->filename);
+    } else if (linkp->filename_[0] != '/' && (filename_scheme_length == 0)) {
+      // If the filename is relative and does not start with a scheme (ftp: , etc.)...
+      if (!directory_.empty()) {
+        // If we have a current directory, use that as the base for the URL
+        url = directory_ + "/" + linkp->filename_;
+      } else {
+        // If we do not have a current directory, use the application's current working directory
+        char dir[FL_PATH_MAX];       // Current directory (static size ok until we have fl_getcwd_std()
+        fl_getcwd(dir, sizeof(dir));
+        url = "file:" + std::string(dir) + "/" + linkp->filename_;
       }
+    } else {
+      // If the filename is absolute or starts with a protocol (e.g.ftp:), use it as is
+      url = linkp->filename_;
     }
-    else
-      strlcpy(temp, linkp->filename, sizeof(temp));
 
-    if (linkp->name[0])
-      snprintf(temp + strlen(temp), sizeof(temp) - strlen(temp), "#%s",
-               linkp->name);
+    // If a target is specified, append it to the URL
+    if (!linkp->target.empty()) {
+      url += "#" + linkp->target;
+    }
 
-    load(temp);
-  }
-  else if (target[0])
-    topline(target);
-  else
+    load(url.c_str());
+
+  } else if (!target.empty()) {
+    // Keep the same document, scroll to the target line
+    topline(target.c_str());
+  } else {
+    // No target, no filename, just scroll to the top of the document
     topline(0);
+  }
 
+  // Scroll the content horizontally to the left
   leftline(0);
 }
 
-/** Removes the current text selection. */
+
+/**
+  \brief Removes the current text selection.
+*/
 void Fl_Help_View::clear_selection()
 {
   if (current_view_==this)
     clear_global_selection();
 }
-/** Selects all the text in the view. */
+
+
+/**
+  \brief Selects all the text in the view.
+*/
 void Fl_Help_View::select_all()
 {
   clear_global_selection();
@@ -2925,6 +3033,7 @@ void Fl_Help_View::select_all()
   selected_ = 1;
 }
 
+
 void Fl_Help_View::clear_global_selection()
 {
   if (selected_) redraw();
@@ -2933,6 +3042,7 @@ void Fl_Help_View::clear_global_selection()
   selection_first_ = selection_last_ = 0;
   selected_ = 0;
 }
+
 
 char Fl_Help_View::begin_selection()
 {
@@ -2954,6 +3064,7 @@ char Fl_Help_View::begin_selection()
   if (selection_push_last_) return 1;
   else return 0;
 }
+
 
 char Fl_Help_View::extend_selection()
 {
@@ -3007,9 +3118,9 @@ char Fl_Help_View::extend_selection()
 }
 
 // convert a command with up to four letters into an unsigned int
-static unsigned int command(const char *cmd)
+static uint32_t command(const char *cmd)
 {
-  unsigned int ret = (tolower(cmd[0])<<24);
+  uint32_t ret = (tolower(cmd[0])<<24);
   char c = cmd[1];
   if (c=='>' || c==' ' || c==0) return ret;
   ret |= (tolower(c)<<16);
@@ -3024,7 +3135,12 @@ static unsigned int command(const char *cmd)
   return 0;
 }
 
-#define CMD(a, b, c, d) ((a<<24)|(b<<16)|(c<<8)|d)
+
+static constexpr uint32_t CMD(char a, char b, char c, char d)
+{
+  return ((a<<24)|(b<<16)|(c<<8)|d);
+}
+
 
 void Fl_Help_View::end_selection(int clipboard)
 {
@@ -3115,6 +3231,7 @@ void Fl_Help_View::end_selection(int clipboard)
   free(txt);
 }
 
+
 /**
  \brief Check if the user selected text in this view.
  \return 1 if text is selected, 0 if no text is selected
@@ -3125,6 +3242,7 @@ int Fl_Help_View::text_selected() {
   else
     return 0;
 }
+
 
 /**
  \brief If text is selected in this view, copy it to a clipboard.
@@ -3140,11 +3258,15 @@ int Fl_Help_View::copy(int clipboard) {
   }
 }
 
-/** Handles events in the widget. */
-int                             // O - 1 if we handled it, 0 otherwise
-Fl_Help_View::handle(int event) // I - Event to handle
+
+/**
+  \brief Handles events in the widget.
+  \param[in] event Event to handle.
+  \return 1 if the event was handled, 0 otherwise.
+  */
+int Fl_Help_View::handle(int event)
 {
-  static Fl_Help_Link *linkp;   // currently clicked link
+  static std::shared_ptr<Link> linkp = nullptr;   // currently clicked link
 
   int xx = Fl::event_x() - x() + leftline_;
   int yy = Fl::event_y() - y() + topline_;
@@ -3239,20 +3361,16 @@ Fl_Help_View::handle(int event) // I - Event to handle
   return (Fl_Group::handle(event));
 }
 
+
 /**
-  The constructor creates the Fl_Help_View widget at the specified
-  position and size.
+  \brief Creates the Fl_Help_View widget at the specified position and size.
+  \param[in] xx, yy, ww, hh Position and size of the widget
+  \param[in] l Label for the widget, can be nullptr
 */
-Fl_Help_View::Fl_Help_View(int        xx,       // I - Left position
-                           int        yy,       // I - Top position
-                           int        ww,       // I - Width in pixels
-                           int        hh,       // I - Height in pixels
-                           const char *l)
-    : Fl_Group(xx, yy, ww, hh, l),
-      scrollbar_(xx + ww - Fl::scrollbar_size(), yy,
-                 Fl::scrollbar_size(), hh - Fl::scrollbar_size()),
-      hscrollbar_(xx, yy + hh - Fl::scrollbar_size(),
-                  ww - Fl::scrollbar_size(), Fl::scrollbar_size())
+Fl_Help_View::Fl_Help_View(int xx, int yy, int ww, int hh, const char *l)
+: Fl_Group(xx, yy, ww, hh, l),
+  scrollbar_(xx + ww - Fl::scrollbar_size(), yy, Fl::scrollbar_size(), hh - Fl::scrollbar_size()),
+  hscrollbar_(xx, yy + hh - Fl::scrollbar_size(), ww - Fl::scrollbar_size(), Fl::scrollbar_size())
 {
   color(FL_BACKGROUND2_COLOR, FL_SELECTION_COLOR);
 
@@ -3263,24 +3381,16 @@ Fl_Help_View::Fl_Help_View(int        xx,       // I - Left position
   linkcolor_    = FL_SELECTION_COLOR;
   textfont_     = FL_TIMES;
   textsize_     = 12;
-  value_        = NULL;
+  value_        = nullptr;
 
-  ablocks_      = 0;
-  nblocks_      = 0;
-  blocks_       = (Fl_Help_Block *)0;
+  blocks_.clear();
 
   link_         = (Fl_Help_Func *)0;
 
-  alinks_       = 0;
-  nlinks_       = 0;
-  links_        = (Fl_Help_Link *)0;
+  link_list_.clear();
 
-  atargets_     = 0;
-  ntargets_     = 0;
-  targets_      = (Fl_Help_Target *)0;
-
-  directory_[0] = '\0';
-  filename_[0]  = '\0';
+  directory_.clear();
+  filename_.clear();
 
   topline_      = 0;
   leftline_     = 0;
@@ -3304,7 +3414,8 @@ Fl_Help_View::Fl_Help_View(int        xx,       // I - Left position
 }
 
 
-/** Destroys the Fl_Help_View widget.
+/**
+  \brief Destroys the Fl_Help_View widget.
 
   The destructor destroys the widget and frees all memory that has been
   allocated for the current document.
@@ -3316,34 +3427,109 @@ Fl_Help_View::~Fl_Help_View()
 }
 
 
-/** Loads the specified file.
+/**
+  \brief Return the current filename for the text in the buffer.
 
- This method loads the specified file or URL. The filename may end in a
- \c \#name style target.
+  Fl_Help_View remains the owner of the allocated memory. If the filename
+  changes, the returned pointer will become stale.
 
- If the URL starts with \a ftp, \a http, \a https, \a ipp, \a mailto, or
- \a news, followed by a colon, FLTK will use fl_open_uri() to show the
- requested page in an external browser.
+  \return nullptr if the filename is empty
+*/
+const char *Fl_Help_View::filename() const {
+  if (filename_.empty())
+    return nullptr;
+  else
+    return filename_.c_str();
+}
 
- In all other cases, the URL is interpreted as a filename. The file is read and
- displayed in this browser. Note that Windows style backslashes are not
- supported in the file name.
 
- \param[in] f filename or URL
+/**
+  \brief Return the current directory for the text in the buffer.
 
- \return 0 on success, -1 on error
+  Fl_Help_View remains the owner of the allocated memory. If the directory
+  changes, the returned pointer will become stale.
 
- \see fl_open_uri()
+  \return nullptr if the directory name is empty
+*/
+const char *Fl_Help_View::directory() const {
+  if (directory_.empty())
+    return nullptr;
+  else
+    return directory_.c_str();
+}
+
+
+/**
+  \brief Return the title of the current document.
+
+  Fl_Help_View remains the owner of the allocated memory. If the document
+  changes, the returned pointer will become stale.
+
+  \return empty string if the directory name is empty
+ */
+const char *Fl_Help_View::title() const {
+  return title_.c_str();
+}
+
+
+/**
+  \brief Set a callback function for following links.
+
+  This method assigns a callback function to use when a link is
+  followed or a file is loaded (via Fl_Help_View::load()) that
+  requires a different file or path.
+
+  The callback function receives a pointer to the Fl_Help_View
+  widget and the URI or full pathname for the file in question.
+  It must return a pathname that can be opened as a local file or nullptr:
+
+  \code
+  const char *fn(Fl_Widget *w, const char *uri);
+  \endcode
+
+  The link function can be used to retrieve remote or virtual
+  documents, returning a temporary file that contains the actual
+  data. If the link function returns nullptr, the value of
+  the Fl_Help_View widget will remain unchanged.
+
+  If the link callback cannot handle the URI scheme, it should
+  return the uri value unchanged or set the value() of the widget
+  before returning nullptr.
+
+  \param[in] fn Pointer to the callback function
+*/
+void Fl_Help_View::link(Fl_Help_Func *fn) {
+  link_ = fn;
+}
+
+
+/**
+  \brief Loads the specified file.
+
+  This method loads the specified file or URL. The filename may end in a
+  \c \#name style target.
+
+  If the URL starts with \a ftp, \a http, \a https, \a ipp, \a mailto, or
+  \a news, followed by a colon, FLTK will use fl_open_uri() to show the
+  requested page in an external browser.
+
+  In all other cases, the URL is interpreted as a filename. The file is read and
+  displayed in this browser. Note that Windows style backslashes are not
+  supported in the file name.
+
+  \param[in] f filename or URL
+  \return 0 on success, -1 on error
+
+  \see fl_open_uri()
 */
 int Fl_Help_View::load(const char *f)
 {
   FILE          *fp;            // File to read from
   long          len;            // Length of file
-  char          *target;        // Target in file
-  char          *slash;         // Directory separator
-  const char    *localname;     // Local filename
-  char          error[2 * FL_PATH_MAX]; // Error buffer
-  char          newname[FL_PATH_MAX];   // New filename buffer
+  std::string target;        // Target in file
+  std::string localname;     // Local filename
+  std::string error; // Error buffer
+  std::string newname;   // New filename buffer
 
   // printf("load(%s)\n",f); fflush(stdout);
 
@@ -3354,41 +3540,45 @@ int Fl_Help_View::load(const char *f)
       strncmp(f, "mailto:", 7) == 0 ||
       strncmp(f, "news:", 5) == 0)
   {
-    char urimsg[FL_PATH_MAX];
+    char urimsg[FL_PATH_MAX]; // Use of static size ok.
     if ( fl_open_uri(f, urimsg, sizeof(urimsg)) == 0 ) {
       clear_selection();
 
-      strlcpy(newname, f, sizeof(newname));
-      if ((target = strrchr(newname, '#')) != NULL)
-        *target++ = '\0';
+      newname = f;
+      size_t hash_pos = newname.rfind('#');
+      if (hash_pos != std::string::npos) {
+        target = newname.substr(hash_pos + 1);
+        newname.resize(hash_pos);
+      }
 
-      if (link_)
-        localname = (*link_)(this, newname);
-      else
-        localname = filename_;
-
-      if (!localname)
-        return (0);
+      if (link_) {
+        const char *n = (*link_)(this, newname.c_str());
+        if (n == nullptr)
+          return 0;
+        localname = n;
+      } else {
+        localname = newname;
+      }
 
       free_data();
 
-      strlcpy(filename_, newname, sizeof(filename_));
-      strlcpy(directory_, newname, sizeof(directory_));
+      filename_ = newname;
 
       // Note: We do not support Windows backslashes, since they are illegal
       //       in URLs...
-      if ((slash = strrchr(directory_, '/')) == NULL)
-        directory_[0] = '\0';
-      else if (slash > directory_ && slash[-1] != '/')
-        *slash = '\0';
+      directory_ = newname;
+      size_t slash_pos = directory_.rfind('/');
+      if (slash_pos == std::string::npos) {
+        directory_.clear();
+      } else if ((slash_pos > 0) && (directory_[slash_pos-1] != '/')) {
+        directory_.resize(slash_pos);
+      }
 
-      snprintf(error, sizeof(error),
-               "<HTML><HEAD><TITLE>Error</TITLE></HEAD>"
-               "<BODY><H1>Error</H1>"
-               "<P>Unable to follow the link \"%s\" - "
-               "%s.</P></BODY>",
-               f, urimsg);
-      value(error);
+      error = "<HTML><HEAD><TITLE>Error</TITLE></HEAD>"
+              "<BODY><H1>Error</H1>"
+              "<P>Unable to follow the link \""
+              + std::string(f) + "\" - " + std::string(urimsg) + ".</P></BODY>";
+      value(error.c_str());
       return -1;
     } else {
       return 0;
@@ -3397,35 +3587,42 @@ int Fl_Help_View::load(const char *f)
 
   clear_selection();
 
-  strlcpy(newname, f, sizeof(newname));
-  if ((target = strrchr(newname, '#')) != NULL)
-    *target++ = '\0';
+  newname = f;
+  size_t hash_pos = newname.rfind('#');
+  if (hash_pos != std::string::npos) {
+    target = newname.substr(hash_pos + 1);
+    newname.resize(hash_pos);
+  }
 
-  if (link_)
-    localname = (*link_)(this, newname);
-  else
-    localname = filename_;
-
-  if (!localname)
-    return -1;
+  if (link_) {
+    const char *n = (*link_)(this, newname.c_str());
+    if (n == nullptr)
+      return -1;
+    localname = n;
+  } else {
+    localname = newname;
+  }
 
   free_data();
 
-  strlcpy(filename_, newname, sizeof(filename_));
-  strlcpy(directory_, newname, sizeof(directory_));
+  filename_ = newname;
+  directory_ = newname;
 
   // Note: We do not support Windows backslashes, since they are illegal
   //       in URLs...
-  if ((slash = strrchr(directory_, '/')) == NULL)
-    directory_[0] = '\0';
-  else if (slash > directory_ && slash[-1] != '/')
-    *slash = '\0';
+  size_t slash_pos = directory_.rfind('/');
+  if (slash_pos == std::string::npos) {
+    directory_.clear();
+  } else if ((slash_pos > 0) && (directory_[slash_pos-1] != '/')) {
+    directory_.resize(slash_pos);
+  }
 
-  if (strncmp(localname, "file:", 5) == 0)
-    localname += 5;     // Adjust for local filename...
+  if (localname.find("file:") == 0) {
+    localname.erase(0, 5);     // Adjust for local filename...
+  }
 
   int ret = 0;
-  if ((fp = fl_fopen(localname, "rb")) != NULL)
+  if ((fp = fl_fopen(localname.c_str(), "rb")) != nullptr)
   {
     fseek(fp, 0, SEEK_END);
     len = ftell(fp);
@@ -3437,13 +3634,11 @@ int Fl_Help_View::load(const char *f)
   }
   else
   {
-    snprintf(error, sizeof(error),
-             "<HTML><HEAD><TITLE>Error</TITLE></HEAD>"
-             "<BODY><H1>Error</H1>"
-             "<P>Unable to follow the link \"%s\" - "
-             "%s.</P></BODY>",
-             localname, strerror(errno));
-    value_ = fl_strdup(error);
+    error = "<HTML><HEAD><TITLE>Error</TITLE></HEAD>"
+            "<BODY><H1>Error</H1>"
+            "<P>Unable to follow the link \"" +localname + "\" - "
+            + strerror(errno) + ".</P></BODY>";
+    value_ = fl_strdup(error.c_str());
     ret = -1;
   }
 
@@ -3451,8 +3646,8 @@ int Fl_Help_View::load(const char *f)
   format();
   initial_load = 0;
 
-  if (target)
-    topline(target);
+  if (!target.empty())
+    topline(target.c_str());
   else
     topline(0);
 
@@ -3460,17 +3655,13 @@ int Fl_Help_View::load(const char *f)
 }
 
 
-/** Resizes the help widget. */
-
-void
-Fl_Help_View::resize(int xx,    // I - New left position
-                     int yy,    // I - New top position
-                     int ww,    // I - New width
-                     int hh)    // I - New height
+/**
+  \brief Override the superclass's resize method.
+  \param[in] xx, yy, ww, hh New position and size of the widget
+ */
+void Fl_Help_View::resize(int xx, int yy, int ww, int hh)
 {
-  Fl_Boxtype            b = box() ? box() : FL_DOWN_BOX;
-                                        // Box to draw...
-
+  Fl_Boxtype b = box() ? box() : FL_DOWN_BOX; // Box to draw...
 
   Fl_Widget::resize(xx, yy, ww, hh);
 
@@ -3480,44 +3671,37 @@ Fl_Help_View::resize(int xx,    // I - New left position
   hscrollbar_.resize(x() + Fl::box_dx(b),
                      y() + h() - scrollsize - Fl::box_dh(b) + Fl::box_dy(b),
                      w() - scrollsize - Fl::box_dw(b), scrollsize);
-
   format();
 }
 
 
-/** Scrolls the text to the indicated position, given a named destination.
-
-  \param[in] n target name
+/**
+  \brief Scroll the text to the given anchor.
+  \param[in] anchor scroll to this named anchor
 */
-void
-Fl_Help_View::topline(const char *n)    // I - Target name
+void Fl_Help_View::topline(const char *anchor)
 {
-  Fl_Help_Target key,                   // Target name key
-                *target;                // Pointer to matching target
-
-
-  if (ntargets_ == 0)
-    return;
-
-  strlcpy(key.name, n, sizeof(key.name));
-
-  target = (Fl_Help_Target *)bsearch(&key, targets_, ntargets_, sizeof(Fl_Help_Target),
-                                 (compare_func_t)compare_targets);
-
-  if (target != NULL)
-    topline(target->y);
+  std::string target_name = to_lower(anchor); // Convert to lower case
+  auto tl = target_line_map_.find(target_name);
+  if (tl != target_line_map_.end()) {
+    // Found the target name, scroll to the line
+    topline(tl->second);
+  } else {
+    // Scroll to the top.
+    topline(0);
+  }
 }
 
 
-/** Scrolls the text to the indicated position, given a pixel line.
+/**
+  \brief Scrolls the text to the indicated position, given a pixel line.
 
   If the given pixel value \p top is out of range, then the text is
   scrolled to the top or bottom of the document, resp.
 
   \param[in] top top line number in pixels (0 = start of document)
 */
-void
-Fl_Help_View::topline(int top)  // I - Top line number
+void Fl_Help_View::topline(int top)
 {
   if (!value_)
     return;
@@ -3538,15 +3722,15 @@ Fl_Help_View::topline(int top)  // I - Top line number
 }
 
 
-/** Scrolls the text to the indicated position, given a pixel column.
+/**
+  \brief Scrolls the text to the indicated position, given a pixel column.
 
   If the given pixel value \p left is out of range, then the text is
   scrolled to the left or right side of the document, resp.
 
   \param[in] left left column number in pixels (0 = left side)
 */
-void
-Fl_Help_View::leftline(int left)        // I - Left position
+void Fl_Help_View::leftline(int left)
 {
   if (!value_)
     return;
@@ -3565,15 +3749,18 @@ Fl_Help_View::leftline(int left)        // I - Left position
 }
 
 
-/** Sets the current help text buffer to the string provided and reformats the text.
+/**
+  \brief Sets the current help text buffer to the string provided and reformats the text.
 
   The provided character string \p val is copied internally and will be
   freed when value() is called again, or when the widget is destroyed.
 
-  If \p val is NULL, then the widget is cleared.
+  If \p val is nullptr, then the widget is cleared.
+
+  \param[in] val Text to view, or nullptr to clear the widget,
+      Fl_Help_View will creat a local copy of the string.
 */
-void
-Fl_Help_View::value(const char *val)    // I - Text to view
+void Fl_Help_View::value(const char *val)
 {
   clear_selection();
   free_data();
@@ -3593,39 +3780,42 @@ Fl_Help_View::value(const char *val)    // I - Text to view
 }
 
 
-/*  Returns the Unicode Code Point associated with a quoted character
-    (aka "HTML Entity").
+/*
+  \brief Returns the Unicode Code Point associated with a quoted character (aka "HTML Entity").
 
-    Possible encoding formats:
-     - &name;           named entity
-     - &#nn..;          numeric (decimal) Unicode Code Point
-     - &#xnn..;         numeric (hexadecimal) Unicode Code Point
-     - &#Xnn..;         numeric (hexadecimal) Unicode Code Point
-    'nn..' = decimal or hexadecimal number, resp.
+  Possible encoding formats:
+    - `&name;`           named entity
+    - `&#nn..;`          numeric (decimal) Unicode Code Point
+    - `&#xnn..;`         numeric (hexadecimal) Unicode Code Point
+    - `&#Xnn..;`         numeric (hexadecimal) Unicode Code Point
+  `nn..` = decimal or hexadecimal number, resp.
 
-    Contents of the table names[] below:
+  Contents of the table `names[]` below:
 
-    All printable ASCII (32-126) and ISO-8859-1 (160-255) characters
-    are encoded with the same value in Unicode. Special characters
-    outside the range [0-255] are encoded with their Unicode Code Point
-    as hexadecimal constants. Example:
-     - Euro sign: (Unicode) U+20ac = (hex) 0x20ac
+  All printable ASCII (32-126) and ISO-8859-1 (160-255) characters
+  are encoded with the same value in Unicode. Special characters
+  outside the range [0-255] are encoded with their Unicode Code Point
+  as hexadecimal constants. Example:
+    - Euro sign: (Unicode) U+20ac = (hex) 0x20ac
 
-    Note: Converted to correct Unicode values and tested (compared with
-    the display of Firefox). AlbrechtS, 14 Feb. 2016.
+  \note Converted to correct Unicode values and tested (compared with
+  the display of Firefox). AlbrechtS, 14 Feb. 2016.
 
-    Note to devs: if you add or remove items to/from this list, please
-    update the documentation in FL/Fl_Help_View.H.
+  \note if you add or remove items to/from this list, please
+  update the documentation for Fl_Help_View::Fl_Help_View().
+
+  \param[in] p Pointer to the quoted character string, e.g. `&copy;` or `&#169;`
+  \return the Unicode Code Point for the quoted character, or -1 if not found.
 */
-static int                      // O - Code or -1 on error
-quote_char(const char *p) {     // I - Quoted string
-  int   i;                      // Looping var
+static int quote_char(const char *p) {
+  int i;
   static const struct {
     const char  *name;
     int         namelen;
     int         code;
-  }     *nameptr,               // Pointer into name array
-        names[] = {             // Quoting names
+  } *nameptr,   // Pointer into name array
+    names[] =   // Quoting names
+  {
     { "Aacute;", 7, 193 },
     { "aacute;", 7, 225 },
     { "Acirc;",  6, 194 },
@@ -3737,28 +3927,130 @@ quote_char(const char *p) {     // I - Quoted string
 
   if (!strchr(p, ';')) return -1;
   if (*p == '#') {
-    if (*(p+1) == 'x' || *(p+1) == 'X') return (int)strtol(p+2, NULL, 16);
-    else return atoi(p+1);
+    if (*(p+1) == 'x' || *(p+1) == 'X') {
+      return (int)strtol(p+2, nullptr, 16);
+    } else {
+      return atoi(p+1);
+    }
   }
-  for (i = (int)(sizeof(names) / sizeof(names[0])), nameptr = names; i > 0; i --, nameptr ++)
+  for (i = (int)(sizeof(names) / sizeof(names[0])), nameptr = names; i > 0; i --, nameptr ++) {
     if (strncmp(p, nameptr->name, nameptr->namelen) == 0)
       return nameptr->code;
+  }
 
   return -1;
 }
 
 
-/** The vertical scrollbar callback. */
-static void
-scrollbar_callback(Fl_Widget *s, void *)
+/**
+  \brief Get the current size of the scrollbars' troughs, in pixels.
+
+  If this value is zero (default), this widget will use the
+  Fl::scrollbar_size() value as the scrollbar's width.
+
+  \returns Scrollbar size in pixels, or 0 if the global Fl::scrollbar_size() is being used.
+  \see Fl::scrollbar_size(int)
+*/
+int Fl_Help_View::scrollbar_size() const {
+    return(scrollbar_size_);
+}
+
+
+/**
+  \brief Set the pixel size of the scrollbars' troughs to \p newSize, in pixels.
+
+  Normally you should not need this method, and should use
+  Fl::scrollbar_size(int) instead to manage the size of ALL
+  your widgets' scrollbars. This ensures your application
+  has a consistent UI, is the default behavior, and is normally
+  what you want.
+
+  Only use THIS method if you really need to override the global
+  scrollbar size. The need for this should be rare.
+
+  Setting \p newSize to the special value of 0 causes the widget to
+  track the global Fl::scrollbar_size(), which is the default.
+
+  \param[in] newSize Sets the scrollbar size in pixels.\n
+      If 0 (default), scrollbar size tracks the global Fl::scrollbar_size()
+  \see Fl::scrollbar_size()
+*/
+void Fl_Help_View::scrollbar_size(int newSize) {
+    scrollbar_size_ = newSize;
+}
+
+
+/**
+ \brief The vertical scrollbar callback.
+ */
+static void scrollbar_callback(Fl_Widget *s, void *)
 {
   ((Fl_Help_View *)(s->parent()))->topline(int(((Fl_Scrollbar*)s)->value()));
 }
 
 
-/** The horizontal scrollbar callback. */
-static void
-hscrollbar_callback(Fl_Widget *s, void *)
+/**
+ \brief The horizontal scrollbar callback.
+ */
+static void hscrollbar_callback(Fl_Widget *s, void *)
 {
   ((Fl_Help_View *)(s->parent()))->leftline(int(((Fl_Scrollbar*)s)->value()));
 }
+
+
+// Note: The CMP recommends that the Doxygen comment should be placed where
+// the implementation is. I decided to place the Doxygen comment here, because
+// the Fl_Help_View class is huge, and the header file should IMHO not be
+// cluttered with comments. Some implementations stay in the header to make
+// inlinig easier for the compiler.
+//  - Matt
+
+/**
+  \fn int Fl_Help_View::size() const
+  \brief Gets the size of the help view.
+*/
+
+/**
+  \fn void Fl_Help_View::textcolor(Fl_Color c)
+  \brief Sets the default text color.
+*/
+
+/**
+  \fn Fl_Color Fl_Help_View::textcolor() const
+  \brief Returns the current default text color.
+*/
+
+/**
+  \fn void Fl_Help_View::textfont(Fl_Font f)
+  \brief Sets the default text font.
+*/
+
+/**
+  \fn Fl_Font Fl_Help_View::textfont() const
+  \brief Returns the current default text font.
+*/
+
+/**
+  \fn void Fl_Help_View::textsize(Fl_Fontsize s)
+  \brief Sets the default text size.
+*/
+
+/**
+  \fn Fl_Fontsize Fl_Help_View::textsize() const
+  \brief Gets the default text size.
+*/
+
+/**
+  \fn int Fl_Help_View::topline() const
+  \brief Returns the current top line in pixels.
+*/
+
+/**
+  \fn int Fl_Help_View::leftline()
+  \brief Gets the left position in pixels.
+*/
+
+/**
+  \fn const char *Fl_Help_View::value() const
+  \brief Returns the current buffer contents.
+*/

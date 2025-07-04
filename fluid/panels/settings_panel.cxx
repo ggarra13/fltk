@@ -542,7 +542,7 @@ static void cb_w_layout_menu(Fl_Menu_Button*, void* v) {
       for (int i=1; i<4; i++) w_layout_menu_storage[i]->activate();
       w_layout_menu_delete->activate();
     }
-    w_layout_menu_storage[static_cast<int>(suite.storage_)]->setonly();
+    w_layout_menu_storage[static_cast<int>(suite.storage_)]->setonly(menu_w_layout_menu);
   }
 }
 
@@ -2137,10 +2137,10 @@ Fl_Input *i18n_gnu_include_input=(Fl_Input *)0;
 
 static void cb_i18n_gnu_include_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_gnu_include.c_str());
+    o->value(Fluid.proj.i18n.gnu_include.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_gnu_include = o->value();
+    Fluid.proj.i18n.gnu_include = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2149,10 +2149,10 @@ Fl_Input *i18n_gnu_conditional_input=(Fl_Input *)0;
 
 static void cb_i18n_gnu_conditional_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_gnu_conditional.c_str());
+    o->value(Fluid.proj.i18n.gnu_conditional.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_gnu_conditional = o->value();
+    Fluid.proj.i18n.gnu_conditional = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2161,10 +2161,10 @@ Fl_Input *i18n_gnu_function_input=(Fl_Input *)0;
 
 static void cb_i18n_gnu_function_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_gnu_function.c_str());
+    o->value(Fluid.proj.i18n.gnu_function.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_gnu_function = o->value();
+    Fluid.proj.i18n.gnu_function = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2173,10 +2173,10 @@ Fl_Input *i18n_gnu_static_function_input=(Fl_Input *)0;
 
 static void cb_i18n_gnu_static_function_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_gnu_static_function.c_str());
+    o->value(Fluid.proj.i18n.gnu_static_function.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_gnu_static_function = o->value();
+    Fluid.proj.i18n.gnu_static_function = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2191,10 +2191,10 @@ Fl_Input *i18n_pos_include_input=(Fl_Input *)0;
 
 static void cb_i18n_pos_include_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_pos_include.c_str());
+    o->value(Fluid.proj.i18n.posix_include.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_pos_include = o->value();
+    Fluid.proj.i18n.posix_include = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2203,10 +2203,10 @@ Fl_Input *i18n_pos_conditional_input=(Fl_Input *)0;
 
 static void cb_i18n_pos_conditional_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_pos_conditional.c_str());
+    o->value(Fluid.proj.i18n.posix_conditional.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_pos_conditional = o->value();
+    Fluid.proj.i18n.posix_conditional = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2215,10 +2215,10 @@ Fl_Input *i18n_pos_file_input=(Fl_Input *)0;
 
 static void cb_i18n_pos_file_input(Fl_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_pos_file.c_str());
+    o->value(Fluid.proj.i18n.posix_file.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_pos_file = o->value();
+    Fluid.proj.i18n.posix_file = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2231,10 +2231,10 @@ Fl_Int_Input *i18n_pos_set_input=(Fl_Int_Input *)0;
 
 static void cb_i18n_pos_set_input(Fl_Int_Input* o, void* v) {
   if (v == LOAD) {
-    o->value(Fluid.proj.i18n_pos_set.c_str());
+    o->value(Fluid.proj.i18n.posix_set.c_str());
   } else {
     Fluid.proj.undo.checkpoint();
-    Fluid.proj.i18n_pos_set = o->value();
+    Fluid.proj.i18n.posix_set = o->value();
     Fluid.proj.set_modflag(1);
   }
 }
@@ -2452,6 +2452,7 @@ Fl_Double_Window* make_settings_window() {
         w_settings_general_tab->image( image_general_64() );
         w_settings_general_tab->image()->scale(36, 24, 0, 1);
         w_settings_general_tab->labelsize(11);
+        w_settings_general_tab->hide();
         { Fl_Group* o = new Fl_Group(120, 78, 130, 25);
           o->callback((Fl_Callback*)cb_);
           { scheme_choice = new Fl_Scheme_Choice(120, 78, 120, 25, "Scheme: ");
@@ -3229,7 +3230,6 @@ Fl_Double_Window* make_settings_window() {
         w_settings_i18n_tab->image()->scale(36, 24, 0, 1);
         w_settings_i18n_tab->labelsize(11);
         w_settings_i18n_tab->callback((Fl_Callback*)cb_w_settings_i18n_tab);
-        w_settings_i18n_tab->hide();
         { Fl_Group* o = new Fl_Group(100, 78, 170, 20);
           o->callback((Fl_Callback*)propagate_load);
           { i18n_type_chooser = new Fl_Choice(100, 78, 160, 20, "i18n Library:");

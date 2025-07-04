@@ -438,7 +438,9 @@ struct FL_EXPORT Fl_Menu_Item {
   /** Turns the check or radio item "off" for the menu item. */
   void clear() {flags &= ~FL_MENU_VALUE;}
 
-  void setonly(Fl_Menu_Item const* first = NULL);
+  FL_DEPRECATED("since 1.3 - use setonly(Fl_Menu_Item const* first) instead",
+  void setonly());
+  void setonly(Fl_Menu_Item const* first);
 
   /** Gets the visibility of an item. */
   int visible() const {return !(flags&FL_MENU_INVISIBLE);}
@@ -525,30 +527,6 @@ struct FL_EXPORT Fl_Menu_Item {
   void do_callback(Fl_Widget* o, long arg, Fl_Callback_Reason reason=FL_REASON_UNKNOWN) const {
     Fl::callback_reason_ = reason; callback_(o, (void*)(fl_intptr_t)arg);
   }
-
-  /** Back compatibility only.
-    \deprecated
-      Please use Fl_Menu_Item::value() instead.
-      This method will be removed in FLTK 1.5.0 or later.
-    \see value()
-  */
-  inline int checked() const {return value();}
-
-  /** Back compatibility only.
-    \deprecated
-      Please use Fl_Menu_Item::set() instead.
-      This method will be removed in FLTK 1.5.0 or later.
-    \see set()
-  */
-  inline void check() {set();}
-
-  /** Back compatibility only.
-    \deprecated
-      Please use Fl_Menu_Item::clear() instead.
-      This method will be removed in FLTK 1.5.0 or later.
-    \see clear()
-  */
-  inline void uncheck() {clear();}
 
   int insert(int,const char*,int,Fl_Callback*,void* =0, int =0);
   int add(const char*, int shortcut, Fl_Callback*, void* =0, int = 0);
