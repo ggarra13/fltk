@@ -186,7 +186,7 @@ private: // data members
 
   Fl_Help_Func  *link_;                 ///< Link transform function
 
-  std::vector<std::shared_ptr<Link>> link_list_; ///< List of links for each line
+  std::vector<std::shared_ptr<Link> > link_list_; ///< List of links for each line
 
   std::map<std::string, int> target_line_map_; ///< Map of targets for fast access
 
