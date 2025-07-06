@@ -20,6 +20,7 @@
 
 #include <FL/vk.h>
 #include <FL/vk_enum_string_helper.h>
+#include <FL/Fl_Vk_Utils.H>
 #include <FL/Fl_Vk_Window.H>
 #include "Fl_Vk_Window_Driver.H"
 #include "Fl_Window_Driver.H"
@@ -568,6 +569,106 @@ void Fl_Vk_Window::swap_buffers() {
             m_previous_hdr_metadata = m_hdr_metadata;
             m_hdr_metadata_changed = false;
         }
+
+        if (m_store_swapchain && m_store_swapchain_size > 0)
+        {                
+            VkImage swapchainImage = get_back_buffer_image();
+
+            // 1. Create a host-readable buffer
+            VkBufferCreateInfo bufferInfo = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .size = static_cast<VkDeviceSize>(m_store_swapchain_size), 
+                .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            };
+            VkBuffer buffer;
+            vkCreateBuffer(device(), &bufferInfo, nullptr, &buffer);
+
+            // Allocate memory
+            VkMemoryRequirements memRequirements;
+            vkGetBufferMemoryRequirements(device(), buffer, &memRequirements);
+            VkMemoryAllocateInfo allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memRequirements.size,
+                .memoryTypeIndex = findMemoryType(
+                    gpu(),
+                    memRequirements.memoryTypeBits, 
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
+            };
+            VkDeviceMemory bufferMemory;
+            vkAllocateMemory(device(), &allocInfo, nullptr, &bufferMemory);
+            vkBindBufferMemory(device(), buffer, bufferMemory, 0);
+
+            // Record command buffer to copy image to buffer
+            VkCommandBuffer commandBuffer = beginSingleTimeCommands(device(), commandPool());
+
+            // Transition swapchain image to TRANSFER_SRC_OPTIMAL
+            VkImageMemoryBarrier barrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .image = swapchainImage,
+                .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+            };
+            vkCmdPipelineBarrier(commandBuffer, 
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            // Copy image to buffer
+            VkBufferImageCopy region = {
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+                .imageOffset = {0, 0, 0},
+                .imageExtent = {
+                    static_cast<uint32_t>(pixel_w()),
+                    static_cast<uint32_t>(pixel_h()), 1},
+            };
+
+            vkCmdCopyImageToBuffer(commandBuffer, swapchainImage, 
+                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                                   buffer, 1, &region);
+
+            // Transition swapchain image back to PRESENT_SRC_KHR
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+            vkCmdPipelineBarrier(commandBuffer, 
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+            endSingleTimeCommands(commandBuffer, device(), commandPool(), queue());
+
+            // 3. Map buffer and read data
+            void* data;
+            vkMapMemory(device(), bufferMemory, 0, bufferInfo.size, 0, &data);
+
+            // Copy 'data' to your image processing logic
+            memcpy(m_store_swapchain, data, m_store_swapchain_size);
+                
+            vkUnmapMemory(device(), bufferMemory);
+
+            vkDestroyBuffer(device(), buffer, nullptr);
+            vkFreeMemory(device(), bufferMemory, nullptr);
+        }
         
         result = vkQueuePresentKHR(queue(), &present_info);
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
@@ -1091,6 +1192,9 @@ void Fl_Vk_Window::init() {
   vkSetHdrMetadataEXT = nullptr;
 
   // Swapchain info
+  m_store_swapchain = nullptr;
+  m_store_swapchain_size = 0;
+  
   m_swapchain = VK_NULL_HANDLE;
   m_resizeFence = VK_NULL_HANDLE;
   m_currentExtent = {0, 0};

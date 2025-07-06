@@ -284,6 +284,12 @@ public:
       return m_buffers[m_last_presented_buffer].image;
   }
 
+  void store_swapchain(uint8_t* out, const size_t dataSize)
+  {
+      m_store_swapchain = out;
+      m_store_swapchain_size = dataSize;
+  }
+  
   //! @}
   
   // Application
@@ -346,6 +352,13 @@ private:
   };
 
 protected:
+  // Pointer to store result of drawing in swapchain before swap buffers (swapchain) 
+  uint8_t*               m_store_swapchain;
+
+  // size of storage for storing in the swapchain (should match size of swapchain
+  // VkFormat's pixel size times swapchainExtent)
+  size_t                 m_store_swapchain_size;
+  
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;

@@ -42,6 +42,8 @@ or any higher (minimum) CMake version users need to use at least one of
 the following techniques:
 
 -D FLTK_USE_VK=ON
+-D CMAKE_CXX_STANDARD=17   # or:
+   			   # provide custom implementation of macro VMA_SYSTEM_ALIGNED_MALLOC (and VMA_SYSTEM_ALIGNED_FREE)
 
 
  2.2 Configuration
@@ -69,10 +71,13 @@ on the various supported Linux distributions/OS.
 3.1 Debian and Derivatives (like Ubuntu, Mint, RaspberryPiOS)
 -------------------------------------------------------------
 
-sudo apt install libvulkan-dev.
+sudo apt install libvulkan-dev
 
 3.2 Fedora
 ----------
+
+sudo dnf install vulkan-headers vulkan-loader-devel
+sudo dnf install vulkan-tools vulkan-validation-layers-devel
 
 
 3.3 macOS
@@ -94,7 +99,7 @@ brew install vulkan-validationslayers
 
 Depending if you are on MacOS Intel or MacOS M1 and later, the location of:
 
-VULKAN_SDK should be set to:
+environment variable VULKAN_SDK should be set to:
 
 /usr/local    on Intel
 /opt/homebrew on M1+
@@ -102,3 +107,8 @@ VULKAN_SDK should be set to:
 If you installed the version from LunarG, by default it will get installed in your home directory, like:
 
 /home/<username>/VulkanSDK/<SDK version>/macOS
+
+3.4 Windows
+-----------
+
+You need to download the Vulkan SDK from LunarG.   Once installed, the normal location will be C:\VulkanSDK.  You should set the environment variable VULKAN_SDK to that directory.
