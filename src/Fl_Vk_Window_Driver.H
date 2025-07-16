@@ -95,7 +95,7 @@ public:
   virtual void destroy_resources();
 
   void init_colorspace();
-  void init_vk();
+  void init_vk(int requested_device_index = -1);
 
   VkInstance instance() { return m_instance; }
   VkPhysicalDevice gpu() { return m_gpu; }

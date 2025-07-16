@@ -508,7 +508,7 @@ void Fl_Vk_Window_Driver::init_instance()
     
 }
 
-void Fl_Vk_Window_Driver::init_vk()
+void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 {
     VkResult err;
     uint32_t i = 0;
@@ -519,8 +519,7 @@ void Fl_Vk_Window_Driver::init_vk()
     // Increment instance (window) counter
     pWindow->ctx.instance = pWindow->m_instance;
 
-    // Make initial call to query gpu_count, then second call for gpu info
-    // Make initial call to query gpu_count
+    // --- GPU ENUMERATION ---
     uint32_t gpu_count = 0;
     err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, NULL);
     if (err != VK_SUCCESS || gpu_count == 0)
@@ -540,9 +539,53 @@ void Fl_Vk_Window_Driver::init_vk()
                   "Error code");
     }
 
+    // --- GPU SELECTION LOGIC START --- 
+    VkPhysicalDevice chosen_gpu = VK_NULL_HANDLE;
+
+    if (requested_device_index >= 0 &&
+        (uint32_t)requested_device_index < gpu_count)
+    {
+        // A specific, valid device index was requested
+        chosen_gpu = physicalDevices[requested_device_index];
+        Fl::warning("User selected GPU index %d.", requested_device_index);
+    }
+    else
+    {
+        // Automatic selection based on scoring
+        uint32_t best_score = 0;
+        uint32_t best_device_index = 0;
+
+        for (uint32_t dev_idx = 0; dev_idx < gpu_count; ++dev_idx) {
+            VkPhysicalDeviceProperties device_properties;
+            vkGetPhysicalDeviceProperties(physicalDevices[dev_idx],
+                                          &device_properties);
+            
+            uint32_t current_score = 0;
+            if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            {
+                current_score += 1000;
+            }
+            else if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            {
+                current_score += 500;
+            }
+
+            // You could add more scoring criteria here, e.g., memory size, features, etc.
+
+            if (current_score > best_score) {
+                best_score = current_score;
+                best_device_index = dev_idx;
+            }
+        }
+        chosen_gpu = physicalDevices[best_device_index];
+    }
+
     // Assign the first GPU handle and free the array
-    pWindow->gpu() = m_gpu = physicalDevices[0];
+    pWindow->gpu() = m_gpu = chosen_gpu;
     VK_FREE(physicalDevices);
+    
+    // This is now freed after selection
+    // --- GPU SELECTION LOGIC END ---
 
     // Look for device extensions
     uint32_t device_extension_count = 0;
