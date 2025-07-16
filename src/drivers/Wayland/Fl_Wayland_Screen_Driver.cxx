@@ -1159,6 +1159,12 @@ static struct wl_output_listener output_listener = {
 };
 
 
+struct pair_bool {
+  bool found_gtk_shell;
+  bool found_wf_shell;
+};
+
+
 // Notice: adding use of unstable protocol "XDG output" would allow FLTK to be notified
 // in real time of changes to the relative location of multiple displays;
 // with the present code, that information is received at startup only.
@@ -1274,8 +1280,10 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
     scr_driver->xdg_wm_base = (struct xdg_wm_base *)wl_registry_bind(wl_registry, id,
                                                         &xdg_wm_base_interface, 1);
     xdg_wm_base_add_listener(scr_driver->xdg_wm_base, &xdg_wm_base_listener, NULL);
+  } else if (strstr(interface, "wf_shell_manager")) {
+    ((pair_bool*)user_data)->found_wf_shell = true;
   } else if (strcmp(interface, "gtk_shell1") == 0) {
-    Fl_Wayland_Screen_Driver::compositor = Fl_Wayland_Screen_Driver::MUTTER;
+    ((pair_bool*)user_data)->found_gtk_shell = true;
     //fprintf(stderr, "Running the Mutter compositor\n");
     scr_driver->seat->gtk_shell = (struct gtk_shell1*)wl_registry_bind(wl_registry, id,
                                   &gtk_shell1_interface, version);
@@ -1413,10 +1421,14 @@ void Fl_Wayland_Screen_Driver::open_display_platform() {
   wl_list_init(&outputs);
 
   wl_registry = wl_display_get_registry(wl_display);
-  wl_registry_add_listener(wl_registry, &registry_listener, NULL);
+  struct pair_bool pair = {false, false};
+  wl_registry_add_listener(wl_registry, &registry_listener, &pair);
   struct wl_callback *registry_cb = wl_display_sync(wl_display);
   wl_callback_add_listener(registry_cb, &sync_listener, &registry_cb);
   while (registry_cb) wl_display_dispatch(wl_display);
+  if (pair.found_gtk_shell || pair.found_wf_shell) {
+    Fl_Wayland_Screen_Driver::compositor = (pair.found_wf_shell ? WAYFIRE : MUTTER);
+  }
   Fl::add_fd(wl_display_get_fd(wl_display), FL_READ, (Fl_FD_Handler)wayland_socket_callback,
              wl_display);
   fl_create_print_window();
@@ -1607,7 +1619,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
 
 
 /* Implementation note about computing work area and about handling fractional scaling.
- 
+
  FLTK computes 2 pairs of (WxH) values for each display:
  1) (pixel_width x pixel_height) gives the size in pixel of a display. It's unchanged by
  any scaling applied by the compositor; it's assigned by function output_mode().
@@ -1615,7 +1627,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
  When the active scaling is non-fractional, these equations hold:
    pixel_width = width = wld_scale * configured-width-of-fullscreen-window
    pixel_height = height = wld_scale * configured-height-of-fullscreen-window
- 
+
  When fractional scaling is active, buffers received from client are scaled down
  by the compositor and mapped to screen. These equations hold:
    pixel_width < width = wld_scale * configured-width-of-fullscreen-window
@@ -1624,7 +1636,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
  One way for a client to discover that fractional scaling is active on a given display
  is to ask for a fullscreen window on that display, get its configured size and compare
  it to that display's pixel size. That's what function compute_full_and_maximized_areas() does.
- 
+
  One way for a client to discover the work area size of a display is to get the configured size
  of a maximized window on that display. FLTK didn't find a way to control in general
  on what display the compositor puts a maximized window. One procedure which works
@@ -1634,7 +1646,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
  display as the fullscreen one, giving the size of that display's work area.
  Therefore, FLTK computes an exact work area size only with MUTTER or when the system
  contains a single display. That's also done by function compute_full_and_maximized_areas().
- 
+
  The procedure to compute the work area size also reveals which display is primary:
  that with a work area vertically smaller than the display's pixel height. This allows
  to place the primary display as FLTK display #0. Again, FLTK guarantees to identify
