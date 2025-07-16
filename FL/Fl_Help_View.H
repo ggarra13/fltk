@@ -123,7 +123,6 @@ private:
 
   Fl_Scrollbar  scrollbar_;             ///< Vertical scrollbar for document
   Fl_Scrollbar  hscrollbar_;            ///< Horizontal scrollbar
->>>>>>> original
 
 protected:
 
