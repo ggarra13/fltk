@@ -293,6 +293,17 @@ public:
   //! @}
   
   // Application
+  struct CommandBufferSubmission {
+      VkCommandBuffer commandBuffer;
+      VkSemaphore imageAcquiredSemaphore;
+      VkSemaphore drawCompleteSemaphore;
+      VkFence fence;
+      Fl_Vk_Window* window; // Reference to the window for context
+  };
+  
+  void submit_all_pending_command_buffers();
+  static std::vector<CommandBufferSubmission> s_pendingSubmissions;
+  static std::mutex s_submissionMutex; // Mutex for thread-safe access to s_pendingSubmissions
 
   // if true, turns on validation layers.  Default is to have it on on Debug
   // builds and off on Release or RelWithDebInfo builds.

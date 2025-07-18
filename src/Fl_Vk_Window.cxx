@@ -30,6 +30,19 @@
 
 #include <iostream>
 
+static uint32_t number_of_vk_windows()
+{
+    uint32_t out = 0;
+    for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
+    {
+        if (win->visible() && win->as_vk_window())
+        {
+            ++out;
+        }
+    }
+    return out;
+}
+
 static bool all_windows_invisible()
 {
     for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
@@ -48,6 +61,8 @@ VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
 VmaAllocator            Fl_Vk_Window::m_allocator = VK_NULL_HANDLE;
 Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
+std::vector<Fl_Vk_Window::CommandBufferSubmission> Fl_Vk_Window::s_pendingSubmissions;
+std::mutex Fl_Vk_Window::s_submissionMutex;
 
 
 bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
@@ -505,6 +520,104 @@ void Fl_Vk_Window::set_hdr_metadata()
     m_hdr_metadata_changed = true; // Mark as changed
 }
 
+void Fl_Vk_Window::submit_all_pending_command_buffers() {
+    std::lock_guard<std::mutex> lock(s_submissionMutex);
+    if (s_pendingSubmissions.empty()) return;
+
+    // Create a single fence for this submission batch
+    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0 };
+    VkFence batchFence = VK_NULL_HANDLE;
+    VkResult result = vkCreateFence(device(), &fenceInfo, nullptr, &batchFence);
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vkCreateFence failed for batch: %s\n", string_VkResult(result));
+        s_pendingSubmissions.clear();
+        return;
+    }
+    
+    // Collect all command buffers and semaphores
+    std::vector<VkCommandBuffer> commandBuffers;
+    std::vector<VkSemaphore> waitSemaphores;
+    std::vector<VkSemaphore> signalSemaphores;
+    std::vector<VkPipelineStageFlags> waitStages;
+
+    for (const auto& submission : s_pendingSubmissions) {
+        if (submission.commandBuffer != VK_NULL_HANDLE && submission.window->isFrameActive()) {
+            commandBuffers.push_back(submission.commandBuffer);
+            waitSemaphores.push_back(submission.imageAcquiredSemaphore);
+            signalSemaphores.push_back(submission.drawCompleteSemaphore);
+            waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+        }
+    }
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
+
+    if (commandBuffers.empty()) {
+        std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
+        vkDestroyFence(device(), batchFence, nullptr);
+        s_pendingSubmissions.clear();
+        return;
+    }
+
+    // Create submit info
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
+    submitInfo.pCommandBuffers = commandBuffers.data();
+    submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+    submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
+    submitInfo.pSignalSemaphores = signalSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
+
+    
+    // Submit to the queue
+    {
+        std::lock_guard<std::mutex> queueLock(queue_mutex()); // Use existing queue mutex
+        result = vkQueueSubmit(queue(), 1, &submitInfo, batchFence);
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vkQueueSubmit failed: %s\n", string_VkResult(result));
+            vkDestroyFence(device(), batchFence, nullptr);
+            s_pendingSubmissions.clear();
+            return;
+        }
+    }
+
+    // Wait for the submission to complete (optional, for synchronization)
+    result = vkWaitForFences(device(), 1, &batchFence, VK_TRUE, UINT64_MAX);
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vkWaitForFences failed: %s\n", string_VkResult(result));
+    }
+    vkResetFences(device(), 1, &batchFence);
+    vkDestroyFence(device(), batchFence, nullptr);
+    
+    // Present each window's image
+    for (const auto& submission : s_pendingSubmissions) {
+        VkPresentInfoKHR presentInfo = {};
+        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        presentInfo.waitSemaphoreCount = 1;
+        presentInfo.pWaitSemaphores = &submission.drawCompleteSemaphore;
+        presentInfo.swapchainCount = 1;
+        presentInfo.pSwapchains = &submission.window->m_swapchain;
+        presentInfo.pImageIndices = &submission.window->m_current_buffer;
+
+        vkQueuePresentKHR(queue(), &presentInfo);
+
+        // Update last presented buffer
+        submission.window->m_last_presented_buffer = submission.window->m_current_buffer;
+
+        // Reset frame active state
+        submission.window->m_frames[submission.window->m_currentFrameIndex].active = false;
+
+        // Wait on fence if debug sync is enabled
+        if (submission.window->m_debugSync) {
+            vkWaitForFences(device(), 1, &submission.fence, VK_TRUE, UINT64_MAX);
+            vkResetFences(device(), 1, &submission.fence);
+        }
+    }
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
+    
+    // Clear pending submissions
+    s_pendingSubmissions.clear();
+}
 
 void Fl_Vk_Window::swap_buffers() {
     VkResult result;
@@ -520,17 +633,35 @@ void Fl_Vk_Window::swap_buffers() {
         return;
     }
 
+#if 1
+    // Add command buffer to pending submissions
+    {
+        std::lock_guard<std::mutex> lock(s_submissionMutex);
+        s_pendingSubmissions.push_back({
+            frame.commandBuffer,
+            frame.imageAcquiredSemaphore,
+            frame.drawCompleteSemaphore,
+            frame.fence,
+            this
+        });
+    }
+    
+    submit_all_pending_command_buffers();
+
+#else
+    std::cerr << "call queue submit" << std::endl;
+
     // Submit command buffer
+    VkSubmitInfo submitInfo = {};
     VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &frame.imageAcquiredSemaphore;
-    submit_info.pWaitDstStageMask = &pipe_stage_flags;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &frame.commandBuffer;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &frame.imageAcquiredSemaphore;
+    submitInfo.pWaitDstStageMask = &pipe_stage_flags;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &frame.commandBuffer;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = &frame.drawCompleteSemaphore;
 
     if (m_debugSync) {
         fprintf(stderr, "Submitting frame %u for image index %u\n",
@@ -539,157 +670,61 @@ void Fl_Vk_Window::swap_buffers() {
 
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
-        result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
+        result = vkQueueSubmit(queue(), 1, &submitInfo, frame.fence);
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkQueueSubmit failed: %s\n",
                     string_VkResult(result));
             frame.active = false;
             return;
         }
-
-        // Present swapchain image
-        VkPresentInfoKHR present_info = {};
-        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        present_info.waitSemaphoreCount = 1;
-        present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
-        present_info.swapchainCount = 1;
-        present_info.pSwapchains = &m_swapchain;
-        present_info.pImageIndices = &m_current_buffer;
-
-        if (m_debugSync) {
-            fprintf(stderr, "Presenting image index %u for frame %u\n",
-                    m_current_buffer, m_currentFrameIndex);
-        }
-
-        // Update HDR metadata if changed
-        if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-            m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-        {
-            vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-            m_previous_hdr_metadata = m_hdr_metadata;
-            m_hdr_metadata_changed = false;
-        }
-
-        if (m_store_swapchain && m_store_swapchain_size > 0)
-        {                
-            VkImage swapchainImage = get_back_buffer_image();
-
-            // 1. Create a host-readable buffer
-            VkBufferCreateInfo bufferInfo = {
-                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                .size = static_cast<VkDeviceSize>(m_store_swapchain_size), 
-                .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-            };
-            VkBuffer buffer;
-            vkCreateBuffer(device(), &bufferInfo, nullptr, &buffer);
-
-            // Allocate memory
-            VkMemoryRequirements memRequirements;
-            vkGetBufferMemoryRequirements(device(), buffer, &memRequirements);
-            VkMemoryAllocateInfo allocInfo = {
-                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-                .allocationSize = memRequirements.size,
-                .memoryTypeIndex = findMemoryType(
-                    gpu(),
-                    memRequirements.memoryTypeBits, 
-                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
-                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-            };
-            VkDeviceMemory bufferMemory;
-            vkAllocateMemory(device(), &allocInfo, nullptr, &bufferMemory);
-            vkBindBufferMemory(device(), buffer, bufferMemory, 0);
-
-            // Record command buffer to copy image to buffer
-            VkCommandBuffer commandBuffer = beginSingleTimeCommands(device(), commandPool());
-
-            // Transition swapchain image to TRANSFER_SRC_OPTIMAL
-            VkImageMemoryBarrier barrier = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                .image = swapchainImage,
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
-            vkCmdPipelineBarrier(commandBuffer, 
-                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-            // Copy image to buffer
-            VkBufferImageCopy region = {
-                .bufferOffset = 0,
-                .bufferRowLength = 0,
-                .bufferImageHeight = 0,
-                .imageSubresource = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .mipLevel = 0,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-                .imageOffset = {0, 0, 0},
-                .imageExtent = {
-                    static_cast<uint32_t>(pixel_w()),
-                    static_cast<uint32_t>(pixel_h()), 1},
-            };
-
-            vkCmdCopyImageToBuffer(commandBuffer, swapchainImage, 
-                                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                                   buffer, 1, &region);
-
-            // Transition swapchain image back to PRESENT_SRC_KHR
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-            barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            vkCmdPipelineBarrier(commandBuffer, 
-                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                                 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-            endSingleTimeCommands(commandBuffer, device(), commandPool(), queue());
-
-            // 3. Map buffer and read data
-            void* data;
-            vkMapMemory(device(), bufferMemory, 0, bufferInfo.size, 0, &data);
-
-            // Copy 'data' to your image processing logic
-            memcpy(m_store_swapchain, data, m_store_swapchain_size);
-                
-            vkUnmapMemory(device(), bufferMemory);
-
-            vkDestroyBuffer(device(), buffer, nullptr);
-            vkFreeMemory(device(), bufferMemory, nullptr);
-        }
-        
-        result = vkQueuePresentKHR(queue(), &present_info);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-            m_swapchain_needs_recreation = true;
-            frame.active = false;
-            return;
-        }
-        else if (result != VK_SUCCESS)
-        {
-            fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
-                    string_VkResult(result));
-            frame.active = false;
-            return;
-        }
     }
 
+        
+    // Present swapchain image
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &frame.drawCompleteSemaphore;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = &m_swapchain;
+    presentInfo.pImageIndices = &m_current_buffer;
+
+    if (m_debugSync) {
+        fprintf(stderr, "Presenting image index %u for frame %u\n",
+                m_current_buffer, m_currentFrameIndex);
+    }
+
+    // Update HDR metadata if changed
+    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+    {
+        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+        m_previous_hdr_metadata = m_hdr_metadata;
+        m_hdr_metadata_changed = false;
+    }
+        
+    result = vkQueuePresentKHR(queue(), &presentInfo);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        m_swapchain_needs_recreation = true;
+        frame.active = false;
+        return;
+    }
+    else if (result != VK_SUCCESS)
+    {
+        fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
+                string_VkResult(result));
+        frame.active = false;
+        return;
+    }
+    
     pVkWindowDriver->swap_buffers();
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
     m_last_presented_buffer = m_current_buffer;
+
+#endif
+    
 }
 
 /**
