@@ -14,6 +14,8 @@
 //     https://www.fltk.org/bugs.php
 //
 
+#define USE_FRAME_FENCE 0
+
 #include <config.h>
 
 #if HAVE_VK
@@ -30,7 +32,7 @@
 
 #include <iostream>
 
-static uint32_t number_of_vk_windows()
+static uint32_t number_of_vulkan_windows()
 {
     uint32_t out = 0;
     for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
@@ -122,11 +124,13 @@ void Fl_Vk_Window::recreate_swapchain() {
             vkDestroySemaphore(device(), frame.drawCompleteSemaphore, nullptr);
             frame.drawCompleteSemaphore = VK_NULL_HANDLE;
         }
+#if USE_FRAME_FENCE
         if (frame.fence != VK_NULL_HANDLE)
         {
             vkDestroyFence(device(), frame.fence, nullptr);
             frame.fence = VK_NULL_HANDLE;
         }
+#endif
         frame.active = false;
     }
 
@@ -202,6 +206,7 @@ void Fl_Vk_Window::recreate_swapchain() {
                 return;
             }
         }
+#if USE_FRAME_FENCE
         if (frame.fence == VK_NULL_HANDLE) {
             result = vkCreateFence(device(), &fenceInfo, nullptr, &frame.fence);
             if (result != VK_SUCCESS) {
@@ -210,6 +215,7 @@ void Fl_Vk_Window::recreate_swapchain() {
                 return;
             }
         }
+#endif
         if (frame.commandBuffer == VK_NULL_HANDLE) {
             result = vkAllocateCommandBuffers(device(), &cmdInfo, &frame.commandBuffer);
             if (result != VK_SUCCESS) {
@@ -307,7 +313,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     FrameData& frame = m_frames[m_currentFrameIndex];
 
     // Wait for this frame’s previous use
-#if 0
+#if USE_FRAME_FENCE
     if (frame.active && frame.fence != VK_NULL_HANDLE)
     {
         if (m_debugSync) {
@@ -554,9 +560,10 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
         }
         else
         {
-            submission.window->m_frames[submission.window->m_currentFrameIndex].active = false;
             if (submission.window->m_debugSync) {
-                fprintf(stderr, "Skipping submission for window %p: invalid state\n", submission.window);
+                fprintf(stderr, "Skipping submission for window %p: invalid state active=%d\n",
+                        submission.window, submission.window->isFrameActive());
+                submission.window->m_frames[submission.window->m_currentFrameIndex].active = false;
             }
         }
     }
@@ -627,6 +634,9 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
 
         // Update last presented buffer
         submission.window->m_last_presented_buffer = submission.window->m_current_buffer;
+        submission.window->m_currentFrameIndex = 
+            (submission.window->m_currentFrameIndex + 1) % submission.window->m_frames.size();
+
 
         // Reset frame active state
         submission.window->m_frames[submission.window->m_currentFrameIndex].active = false;
@@ -660,7 +670,7 @@ void Fl_Vk_Window::swap_buffers() {
         return;
     }
 
-#if 0
+#if 1
     // Add command buffer to pending submissions
     {
         std::lock_guard<std::mutex> lock(s_submissionMutex);
@@ -750,10 +760,11 @@ void Fl_Vk_Window::swap_buffers() {
     pVkWindowDriver->swap_buffers();
 
     // Advance to next frame
+    m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
     m_last_presented_buffer = m_current_buffer;
+    
 #endif
     
-    m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
 }
 
 /**
@@ -971,16 +982,18 @@ void Fl_Vk_Window::shutdown_vulkan() {
             vkDestroySemaphore(device(), frame.drawCompleteSemaphore, nullptr);
             frame.drawCompleteSemaphore = VK_NULL_HANDLE;
         }
-        if (frame.fence != VK_NULL_HANDLE) {
-            // Wait for fence to ensure no pending operations
-            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
-            if (result != VK_SUCCESS) {
-                fprintf(stderr, "vkWaitForFences failed for frame %p: %s\n",
-                        &frame, string_VkResult(result));
-            }
-            vkDestroyFence(device(), frame.fence, nullptr);
-            frame.fence = VK_NULL_HANDLE;
-        }
+#if USE_FRAME_FENCE
+        // if (frame.fence != VK_NULL_HANDLE) {
+        //     // Wait for fence to ensure no pending operations
+        //     result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+        //     if (result != VK_SUCCESS) {
+        //         fprintf(stderr, "vkWaitForFences failed for frame %p: %s\n",
+        //                 &frame, string_VkResult(result));
+        //     }
+        //     vkDestroyFence(device(), frame.fence, nullptr);
+        //     frame.fence = VK_NULL_HANDLE;
+        // }
+#endif
     }
     m_frames.clear();
 
@@ -1171,12 +1184,14 @@ void Fl_Vk_Window::init_vulkan() {
             shutdown_vulkan();
             return;
         }
+#if USE_FRAME_FENCE
         result = vkCreateFence(device(), &fenceInfo, nullptr, &frame.fence);
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkCreateFence failed: %s\n", string_VkResult(result));
             shutdown_vulkan();
             return;
         }
+#endif
         result = vkAllocateCommandBuffers(device(), &cmdInfo, &frame.commandBuffer);
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkAllocateCommandBuffers failed: %s\n", string_VkResult(result));
@@ -1236,7 +1251,7 @@ void Fl_Vk_Window::init() {
   m_debugSync = false;
 #else
   m_validate = true;
-  m_debugSync = true;
+  m_debugSync = false;
 #endif
 
   // Allocate a dummy safe thread queue

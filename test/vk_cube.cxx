@@ -146,7 +146,7 @@ public:
         m_wire_pipeline = VK_NULL_HANDLE; 
         // Turn on validations
         m_validate = true;
-        m_debugSync = true;
+        m_debugSync = false;
     
     }
 };
