@@ -32,7 +32,7 @@
 
 #include <iostream>
 
-static uint32_t number_of_vulkan_windows()
+static uint32_t number_of_vulkan_windows_visible()
 {
     uint32_t out = 0;
     for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
@@ -344,7 +344,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     // Acquire next swapchain image
     if (m_debugSync)
     {
-        fprintf(stderr, "Acquiring image for frame %u\n", m_currentFrameIndex);
+        fprintf(stderr, "%p Acquiring image for frame %u\n", this, m_currentFrameIndex);
     }
     const uint64_t timeout = UINT64_MAX;
     result = vkAcquireNextImageKHR(device(), m_swapchain, timeout,
@@ -381,12 +381,13 @@ void Fl_Vk_Window::vk_draw_begin() {
     }
     else if (result != VK_SUCCESS)
     {
-        fprintf(stderr, "vkAcquireNextImageKHR failed: %s\n", string_VkResult(result));
+        fprintf(stderr, "%p vkAcquireNextImageKHR failed: %s\n", this, string_VkResult(result));
         return;
     }
 
     if (m_debugSync) {
-        fprintf(stderr, "Acquired image index %u for frame %u\n", m_current_buffer, m_currentFrameIndex);
+        fprintf(stderr, "%p Acquired image index %u for frame %u\n", this,
+                m_current_buffer, m_currentFrameIndex);
     }
 
     // Reset and begin command buffer
@@ -684,7 +685,7 @@ void Fl_Vk_Window::swap_buffers() {
     }
     
     ++s_current_vk_window;
-    if (s_current_vk_window >= number_of_vulkan_windows())
+    if (s_current_vk_window >= number_of_vulkan_windows_visible())
     {
         submit_all_pending_command_buffers();
         s_current_vk_window = 0;
@@ -815,6 +816,23 @@ void Fl_Vk_Window::flush() {
           fprintf(stderr, "Vulkan initialization failed\n");
           return;
       }
+  }
+  
+  // Skip if the current frame is already active
+  FrameData& frame = m_frames[m_currentFrameIndex];
+  if (frame.active) {
+      if (m_debugSync) {
+          fprintf(stderr, "Skipping flush for window %p: frame %u is already active\n",
+                  this, m_currentFrameIndex);
+      }
+      // Optionally trigger submission if all windows are ready
+      ++s_current_vk_window;
+      int num_vk_windows = number_of_vulkan_windows_visible();
+      if (s_current_vk_window >= num_vk_windows) {
+          submit_all_pending_command_buffers();
+          s_current_vk_window = 0;
+      }
+      return;
   }
     
   vk_draw_begin();
