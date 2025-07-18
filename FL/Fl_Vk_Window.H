@@ -304,7 +304,8 @@ public:
   void submit_all_pending_command_buffers();
   static std::vector<CommandBufferSubmission> s_pendingSubmissions;
   static std::mutex s_submissionMutex; // Mutex for thread-safe access to s_pendingSubmissions
-
+  static unsigned   s_current_vk_window;
+  
   // if true, turns on validation layers.  Default is to have it on on Debug
   // builds and off on Release or RelWithDebInfo builds.
   bool m_validate;

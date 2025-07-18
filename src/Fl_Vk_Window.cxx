@@ -61,6 +61,7 @@ VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
 VmaAllocator            Fl_Vk_Window::m_allocator = VK_NULL_HANDLE;
 Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
+unsigned                Fl_Vk_Window::s_current_vk_window = 0;
 std::vector<Fl_Vk_Window::CommandBufferSubmission> Fl_Vk_Window::s_pendingSubmissions;
 std::mutex Fl_Vk_Window::s_submissionMutex;
 
@@ -306,6 +307,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     FrameData& frame = m_frames[m_currentFrameIndex];
 
     // Wait for this frame’s previous use
+#if 0
     if (frame.active && frame.fence != VK_NULL_HANDLE)
     {
         if (m_debugSync) {
@@ -331,7 +333,8 @@ void Fl_Vk_Window::vk_draw_begin() {
             return;
         }
     }
-
+#endif
+    
     // Acquire next swapchain image
     if (m_debugSync)
     {
@@ -539,6 +542,7 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
     std::vector<VkSemaphore> waitSemaphores;
     std::vector<VkSemaphore> signalSemaphores;
     std::vector<VkPipelineStageFlags> waitStages;
+    std::vector<CommandBufferSubmission> validSubmissions;
 
     for (const auto& submission : s_pendingSubmissions) {
         if (submission.commandBuffer != VK_NULL_HANDLE && submission.window->isFrameActive()) {
@@ -546,12 +550,18 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
             waitSemaphores.push_back(submission.imageAcquiredSemaphore);
             signalSemaphores.push_back(submission.drawCompleteSemaphore);
             waitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+            validSubmissions.push_back(submission);
+        }
+        else
+        {
+            submission.window->m_frames[submission.window->m_currentFrameIndex].active = false;
+            if (submission.window->m_debugSync) {
+                fprintf(stderr, "Skipping submission for window %p: invalid state\n", submission.window);
+            }
         }
     }
-    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
 
     if (commandBuffers.empty()) {
-        std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
         vkDestroyFence(device(), batchFence, nullptr);
         s_pendingSubmissions.clear();
         return;
@@ -564,9 +574,9 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
     submitInfo.pCommandBuffers = commandBuffers.data();
     submitInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
     submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
     submitInfo.signalSemaphoreCount = static_cast<uint32_t>(signalSemaphores.size());
     submitInfo.pSignalSemaphores = signalSemaphores.data();
-    submitInfo.pWaitDstStageMask = waitStages.data();
 
     
     // Submit to the queue
@@ -590,7 +600,9 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
     vkDestroyFence(device(), batchFence, nullptr);
     
     // Present each window's image
-    for (const auto& submission : s_pendingSubmissions) {
+    for (size_t i = 0; i < validSubmissions.size(); ++i) {
+        const auto& submission = validSubmissions[i];
+        
         VkPresentInfoKHR presentInfo = {};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
@@ -599,7 +611,19 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
         presentInfo.pSwapchains = &submission.window->m_swapchain;
         presentInfo.pImageIndices = &submission.window->m_current_buffer;
 
-        vkQueuePresentKHR(queue(), &presentInfo);
+        result = vkQueuePresentKHR(queue(), &presentInfo);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            m_swapchain_needs_recreation = true;
+            // frame.active = false;
+            return;
+        }
+        else if (result != VK_SUCCESS)
+        {
+            fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
+                    string_VkResult(result));
+            // frame.active = false;
+            return;
+        }
 
         // Update last presented buffer
         submission.window->m_last_presented_buffer = submission.window->m_current_buffer;
@@ -607,13 +631,16 @@ void Fl_Vk_Window::submit_all_pending_command_buffers() {
         // Reset frame active state
         submission.window->m_frames[submission.window->m_currentFrameIndex].active = false;
 
-        // Wait on fence if debug sync is enabled
-        if (submission.window->m_debugSync) {
-            vkWaitForFences(device(), 1, &submission.fence, VK_TRUE, UINT64_MAX);
-            vkResetFences(device(), 1, &submission.fence);
-        }
+        // Handle per-window fence for debugging
+        // if (submission.window->m_debugSync && fences[i] != VK_NULL_HANDLE) {
+        //     result = vkWaitForFences(device(), 1, &fences[i], VK_TRUE, UINT64_MAX);
+        //     if (result != VK_SUCCESS) {
+        //         fprintf(stderr, "vkWaitForFences failed for window %p: %s\n",
+        //                 submission.window, string_VkResult(result));
+        //     }
+        //     vkResetFences(device(), 1, &fences[i]);
+        // }
     }
-    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     
     // Clear pending submissions
     s_pendingSubmissions.clear();
@@ -633,7 +660,7 @@ void Fl_Vk_Window::swap_buffers() {
         return;
     }
 
-#if 1
+#if 0
     // Add command buffer to pending submissions
     {
         std::lock_guard<std::mutex> lock(s_submissionMutex);
@@ -646,22 +673,26 @@ void Fl_Vk_Window::swap_buffers() {
         });
     }
     
-    submit_all_pending_command_buffers();
+    ++s_current_vk_window;
+    if (s_current_vk_window >= number_of_vulkan_windows())
+    {
+        submit_all_pending_command_buffers();
+        s_current_vk_window = 0;
+    }
 
 #else
-    std::cerr << "call queue submit" << std::endl;
 
     // Submit command buffer
-    VkSubmitInfo submitInfo = {};
     VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = &frame.imageAcquiredSemaphore;
-    submitInfo.pWaitDstStageMask = &pipe_stage_flags;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &frame.commandBuffer;
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &frame.drawCompleteSemaphore;
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &frame.imageAcquiredSemaphore;
+    submit_info.pWaitDstStageMask = &pipe_stage_flags;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &frame.commandBuffer;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
 
     if (m_debugSync) {
         fprintf(stderr, "Submitting frame %u for image index %u\n",
@@ -670,61 +701,59 @@ void Fl_Vk_Window::swap_buffers() {
 
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
-        result = vkQueueSubmit(queue(), 1, &submitInfo, frame.fence);
+        result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkQueueSubmit failed: %s\n",
                     string_VkResult(result));
             frame.active = false;
             return;
         }
-    }
 
+        // Present swapchain image
+        VkPresentInfoKHR present_info = {};
+        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        present_info.waitSemaphoreCount = 1;
+        present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
+        present_info.swapchainCount = 1;
+        present_info.pSwapchains = &m_swapchain;
+        present_info.pImageIndices = &m_current_buffer;
+
+        if (m_debugSync) {
+            fprintf(stderr, "Presenting image index %u for frame %u\n",
+                    m_current_buffer, m_currentFrameIndex);
+        }
+
+        // Update HDR metadata if changed
+        if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+            m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+        {
+            vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+            m_previous_hdr_metadata = m_hdr_metadata;
+            m_hdr_metadata_changed = false;
+        }
         
-    // Present swapchain image
-    VkPresentInfoKHR presentInfo = {};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &frame.drawCompleteSemaphore;
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &m_swapchain;
-    presentInfo.pImageIndices = &m_current_buffer;
-
-    if (m_debugSync) {
-        fprintf(stderr, "Presenting image index %u for frame %u\n",
-                m_current_buffer, m_currentFrameIndex);
+        result = vkQueuePresentKHR(queue(), &present_info);
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            m_swapchain_needs_recreation = true;
+            frame.active = false;
+            return;
+        }
+        else if (result != VK_SUCCESS)
+        {
+            fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
+                    string_VkResult(result));
+            frame.active = false;
+            return;
+        }
     }
 
-    // Update HDR metadata if changed
-    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-    {
-        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-        m_previous_hdr_metadata = m_hdr_metadata;
-        m_hdr_metadata_changed = false;
-    }
-        
-    result = vkQueuePresentKHR(queue(), &presentInfo);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        m_swapchain_needs_recreation = true;
-        frame.active = false;
-        return;
-    }
-    else if (result != VK_SUCCESS)
-    {
-        fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
-                string_VkResult(result));
-        frame.active = false;
-        return;
-    }
-    
     pVkWindowDriver->swap_buffers();
 
     // Advance to next frame
-    m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
     m_last_presented_buffer = m_current_buffer;
-
 #endif
     
+    m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
 }
 
 /**
@@ -1207,7 +1236,7 @@ void Fl_Vk_Window::init() {
   m_debugSync = false;
 #else
   m_validate = true;
-  m_debugSync = false;
+  m_debugSync = true;
 #endif
 
   // Allocate a dummy safe thread queue
