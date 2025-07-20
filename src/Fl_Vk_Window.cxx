@@ -47,6 +47,9 @@ VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
 VmaAllocator            Fl_Vk_Window::m_allocator = VK_NULL_HANDLE;
 Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
+PFN_vkCmdBeginDebugUtilsLabelEXT Fl_Vk_Window::vkCmdBeginDebugUtilsLabelEXT = nullptr;
+PFN_vkCmdEndDebugUtilsLabelEXT Fl_Vk_Window::vkCmdEndDebugUtilsLabelEXT = nullptr;
+PFN_vkSetDebugUtilsObjectNameEXT Fl_Vk_Window::vkSetDebugUtilsObjectNameEXT = nullptr;
 
 
 bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
@@ -910,6 +913,16 @@ void Fl_Vk_Window::init_vulkan() {
             fprintf(stderr, "init_vulkan() failed to create Vulkan instance\n");
             return;
         }
+#ifndef NDEBUG
+        vkCmdBeginDebugUtilsLabelEXT = 
+            (PFN_vkCmdBeginDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdBeginDebugUtilsLabelEXT");
+
+        vkCmdEndDebugUtilsLabelEXT = 
+            (PFN_vkCmdEndDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdEndDebugUtilsLabelEXT");
+
+        vkSetDebugUtilsObjectNameEXT =
+            (PFN_vkSetDebugUtilsObjectNameEXT) vkGetInstanceProcAddr(instance(), "vkSetDebugUtilsObjectNameEXT");
+#endif
     }
 
     // Create surface
@@ -1042,6 +1055,9 @@ std::vector<const char*> Fl_Vk_Window::get_device_extensions()
 std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 {
     std::vector<const char*> out;
+#ifndef NDEBUG
+    out.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
     return out;
 }
 
