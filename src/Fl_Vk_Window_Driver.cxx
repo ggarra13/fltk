@@ -685,6 +685,7 @@ void Fl_Vk_Window_Driver::create_device()
     VkPhysicalDeviceFeatures features = {};
     vkGetPhysicalDeviceFeatures(gpu(), &features);
     features.fillModeNonSolid = VK_TRUE;
+    features.robustBufferAccess = VK_TRUE;
 
 
     float queue_priorities = 1.0;
