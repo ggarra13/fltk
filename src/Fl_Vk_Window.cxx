@@ -87,8 +87,8 @@ void Fl_Vk_Window::destroy_common_resources() {
 void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
 
-    // Wait for all operations to complete
-    wait_queue(); // was wait_device() ?
+    // Wait for all operations to complete on the device, not queue.
+    wait_device();
 
     // Free existing command buffers
     for (auto& frame : m_frames)

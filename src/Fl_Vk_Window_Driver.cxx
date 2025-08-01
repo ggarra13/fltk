@@ -1011,10 +1011,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
     uint32_t i;
     VkResult result;
 
-    {
-        std::lock_guard<std::mutex> lock(pWindow->queue_mutex());
-        vkDeviceWaitIdle(pWindow->device());
-    }
+    vkDeviceWaitIdle(pWindow->device());
     
     // Destroy resources in reverse creation order (first, those of window)
     pWindow->destroy_common_resources();
