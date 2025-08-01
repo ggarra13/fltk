@@ -93,6 +93,9 @@ void Fl_Vk_Window::recreate_swapchain() {
     // Free existing command buffers
     for (auto& frame : m_frames)
     {
+        if (frame.fence != VK_NULL_HANDLE) {
+            vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+        }
         if (frame.commandBuffer != VK_NULL_HANDLE)
         {
             vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
