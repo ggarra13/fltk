@@ -117,7 +117,6 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
 
   //! Fence used to handle resizes.
   VkFence                m_resizeFence;
-  VkExtent2D             m_currentExtent; // Track current swapchain extend
 
     
   static int can_do(int, const int *);
@@ -278,12 +277,6 @@ public:
       return m_buffers[m_current_buffer].framebuffer;
   }
 
-  // Simulates access to the "front buffer" (read-only!) and not
-  // guaranteed to work post-presentation.
-  VkImage get_front_buffer_image() const {
-      return m_buffers[m_last_presented_buffer].image;
-  }
-
   //! @}
   
   // Application
@@ -349,6 +342,7 @@ private:
   };
 
 protected:
+  float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
@@ -402,7 +396,6 @@ public:
   //! operations to finish.
   void wait_device();
   
-  VkExtent2D getCurrentExtent() const { return m_currentExtent; }
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
       return m_frames[m_currentFrameIndex].commandBuffer;

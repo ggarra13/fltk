@@ -234,11 +234,8 @@ void Fl_Window_Driver::resize_after_scale_change(int ns, float old_f, float new_
     else if (Y+H/2 > sY+sH-1) Y = sY+sH-1-H/2-d;
   }
   size_range(); // adjust the OS-level boundary size values for the window (#880)
-  fprintf(stderr, "pWindow %d,%d %dx%d\n", X, Y, W, H);
   is_a_rescale_ = true;
   pWindow->resize(X, Y, W, H);
-  fprintf(stderr, "    new %d,%d %dx%d\n", pWindow->x(), pWindow->y(),
-          pWindow->w(), pWindow->h());
   is_a_rescale_ = false;
 }
 

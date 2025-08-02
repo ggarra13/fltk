@@ -96,6 +96,11 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       (uint32_t)pWindow->pixel_w(),
       (uint32_t)pWindow->pixel_h()
   };
+
+  std::cerr << pWindow << " new swapchain extent: "
+            << swapchainExtent.width << "x"
+            << swapchainExtent.height << std::endl;
+  
   swapchainExtent.width = FLTK_CLAMP(swapchainExtent.width,
                                      surfCapabilities.minImageExtent.width,
                                      surfCapabilities.maxImageExtent.width);
@@ -103,10 +108,14 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                       surfCapabilities.minImageExtent.height,
                                       surfCapabilities.maxImageExtent.height);
 
+  std::cerr << pWindow << " clamped swapchainExtent: "
+            << swapchainExtent.width << "x"
+            << swapchainExtent.height << std::endl;
+  
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
-      swapchainExtent.width == pWindow->getCurrentExtent().width &&
-      swapchainExtent.height == pWindow->getCurrentExtent().height) {
+      swapchainExtent.width == pWindow->pixel_w() &&
+      swapchainExtent.height == pWindow->pixel_h()) {
       pWindow->m_swapchain = oldSwapchain;
       return;
   }
