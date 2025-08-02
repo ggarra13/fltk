@@ -1304,7 +1304,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
   FLView *view = (FLView*)[nsw contentView];
   if (views_use_CA && [view did_view_resolution_change]) {
-      if ((window->as_gl_window() || window->as_vk_window()) && Fl::use_high_res_GL()) [view setNeedsDisplay:YES]; // necessary with  macOS ≥ 10.14.2; harmless before
+      if (window->as_gl_window() && Fl::use_high_res_GL()) [view setNeedsDisplay:YES]; // necessary with  macOS ≥ 10.14.2; harmless before
   }
 #endif
   if (window == starting_moved_window) {
@@ -1400,14 +1400,14 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
 
   Fl_Cocoa_Window_Driver::driver(window)->view_resized(1);
   if (Fl_Cocoa_Window_Driver::driver(window)->through_resize()) {
-      if (window->as_gl_window() || window->as_vk_window()) {
+      if (window->as_gl_window()) {
       static Fl_Cocoa_Plugin *plugin = NULL;
       if (!plugin) {
         Fl_Plugin_Manager pm("fltk:cocoa");
         plugin = (Fl_Cocoa_Plugin*)pm.plugin("gl.cocoa.fltk.org");
       }
       // calls Fl_Gl_Window::resize() without including Fl_Gl_Window.H
-      plugin->resize(window->as_gl_window() | window->as_vk_window(), X, Y, W, H);
+      plugin->resize(window->as_gl_window(), X, Y, W, H);
     } else {
       Fl_Cocoa_Window_Driver::driver(window)->resize(X, Y, W, H);
     }
@@ -4592,7 +4592,7 @@ static NSBitmapImageRep* rect_to_NSBitmapImageRep(Fl_Window *win, int x, int y, 
     NSBitmapImageRep *bitmap = nil;
     NSRect rect;
     float s = Fl_Graphics_Driver::default_driver().scale();
-    if ((win->as_gl_window() || win->as_vk_window()) && y >= 0) {
+    if ((win->as_gl_window()) && y >= 0) {
       bitmap = GL_rect_to_nsbitmap(win, x, y, w, h);
     }
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
@@ -4664,7 +4664,7 @@ static NSBitmapImageRep* rect_to_NSBitmapImageRep_subwins(Fl_Window *win, int x,
                                                              win->h() - clip.origin.y - sub->y() - clip.size.height, clip.size.width, clip.size.height, true);
     if (childbitmap) {
       // if bitmap is high res and childbitmap is not, childbitmap must be rescaled
-        if ((!win->as_gl_window() || !win->as_vk_window()) && Fl_Cocoa_Window_Driver::driver(win)->mapped_to_retina() &&
+        if ((!win->as_gl_window() && Fl_Cocoa_Window_Driver::driver(win)->mapped_to_retina() &&
             (sub->as_gl_window() || sub->as_vk_window()) &&
             !Fl::use_high_res_GL()) {
         childbitmap = scale_nsbitmapimagerep(childbitmap, 2);
