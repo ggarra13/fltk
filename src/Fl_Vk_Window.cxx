@@ -281,13 +281,13 @@ void Fl_Vk_Window::vk_draw_begin() {
     // Recreate swapchain if needed
     if (m_swapchain_needs_recreation)
     {
-        m_pixels_per_unit = pixels_per_unit();
         recreate_swapchain();
         if (m_swapchain == VK_NULL_HANDLE)
         {
             fprintf(stderr, "Skipping vk_draw_begin: Swapchain recreation failed\n");
             return;
         }
+        m_pixels_per_unit = pixels_per_unit();
     }
 
     // Get current frame data
@@ -657,14 +657,14 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
   // printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
   // printf("orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
   //        x(), y(), w(), h(), pixel_w(), pixel_h());
-  int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale() ||
+  int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() ||
+                     is_a_rescale() ||
                      m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
 
   if (is_a_resize && visible_r()) {
       m_swapchain_needs_recreation = true;
-      m_pixels_per_unit = pixels_per_unit();
   }
 }
 
