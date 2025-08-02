@@ -217,7 +217,6 @@ int Fl_Window_Driver::screen_num() {
 bool Fl_Window_Driver::is_a_rescale_ = false;
 
 void Fl_Window_Driver::resize_after_scale_change(int ns, float old_f, float new_f) {
-    fprintf(stderr, "ns=%d old_f=%g new_f=%g\n", ns, old_f, new_f);
   screen_num(ns);
   Fl_Graphics_Driver::default_driver().scale(new_f);
   int X = int(pWindow->x() * old_f / new_f), Y = int(pWindow->y() * old_f / new_f);
@@ -235,9 +234,11 @@ void Fl_Window_Driver::resize_after_scale_change(int ns, float old_f, float new_
     else if (Y+H/2 > sY+sH-1) Y = sY+sH-1-H/2-d;
   }
   size_range(); // adjust the OS-level boundary size values for the window (#880)
+  fprintf(stderr, "pWindow %d,%d %dx%d\n", X, Y, W, H);
   is_a_rescale_ = true;
-  printf("pWindow::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
   pWindow->resize(X, Y, W, H);
+  fprintf(stderr, "    new %d,%d %dx%d\n", pWindow->x(), pWindow->y(),
+          pWindow->w(), pWindow->h());
   is_a_rescale_ = false;
 }
 

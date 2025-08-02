@@ -422,7 +422,7 @@ public:
   /** Gives the window width in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::w()
    which is expressed in FLTK units, may differ from the window width in pixels.
-   Calls to Vulkan functions expecting pixel values (\em e.g., \c glViewport) should therefore
+   Calls to Vulkan functions expecting pixel values (\em e.g., \c vkScissor
    use pixel_w() rather than w().
    Method pixel_w() detects when the GUI is rescaled or when the window has been moved
    between low and high resolution displays and automatically adjusts the returned value.

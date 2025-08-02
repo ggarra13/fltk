@@ -645,6 +645,8 @@ void Fl_Vk_Window::flush() {
   }
     
   vk_draw_begin();
+  printf("pre-draw: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(),
+         pixel_w(), pixel_h());
   draw();  // User defined virtual draw function
   vk_draw_end();
   
@@ -653,9 +655,10 @@ void Fl_Vk_Window::flush() {
 }
 
 void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
-  printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
-  printf("current: x()=%d, y()=%d, w()=%d, h()=%d\n", x(), y(), w(), h());
-
+  // printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
+  // printf("orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
+  //        x(), y(), w(), h(), pixel_w(), pixel_h());
+    abort();
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
 
   Fl_Window::resize(X, Y, W, H);

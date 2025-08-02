@@ -500,16 +500,6 @@ set(VKCPPFILES
 
 set(VK_DRIVER_FILES
   Fl_Vk_Window_Driver.cxx
-  #drivers/Vulkan/Fl_Vulkan_Display_Device.cxx
-  # the following file doesn't contribute any code:
-  #drivers/Vulkan/Fl_Vulkan_Graphics_Driver.cxx
-  
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_arci.cxx
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_color.cxx
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_font.cxx
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_line_style.cxx
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_rect.cxx
-  # drivers/Vulkan/Fl_Vulkan_Graphics_Driver_vertex.cxx
 )
 
 if(FLTK_BACKEND_WAYLAND)

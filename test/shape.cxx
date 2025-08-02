@@ -44,6 +44,7 @@ void shape_window::draw() {
     valid(1);
     glLoadIdentity();
     glViewport(0, 0, pixel_w(), pixel_h());
+    fprintf(stderr, "%dx%d\n", pixel_w(), pixel_h());
   }
 // draw an amazing graphic:
   glClear(GL_COLOR_BUFFER_BIT);

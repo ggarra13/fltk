@@ -92,7 +92,10 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   VK_CHECK(result);
 
   // Set swapchain extent to match window size, clamped to capabilities
-  VkExtent2D swapchainExtent = {(uint32_t)pWindow->w(), (uint32_t)pWindow->h()};
+  VkExtent2D swapchainExtent = {
+      (uint32_t)pWindow->pixel_w(),
+      (uint32_t)pWindow->pixel_h()
+  };
   swapchainExtent.width = FLTK_CLAMP(swapchainExtent.width,
                                      surfCapabilities.minImageExtent.width,
                                      surfCapabilities.maxImageExtent.width);
@@ -220,7 +223,9 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   image.pNext = NULL;
   image.imageType = VK_IMAGE_TYPE_2D;
   image.format = depth_format;
-  image.extent = {(uint32_t)pWindow->w(), (uint32_t)pWindow->h(), 1};
+  image.extent = {
+      (uint32_t)pWindow->pixel_w(),
+      (uint32_t)pWindow->pixel_h(), 1};
   image.mipLevels = 1;
   image.arrayLayers = 1;
   image.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -315,8 +320,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   bool has_stencil = pWindow->mode() & FL_STENCIL;
   fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
   fb_info.pAttachments = attachments;
-  fb_info.width = pWindow->w();
-  fb_info.height = pWindow->h();
+  fb_info.width = pWindow->pixel_w();
+  fb_info.height = pWindow->pixel_h();
   fb_info.layers = 1;
 
   VkResult result;
