@@ -91,6 +91,9 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                                      &surfCapabilities);
   VK_CHECK(result);
 
+  std::cerr << "1 pWindow->pixel_w()=" << pWindow->pixel_w() << std::endl
+            << "1 pWindow->pixel_h()=" << pWindow->pixel_h() << std::endl;
+  
   // Set swapchain extent to match window size, clamped to capabilities
   VkExtent2D swapchainExtent = {
       (uint32_t)pWindow->pixel_w(),
@@ -103,6 +106,9 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchainExtent.height = FLTK_CLAMP(swapchainExtent.height,
                                       surfCapabilities.minImageExtent.height,
                                       surfCapabilities.maxImageExtent.height);
+  
+  std::cerr << "CLAMP width=" << swapchainExtent.width << std::endl
+            << "CLAMP height=" << swapchainExtent.height << std::endl;
   
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
@@ -224,6 +230,8 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   image.pNext = NULL;
   image.imageType = VK_IMAGE_TYPE_2D;
   image.format = depth_format;
+  std::cerr << "2 pWindow->pixel_w()=" << pWindow->pixel_w() << std::endl
+            << "2 pWindow->pixel_h()=" << pWindow->pixel_h() << std::endl;
   image.extent = {
       (uint32_t)pWindow->pixel_w(),
       (uint32_t)pWindow->pixel_h(), 1};
@@ -321,6 +329,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   bool has_stencil = pWindow->mode() & FL_STENCIL;
   fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
   fb_info.pAttachments = attachments;
+  std::cerr << "3 pWindow->pixel_w()=" << pWindow->pixel_w() << std::endl
+            << "3 pWindow->pixel_h()=" << pWindow->pixel_h() << std::endl;
   fb_info.width = pWindow->pixel_w();
   fb_info.height = pWindow->pixel_h();
   fb_info.layers = 1;
