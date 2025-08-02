@@ -4664,7 +4664,7 @@ static NSBitmapImageRep* rect_to_NSBitmapImageRep_subwins(Fl_Window *win, int x,
                                                              win->h() - clip.origin.y - sub->y() - clip.size.height, clip.size.width, clip.size.height, true);
     if (childbitmap) {
       // if bitmap is high res and childbitmap is not, childbitmap must be rescaled
-        if ((!win->as_gl_window() && Fl_Cocoa_Window_Driver::driver(win)->mapped_to_retina() &&
+        if ((!win->as_gl_window() && Fl_Cocoa_Window_Driver::driver(win)->mapped_to_retina()) &&
             (sub->as_gl_window() || sub->as_vk_window()) &&
             !Fl::use_high_res_GL()) {
         childbitmap = scale_nsbitmapimagerep(childbitmap, 2);
