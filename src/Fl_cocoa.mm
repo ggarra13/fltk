@@ -1400,14 +1400,14 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
 
   Fl_Cocoa_Window_Driver::driver(window)->view_resized(1);
   if (Fl_Cocoa_Window_Driver::driver(window)->through_resize()) {
-      if (window->as_gl_window() || window->as_vk_window()) {
+      if (window->as_gl_window()) {
       static Fl_Cocoa_Plugin *plugin = NULL;
       if (!plugin) {
         Fl_Plugin_Manager pm("fltk:cocoa");
         plugin = (Fl_Cocoa_Plugin*)pm.plugin("gl.cocoa.fltk.org");
       }
       // calls Fl_Gl_Window::resize() without including Fl_Gl_Window.H
-      plugin->resize(window->as_gl_window() | window->as_vk_window(), X, Y, W, H);
+      plugin->resize(window->as_gl_window(), X, Y, W, H);
     } else {
       Fl_Cocoa_Window_Driver::driver(window)->resize(X, Y, W, H);
     }
