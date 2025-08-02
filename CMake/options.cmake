@@ -668,6 +668,7 @@ if(FLTK_BUILD_GL)
     find_library(OPENGL_LIB GL)
     get_filename_component(PATH_TO_GLLIB ${OPENGL_LIB} DIRECTORY)
     find_library(GLU_LIB GLU)
+    message(STATUS "${GLU_LIB}")
     get_filename_component(PATH_TO_GLULIB ${GLU_LIB} DIRECTORY)
     # FIXME: we should find a better way to resolve this issue:
     # with GL, must use XQuartz libX11 else "Insufficient GL support"

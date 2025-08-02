@@ -2322,7 +2322,7 @@ void Fl_X11_Window_Driver::resize(int X,int Y,int W,int H) {
     pWindow->Fl_Group::resize(X,Y,W,H);
     if (shown()) {
 #if FLTK_USE_CAIRO
-      if (!pWindow->as_gl_window() && cairo_) {
+        if (!pWindow->as_gl_window() && !pWindow->as_vk_window() && cairo_) {
         float s = Fl::screen_driver()->scale(screen_num());
         cairo_xlib_surface_set_size(cairo_get_target(cairo_), (W>0 ? int(W*s) : 1), (H>0 ? int(H*s) : 1));
       }
