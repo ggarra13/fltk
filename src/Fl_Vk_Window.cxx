@@ -216,7 +216,7 @@ void Fl_Vk_Window::recreate_swapchain() {
 }
 
 void Fl_Vk_Window::begin_render_pass(VkCommandBuffer& cmd)
-{    
+{   
     VkClearValue clear_values[2];
     clear_values[0].color = m_clearColor;
     clear_values[1].depthStencil = {m_depthStencil, 0};
@@ -227,8 +227,8 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer& cmd)
     rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
-    rp_begin.renderArea.extent.width = w();
-    rp_begin.renderArea.extent.height = h();
+    rp_begin.renderArea.extent.width = pixel_w();
+    rp_begin.renderArea.extent.height = pixel_h();
     rp_begin.clearValueCount = (mode() & FL_DEPTH || mode() & FL_STENCIL) ? 2 : 1;
     rp_begin.pClearValues = clear_values;
 
@@ -279,7 +279,7 @@ void Fl_Vk_Window::vk_draw_begin() {
     }
 
     // Recreate swapchain if needed
-    if (m_swapchain_needs_recreation || m_pixels_per_unit != pixels_per_unit())
+    if (m_swapchain_needs_recreation)
     {
         m_pixels_per_unit = pixels_per_unit();
         recreate_swapchain();
@@ -657,12 +657,14 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
   // printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
   // printf("orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
   //        x(), y(), w(), h(), pixel_w(), pixel_h());
-  int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale());
+  int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() || is_a_rescale() ||
+                     m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
 
   if (is_a_resize && visible_r()) {
       m_swapchain_needs_recreation = true;
+      m_pixels_per_unit = pixels_per_unit();
   }
 }
 
