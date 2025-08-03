@@ -173,8 +173,13 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   // Recreate buffers
   pWindow->m_buffers.resize(swapchainImageCount);
+  VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   for (uint32_t i = 0; i < swapchainImageCount; i++)
   {
+      result = vkCreateSemaphore(pWindow->device(), &semaphoreInfo, nullptr,
+                                 &pWindow->m_buffers[i].semaphore);
+      VK_CHECK(result);
+      
       VkImageViewCreateInfo view_info = {};
       view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
       view_info.image = swapchainImages[i];
