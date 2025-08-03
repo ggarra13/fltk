@@ -103,7 +103,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchainExtent.height = FLTK_CLAMP(swapchainExtent.height,
                                       surfCapabilities.minImageExtent.height,
                                       surfCapabilities.maxImageExtent.height);
-  
+    
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
       swapchainExtent.width == pWindow->pixel_w() &&
