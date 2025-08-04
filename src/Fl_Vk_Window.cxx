@@ -214,8 +214,13 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer& cmd)
     rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
+#ifdef __APPLE__
+    rp_begin.renderArea.extent.width = pixel_w() / pixels_per_unit();
+    rp_begin.renderArea.extent.height = pixel_h() / pixels_per_unit();
+#else
     rp_begin.renderArea.extent.width = pixel_w();
     rp_begin.renderArea.extent.height = pixel_h();
+#endif
     rp_begin.clearValueCount = (mode() & FL_DEPTH || mode() & FL_STENCIL) ? 2 : 1;
     rp_begin.pClearValues = clear_values;
 
