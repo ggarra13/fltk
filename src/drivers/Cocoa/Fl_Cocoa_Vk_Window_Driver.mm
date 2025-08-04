@@ -223,10 +223,13 @@ void Fl_Cocoa_Vk_Window_Driver::create_surface()
     CGFloat scale = [[view window] backingScaleFactor];
 
     // Apply the scale to the layer
-    metalLayer.contentsScale = scale;
-    metalLayer.drawableSize = CGSizeMake(view.bounds.size.width * scale,
-                                         view.bounds.size.height * scale);
-
+    if (Fl::use_high_res_VK())
+    {
+        metalLayer.contentsScale = scale;
+        metalLayer.drawableSize = CGSizeMake(view.bounds.size.width * scale,
+                                             view.bounds.size.height * scale);
+    }
+    
     VkMetalSurfaceCreateInfoEXT surfaceInfo = {};
     surfaceInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
     surfaceInfo.pNext = nullptr;
