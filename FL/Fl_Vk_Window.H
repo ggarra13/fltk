@@ -430,6 +430,7 @@ public:
    \version 1.3.4
    */
   int pixel_w() { return int(pixels_per_unit() * w() - 0.5f); }
+  
   /** Gives the window height in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
    which is expressed in FLTK units, may differ from the window height in pixels.

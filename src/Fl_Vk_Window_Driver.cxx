@@ -78,6 +78,15 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
+void Fl_Vk_Window_Driver::get_size(int& W, int& H)
+{
+  W = pWindow->pixel_w();
+  H = pWindow->pixel_h();
+
+  if (W == pWindow->w() - 1) W = pWindow->w();
+  if (H == pWindow->h() - 1) H = pWindow->h();
+}
+
 // Recreates m_swapchain and m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
@@ -92,15 +101,10 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   VK_CHECK(result);
 
   // Set swapchain extent to match window size, clamped to capabilities
-#ifdef __APPLE__
-  uint32_t W = pWindow->w();
-  uint32_t H = pWindow->h();
-#else 
-  uint32_t W = pWindow->pixel_w();
-  uint32_t H = pWindow->pixel_h();
-#endif
+  int W, H;
+  get_size(W, H);
   
-  VkExtent2D swapchainExtent = { W, H };
+  VkExtent2D swapchainExtent = { (uint32_t)W, (uint32_t)H };
   
   swapchainExtent.width = FLTK_CLAMP(swapchainExtent.width,
                                      surfCapabilities.minImageExtent.width,
@@ -228,20 +232,15 @@ void Fl_Vk_Window_Driver::prepare_depth() {
       }
   }
   
-#ifdef __APPLE__
-  uint32_t W = pWindow->w();
-  uint32_t H = pWindow->h();
-#else 
-  uint32_t W = pWindow->pixel_w();
-  uint32_t H = pWindow->pixel_h();
-#endif
-
+  int W, H;
+  get_size(W, H);
+  
   VkImageCreateInfo image = {};
   image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image.pNext = NULL;
   image.imageType = VK_IMAGE_TYPE_2D;
   image.format = depth_format;
-  image.extent = { W, H, 1};
+  image.extent = { (uint32_t)W, (uint32_t)H, 1};
   image.mipLevels = 1;
   image.arrayLayers = 1;
   image.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -328,13 +327,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   attachments[0] = VK_NULL_HANDLE;        // Color attachment
   attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
 
-#ifdef __APPLE__
-  uint32_t W = pWindow->w();
-  uint32_t H = pWindow->h();
-#else 
-  uint32_t W = pWindow->pixel_w();
-  uint32_t H = pWindow->pixel_h();
-#endif
+  int W, H;
+  get_size(W, H);
   
   VkFramebufferCreateInfo fb_info = {};
   fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

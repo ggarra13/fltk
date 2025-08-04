@@ -55,89 +55,6 @@ Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w)
 
 static void* mode_to_NSVulkanPixelFormat(int m, const int *alistp)
 {
-//   NSVulkanPixelFormatAttribute attribs[32];
-//   int n = 0;
-//   // AGL-style code remains commented out for comparison
-//   if (!alistp) {
-//     if (m & FL_INDEX) {
-//       //list[n++] = AGL_BUFFER_SIZE; list[n++] = 8;
-//     } else {
-//       //list[n++] = AGL_RGBA;
-//       //list[n++] = AGL_GREEN_SIZE;
-//       //list[n++] = (m & FL_RGB8) ? 8 : 1;
-//       attribs[n++] = NSVulkanPFAColorSize;
-//       attribs[n++] = (NSVulkanPixelFormatAttribute)((m & FL_RGB8) ? 32 : 1);
-//       if (m & FL_ALPHA) {
-//         //list[n++] = AGL_ALPHA_SIZE;
-//         attribs[n++] = NSVulkanPFAAlphaSize;
-//         attribs[n++] = (NSVulkanPixelFormatAttribute)((m & FL_RGB8) ? 8 : 1);
-//       }
-//       if (m & FL_ACCUM) {
-//         //list[n++] = AGL_ACCUM_GREEN_SIZE; list[n++] = 1;
-//         attribs[n++] = NSVulkanPFAAccumSize;
-//         attribs[n++] = (NSVulkanPixelFormatAttribute)1;
-//         if (m & FL_ALPHA) {
-//           //list[n++] = AGL_ACCUM_ALPHA_SIZE; list[n++] = 1;
-//         }
-//       }
-//     }
-//     if (m & FL_DOUBLE) {
-//       //list[n++] = AGL_DOUBLEBUFFER;
-//       attribs[n++] = NSVulkanPFADoubleBuffer;
-//     }
-//     if (m & FL_DEPTH) {
-//       //list[n++] = AGL_DEPTH_SIZE; list[n++] = 24;
-//       attribs[n++] = NSVulkanPFADepthSize;
-//       attribs[n++] = (NSVulkanPixelFormatAttribute)24;
-//     }
-//     if (m & FL_STENCIL) {
-//       //list[n++] = AGL_STENCIL_SIZE; list[n++] = 1;
-//       attribs[n++] = NSVulkanPFAStencilSize;
-//       attribs[n++] = (NSVulkanPixelFormatAttribute)1;
-//     }
-//     if (m & FL_STEREO) {
-//       //list[n++] = AGL_STEREO;
-//       attribs[n++] = 6/*NSVulkanPFAStereo*/;
-//     }
-//     if ((m & FL_MULTISAMPLE) && fl_mac_os_version >= 100400) {
-// #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_4
-//       attribs[n++] = NSVulkanPFAMultisample; // 10.4
-// #endif
-//       attribs[n++] = NSVulkanPFASampleBuffers; attribs[n++] = (NSVulkanPixelFormatAttribute)1;
-//       attribs[n++] = NSVulkanPFASamples; attribs[n++] = (NSVulkanPixelFormatAttribute)4;
-//     }
-// #if MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
-// #define NSVulkanPFAVulkanProfile      (NSVulkanPixelFormatAttribute)99
-// #define kCGLPFAVulkanProfile          NSVulkanPFAVulkanProfile
-// #define NSVulkanProfileVersionLegacy  (NSVulkanPixelFormatAttribute)0x1000
-// #define NSVulkanProfileVersion3_2Core  (NSVulkanPixelFormatAttribute)0x3200
-// #define kCGLOGLPVersion_Legacy        NSVulkanProfileVersionLegacy
-// #endif
-//     if (fl_mac_os_version >= 100700) {
-//       attribs[n++] = NSVulkanPFAVulkanProfile;
-//       attribs[n++] =  (m & FL_OPENGL3) ? NSVulkanProfileVersion3_2Core : NSVulkanProfileVersionLegacy;
-//     }
-//   } else {
-//     while (alistp[n] && n < 30) {
-//       if (alistp[n] == kCGLPFAVulkanProfile) {
-//         if (fl_mac_os_version < 100700) {
-//           if (alistp[n+1] != kCGLOGLPVersion_Legacy) return nil;
-//           n += 2;
-//           continue;
-//         }
-//       }
-//       attribs[n] = (NSVulkanPixelFormatAttribute)alistp[n];
-//       n++;
-//     }
-//   }
-//   attribs[n] = (NSVulkanPixelFormatAttribute)0;
-//   NSVulkanPixelFormat *pixform = [[NSVulkanPixelFormat alloc] initWithAttributes:attribs];
-  /*GLint color,alpha,accum,depth;
-  [pixform getValues:&color forAttribute:NSVulkanPFAColorSize forVirtualScreen:0];
-  [pixform getValues:&alpha forAttribute:NSVulkanPFAAlphaSize forVirtualScreen:0];
-  [pixform getValues:&accum forAttribute:NSVulkanPFAAccumSize forVirtualScreen:0];
-  [pixform getValues:&depth forAttribute:NSVulkanPFADepthSize forVirtualScreen:0];
-  NSLog(@"color=%d alpha=%d accum=%d depth=%d",color,alpha,accum,depth);*/
   return nullptr;
 }
 
@@ -302,11 +219,17 @@ void Fl_Cocoa_Vk_Window_Driver::create_surface()
     [view setLayer:metalLayer];
     [view setWantsLayer:YES]; // Enable layer-backing for the NSView
     
+    // Get the scale factor from the window or screen
+    CGFloat scale = [[view window] backingScaleFactor];
+
+    // Apply the scale to the layer
+    // metalLayer.contentsScale = scale;
+
     VkMetalSurfaceCreateInfoEXT surfaceInfo = {};
     surfaceInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
     surfaceInfo.pNext = nullptr;
     surfaceInfo.flags = 0;
-    surfaceInfo.pLayer = (__bridge CAMetalLayer*)[view layer]; // Use the layer instead of the view
+    surfaceInfo.pLayer = (__bridge CAMetalLayer*)metalLayer; // Use the layer instead of the view
 
     // Use vkCreateMetalSurfaceEXT instead of vkCreateMacOSSurfaceMVK
     VkResult result = vkCreateMetalSurfaceEXT(pWindow->ctx.instance,
