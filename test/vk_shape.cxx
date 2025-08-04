@@ -557,7 +557,6 @@ void sides_cb(Fl_Widget *o, void *p) {
 }
 
 int main(int argc, char **argv) {
-    Fl::use_high_res_VK(1);
 
     Fl_Window window(300, 330);
   

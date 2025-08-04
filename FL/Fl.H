@@ -1419,18 +1419,6 @@ public:
    */
   static int use_high_res_GL() { return use_high_res_GL_; }
 
-  /**  sets whether GL windows should be drawn at high resolution on Apple
-   computers with retina displays
-   \version 1.3.4
-   */
-  static void use_high_res_VK(int val) { use_high_res_GL_ = val; }
-  /**  returns whether GL windows should be drawn at high resolution on Apple
-   computers with retina displays.
-   Default is no.
-   \version 1.3.4
-   */
-  static int use_high_res_VK() { return use_high_res_GL_; }
-
   /**  sets whether OpenGL uses textures to draw all text.
    By default, FLTK draws OpenGL text using textures, if the necessary
    hardware support is available. Call \p Fl::draw_GL_text_with_textures(0)
