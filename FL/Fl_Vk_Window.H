@@ -429,7 +429,11 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
+#ifdef __APPLE__
+  int pixel_w() { return int(pixels_per_unit() * w() + 0.5f); }
+#else
   int pixel_w() { return int(pixels_per_unit() * w() - 0.5f); }
+#endif
   
   /** Gives the window height in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
@@ -440,7 +444,11 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
+#ifdef __APPLE__
+  int pixel_h() { return int(pixels_per_unit() * h() + 0.5f); }
+#else
   int pixel_h() { return int(pixels_per_unit() * h() - 0.5f); }
+#endif
 
   virtual ~Fl_Vk_Window();
   /**

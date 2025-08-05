@@ -83,6 +83,7 @@ void Fl_Vk_Window_Driver::get_size(int& W, int& H)
   W = pWindow->pixel_w();
   H = pWindow->pixel_h();
 
+  // Sanity check (not for Retina)
   if (W == pWindow->w() - 1) W = pWindow->w();
   if (H == pWindow->h() - 1) H = pWindow->h();
 }
