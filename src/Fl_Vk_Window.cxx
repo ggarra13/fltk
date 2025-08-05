@@ -901,7 +901,6 @@ void Fl_Vk_Window::init_vulkan() {
             fprintf(stderr, "init_vulkan() failed to create Vulkan instance\n");
             return;
         }
-#ifndef NDEBUG
         vkCmdBeginDebugUtilsLabelEXT = 
             (PFN_vkCmdBeginDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdBeginDebugUtilsLabelEXT");
 
@@ -910,7 +909,6 @@ void Fl_Vk_Window::init_vulkan() {
 
         vkSetDebugUtilsObjectNameEXT =
             (PFN_vkSetDebugUtilsObjectNameEXT) vkGetInstanceProcAddr(instance(), "vkSetDebugUtilsObjectNameEXT");
-#endif
     }
 
     // Create surface
@@ -1037,9 +1035,7 @@ std::vector<const char*> Fl_Vk_Window::get_device_extensions()
 std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 {
     std::vector<const char*> out;
-#ifndef NDEBUG
     out.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-#endif
     return out;
 }
 
