@@ -15,6 +15,8 @@
 //     https://www.fltk.org/bugs.php
 //
 
+// #define FLTK_CHECK_SIZES 1
+
 #define VMA_IMPLEMENTATION
 
 #include <FL/vk.h>
@@ -80,12 +82,8 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 
 void Fl_Vk_Window_Driver::get_size(int& W, int& H)
 {
-  W = pWindow->pixel_w();
-  H = pWindow->pixel_h();
-
-  // Sanity check (not for Retina)
-  if (W == pWindow->w() - 1) W = pWindow->w();
-  if (H == pWindow->h() - 1) H = pWindow->h();
+    W = pWindow->pixel_w();
+    H = pWindow->pixel_h();
 }
 
 // Recreates m_swapchain and m_buffers
