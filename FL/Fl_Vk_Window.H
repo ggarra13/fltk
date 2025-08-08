@@ -429,7 +429,7 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
-  int pixel_w() { return int(pixels_per_unit() * w() - 0.5f); }
+  int pixel_w() { return int(pixels_per_unit() * w() + 0.5f); }
   
   /** Gives the window height in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
@@ -440,7 +440,7 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
-  int pixel_h() { return int(pixels_per_unit() * h() - 0.5f); }
+  int pixel_h() { return int(pixels_per_unit() * h() + 0.5f); }
 
   virtual ~Fl_Vk_Window();
   /**
