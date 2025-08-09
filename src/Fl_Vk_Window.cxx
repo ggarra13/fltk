@@ -1078,8 +1078,6 @@ std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
     std::vector<const char*> out;
     out.push_back("VK_EXT_swapchain_colorspace");
-    out.push_back("VK_KHR_present_id");
-    out.push_back("VK_KHR_present_wait");
     return out;
 }
 
