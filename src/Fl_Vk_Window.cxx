@@ -172,7 +172,9 @@ void Fl_Vk_Window::recreate_swapchain() {
     // Resize frame data
     m_frames.resize(m_swapchainImageCount);
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
+    VkFenceCreateInfo fenceInfo = {};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = 0; // NOT signaled
     VkCommandBufferAllocateInfo cmdInfo = {};
     cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmdInfo.commandPool = commandPool();
@@ -246,7 +248,7 @@ void Fl_Vk_Window::begin_render_pass()
 
 void Fl_Vk_Window::end_render_pass(VkCommandBuffer& cmd)
 {
-    if (m_in_render_pass)
+    if (m_in_render_pass && cmd != VK_NULL_HANDLE)
     {
         vkCmdEndRenderPass(cmd);
         m_in_render_pass = false;
@@ -480,7 +482,7 @@ void Fl_Vk_Window::vk_draw_end()
         frame.active = false;
         return;
     }
-    
+
     VkResult result = vkEndCommandBuffer(frame.commandBuffer);
     if (result != VK_SUCCESS)
     {
