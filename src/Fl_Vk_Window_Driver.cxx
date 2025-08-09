@@ -97,7 +97,12 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
                                                      pWindow->m_surface,
                                                      &surfCapabilities);
-  VK_CHECK(result);
+  if (result != VK_SUCCESS)
+  {
+      fprintf(stderr, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: %s\n", string_VkResult(result));
+      pWindow->m_swapchain = VK_NULL_HANDLE;
+      return;
+  }
 
   // Set swapchain extent to match window size, clamped to capabilities
   int W, H;

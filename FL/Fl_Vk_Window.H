@@ -141,7 +141,8 @@ protected:
   //! Called before begin_render_pass.  Allows setting up a color or depth.
   //! The default function will call begin_render_pass().  Override this if
   //! you don't want that behavior.
-  virtual void vk_draw_begin();
+  //! Must return true on success, false on failure.
+  virtual bool vk_draw_begin();
 
   //! Main function to use for drawing with Vulkan.  Note that by default
   //! FLTK calls this after calling vk_draw_begin() and begin_render_pass();
