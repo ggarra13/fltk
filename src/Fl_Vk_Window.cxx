@@ -675,6 +675,7 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
   //        x(), y(), w(), h(), pixel_w(), pixel_h());
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() ||
                      is_a_rescale() ||
+                     m_pixels_per_unit <= 0.F ||
                      m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
@@ -1108,7 +1109,7 @@ void Fl_Vk_Window::init() {
   vkSetHdrMetadataEXT = nullptr;
 
   // Swapchain info
-  m_pixels_per_unit = 1.F;
+  m_pixels_per_unit = 0.F;
   m_swapchain = VK_NULL_HANDLE;
   m_resizeFence = VK_NULL_HANDLE;
 
