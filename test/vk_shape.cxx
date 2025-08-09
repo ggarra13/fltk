@@ -30,7 +30,7 @@
 #include <Fl_Vk_Demos.H>   // Useless classes used for demo purposes only
 
 class vk_shape_window : public Fl_Vk_Window {
-    void vk_draw_begin() FL_OVERRIDE;
+    bool vk_draw_begin() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
 public:
     int sides;
@@ -473,9 +473,9 @@ void vk_shape_window::prepare()
     prepare_pipeline();
 }
 
-void vk_shape_window::vk_draw_begin() {
+bool vk_shape_window::vk_draw_begin() {
     m_clearColor = { 1.0, 0, 0, 0 };  // Red background
-    Fl_Vk_Window::vk_draw_begin();
+    return Fl_Vk_Window::vk_draw_begin();
 }
 
 void vk_shape_window::draw() {
