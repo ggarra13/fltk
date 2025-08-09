@@ -93,8 +93,7 @@ void Fl_Vk_Window::recreate_swapchain() {
     // Validate surface
     VkSurfaceCapabilitiesKHR surfCapabilities;
     result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &surfCapabilities);
-    if (result == VK_ERROR_SURFACE_LOST_KHR) {
-        fprintf(stderr, "Surface lost, recreating\n");
+    if (result == VK_ERROR_SURFACE_LOST_KHR || result != VK_SUCCESS) {
         pVkWindowDriver->destroy_surface();
         pVkWindowDriver->create_surface();
         if (m_surface == VK_NULL_HANDLE) {
@@ -308,7 +307,13 @@ bool Fl_Vk_Window::vk_draw_begin() {
             fprintf(stderr, "Waiting for frame %u fence\n", m_currentFrameIndex);
         }
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
-                                 UINT64_MAX);
+                                 1'000'000'000); // 1s
+        
+        if (result == VK_TIMEOUT) {
+            fprintf(stderr, "vkWaitForFences timed out, attempting recovery\n");
+            m_swapchain_needs_recreation = true;
+            return false;
+        }
         if (result != VK_SUCCESS) {
             fprintf(stderr, "Fl_Vk_Window - vkWaitForFences failed: %s\n", string_VkResult(result));
             frame.active = false;
@@ -344,6 +349,12 @@ bool Fl_Vk_Window::vk_draw_begin() {
             fprintf(stderr, "vkAcquireNextImageKHR timed out\n");
         }
         return false;
+    }
+    else if (result == VK_ERROR_SURFACE_LOST_KHR)
+    {
+        fprintf(stderr, "Surface lost, triggering recreation\n");
+        m_swapchain_needs_recreation = true;
+        return false; // Early return to trigger recreate_swapchain
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR ||
              result == VK_SUBOPTIMAL_KHR)
@@ -1067,6 +1078,8 @@ std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
     std::vector<const char*> out;
     out.push_back("VK_EXT_swapchain_colorspace");
+    out.push_back("VK_KHR_present_id");
+    out.push_back("VK_KHR_present_wait");
     return out;
 }
 
