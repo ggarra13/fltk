@@ -355,8 +355,8 @@ void Fl_Wayland_Window_Driver::make_current() {
   }
 
   // to support progressive drawing
-  if ( (!Fl_Wayland_Window_Driver::in_flush_) && window->buffer && (!window->frame_cb)
-      && window->buffer->draw_buffer_needs_commit && (!wait_for_expose_value) ) {
+  if ( (!Fl_Wayland_Window_Driver::in_flush_) && window->buffer && (!window->frame_cb) &&
+      (!wait_for_expose_value) ) {
     Fl_Wayland_Graphics_Driver::buffer_commit(window);
   }
 
@@ -590,7 +590,9 @@ void Fl_Wayland_Window_Driver::iconize() {
   struct wld_window *wl_win = (struct wld_window*)ip->xid;
   if (wl_win->kind == DECORATED) {
     libdecor_frame_set_minimized(wl_win->frame);
-    Fl::handle(FL_HIDE, pWindow);
+    if (xdg_toplevel_get_version(xdg_toplevel()) < 6) {
+      Fl::handle(FL_HIDE, pWindow);
+    }
   }
   else if (wl_win->kind == UNFRAMED && wl_win->xdg_toplevel) xdg_toplevel_set_minimized(wl_win->xdg_toplevel);
 }
@@ -970,10 +972,6 @@ static void handle_configure(struct libdecor_frame *frame,
   if (is_2nd_run) driver->wait_for_expose_value = 0;
 //fprintf(stderr, "handle_configure fl_win=%p size:%dx%d state=%x wait_for_expose_value=%d is_2nd_run=%d\n", window->fl_win, width,height,window_state,driver->wait_for_expose_value, is_2nd_run);
 
-/* We would like to do FL_HIDE when window is minimized but :
- "There is no way to know if the surface is currently minimized, nor is there any way to
- unset minimization on this surface. If you are looking to throttle redrawing when minimized,
- please instead use the wl_surface.frame event" */
   if (window_state & LIBDECOR_WINDOW_STATE_ACTIVE) {
     if (Fl_Wayland_Screen_Driver::compositor == Fl_Wayland_Screen_Driver::WESTON) {
       // After click on titlebar, weston calls wl_keyboard_enter() for a
@@ -983,7 +981,11 @@ static void handle_configure(struct libdecor_frame *frame,
     if (!window->fl_win->border()) libdecor_frame_set_visibility(window->frame, false);
     else if (!libdecor_frame_is_visible(window->frame)) {
       libdecor_frame_set_visibility(window->frame, true);
+    } else if (!window->fl_win->visible()) {
+      Fl::handle(FL_SHOW, window->fl_win); // useful when un-minimizing
     }
+  } else if (window_state & LIBDECOR_WINDOW_STATE_SUSPENDED) { // window is minimized
+    Fl::handle(FL_HIDE, window->fl_win);
   }
 
   if (window->fl_win->border())
@@ -1516,7 +1518,7 @@ void Fl_Wayland_Window_Driver::makeWindow()
     // the state of the parent surface is applied."
     new_window->configured_width = pWindow->w();
     new_window->configured_height = pWindow->h();
-    if (!pWindow->as_gl_window())  {
+    if (!pWindow->as_gl_window() && !pWindow->as_vk_window())  {
       parent->fl_win->wait_for_expose();
       wl_surface_commit(parent->wl_surface);
     }
@@ -1882,7 +1884,7 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   // When moving or resizing a non-GL subwindow independently from its parent, this condition
   // delays application of X,Y,W,H values until the compositor signals
   // it's ready for a new frame using the frame callback mechanism.
-  if ((parent && parent->damage()) || depth > 1 || pWindow->as_gl_window() || !parent_xid ||
+  if ((parent && parent->damage()) || depth > 1 || pWindow->as_gl_window() || pWindow->as_vk_window() || !parent_xid ||
       wait_for_expose_value || (parent_xid->frame_cb && !xid_rect)) {
     if (is_a_resize) {
       if (pWindow->parent()) {
@@ -1922,11 +1924,11 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
         }
       } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
         wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
-        if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+        if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
         fl_win->configured_width = W;
         fl_win->configured_height = H;
       } else if (fl_win->xdg_surface) { // a window without border
-        if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+        if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
         fl_win->configured_width = W;
         fl_win->configured_height = H;
         W *= f; H *= f;
@@ -1947,14 +1949,14 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
           Fl::pushed(NULL);
           Fl::e_state = 0;
         }
-      } else if (pWindow->as_gl_window() && fl_win->kind == SUBWINDOW && fl_win->subsurface) {
+      } else if ((pWindow->as_gl_window() || pWindow->as_vk_window()) && fl_win->kind == SUBWINDOW && fl_win->subsurface) {
         wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
       }
     }
   }
 
   if (fl_win && parent_xid) {
-    if (pWindow->as_gl_window()) {
+      if (pWindow->as_gl_window() || pWindow->as_vk_window()) {
       if (fl_win->frame_cb) {
         wl_callback_destroy(fl_win->frame_cb);
         fl_win->frame_cb = NULL;

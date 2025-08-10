@@ -4592,7 +4592,7 @@ static NSBitmapImageRep* rect_to_NSBitmapImageRep(Fl_Window *win, int x, int y, 
     NSBitmapImageRep *bitmap = nil;
     NSRect rect;
     float s = Fl_Graphics_Driver::default_driver().scale();
-    if ((win->as_gl_window() || win->as_vk_window()) && y >= 0) {
+    if ((win->as_gl_window()) && y >= 0) {
       bitmap = GL_rect_to_nsbitmap(win, x, y, w, h);
     }
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14

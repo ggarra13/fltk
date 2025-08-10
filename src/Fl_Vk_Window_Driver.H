@@ -95,13 +95,14 @@ public:
   virtual void destroy_resources();
 
   void init_colorspace();
-  void init_vk();
+  void init_vk(int requested_device_index = -1);
 
   VkInstance instance() { return m_instance; }
   VkPhysicalDevice gpu() { return m_gpu; }
   VkDevice device() { return m_device; }
   VkQueue queue() { return m_queue; }
   uint32_t queueFamily() { return m_queueFamilyIndex; }
+  void get_size(int& W, int& H);
 
 protected:
   void create_device();

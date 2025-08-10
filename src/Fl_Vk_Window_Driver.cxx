@@ -15,6 +15,8 @@
 //     https://www.fltk.org/bugs.php
 //
 
+// #define FLTK_CHECK_SIZES 1
+
 #define VMA_IMPLEMENTATION
 
 #include <FL/vk.h>
@@ -78,6 +80,12 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
+void Fl_Vk_Window_Driver::get_size(int& W, int& H)
+{
+    W = pWindow->pixel_w();
+    H = pWindow->pixel_h();
+}
+
 // Recreates m_swapchain and m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
@@ -89,21 +97,29 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
                                                      pWindow->m_surface,
                                                      &surfCapabilities);
-  VK_CHECK(result);
+  if (result != VK_SUCCESS)
+  {
+      fprintf(stderr, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: %s\n", string_VkResult(result));
+      pWindow->m_swapchain = VK_NULL_HANDLE;
+      return;
+  }
 
   // Set swapchain extent to match window size, clamped to capabilities
-  VkExtent2D swapchainExtent = {(uint32_t)pWindow->w(), (uint32_t)pWindow->h()};
+  int W, H;
+  get_size(W, H);
+  
+  VkExtent2D swapchainExtent = { (uint32_t)W, (uint32_t)H };
+  
   swapchainExtent.width = FLTK_CLAMP(swapchainExtent.width,
                                      surfCapabilities.minImageExtent.width,
                                      surfCapabilities.maxImageExtent.width);
   swapchainExtent.height = FLTK_CLAMP(swapchainExtent.height,
                                       surfCapabilities.minImageExtent.height,
                                       surfCapabilities.maxImageExtent.height);
-
+    
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
-      swapchainExtent.width == pWindow->getCurrentExtent().width &&
-      swapchainExtent.height == pWindow->getCurrentExtent().height) {
+      swapchainExtent.width == W && swapchainExtent.height == H) {
       pWindow->m_swapchain = oldSwapchain;
       return;
   }
@@ -169,8 +185,13 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   // Recreate buffers
   pWindow->m_buffers.resize(swapchainImageCount);
+  VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   for (uint32_t i = 0; i < swapchainImageCount; i++)
   {
+      result = vkCreateSemaphore(pWindow->device(), &semaphoreInfo, nullptr,
+                                 &pWindow->m_buffers[i].semaphore);
+      VK_CHECK(result);
+      
       VkImageViewCreateInfo view_info = {};
       view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
       view_info.image = swapchainImages[i];
@@ -214,13 +235,16 @@ void Fl_Vk_Window_Driver::prepare_depth() {
         aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
       }
   }
-
+  
+  int W, H;
+  get_size(W, H);
+  
   VkImageCreateInfo image = {};
   image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image.pNext = NULL;
   image.imageType = VK_IMAGE_TYPE_2D;
   image.format = depth_format;
-  image.extent = {(uint32_t)pWindow->w(), (uint32_t)pWindow->h(), 1};
+  image.extent = { (uint32_t)W, (uint32_t)H, 1};
   image.mipLevels = 1;
   image.arrayLayers = 1;
   image.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -307,6 +331,9 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   attachments[0] = VK_NULL_HANDLE;        // Color attachment
   attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
 
+  int W, H;
+  get_size(W, H);
+  
   VkFramebufferCreateInfo fb_info = {};
   fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
   fb_info.pNext = NULL;
@@ -315,8 +342,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   bool has_stencil = pWindow->mode() & FL_STENCIL;
   fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
   fb_info.pAttachments = attachments;
-  fb_info.width = pWindow->w();
-  fb_info.height = pWindow->h();
+  fb_info.width = W;
+  fb_info.height = H;
   fb_info.layers = 1;
 
   VkResult result;
@@ -508,7 +535,7 @@ void Fl_Vk_Window_Driver::init_instance()
     
 }
 
-void Fl_Vk_Window_Driver::init_vk()
+void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 {
     VkResult err;
     uint32_t i = 0;
@@ -519,8 +546,7 @@ void Fl_Vk_Window_Driver::init_vk()
     // Increment instance (window) counter
     pWindow->ctx.instance = pWindow->m_instance;
 
-    // Make initial call to query gpu_count, then second call for gpu info
-    // Make initial call to query gpu_count
+    // --- GPU ENUMERATION ---
     uint32_t gpu_count = 0;
     err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, NULL);
     if (err != VK_SUCCESS || gpu_count == 0)
@@ -540,9 +566,53 @@ void Fl_Vk_Window_Driver::init_vk()
                   "Error code");
     }
 
+    // --- GPU SELECTION LOGIC START --- 
+    VkPhysicalDevice chosen_gpu = VK_NULL_HANDLE;
+
+    if (requested_device_index >= 0 &&
+        (uint32_t)requested_device_index < gpu_count)
+    {
+        // A specific, valid device index was requested
+        chosen_gpu = physicalDevices[requested_device_index];
+        Fl::warning("User selected GPU index %d.", requested_device_index);
+    }
+    else
+    {
+        // Automatic selection based on scoring
+        uint32_t best_score = 0;
+        uint32_t best_device_index = 0;
+
+        for (uint32_t dev_idx = 0; dev_idx < gpu_count; ++dev_idx) {
+            VkPhysicalDeviceProperties device_properties;
+            vkGetPhysicalDeviceProperties(physicalDevices[dev_idx],
+                                          &device_properties);
+            
+            uint32_t current_score = 0;
+            if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            {
+                current_score += 1000;
+            }
+            else if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            {
+                current_score += 500;
+            }
+
+            // You could add more scoring criteria here, e.g., memory size, features, etc.
+
+            if (current_score > best_score) {
+                best_score = current_score;
+                best_device_index = dev_idx;
+            }
+        }
+        chosen_gpu = physicalDevices[best_device_index];
+    }
+
     // Assign the first GPU handle and free the array
-    pWindow->gpu() = m_gpu = physicalDevices[0];
+    pWindow->gpu() = m_gpu = chosen_gpu;
     VK_FREE(physicalDevices);
+    
+    // This is now freed after selection
+    // --- GPU SELECTION LOGIC END ---
 
     // Look for device extensions
     uint32_t device_extension_count = 0;
@@ -642,6 +712,7 @@ void Fl_Vk_Window_Driver::create_device()
     VkPhysicalDeviceFeatures features = {};
     vkGetPhysicalDeviceFeatures(gpu(), &features);
     features.fillModeNonSolid = VK_TRUE;
+    features.robustBufferAccess = VK_TRUE;
 
 
     float queue_priorities = 1.0;
@@ -967,10 +1038,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
     uint32_t i;
     VkResult result;
 
-    {
-        std::lock_guard<std::mutex> lock(pWindow->queue_mutex());
-        vkDeviceWaitIdle(pWindow->device());
-    }
+    vkDeviceWaitIdle(pWindow->device());
     
     // Destroy resources in reverse creation order (first, those of window)
     pWindow->destroy_common_resources();

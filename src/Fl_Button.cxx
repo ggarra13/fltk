@@ -254,10 +254,19 @@ void Fl_Button::key_release_timeout(void *d)
 
  Derived classes may handle this differently.
 
- A button may request callbacks with \p when() \p FL_WHEN_CHANGED,
- \p FL_WHEN_NOT_CHANGED, and \p FL_WHEN_RELEASE, triggering the callback
- reasons \p FL_REASON_CHANGED, \p FL_REASON_SELECTED,
- and \p FL_REASON_DESELECTED.
+ Calling `when()` will tell the button widget when to call the callback.
+
+ Setting `FL_WHEN_RELEASE` will call the callback only if the button value
+ changed. It's called during `FL_RELEASE` and `FL_KEYBOARD` events with
+ `FL_REASON_RELEASED` set as the callback reason.
+
+ Setting `FL_WHEN_CHANGED` will call the callback with `FL_REASON_CHANGED`
+ every time the value of the button changes during `FL_DRAG`, `FL_RELEASE`,
+ and `FL_KEYBOARD` events.
+
+ Setting `FL_WHEN_NOT_CHANGED` will trigger a callback during `FL_RELEASE`
+ events, even if the value of the button die *not* change. For radio buttons,
+ this is also true during `FL_KEYBOARD` events.
 
  \param[in] X, Y, W, H position and size of the widget
  \param[in] L widget label, default is no label
@@ -320,3 +329,6 @@ Fl_Toggle_Button::Fl_Toggle_Button(int X,int Y,int W,int H,const char *L)
  \param[in] v switch compact mode on (1) or off (0)
  */
 void Fl_Button::compact(uchar v) { compact_ = v; }
+
+/// (for backwards compatibility)
+void Fl_Button::shortcut(const char *s) {shortcut(fl_old_shortcut(s));}

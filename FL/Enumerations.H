@@ -256,7 +256,9 @@ enum Fl_Event { // events
 
   /** This widget is no longer visible, due to Fl_Widget::hide() being
       called on it or one of its parents, or due to a parent window being
-      minimized.  Fl_Widget::visible() may still be true after this, but the
+      minimized (old Wayland versions may not send the FL_HIDE
+      event to minimized toplevel windows).
+      Fl_Widget::visible() may still be true after this, but the
       widget is visible only if visible() is true for it and all its
       parents (use Fl_Widget::visible_r() to check this).
    */

@@ -536,6 +536,8 @@ static int process_wld_key(struct xkb_state *xkb_state, uint32_t key,
   uint32_t keycode = key + 8;
   xkb_keysym_t sym = xkb_state_key_get_one_sym(xkb_state, keycode);
   if (sym == 0xfe20) sym = FL_Tab;
+  if (sym == 0xffeb) sym = FL_Meta_L; // repair value libxkb gives for FL_Meta_L
+  if (sym == 0xffec) sym = FL_Meta_R; // repair value libxkb gives for FL_Meta_R
   if (sym >= 'A' && sym <= 'Z') sym += 32; // replace uppercase by lowercase letter
   int for_key_vector = sym; // for support of Fl::event_key(int)
   // special processing for number keys == keycodes 10-19 :
@@ -682,8 +684,9 @@ int Fl_Wayland_Screen_Driver::compose(int& del) {
                 Fl::e_keysym == FL_Alt_Gr);
   // FL_Home FL_Left FL_Up FL_Right FL_Down FL_Page_Up FL_Page_Down FL_End
   // FL_Print FL_Insert FL_Menu FL_Help and more
-  condition |= (Fl::e_keysym >= FL_Home && Fl::e_keysym <= FL_Help);
-  condition |= Fl::e_keysym == FL_Tab;
+  condition |= (Fl::e_keysym >= FL_Home && Fl::e_keysym <= FL_Num_Lock);
+  condition |= (Fl::e_keysym >= FL_F && Fl::e_keysym <= FL_F_Last);
+  condition |= Fl::e_keysym == FL_Tab || Fl::e_keysym == FL_Scroll_Lock || Fl::e_keysym == FL_Pause;
 //fprintf(stderr, "compose: condition=%d e_state=%x ascii=%d\n", condition, Fl::e_state, ascii);
   if (condition) { del = 0; return 0;}
 //fprintf(stderr, "compose: del=%d compose_state=%d next_marked_length=%d \n", del, Fl::compose_state, next_marked_length);
@@ -863,13 +866,15 @@ static void wl_keyboard_modifiers(void *data, struct wl_keyboard *wl_keyboard,
     (struct Fl_Wayland_Screen_Driver::seat*)data;
   xkb_state_update_mask(seat->xkb_state, mods_depressed, mods_latched, mods_locked,
                         0, 0, group);
-  Fl::e_state &= ~(FL_SHIFT+FL_CTRL+FL_ALT+FL_CAPS_LOCK+FL_NUM_LOCK);
+  Fl::e_state &= ~(FL_SHIFT+FL_CTRL+FL_ALT+FL_META+FL_CAPS_LOCK+FL_NUM_LOCK);
   if (xkb_state_mod_name_is_active(seat->xkb_state, XKB_MOD_NAME_SHIFT,
                                    XKB_STATE_MODS_DEPRESSED)) Fl::e_state |= FL_SHIFT;
   if (xkb_state_mod_name_is_active(seat->xkb_state, XKB_MOD_NAME_CTRL,
                                    XKB_STATE_MODS_DEPRESSED)) Fl::e_state |= FL_CTRL;
   if (xkb_state_mod_name_is_active(seat->xkb_state, XKB_MOD_NAME_ALT,
                                    XKB_STATE_MODS_DEPRESSED)) Fl::e_state |= FL_ALT;
+  if (xkb_state_mod_name_is_active(seat->xkb_state, XKB_MOD_NAME_LOGO,
+                                   XKB_STATE_MODS_DEPRESSED)) Fl::e_state |= FL_META;
   if (xkb_state_mod_name_is_active(seat->xkb_state, XKB_MOD_NAME_CAPS,
                                    XKB_STATE_MODS_LOCKED)) Fl::e_state |= FL_CAPS_LOCK;
   if (xkb_state_mod_name_is_active(seat->xkb_state, XKB_MOD_NAME_NUM,
@@ -1106,8 +1111,8 @@ static void output_done(void *data, struct wl_output *wl_output)
   while (xp) { // all mapped windows
     struct wld_window *win = (struct wld_window*)xp->xid;
     Fl_Window *W = win->fl_win;
-    if (win->buffer || W->as_gl_window()) {
-      if (W->as_gl_window()) {
+    if (win->buffer || W->as_gl_window() || W->as_vk_window()) {
+        if (W->as_gl_window() || W->as_vk_window()) {
         wl_surface_set_buffer_scale(win->wl_surface, output->wld_scale);
         Fl_Window_Driver::driver(W)->is_a_rescale(true);
         W->resize(W->x(), W->y(), W->w(), W->h());
@@ -1156,6 +1161,12 @@ static struct wl_output_listener output_listener = {
   output_mode,
   output_done,
   output_scale
+};
+
+
+struct pair_bool {
+  bool found_gtk_shell;
+  bool found_wf_shell;
 };
 
 
@@ -1274,8 +1285,10 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
     scr_driver->xdg_wm_base = (struct xdg_wm_base *)wl_registry_bind(wl_registry, id,
                                                         &xdg_wm_base_interface, 1);
     xdg_wm_base_add_listener(scr_driver->xdg_wm_base, &xdg_wm_base_listener, NULL);
+  } else if (strstr(interface, "wf_shell_manager")) {
+    ((pair_bool*)user_data)->found_wf_shell = true;
   } else if (strcmp(interface, "gtk_shell1") == 0) {
-    Fl_Wayland_Screen_Driver::compositor = Fl_Wayland_Screen_Driver::MUTTER;
+    ((pair_bool*)user_data)->found_gtk_shell = true;
     //fprintf(stderr, "Running the Mutter compositor\n");
     scr_driver->seat->gtk_shell = (struct gtk_shell1*)wl_registry_bind(wl_registry, id,
                                   &gtk_shell1_interface, version);
@@ -1347,7 +1360,8 @@ static void wayland_socket_callback(int fd, struct wl_display *display) {
       if (err == EPROTO) {
         const struct wl_interface *interface;
         int code = wl_display_get_protocol_error(display, &interface, NULL);
-        Fl::fatal("Fatal error no %d in Wayland protocol: %s", code, interface->name);
+        Fl::fatal("Fatal error no %d in Wayland protocol: %s", code,
+                  (interface ? interface->name : "unknown") );
       } else {
         Fl::fatal("Fatal error while communicating with the Wayland server: %s",
                   strerror(errno));
@@ -1413,10 +1427,14 @@ void Fl_Wayland_Screen_Driver::open_display_platform() {
   wl_list_init(&outputs);
 
   wl_registry = wl_display_get_registry(wl_display);
-  wl_registry_add_listener(wl_registry, &registry_listener, NULL);
+  struct pair_bool pair = {false, false};
+  wl_registry_add_listener(wl_registry, &registry_listener, &pair);
   struct wl_callback *registry_cb = wl_display_sync(wl_display);
   wl_callback_add_listener(registry_cb, &sync_listener, &registry_cb);
   while (registry_cb) wl_display_dispatch(wl_display);
+  if (pair.found_gtk_shell || pair.found_wf_shell) {
+    Fl_Wayland_Screen_Driver::compositor = (pair.found_wf_shell ? WAYFIRE : MUTTER);
+  }
   Fl::add_fd(wl_display_get_fd(wl_display), FL_READ, (Fl_FD_Handler)wayland_socket_callback,
              wl_display);
   fl_create_print_window();
@@ -1607,7 +1625,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
 
 
 /* Implementation note about computing work area and about handling fractional scaling.
- 
+
  FLTK computes 2 pairs of (WxH) values for each display:
  1) (pixel_width x pixel_height) gives the size in pixel of a display. It's unchanged by
  any scaling applied by the compositor; it's assigned by function output_mode().
@@ -1615,7 +1633,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
  When the active scaling is non-fractional, these equations hold:
    pixel_width = width = wld_scale * configured-width-of-fullscreen-window
    pixel_height = height = wld_scale * configured-height-of-fullscreen-window
- 
+
  When fractional scaling is active, buffers received from client are scaled down
  by the compositor and mapped to screen. These equations hold:
    pixel_width < width = wld_scale * configured-width-of-fullscreen-window
@@ -1624,7 +1642,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
  One way for a client to discover that fractional scaling is active on a given display
  is to ask for a fullscreen window on that display, get its configured size and compare
  it to that display's pixel size. That's what function compute_full_and_maximized_areas() does.
- 
+
  One way for a client to discover the work area size of a display is to get the configured size
  of a maximized window on that display. FLTK didn't find a way to control in general
  on what display the compositor puts a maximized window. One procedure which works
@@ -1634,7 +1652,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
  display as the fullscreen one, giving the size of that display's work area.
  Therefore, FLTK computes an exact work area size only with MUTTER or when the system
  contains a single display. That's also done by function compute_full_and_maximized_areas().
- 
+
  The procedure to compute the work area size also reveals which display is primary:
  that with a work area vertically smaller than the display's pixel height. This allows
  to place the primary display as FLTK display #0. Again, FLTK guarantees to identify

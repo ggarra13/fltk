@@ -91,7 +91,7 @@ struct MVP
 };
 
 class cube_box : public Fl_Vk_Window {
-    void vk_draw_begin() FL_OVERRIDE;
+    bool vk_draw_begin() FL_OVERRIDE;
     void draw() FL_OVERRIDE;
     int handle(int) FL_OVERRIDE;
 
@@ -763,11 +763,11 @@ void cube_box::prepare()
 }
 
 
-void cube_box::vk_draw_begin()
+bool cube_box::vk_draw_begin()
 {
     // Background color
     m_clearColor = { 0.4f, 0.4f, 0.4f, 0.0 };
-    Fl_Vk_Window::vk_draw_begin();
+    return Fl_Vk_Window::vk_draw_begin();
 }
 
 void cube_box::draw() {
@@ -1061,7 +1061,6 @@ void makeform(const char *name) {
 }
 
 int main(int argc, char **argv) {
-  Fl::use_high_res_VK(1);
   Fl::set_color(FL_FREE_COLOR, 255, 255, 0, 75);
   makeform(argv[0]);
 

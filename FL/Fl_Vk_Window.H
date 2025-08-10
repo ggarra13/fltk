@@ -33,11 +33,13 @@ struct Fl_Vk_SwapchainBuffer {
     VkImage image;
     VkImageView view;
     VkFramebuffer framebuffer;
+    VkSemaphore semaphore;
 
     Fl_Vk_SwapchainBuffer() :
         image(VK_NULL_HANDLE),
         view(VK_NULL_HANDLE),
-        framebuffer(VK_NULL_HANDLE)
+        framebuffer(VK_NULL_HANDLE),
+        semaphore(VK_NULL_HANDLE)
         {
         }
     
@@ -53,6 +55,12 @@ struct Fl_Vk_SwapchainBuffer {
             {
                 vkDestroyImageView(device, view, NULL);
                 view = VK_NULL_HANDLE;
+            }
+
+            if (semaphore != VK_NULL_HANDLE)
+            {
+                vkDestroySemaphore(device, semaphore, NULL);
+                semaphore = VK_NULL_HANDLE;
             }
             
             // image belongs to the swapchain (must not destroy).
@@ -114,11 +122,6 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   Fl_Vk_Choice *g; // needed ?  we may need to use it translate
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
-
-  //! Fence used to handle resizes.
-  VkFence                m_resizeFence;
-  VkExtent2D             m_currentExtent; // Track current swapchain extend
-
     
   static int can_do(int, const int *);
   int mode(int, const int *);
@@ -134,7 +137,8 @@ protected:
   //! Called before begin_render_pass.  Allows setting up a color or depth.
   //! The default function will call begin_render_pass().  Override this if
   //! you don't want that behavior.
-  virtual void vk_draw_begin();
+  //! Must return true on success, false on failure.
+  virtual bool vk_draw_begin();
 
   //! Main function to use for drawing with Vulkan.  Note that by default
   //! FLTK calls this after calling vk_draw_begin() and begin_render_pass();
@@ -278,18 +282,6 @@ public:
       return m_buffers[m_current_buffer].framebuffer;
   }
 
-  // Simulates access to the "front buffer" (read-only!) and not
-  // guaranteed to work post-presentation.
-  VkImage get_front_buffer_image() const {
-      return m_buffers[m_last_presented_buffer].image;
-  }
-
-  void store_swapchain(uint8_t* out, const size_t dataSize)
-  {
-      m_store_swapchain = out;
-      m_store_swapchain_size = dataSize;
-  }
-  
   //! @}
   
   // Application
@@ -308,6 +300,9 @@ public:
   static VmaAllocator m_allocator;
   
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
+  static PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT;
+  static PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT;
+  static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
 
   // Window's Vulkan context.
   Fl_Vk_Context ctx;
@@ -336,29 +331,25 @@ private:
   // Per frame data used internally.
   struct FrameData {
       VkSemaphore imageAcquiredSemaphore;
-      VkSemaphore drawCompleteSemaphore;
       VkFence fence;
       VkCommandBuffer commandBuffer;
       bool active;
+      bool submitted;
+      VkResult lastSubmitResult;
 
       FrameData() :
           imageAcquiredSemaphore(VK_NULL_HANDLE),
-          drawCompleteSemaphore(VK_NULL_HANDLE),
           fence(VK_NULL_HANDLE),
           commandBuffer(VK_NULL_HANDLE),
-          active(false)
+          active(false),
+          submitted(false),
+          lastSubmitResult(VK_SUCCESS)
           {
           }
   };
 
 protected:
-  // Pointer to store result of drawing in swapchain before swap buffers (swapchain) 
-  uint8_t*               m_store_swapchain;
-
-  // size of storage for storing in the swapchain (should match size of swapchain
-  // VkFormat's pixel size times swapchainExtent)
-  size_t                 m_store_swapchain_size;
-  
+  float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
@@ -391,9 +382,9 @@ protected:
   // Note that FLTK will call begin_render_pass() in vk_draw_begin()
   // and end_render_pass() in vk_draw_end().
   // That is: draw() is called with an active render pass by default.
-  void begin_render_pass(VkCommandBuffer&);
+  void begin_render_pass(VkCommandBuffer);
   void begin_render_pass();
-  void end_render_pass(VkCommandBuffer&);
+  void end_render_pass(VkCommandBuffer);
   void end_render_pass();
   
   void swap_buffers();
@@ -412,7 +403,6 @@ public:
   //! operations to finish.
   void wait_device();
   
-  VkExtent2D getCurrentExtent() const { return m_currentExtent; }
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
       return m_frames[m_currentFrameIndex].commandBuffer;
@@ -432,13 +422,17 @@ public:
   /** Gives the window width in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::w()
    which is expressed in FLTK units, may differ from the window width in pixels.
-   Calls to Vulkan functions expecting pixel values (\em e.g., \c glViewport) should therefore
+   Calls to Vulkan functions expecting pixel values (\em e.g., \c vkScissor
    use pixel_w() rather than w().
    Method pixel_w() detects when the GUI is rescaled or when the window has been moved
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
+#ifdef _WIN32
+  int pixel_w() { return int(pixels_per_unit() * w() - 0.5f); }
+#else
   int pixel_w() { return int(pixels_per_unit() * w() + 0.5f); }
+#endif
   /** Gives the window height in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
    which is expressed in FLTK units, may differ from the window height in pixels.
@@ -448,7 +442,11 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
+#ifdef _WIN32
+  int pixel_h() { return int(pixels_per_unit() * h() - 0.5f); }
+#else
   int pixel_h() { return int(pixels_per_unit() * h() + 0.5f); }
+#endif
 
   virtual ~Fl_Vk_Window();
   /**

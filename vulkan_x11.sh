@@ -17,7 +17,7 @@ cmake .. \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
       -D FLTK_BUILD_FORMS=OFF \
-      -D FLTK_BUILD_GL=OFF \
+      -D FLTK_BUILD_GL=ON \
       -D FLTK_BUILD_VK=ON \
       -D FLTK_BUILD_PDF_DOCS=OFF \
       -D FLTK_BUILD_HTML_DOCS=OFF \
@@ -43,15 +43,10 @@ cmake .. \
       -D FLTK_USE_XRENDER=OFF \
       -D FLTK_USE_LIBDECOR_GTK=OFF \
       -D FLTK_BACKEND_WAYLAND=OFF \
-      -D FLTK_BACKEND_X11=ON \
-      -D GLU_LIB="" \
-      -D LIB_GL="" \
-      -D LIB_MesaGL="" \
-      -D OPENGL_INCLUDE_DIR="" \
-      -D X11_xcb_xcb_INCLUDE_PATH=""
+      -D FLTK_BACKEND_X11=ON
 
 ninja
 
 bin/test/vk_shape-shared
-bin/test/vk_shape_textured-shared
-bin/test/vk_cube-shared
+#bin/test/vk_shape_textured-shared
+#bin/test/vk_cube-shared
