@@ -209,12 +209,10 @@ void Fl_Vk_Window::recreate_swapchain() {
         frame.active = false;
     }
 
-    m_currentFrameIndex = 0;
     m_swapchain_needs_recreation = false;
-
 }
 
-void Fl_Vk_Window::begin_render_pass(VkCommandBuffer& cmd)
+void Fl_Vk_Window::begin_render_pass(VkCommandBuffer cmd)
 {   
     VkClearValue clear_values[2];
     clear_values[0].color = m_clearColor;
@@ -236,7 +234,6 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer& cmd)
     rp_begin.pClearValues = clear_values;
 
     vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-
     m_in_render_pass = true;
 }
 
@@ -246,9 +243,9 @@ void Fl_Vk_Window::begin_render_pass()
     begin_render_pass(cmd);
 }
 
-void Fl_Vk_Window::end_render_pass(VkCommandBuffer& cmd)
+void Fl_Vk_Window::end_render_pass(VkCommandBuffer cmd)
 {
-    if (m_in_render_pass && cmd != VK_NULL_HANDLE)
+    if (m_in_render_pass)
     {
         vkCmdEndRenderPass(cmd);
         m_in_render_pass = false;
@@ -400,7 +397,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     VkCommandBufferBeginInfo cmd_buf_info = {};
     cmd_buf_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     result = vkBeginCommandBuffer(frame.commandBuffer, &cmd_buf_info);
-    if (result != VK_SUCCESS)
+    if (result != VK_SUCCESS || frame.commandBuffer == VK_NULL_HANDLE)
     {
         fprintf(stderr, "vkBeginCommandBuffer failed: %s\n", string_VkResult(result));
         return false;
@@ -468,11 +465,8 @@ bool Fl_Vk_Window::vk_draw_begin() {
  */
 void Fl_Vk_Window::vk_draw_end()
 {
-    if (m_in_render_pass)
-    {
-        end_render_pass();
-    }
-    
+    end_render_pass();
+
     FrameData& frame = m_frames[m_currentFrameIndex];
     if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
         || !frame.active) {
@@ -665,8 +659,7 @@ void Fl_Vk_Window::flush() {
     
   if (!vk_draw_begin())
   {
-      if (m_debugSync)
-          fprintf(stderr, "Skipping draw to Vulkan error\n");
+      fprintf(stderr, "Skipping draw due to Vulkan error\n");
       return;
   }
   draw();  // User defined virtual draw function
