@@ -122,10 +122,6 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   Fl_Vk_Choice *g; // needed ?  we may need to use it translate
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
-
-  //! Fence used to handle resizes.
-  VkFence                m_resizeFence;
-
     
   static int can_do(int, const int *);
   int mode(int, const int *);
@@ -335,17 +331,19 @@ private:
   // Per frame data used internally.
   struct FrameData {
       VkSemaphore imageAcquiredSemaphore;
-      VkSemaphore drawCompleteSemaphore;
       VkFence fence;
       VkCommandBuffer commandBuffer;
       bool active;
+      bool submitted;
+      VkResult lastSubmitResult;
 
       FrameData() :
           imageAcquiredSemaphore(VK_NULL_HANDLE),
-          drawCompleteSemaphore(VK_NULL_HANDLE),
           fence(VK_NULL_HANDLE),
           commandBuffer(VK_NULL_HANDLE),
-          active(false)
+          active(false),
+          submitted(false),
+          lastSubmitResult(VK_SUCCESS)
           {
           }
   };

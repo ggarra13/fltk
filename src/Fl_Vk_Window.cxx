@@ -104,10 +104,32 @@ void Fl_Vk_Window::recreate_swapchain() {
     }
     
     // Free existing command buffers
+    int i = 0;
     for (auto& frame : m_frames)
     {
-        if (frame.commandBuffer != VK_NULL_HANDLE)
-        {
+        if (frame.fence != VK_NULL_HANDLE) {
+            
+            // Wait for submitted fence to ensure no pending operations
+            if (frame.submitted)
+            {
+                const uint64_t timeout = UINT64_MAX; // 1s - UINT64_MAX hangs
+                result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
+                                         timeout);
+                if (result != VK_SUCCESS) {
+                    fprintf(stderr, "vkWaitForFences failed for frame %p: %s\n",
+                            &frame, string_VkResult(result));
+                }
+            }
+            vkDestroyFence(device(), frame.fence, nullptr);
+            frame.fence = VK_NULL_HANDLE;
+        }
+        if (frame.commandBuffer != VK_NULL_HANDLE) {
+            // Reset command buffer to release any resource references
+            result = vkResetCommandBuffer(frame.commandBuffer, 0);
+            if (result != VK_SUCCESS) {
+                fprintf(stderr, "vkResetCommandBuffer failed for frame %p: %s\n",
+                        &frame, string_VkResult(result));
+            }
             vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
             frame.commandBuffer = VK_NULL_HANDLE;
         }
@@ -116,12 +138,8 @@ void Fl_Vk_Window::recreate_swapchain() {
             vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
             frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
         }
-        if (frame.fence != VK_NULL_HANDLE)
-        {
-            vkDestroyFence(device(), frame.fence, nullptr);
-            frame.fence = VK_NULL_HANDLE;
-        }
         frame.active = false;
+        frame.submitted = false;
     }
 
     // Destroy old command pool
@@ -198,6 +216,7 @@ void Fl_Vk_Window::recreate_swapchain() {
                 return;
             }
         }
+
         if (frame.commandBuffer == VK_NULL_HANDLE) {
             result = vkAllocateCommandBuffers(device(), &cmdInfo, &frame.commandBuffer);
             if (result != VK_SUCCESS) {
@@ -207,9 +226,14 @@ void Fl_Vk_Window::recreate_swapchain() {
             }
         }
         frame.active = false;
+        frame.submitted = false;
     }
 
+    m_currentFrameIndex = 0;
     m_swapchain_needs_recreation = false;
+    std::cerr << "end recreate swapchain m_currentFrameIndex="
+              << m_currentFrameIndex
+              << std::endl;
 }
 
 void Fl_Vk_Window::begin_render_pass(VkCommandBuffer cmd)
@@ -234,11 +258,13 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer cmd)
     rp_begin.pClearValues = clear_values;
 
     vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
+    std::cerr << "begin_render_pass m_currentFrameIndex=" << m_currentFrameIndex
+              << " " << cmd << std::endl;
     m_in_render_pass = true;
 }
 
 void Fl_Vk_Window::begin_render_pass()
-{    
+{
     VkCommandBuffer cmd = getCurrentCommandBuffer();
     begin_render_pass(cmd);
 }
@@ -247,9 +273,11 @@ void Fl_Vk_Window::end_render_pass(VkCommandBuffer cmd)
 {
     if (m_in_render_pass)
     {
+        std::cerr << "end_render_pass   m_currentFrameIndex=" << m_currentFrameIndex
+                  << " " << cmd << std::endl;
         vkCmdEndRenderPass(cmd);
-        m_in_render_pass = false;
     }
+    m_in_render_pass = false;
 }
 
 void Fl_Vk_Window::end_render_pass()
@@ -259,6 +287,10 @@ void Fl_Vk_Window::end_render_pass()
         || !frame.active)
     {
         fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
+        std::cerr << "m_currentFrameIndex=" << m_currentFrameIndex << std::endl;
+        std::cerr << "swapchain=" << m_swapchain << std::endl;
+        std::cerr << "commandBuffer=" << frame.commandBuffer << std::endl;
+        std::cerr << "active=" << frame.active << std::endl;
         frame.active = false;
         return;
     }
@@ -292,15 +324,17 @@ bool Fl_Vk_Window::vk_draw_begin() {
 
     // Get current frame data
     FrameData& frame = m_frames[m_currentFrameIndex];
-
+    frame.submitted = false;
+    
     // Wait for this frame’s previous use
     if (frame.active && frame.fence != VK_NULL_HANDLE)
     {
         if (m_debugSync) {
             fprintf(stderr, "Waiting for frame %u fence\n", m_currentFrameIndex);
         }
+        const uint64_t timeout = UINT64_MAX;
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
-                                 1'000'000'000); // 1s
+                                 timeout); // 1s
         
         if (result == VK_TIMEOUT) {
             fprintf(stderr, "vkWaitForFences timed out, attempting recovery\n");
@@ -310,9 +344,15 @@ bool Fl_Vk_Window::vk_draw_begin() {
         if (result != VK_SUCCESS) {
             fprintf(stderr, "Fl_Vk_Window - vkWaitForFences failed: %s\n", string_VkResult(result));
             frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
             return false;
         }
         frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
     }
 
     // Reset fence
@@ -433,8 +473,11 @@ bool Fl_Vk_Window::vk_draw_begin() {
     }
     
     begin_render_pass(frame.commandBuffer);
-
     frame.active = true;
+
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
     return true;
 }
 
@@ -474,6 +517,10 @@ void Fl_Vk_Window::vk_draw_end()
             fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
         }
         frame.active = false;
+
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
         return;
     }
 
@@ -482,6 +529,9 @@ void Fl_Vk_Window::vk_draw_end()
     {
         fprintf(stderr, "vkEndCommandBuffer failed: %s\n", string_VkResult(result));
         frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
         return;
     }
 }
@@ -530,6 +580,9 @@ void Fl_Vk_Window::swap_buffers() {
             fprintf(stderr, "Skipping swap_buffers: Invalid state\n");
         }
         frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
         return;
     }
 
@@ -554,11 +607,18 @@ void Fl_Vk_Window::swap_buffers() {
 
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
+
         result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
+        frame.submitted = true;
+        frame.lastSubmitResult = result;
+        
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkQueueSubmit failed: %s\n",
                     string_VkResult(result));
             frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
             return;
         }
 
@@ -589,6 +649,9 @@ void Fl_Vk_Window::swap_buffers() {
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             m_swapchain_needs_recreation = true;
             frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
             return;
         }
         else if (result != VK_SUCCESS)
@@ -596,6 +659,9 @@ void Fl_Vk_Window::swap_buffers() {
             fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
                     string_VkResult(result));
             frame.active = false;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
             return;
         }
     }
@@ -807,23 +873,14 @@ void Fl_Vk_Window::shutdown_vulkan() {
 
     // Free command buffers
     for (auto& frame : m_frames) {
-        if (frame.commandBuffer != VK_NULL_HANDLE) {
-            // Reset command buffer to release any resource references
-            result = vkResetCommandBuffer(frame.commandBuffer, 0);
-            if (result != VK_SUCCESS) {
-                fprintf(stderr, "vkResetCommandBuffer failed for frame %p: %s\n",
-                        &frame, string_VkResult(result));
-            }
-            vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
-            frame.commandBuffer = VK_NULL_HANDLE;
-        }
         if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE) {
             vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
             frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
         }
         if (frame.fence != VK_NULL_HANDLE) {
             // Wait for fence to ensure no pending operations
-            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+            const uint64_t timeout = UINT64_MAX;
+            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, timeout);
             if (result != VK_SUCCESS) {
                 fprintf(stderr, "vkWaitForFences failed for frame %p: %s\n",
                         &frame, string_VkResult(result));
@@ -838,12 +895,6 @@ void Fl_Vk_Window::shutdown_vulkan() {
     if (commandPool() != VK_NULL_HANDLE) {
         vkDestroyCommandPool(device(), commandPool(), nullptr);
         commandPool() = VK_NULL_HANDLE;
-    }
-
-    // Destroy resize fence
-    if (m_resizeFence != VK_NULL_HANDLE) {
-        vkDestroyFence(device(), m_resizeFence, nullptr);
-        m_resizeFence = VK_NULL_HANDLE;
     }
 
     // Destroy swapchain and surface
@@ -1009,7 +1060,7 @@ void Fl_Vk_Window::init_vulkan() {
     // Initialize frame data
     m_frames.resize(m_swapchainImageCount);
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
+    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0 };
     VkCommandBufferAllocateInfo cmdInfo = {};
     cmdInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     cmdInfo.commandPool = commandPool();
@@ -1036,14 +1087,9 @@ void Fl_Vk_Window::init_vulkan() {
             return;
         }
         frame.active = false;
-    }
-
-    // Create resize fence
-    result = vkCreateFence(device(), &fenceInfo, nullptr, &m_resizeFence);
-    if (result != VK_SUCCESS) {
-        fprintf(stderr, "vkCreateFence failed: %s\n", string_VkResult(result));
-        shutdown_vulkan();
-        return;
+    std::cerr << "frame.active=" << frame.active << " "
+              << __PRETTY_FUNCTION__ << " " << __LINE__
+              << std::endl;
     }
 
     m_currentFrameIndex = 0;
@@ -1111,7 +1157,6 @@ void Fl_Vk_Window::init() {
   // Swapchain info
   m_pixels_per_unit = 0.F;
   m_swapchain = VK_NULL_HANDLE;
-  m_resizeFence = VK_NULL_HANDLE;
 
   // For drawing
   m_in_render_pass = false;
