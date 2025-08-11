@@ -339,13 +339,15 @@ private:
       VkFence fence;
       VkCommandBuffer commandBuffer;
       bool active;
+      bool submitted;
 
       FrameData() :
           imageAcquiredSemaphore(VK_NULL_HANDLE),
           drawCompleteSemaphore(VK_NULL_HANDLE),
           fence(VK_NULL_HANDLE),
           commandBuffer(VK_NULL_HANDLE),
-          active(false)
+          active(false),
+          submitted(false)
           {
           }
   };

@@ -108,8 +108,23 @@ void Fl_Vk_Window::recreate_swapchain() {
     {
         if (frame.commandBuffer != VK_NULL_HANDLE)
         {
+            // Reset command buffer to release any resource references
+            result = vkResetCommandBuffer(frame.commandBuffer, 0);
+            if (result != VK_SUCCESS) {
+                fprintf(stderr, "vkResetCommandBuffer failed for frame %p: %s\n",
+                        &frame, string_VkResult(result));
+            }
             vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
             frame.commandBuffer = VK_NULL_HANDLE;
+        }
+        if (frame.fence != VK_NULL_HANDLE && frame.submitted)
+        {
+            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+            if (result != VK_SUCCESS) {
+                fprintf(stderr, "vkWaitForFences failed during cleanup: %s\n",
+                        string_VkResult(result));
+                return;
+            }
         }
         if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE)
         {
@@ -208,7 +223,9 @@ void Fl_Vk_Window::recreate_swapchain() {
         }
         frame.active = false;
     }
-
+    
+    // \@bug: this makes the code crash on draw() to invalid command buffer
+    // m_currentFrameIndex = 0;  
     m_swapchain_needs_recreation = false;
 }
 
@@ -287,6 +304,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
             fprintf(stderr, "Skipping vk_draw_begin: Swapchain recreation failed\n");
             return false;
         }
+    
         m_pixels_per_unit = pixels_per_unit();
     }
 
@@ -434,6 +452,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     
     begin_render_pass(frame.commandBuffer);
 
+    frame.submitted = false;
     frame.active = true;
     return true;
 }
@@ -562,6 +581,8 @@ void Fl_Vk_Window::swap_buffers() {
             return;
         }
 
+        frame.submitted = true;
+
         // Present swapchain image
         VkPresentInfoKHR present_info = {};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -586,9 +607,9 @@ void Fl_Vk_Window::swap_buffers() {
         }
         
         result = vkQueuePresentKHR(queue(), &present_info);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+            result == VK_NOT_READY) {
             m_swapchain_needs_recreation = true;
-            frame.active = false;
             return;
         }
         else if (result != VK_SUCCESS)
@@ -832,8 +853,6 @@ void Fl_Vk_Window::shutdown_vulkan() {
             frame.fence = VK_NULL_HANDLE;
         }
     }
-    m_frames.clear();
-
     // Destroy command pool
     if (commandPool() != VK_NULL_HANDLE) {
         vkDestroyCommandPool(device(), commandPool(), nullptr);
