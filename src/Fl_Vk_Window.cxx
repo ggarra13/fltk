@@ -29,6 +29,14 @@
 
 #include <iostream>
 
+#ifdef USE_INFINITE_TIMEOUT
+static const uint64_t kFenceTimeout = UINT64_MAX;
+static const uint64_t kAcquireTimeout = UINT64_MAX;
+#else
+static const uint64_t kFenceTimeout = 1'000'000'000;
+static const uint64_t kAcquireTimeout = 1'000'000'000;
+#endif
+
 static bool all_windows_invisible()
 {
     for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
@@ -119,7 +127,8 @@ void Fl_Vk_Window::recreate_swapchain() {
         }
         if (frame.fence != VK_NULL_HANDLE && frame.submitted)
         {
-            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
+                                     kFenceTimeout);
             if (result != VK_SUCCESS) {
                 fprintf(stderr, "vkWaitForFences failed during cleanup: %s\n",
                         string_VkResult(result));
@@ -158,6 +167,7 @@ void Fl_Vk_Window::recreate_swapchain() {
     if (result != VK_SUCCESS)
     {
         fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
+        wait_device();
         pVkWindowDriver->destroy_resources();
         m_swapchain = VK_NULL_HANDLE;
         m_swapchain_needs_recreation = true;
@@ -178,6 +188,7 @@ void Fl_Vk_Window::recreate_swapchain() {
     if (result != VK_SUCCESS || m_swapchainImageCount == 0)
     {
         fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
+        wait_device();
         pVkWindowDriver->destroy_resources();
         m_swapchain = VK_NULL_HANDLE;
         m_swapchain_needs_recreation = true;
@@ -313,13 +324,13 @@ bool Fl_Vk_Window::vk_draw_begin() {
     FrameData& frame = m_frames[m_currentFrameIndex];
 
     // Wait for this frame’s previous use
-    if (frame.active && frame.fence != VK_NULL_HANDLE)
+    if (frame.active && frame.fence != VK_NULL_HANDLE && frame.submitted)
     {
         if (m_debugSync) {
             fprintf(stderr, "Waiting for frame %u fence\n", m_currentFrameIndex);
         }
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
-                                 1'000'000'000); // 1s
+                                 kFenceTimeout);
         
         if (result == VK_TIMEOUT) {
             fprintf(stderr, "vkWaitForFences timed out, attempting recovery\n");
@@ -334,24 +345,13 @@ bool Fl_Vk_Window::vk_draw_begin() {
         frame.active = false;
     }
 
-    // Reset fence
-    if (frame.fence != VK_NULL_HANDLE)
-    {
-        result = vkResetFences(device(), 1, &frame.fence);
-        if (result != VK_SUCCESS)
-        {
-            fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
-            return false;
-        }
-    }
 
     // Acquire next swapchain image
     if (m_debugSync)
     {
         fprintf(stderr, "Acquiring image for frame %u\n", m_currentFrameIndex);
     }
-    const uint64_t timeout = UINT64_MAX;
-    result = vkAcquireNextImageKHR(device(), m_swapchain, timeout,
+    result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
                                    frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
                                    &m_current_buffer);
     if (result == VK_TIMEOUT)
@@ -369,7 +369,8 @@ bool Fl_Vk_Window::vk_draw_begin() {
         return false; // Early return to trigger recreate_swapchain
     }
     else if (result == VK_ERROR_OUT_OF_DATE_KHR ||
-             result == VK_SUBOPTIMAL_KHR)
+             result == VK_SUBOPTIMAL_KHR ||
+             result == VK_NOT_READY)
     {
         m_swapchain_needs_recreation = true;
         recreate_swapchain();
@@ -380,7 +381,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
             }
             return false;
         }
-        result = vkAcquireNextImageKHR(device(), m_swapchain, timeout,
+        result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
                                        frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
                                        &m_current_buffer);
         if (result != VK_SUCCESS)
@@ -574,6 +575,19 @@ void Fl_Vk_Window::swap_buffers() {
 
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
+
+        // Reset fence
+        if (frame.fence != VK_NULL_HANDLE)
+        {
+            result = vkResetFences(device(), 1, &frame.fence);
+            if (result != VK_SUCCESS)
+            {
+                fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
+                frame.active = false;
+                return;
+            }
+        }
+    
         result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkQueueSubmit failed: %s\n",
@@ -860,12 +874,6 @@ void Fl_Vk_Window::shutdown_vulkan() {
         commandPool() = VK_NULL_HANDLE;
     }
 
-    // Destroy resize fence
-    if (m_resizeFence != VK_NULL_HANDLE) {
-        vkDestroyFence(device(), m_resizeFence, nullptr);
-        m_resizeFence = VK_NULL_HANDLE;
-    }
-
     // Destroy swapchain and surface
     pVkWindowDriver->destroy_resources();
     pVkWindowDriver->destroy_surface();
@@ -1001,6 +1009,7 @@ void Fl_Vk_Window::init_vulkan() {
     result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
     if (result != VK_SUCCESS) {
         fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
+        wait_device();
         pVkWindowDriver->destroy_resources();
         pVkWindowDriver->destroy_surface();
         m_swapchain = VK_NULL_HANDLE;
@@ -1011,6 +1020,7 @@ void Fl_Vk_Window::init_vulkan() {
     pVkWindowDriver->prepare();
     if (m_swapchain == VK_NULL_HANDLE) {
         fprintf(stderr, "prepare() failed\n");
+        wait_device();
         pVkWindowDriver->destroy_resources();
         pVkWindowDriver->destroy_surface();
         return;
@@ -1020,6 +1030,7 @@ void Fl_Vk_Window::init_vulkan() {
     result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
     if (result != VK_SUCCESS || m_swapchainImageCount == 0) {
         fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
+        wait_device();
         pVkWindowDriver->destroy_resources();
         pVkWindowDriver->destroy_surface();
         m_swapchain = VK_NULL_HANDLE;
@@ -1056,14 +1067,6 @@ void Fl_Vk_Window::init_vulkan() {
             return;
         }
         frame.active = false;
-    }
-
-    // Create resize fence
-    result = vkCreateFence(device(), &fenceInfo, nullptr, &m_resizeFence);
-    if (result != VK_SUCCESS) {
-        fprintf(stderr, "vkCreateFence failed: %s\n", string_VkResult(result));
-        shutdown_vulkan();
-        return;
     }
 
     m_currentFrameIndex = 0;
@@ -1131,7 +1134,6 @@ void Fl_Vk_Window::init() {
   // Swapchain info
   m_pixels_per_unit = 0.F;
   m_swapchain = VK_NULL_HANDLE;
-  m_resizeFence = VK_NULL_HANDLE;
 
   // For drawing
   m_in_render_pass = false;

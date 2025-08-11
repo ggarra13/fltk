@@ -1037,8 +1037,6 @@ void Fl_Vk_Window_Driver::destroy_resources()
   
     uint32_t i;
     VkResult result;
-
-    vkDeviceWaitIdle(pWindow->device());
     
     // Destroy resources in reverse creation order (first, those of window)
     pWindow->destroy_common_resources();

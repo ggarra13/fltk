@@ -123,10 +123,6 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
-  //! Fence used to handle resizes.
-  VkFence                m_resizeFence;
-
-    
   static int can_do(int, const int *);
   int mode(int, const int *);
   void destroy_common_resources();
