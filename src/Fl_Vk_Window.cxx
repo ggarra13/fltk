@@ -963,6 +963,10 @@ void Fl_Vk_Window::init_vulkan() {
             (PFN_vkSetDebugUtilsObjectNameEXT) vkGetInstanceProcAddr(instance(), "vkSetDebugUtilsObjectNameEXT");
     }
 
+    // Destroy surface
+    if (m_surface != VK_NULL_HANDLE)
+        pVkWindowDriver->destroy_surface();
+        
     // Create surface
     pVkWindowDriver->create_surface();
     if (m_surface == VK_NULL_HANDLE) {
