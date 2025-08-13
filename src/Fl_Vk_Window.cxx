@@ -681,8 +681,8 @@ int Fl_Vk_Window::swap_interval() const {
 
 
 void Fl_Vk_Window::flush() {
-  if (!shown())
-    return;
+  if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
+      return;
 
   // Initialize Vulkan
   if (m_swapchain == VK_NULL_HANDLE) {
