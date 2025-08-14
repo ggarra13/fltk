@@ -67,6 +67,7 @@ public:
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers() {};
+  virtual void resize(int is_a_resize, int w, int h) {};
   virtual void prepare();
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);

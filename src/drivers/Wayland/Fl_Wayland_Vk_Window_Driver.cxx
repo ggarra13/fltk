@@ -108,26 +108,52 @@ Fl_Vk_Choice *Fl_Wayland_Vk_Window_Driver::find(int m, const int *alistp) {
 
 
 float Fl_Wayland_Vk_Window_Driver::pixels_per_unit() {
-  int ns = Fl_Window_Driver::driver(pWindow)->screen_num();
-  return Fl::screen_driver()->scale(ns);
+  int ns = pWindow->screen_num();
+  int wld_scale = (pWindow->shown() ?
+    Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale() : 1);
+  return wld_scale * Fl::screen_driver()->scale(ns);
 }
 
 
 int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
-  int oldmode = mode();
-  mode(m);
-  alist(a);
-  if (pWindow->shown()) {
-    g(find(m, a));
-    if (!g() || (oldmode ^ m) & (FL_DOUBLE | FL_STEREO)) {
-      pWindow->hide();
-      pWindow->show();
-    }
-  } else {
-    g(0);
-  }
+  mode(m | FL_DOUBLE);
   return 1;
 }
+
+void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
+  // like issue #967, but on Vulkan see #1292  -- this does not solve it!
+  if (pWindow->m_surface) {
+    if (pWindow->parent()) { 
+      struct wld_window *xid = fl_wl_xid(pWindow);
+      if (xid->frame_cb) return;
+      // fprintf(stderr, "add listener for %p\n", pWindow);
+      xid->frame_cb = wl_surface_frame(xid->wl_surface);
+      wl_callback_add_listener(xid->frame_cb,
+                               Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+    }
+  }
+}
+
+void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
+    // This is handled automatically by recreate_swapchain() in pWindow.
+    //
+    // float f = Fl::screen_scale(pWindow->screen_num());
+    // int s = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
+    // W = int(W * f) * s; // W, H must be multiples of int s
+    // H = int(H * f) * s;
+    // if (1)
+    // {
+    // // // if (W2 != W || H2 != H) {
+    // //     struct wld_window *xid = fl_wl_xid(pWindow);
+    // //     if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
+    // //         xid->frame_cb = wl_surface_frame(xid->wl_surface);
+    // //         wl_callback_add_listener(xid->frame_cb,
+    // //                                  Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+    // //     }
+    // //     wl_surface_set_buffer_scale(xid->wl_surface, s);
+    // }
+}
+
 
 void *Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char *procName) {
   return dlsym(RTLD_DEFAULT, procName);
