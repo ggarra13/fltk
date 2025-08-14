@@ -715,8 +715,9 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
                      m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
+  pVkWindowDriver->resize(is_a_resize, W, H);
 
-  if (is_a_resize && visible_r()) {
+  if (is_a_resize) {
       m_swapchain_needs_recreation = true;
   }
 }

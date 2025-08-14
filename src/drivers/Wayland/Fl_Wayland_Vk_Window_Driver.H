@@ -30,6 +30,8 @@ class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   virtual ~Fl_Wayland_Vk_Window_Driver();
   float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
+  void swap_buffers() FL_OVERRIDE;
+  void resize(int is_a_resize, int w, int h) FL_OVERRIDE;
   void make_current_before() FL_OVERRIDE;
   void swap_interval(int) FL_OVERRIDE;
   int swap_interval() const FL_OVERRIDE;
