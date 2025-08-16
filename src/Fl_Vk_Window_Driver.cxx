@@ -708,12 +708,24 @@ void Fl_Vk_Window_Driver::create_device()
 {
     VkResult result;
 
-     // Assuming m_physicalDevice is set
-    VkPhysicalDeviceFeatures features = {};
-    vkGetPhysicalDeviceFeatures(gpu(), &features);
-    features.fillModeNonSolid = VK_TRUE;
-    features.robustBufferAccess = VK_TRUE;
+    // Chain it to your main features struct
+    VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    
+    // Assume you already have a VkPhysicalDevice
+    VkPhysicalDeviceColorWriteEnableFeaturesEXT colorWriteEnableFeatures = {};
+    colorWriteEnableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
+    deviceFeatures2.pNext = &colorWriteEnableFeatures;
 
+    // Assuming m_physicalDevice is set
+    vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
+
+    // Enable the desired fatures
+    colorWriteEnableFeatures.colorWriteEnable = VK_TRUE;
+
+    // The base features are in deviceFeatures2.features
+    // So you can modify them like this:
+    deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
 
     float queue_priorities = 1.0;
     VkDeviceQueueCreateInfo queueCreateInfo = {};
@@ -725,10 +737,9 @@ void Fl_Vk_Window_Driver::create_device()
 
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceInfo.pNext = NULL;
+    deviceInfo.pNext = &deviceFeatures2;
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceInfo.pEnabledFeatures = &features;
     deviceInfo.enabledLayerCount = pWindow->ctx.enabled_layers.size();
     deviceInfo.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
     deviceInfo.enabledExtensionCount = pWindow->ctx.device_extensions.size();

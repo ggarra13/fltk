@@ -75,8 +75,8 @@ struct Fl_Vk_Context
     // !@{
     //    Function pointers to useful extensitons
 
-    // These allow color write modes
-    PFN_vkCmdSetColorWriteEnableEXT vkCmdSetColorWriteEnableEXT;
+    // These allow color write masks in Vulkan 1.3
+    PFN_vkCmdSetColorWriteMaskEXT vkCmdSetColorWriteMaskEXT;
 
     // These allow changing stencil masks/tests
     PFN_vkCmdSetStencilTestEnableEXT vkCmdSetStencilTestEnableEXT;
@@ -99,7 +99,7 @@ struct Fl_Vk_Context
         queue_count(0),
         commandPool(VK_NULL_HANDLE),
         allocator(VK_NULL_HANDLE),
-        vkCmdSetColorWriteEnableEXT(nullptr),
+        vkCmdSetColorWriteMaskEXT(nullptr),
         vkCmdSetStencilTestEnableEXT(nullptr),
         vkCmdSetStencilOpEXT(nullptr),
         vkCmdSetStencilWriteMask(nullptr),

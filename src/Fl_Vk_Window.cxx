@@ -1001,7 +1001,8 @@ void Fl_Vk_Window::init_vulkan() {
     init_colorspace();
 
     // Get the default function pointers after creating the VkDevice
-    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetColorWriteEnableEXT);
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetColorWriteMaskEXT);
+    
     FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilTestEnableEXT);
     FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilOpEXT);
     FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilWriteMask);
@@ -1111,9 +1112,13 @@ void Fl_Vk_Window::init_vulkan() {
 std::vector<const char*> Fl_Vk_Window::get_device_extensions()
 {
     std::vector<const char*> out;
-    out.push_back("VK_EXT_color_write_enable");
+
+    // For easily changing stencil states
     out.push_back("VK_EXT_extended_dynamic_state");
     out.push_back("VK_EXT_extended_dynamic_state2");
+
+    // For easily changing write masks
+    out.push_back("VK_EXT_extended_dynamic_state3");
     return out;
 }
 
