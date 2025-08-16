@@ -26,6 +26,11 @@
 #include "Fl_Vk_Context.H"
 #include "Fl_Window.H"
 
+// Declare a variable to hold the function pointer
+static PFN_vkCmdBeginDebugUtilsLabelEXT pfn_vkCmdBeginDebugUtilsLabelEXT = nullptr;
+static PFN_vkCmdEndDebugUtilsLabelEXT pfn_vkCmdEndDebugUtilsLabelEXT = nullptr;
+static PFN_vkSetDebugUtilsObjectNameEXT pfn_vkSetDebugUtilsObjectNameEXT = nullptr;
+
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
@@ -300,9 +305,6 @@ public:
   static VmaAllocator m_allocator;
   
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
-  static PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT;
-  static PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT;
-  static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
 
   // Window's Vulkan context.
   Fl_Vk_Context ctx;

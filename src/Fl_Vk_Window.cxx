@@ -29,6 +29,18 @@
 
 #include <iostream>
 
+#define FLTK_ADD_DEVICE_EXTENSION(name) \
+    if (!ctx.name) \
+    { \
+        ctx.name = reinterpret_cast<PFN_##name>( \
+            vkGetDeviceProcAddr(device(), #name)); \
+        if (!ctx.name) \
+        { \
+            throw std::runtime_error("Failed to get " #name " function pointer!"); \
+        } \
+    }
+
+
 #ifdef USE_INFINITE_TIMEOUT
 static const uint64_t kFenceTimeout = UINT64_MAX;
 static const uint64_t kAcquireTimeout = UINT64_MAX;
@@ -49,15 +61,13 @@ static bool all_windows_invisible()
     return true;
 }
 
+
 //! Per application variables (statics).
 VkInstance              Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
 VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
 VmaAllocator            Fl_Vk_Window::m_allocator = VK_NULL_HANDLE;
 Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
-PFN_vkCmdBeginDebugUtilsLabelEXT Fl_Vk_Window::vkCmdBeginDebugUtilsLabelEXT = nullptr;
-PFN_vkCmdEndDebugUtilsLabelEXT Fl_Vk_Window::vkCmdEndDebugUtilsLabelEXT = nullptr;
-PFN_vkSetDebugUtilsObjectNameEXT Fl_Vk_Window::vkSetDebugUtilsObjectNameEXT = nullptr;
 
 
 bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
@@ -954,14 +964,26 @@ void Fl_Vk_Window::init_vulkan() {
             fprintf(stderr, "init_vulkan() failed to create Vulkan instance\n");
             return;
         }
-        vkCmdBeginDebugUtilsLabelEXT = 
+        pfn_vkCmdBeginDebugUtilsLabelEXT = 
             (PFN_vkCmdBeginDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdBeginDebugUtilsLabelEXT");
+        if (pfn_vkCmdBeginDebugUtilsLabelEXT == nullptr)
+        {
+            throw std::runtime_error("Failed to get vkCmdBeginDebugUtilsLabelEXT function pointer!");
+        }
 
-        vkCmdEndDebugUtilsLabelEXT = 
+        pfn_vkCmdEndDebugUtilsLabelEXT = 
             (PFN_vkCmdEndDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdEndDebugUtilsLabelEXT");
+        if (pfn_vkCmdEndDebugUtilsLabelEXT == nullptr)
+        {
+            throw std::runtime_error("Failed to get vkCmdEndDebugUtilsLabelEXT function pointer!");
+        }
 
-        vkSetDebugUtilsObjectNameEXT =
+        pfn_vkSetDebugUtilsObjectNameEXT =
             (PFN_vkSetDebugUtilsObjectNameEXT) vkGetInstanceProcAddr(instance(), "vkSetDebugUtilsObjectNameEXT");
+        if (pfn_vkSetDebugUtilsObjectNameEXT == nullptr)
+        {
+            throw std::runtime_error("Failed to get vkSetDebugUtilsObjectNameEXT function pointer!");
+        }
     }
 
     // Destroy surface
@@ -978,6 +1000,14 @@ void Fl_Vk_Window::init_vulkan() {
     // Initialize colorspace
     init_colorspace();
 
+    // Get the default function pointers after creating the VkDevice
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetColorWriteEnableEXT);
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilTestEnableEXT);
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilOpEXT);
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilWriteMask);
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilCompareMask);
+    
+    
     if (!vkSetHdrMetadataEXT)
     {
         bool found_hdr = false;
@@ -1081,6 +1111,9 @@ void Fl_Vk_Window::init_vulkan() {
 std::vector<const char*> Fl_Vk_Window::get_device_extensions()
 {
     std::vector<const char*> out;
+    out.push_back("VK_EXT_color_write_enable");
+    out.push_back("VK_EXT_extended_dynamic_state");
+    out.push_back("VK_EXT_extended_dynamic_state2");
     return out;
 }
 

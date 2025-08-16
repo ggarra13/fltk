@@ -72,9 +72,23 @@ struct Fl_Vk_Context
     // List of device extensions
     std::vector<const char*> device_extensions;
 
+    // !@{
+    //    Function pointers to useful extensitons
+
+    // These allow color write modes
+    PFN_vkCmdSetColorWriteEnableEXT vkCmdSetColorWriteEnableEXT;
+
+    // These allow changing stencil masks/tests
+    PFN_vkCmdSetStencilTestEnableEXT vkCmdSetStencilTestEnableEXT;
+    PFN_vkCmdSetStencilOpEXT vkCmdSetStencilOpEXT;
+    PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask;
+    PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask;
+    // !@}
+    
+    // Thread safe queue (use lock_guard on mutex when submitting)
     VkQueue& queue() { return safe_thread_queue->queue; }
     std::mutex& queue_mutex() { return safe_thread_queue->mutex; }
-    
+
     Fl_Vk_Context() :
         instance(VK_NULL_HANDLE),
         gpu(VK_NULL_HANDLE),
@@ -84,7 +98,12 @@ struct Fl_Vk_Context
         safe_thread_queue(nullptr),
         queue_count(0),
         commandPool(VK_NULL_HANDLE),
-        allocator(VK_NULL_HANDLE)
+        allocator(VK_NULL_HANDLE),
+        vkCmdSetColorWriteEnableEXT(nullptr),
+        vkCmdSetStencilTestEnableEXT(nullptr),
+        vkCmdSetStencilOpEXT(nullptr),
+        vkCmdSetStencilWriteMask(nullptr),
+        vkCmdSetStencilCompareMask(nullptr)
         {
         };
 
