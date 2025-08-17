@@ -126,10 +126,10 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
     if (pWindow->parent()) { 
       struct wld_window *xid = fl_wl_xid(pWindow);
       if (xid->frame_cb) return;
-      // fprintf(stderr, "add listener for %p\n", pWindow);
       xid->frame_cb = wl_surface_frame(xid->wl_surface);
       wl_callback_add_listener(xid->frame_cb,
                                Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+      wl_display_flush(fl_wl_display());
     }
   }
 }
@@ -197,7 +197,10 @@ int Fl_Wayland_Vk_Window_Driver::swap_interval() const {
 
 
 int Fl_Wayland_Vk_Window_Driver::flush_begin() {
-  return 0;
+    struct wld_window* window = fl_wl_xid(pWindow);
+    if (window && window->frame_cb)
+        return 1;  // skip this frame
+    return 0;
 }
 
 Fl_Wayland_Vk_Window_Driver::~Fl_Wayland_Vk_Window_Driver() {}

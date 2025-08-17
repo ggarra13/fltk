@@ -123,8 +123,15 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   struct wld_window *window = (struct wld_window *)data;
   wl_callback_destroy(cb);
   window->frame_cb = NULL;
-  if (window->buffer && window->buffer->draw_buffer_needs_commit) {
-    Fl_Wayland_Graphics_Driver::buffer_commit(window);
+  if (window->fl_win->as_vk_window())
+  {
+      window->fl_win->redraw();
+  }
+  else
+  {
+      if (window->buffer && window->buffer->draw_buffer_needs_commit) {
+          Fl_Wayland_Graphics_Driver::buffer_commit(window);
+      }
   }
 }
 

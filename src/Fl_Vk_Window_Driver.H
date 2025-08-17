@@ -61,7 +61,7 @@ public:
   virtual void after_show() {}
   virtual void swap_interval(int) {};
   virtual int swap_interval() const {return 1;};
-  virtual int flush_begin() { return 0; };
+  virtual int flush_begin() { return 0; };  // return 1 to skip drawing
   virtual void invalidate();
   virtual int mode_(int /*m*/, const int * /*a*/) { return 0; }
   virtual void make_current_before() {}

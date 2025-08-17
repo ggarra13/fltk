@@ -26,6 +26,7 @@
 #include "Fl_Scalable_Graphics_Driver.H" // Fl_Fontdesc
 #include <FL/Fl_Graphics_Driver.H>
 #include <FL/fl_utf8.h>
+#include <FL/platform.H>
 
 #include <iostream>
 
@@ -608,6 +609,18 @@ void Fl_Vk_Window::swap_buffers() {
 
         frame.submitted = true;
 
+
+        pVkWindowDriver->swap_buffers();
+
+        // Update HDR metadata if changed
+        if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+            m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+        {
+            vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+            m_previous_hdr_metadata = m_hdr_metadata;
+            m_hdr_metadata_changed = false;
+        }
+        
         // Present swapchain image
         VkPresentInfoKHR present_info = {};
         present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -620,15 +633,6 @@ void Fl_Vk_Window::swap_buffers() {
         if (m_debugSync) {
             fprintf(stderr, "Presenting image index %u for frame %u\n",
                     m_current_buffer, m_currentFrameIndex);
-        }
-
-        // Update HDR metadata if changed
-        if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-            m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-        {
-            vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-            m_previous_hdr_metadata = m_hdr_metadata;
-            m_hdr_metadata_changed = false;
         }
         
         result = vkQueuePresentKHR(queue(), &present_info);
@@ -645,8 +649,6 @@ void Fl_Vk_Window::swap_buffers() {
             return;
         }
     }
-
-    pVkWindowDriver->swap_buffers();
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
@@ -702,7 +704,10 @@ void Fl_Vk_Window::flush() {
           return;
       }
   }
-    
+  
+  if (pVkWindowDriver->flush_begin())
+      return;
+      
   if (!vk_draw_begin())
   {
       fprintf(stderr, "Skipping draw due to Vulkan error\n");
