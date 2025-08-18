@@ -705,7 +705,7 @@ void Fl_Vk_Window::flush() {
       }
   }
   
-  if (pVkWindowDriver->flush_begin())
+  if (pVkWindowDriver->flush_begin() && !m_swapchain_needs_recreation)
       return;
       
   if (!vk_draw_begin())

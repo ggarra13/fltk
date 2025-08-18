@@ -121,7 +121,7 @@ int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
 }
 
 void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
-  // like issue #967, but on Vulkan see #1292  -- this does not solve it!
+  // like issue #967, but on Vulkan see #1292  -- this solves it
   if (pWindow->m_surface != VK_NULL_HANDLE)
   {
     if (pWindow->parent()) { 
@@ -199,8 +199,8 @@ int Fl_Wayland_Vk_Window_Driver::swap_interval() const {
 
 int Fl_Wayland_Vk_Window_Driver::flush_begin() {
     struct wld_window* window = fl_wl_xid(pWindow);
-    if (window && window->frame_cb)
-        return 1;  // skip this frame
+    if (window && window->frame_cb && window->fl_win)
+        return 1;  // we have a callback, skip this frame
     return 0;
 }
 
