@@ -122,10 +122,11 @@ int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
 
 void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
   // like issue #967, but on Vulkan see #1292  -- this does not solve it!
-  if (pWindow->m_surface) {
+  if (pWindow->m_surface != VK_NULL_HANDLE)
+  {
     if (pWindow->parent()) { 
       struct wld_window *xid = fl_wl_xid(pWindow);
-      if (xid->frame_cb) return;
+      if (xid->frame_cb || !xid->wl_surface) return;
       xid->frame_cb = wl_surface_frame(xid->wl_surface);
       wl_callback_add_listener(xid->frame_cb,
                                Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);

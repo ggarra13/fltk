@@ -707,7 +707,11 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 void Fl_Vk_Window_Driver::create_device()
 {
     VkResult result;
-
+    
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynState3Features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
+    };
+    
     // Chain it to your main features struct
     VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
     deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -715,13 +719,19 @@ void Fl_Vk_Window_Driver::create_device()
     // Assume you already have a VkPhysicalDevice
     VkPhysicalDeviceColorWriteEnableFeaturesEXT colorWriteEnableFeatures = {};
     colorWriteEnableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
-    deviceFeatures2.pNext = &colorWriteEnableFeatures;
+    deviceFeatures2.pNext = &dynState3Features;
 
     // Assuming m_physicalDevice is set
     vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
 
     // Enable the desired fatures
-    colorWriteEnableFeatures.colorWriteEnable = VK_TRUE;
+    if (dynState3Features.extendedDynamicState3ColorWriteMask) {
+        // Enable it
+        dynState3Features.extendedDynamicState3ColorWriteMask = VK_TRUE;
+    } else {
+        // Feature not supported on this GPU/driver
+        throw std::runtime_error("extendedDynamicState3ColorWriteMask not supported");
+    }
 
     // The base features are in deviceFeatures2.features
     // So you can modify them like this:
