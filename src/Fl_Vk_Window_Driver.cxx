@@ -712,8 +712,16 @@ void Fl_Vk_Window_Driver::create_device()
     VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
     deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
+    // Assume you already have a VkPhysicalDevice
+    VkPhysicalDeviceColorWriteEnableFeaturesEXT colorWriteEnableFeatures = {};
+    colorWriteEnableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
+    deviceFeatures2.pNext = &colorWriteEnableFeatures;
+
     // Assuming m_physicalDevice is set
     vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
+
+    // Enable the desired fatures
+    colorWriteEnableFeatures.colorWriteEnable = VK_TRUE;
 
     // The base features are in deviceFeatures2.features
     // So you can modify them like this:

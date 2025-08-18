@@ -123,9 +123,10 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   struct wld_window *window = (struct wld_window *)data;
   wl_callback_destroy(cb);
   window->frame_cb = NULL;
-  if (window->fl_win->as_vk_window())
+  Fl_Window* win = window->fl_win;
+  if (win && win->as_vk_window())
   {
-      window->fl_win->redraw();
+      win->redraw();
   }
   else
   {
