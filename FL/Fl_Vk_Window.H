@@ -355,7 +355,6 @@ protected:
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
-  uint32_t                m_last_presented_buffer;
   
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;

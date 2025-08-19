@@ -652,7 +652,6 @@ void Fl_Vk_Window::swap_buffers() {
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
-    m_last_presented_buffer = m_current_buffer;
 }
 
 /**
@@ -1193,7 +1192,6 @@ void Fl_Vk_Window::init() {
 
   // Counters
   m_current_buffer = 0;
-  m_last_presented_buffer = 0;
   m_currentFrameIndex = 0;
   m_swapchainImageCount = 0; // Track swapchain image count
 }
