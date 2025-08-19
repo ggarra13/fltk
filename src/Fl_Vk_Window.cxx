@@ -50,11 +50,11 @@ static const uint64_t kFenceTimeout = 1'000'000'000;
 static const uint64_t kAcquireTimeout = 1'000'000'000;
 #endif
 
-static bool all_windows_invisible()
+static bool all_vulkan_windows_invisible()
 {
     for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
     {
-        if (win->visible())
+        if (win->visible() && win->as_vk_window())
         {
             return false;
         }
@@ -901,7 +901,7 @@ void Fl_Vk_Window::shutdown_vulkan() {
     // Destroy instance
     if (m_instance != VK_NULL_HANDLE)
     {
-        if (all_windows_invisible())
+        if (all_vulkan_windows_invisible())
         {
             delete m_queue;
             m_queue = nullptr;
