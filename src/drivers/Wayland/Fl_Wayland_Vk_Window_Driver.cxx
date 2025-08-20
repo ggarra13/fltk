@@ -121,18 +121,20 @@ int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
 }
 
 void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
-  // like issue #967, but on Vulkan see #1292  -- this solves it
-  if (pWindow->m_surface != VK_NULL_HANDLE)
-  {
-    if (pWindow->parent()) { 
-      struct wld_window *xid = fl_wl_xid(pWindow);
-      if (xid->frame_cb || !xid->wl_surface) return;
-      xid->frame_cb = wl_surface_frame(xid->wl_surface);
-      wl_callback_add_listener(xid->frame_cb,
-                               Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-      wl_display_flush(fl_wl_display());
-    }
-  }
+  // like issue #967, but on Vulkan see #1292  -- this solves it, but at a
+  // a cost of half performance.
+    
+  // if (pWindow->m_surface != VK_NULL_HANDLE)
+  // {
+  //   if (pWindow->parent()) { 
+  //     struct wld_window *xid = fl_wl_xid(pWindow);
+  //     if (xid->frame_cb || !xid->wl_surface) return;
+  //     xid->frame_cb = wl_surface_frame(xid->wl_surface);
+  //     wl_callback_add_listener(xid->frame_cb,
+  //                              Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+  //     wl_display_flush(fl_wl_display());
+  //   }
+  // }
 }
 
 void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
