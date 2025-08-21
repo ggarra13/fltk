@@ -129,7 +129,7 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   // Trigger a Vulkan window redraw (used for offscreen subwindows)
   if (win && win->as_vk_window())
   {
-      win->redraw();
+      win->flush();
   }
   else
   {
