@@ -202,6 +202,7 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
         struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
   struct Fl_Wayland_Screen_Driver::seat *seat = (struct Fl_Wayland_Screen_Driver::seat*)data;
   Fl_Window *win = event_coords_from_surface(surface, surface_x, surface_y);
+  
   static bool using_GTK = seat->gtk_shell &&
     (gtk_shell1_get_version(seat->gtk_shell) >= GTK_SURFACE1_TITLEBAR_GESTURE_SINCE_VERSION);
   if (!win && using_GTK) {
@@ -221,16 +222,20 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   //fprintf(stderr, "pointer_enter window=%p\n", Fl_Wayland_Window_Driver::surface_to_window(surface));
   // use custom cursor if present
   struct wl_cursor *cursor =
-    fl_wl_xid(win)->custom_cursor ? fl_wl_xid(win)->custom_cursor->wl_cursor : NULL;
+      fl_wl_xid(win)->custom_cursor ? fl_wl_xid(win)->custom_cursor->wl_cursor : NULL;
   Fl_Wayland_Screen_Driver::do_set_cursor(seat, cursor);
   seat->serial = serial;
   seat->pointer_enter_serial = serial;
   set_event_xy(win);
   need_leave = NULL;
   win = Fl_Wayland_Window_Driver::surface_to_window(surface);
-  if (!win->parent()) Fl::handle(FL_ENTER, win);
+  if (!win->parent())
+  {
+      wld_window::inside_window = true;
+      Fl::handle(FL_ENTER, win);
+  }
   seat->pointer_focus = surface;
-}
+  }
 
 
 static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
@@ -247,6 +252,7 @@ static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
     if (need_leave) { // we really left the sub-or-top win and did not enter another
       extern Fl_Window *fl_xmousewin;
       fl_xmousewin = 0;
+      wld_window::inside_window = false;
       Fl::handle(FL_LEAVE, need_leave);
     }
   }

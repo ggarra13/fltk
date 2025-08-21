@@ -1443,6 +1443,7 @@ bool Fl_Wayland_Window_Driver::process_menu_or_tooltip(struct wld_window *new_wi
   return false;
 }
 
+bool wld_window::inside_window = true;
 
 void Fl_Wayland_Window_Driver::makeWindow()
 {
