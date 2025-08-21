@@ -127,6 +127,14 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
     if (pWindow->parent()) { 
       struct wld_window *xid = fl_wl_xid(pWindow);
       if (xid->frame_cb || !xid->wl_surface || xid->inside_window) return;
+      
+      // Check if we are in presentation mode (no callback then).
+      int ns = pWindow->screen_num();
+      int minX, minY, maxW, maxH;
+      Fl::screen_work_area(minX, minY, maxW, maxH, ns);
+      if (pWindow->w() >= maxW && pWindow->h() >= maxH)
+          return;
+      
       xid->frame_cb = wl_surface_frame(xid->wl_surface);
       wl_callback_add_listener(xid->frame_cb,
                                Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
@@ -184,7 +192,9 @@ int Fl_Wayland_Vk_Window_Driver::swap_interval() const {
 int Fl_Wayland_Vk_Window_Driver::flush_begin() {
     struct wld_window* window = fl_wl_xid(pWindow);
     if (window && window->frame_cb && window->fl_win)
+    {
         return 1;  // we have a callback, skip this frame
+    }
     return 0;
 }
 
