@@ -121,40 +121,22 @@ int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
 }
 
 void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
-  // like issue #967, but on Vulkan see #1292  -- this solves it, but at a
-  // a cost of half performance.
-    
-  // if (pWindow->m_surface != VK_NULL_HANDLE)
-  // {
-  //   if (pWindow->parent()) { 
-  //     struct wld_window *xid = fl_wl_xid(pWindow);
-  //     if (xid->frame_cb || !xid->wl_surface) return;
-  //     xid->frame_cb = wl_surface_frame(xid->wl_surface);
-  //     wl_callback_add_listener(xid->frame_cb,
-  //                              Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-  //     wl_display_flush(fl_wl_display());
-  //   }
-  // }
+  // like issue #967, but on Vulkan see #1292  -- this solves it
+  if (pWindow->m_surface != VK_NULL_HANDLE)
+  {
+    if (pWindow->parent()) { 
+      struct wld_window *xid = fl_wl_xid(pWindow);
+      if (xid->frame_cb || !xid->wl_surface) return;
+      xid->frame_cb = wl_surface_frame(xid->wl_surface);
+      wl_callback_add_listener(xid->frame_cb,
+                               Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+      wl_display_flush(fl_wl_display());
+    }
+  }
 }
 
 void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
-    // This is handled automatically by recreate_swapchain() in pWindow.
-    //
-    // float f = Fl::screen_scale(pWindow->screen_num());
-    // int s = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
-    // W = int(W * f) * s; // W, H must be multiples of int s
-    // H = int(H * f) * s;
-    // if (1)
-    // {
-    // // // if (W2 != W || H2 != H) {
-    // //     struct wld_window *xid = fl_wl_xid(pWindow);
-    // //     if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
-    // //         xid->frame_cb = wl_surface_frame(xid->wl_surface);
-    // //         wl_callback_add_listener(xid->frame_cb,
-    // //                                  Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-    // //     }
-    // //     wl_surface_set_buffer_scale(xid->wl_surface, s);
-    // }
+    // This is handled automatically by recreate_swapchain() in Fl_Vk_Window.
 }
 
 
