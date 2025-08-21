@@ -28,7 +28,6 @@
 
 
 #include <cassert>
-#include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <vector>
