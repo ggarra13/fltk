@@ -43,6 +43,10 @@ void Fl_Window::fullscreen() {
     no_fullscreen_w = w();
     no_fullscreen_h = h();
   }
+  if (!no_fullscreen_w)
+      no_fullscreen_w = w();
+  if (!no_fullscreen_h)
+      no_fullscreen_h = h();
   if (shown() && !(flags() & Fl_Widget::FULLSCREEN)) {
     pWindowDriver->fullscreen_on();
   } else {
