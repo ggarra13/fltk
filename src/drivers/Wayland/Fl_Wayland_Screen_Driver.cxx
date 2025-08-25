@@ -252,7 +252,10 @@ static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
     if (need_leave) { // we really left the sub-or-top win and did not enter another
       extern Fl_Window *fl_xmousewin;
       fl_xmousewin = 0;
-      wld_window::inside_window = false;
+      // If we leave through the top of the window (to go to the title bar, mark
+      // window as not inside, so Vulkan slow code that fixes issue #1292 can kick in).
+      if (Fl::e_y_root < 50)
+          wld_window::inside_window = false;
       Fl::handle(FL_LEAVE, need_leave);
     }
   }
