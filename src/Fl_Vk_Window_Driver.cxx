@@ -123,13 +123,32 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       return;
   }
 
+  // Choose present mode (e.g., prefer MAILBOX for low latency)
+  uint32_t presentModeCount;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
+                                            pWindow->m_surface,
+                                            &presentModeCount, nullptr);
+  VkPresentModeKHR* presentModes = (VkPresentModeKHR*)
+                                   malloc(presentModeCount * sizeof(VkPresentModeKHR));
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
+                                            pWindow->m_surface,
+                                            &presentModeCount, presentModes);
+  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR; // Fallback
+  for (uint32_t i = 0; i < presentModeCount; i++) {
+      if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+          presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+          break;
+      }
+  }
+  free(presentModes);
+    
   // If not a double window, try to create a swapchain in
   // VK_PRESENT_MODE_IMMEDIATE_KHR.
   const bool isImmediate = !(pWindow->mode() & FL_DOUBLE);
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
-  swapchain.minImageCount = isImmediate ? 1 : 2;
+  swapchain.minImageCount = isImmediate ? 1 : 3;
   if (swapchain.minImageCount < surfCapabilities.minImageCount) {
     swapchain.minImageCount = surfCapabilities.minImageCount;
   }
@@ -145,7 +164,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   swapchain.presentMode = isImmediate ?
                           VK_PRESENT_MODE_IMMEDIATE_KHR :
-                          VK_PRESENT_MODE_FIFO_KHR;
+                          presentMode;
   swapchain.oldSwapchain = oldSwapchain;
   swapchain.clipped = VK_TRUE;
 
