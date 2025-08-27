@@ -126,17 +126,17 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
 
   if (!window->buffer)
       return;
-  
-  Fl_Window* win = window->fl_win;
 
-  // Trigger a Vulkan window redraw (used for offscreen subwindows)
-  if (win && win->as_vk_window())
-  {
-      win->flush();
-  }
-  else
-  {
-      if (window->buffer->draw_buffer_needs_commit) {
+  if (window->buffer->draw_buffer_needs_commit) {
+  
+      // // Trigger a Vulkan window redraw (used for offscreen subwindows)
+      Fl_Window* win = window->fl_win;
+      if (win && win->as_vk_window())
+      {
+          win->flush();
+      }
+      else
+      {
           Fl_Wayland_Graphics_Driver::buffer_commit(window);
       }
   }
