@@ -133,14 +133,14 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
                                             pWindow->m_surface,
                                             &presentModeCount, presentModes);
-  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR; // Fallback
-  for (uint32_t i = 0; i < presentModeCount; i++) {
-      if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-          presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-          break;
-      }
-  }
-  free(presentModes);
+  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  // for (uint32_t i = 0; i < presentModeCount; i++) {
+  //     if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+  //         presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+  //         break;
+  //     }
+  // }
+  // free(presentModes);
     
   // If not a double window, try to create a swapchain in
   // VK_PRESENT_MODE_IMMEDIATE_KHR.
