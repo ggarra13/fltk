@@ -134,23 +134,31 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                             pWindow->m_surface,
                                             &presentModeCount, presentModes);
   VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-  // for (uint32_t i = 0; i < presentModeCount; i++) {
-  //     if (presentModes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
-  //         presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-  //         break;
-  //     }
-  // }
-  // free(presentModes);
-    
-  // If not a double window, try to create a swapchain in
-  // VK_PRESENT_MODE_IMMEDIATE_KHR.
-  const bool isImmediate = !(pWindow->mode() & FL_DOUBLE);
+  if (swap_interval() == 0)
+  {
+      presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+  }
+  bool found = false;
+  for (uint32_t i = 0; i < presentModeCount; i++) {
+      if (presentModes[i] == presentMode) {
+          found = true;
+          break;
+      }
+  }
+  free(presentModes);
+
+  if (!found)
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
-  swapchain.minImageCount = isImmediate ? 1 : 3;
-  if (swapchain.minImageCount < surfCapabilities.minImageCount) {
-    swapchain.minImageCount = surfCapabilities.minImageCount;
+
+  swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  if (surfCapabilities.maxImageCount > 0 &&
+      swapchain.minImageCount > surfCapabilities.maxImageCount)
+  {
+      swapchain.minImageCount = surfCapabilities.maxImageCount;
   }
   swapchain.imageFormat = pWindow->format();
   swapchain.imageColorSpace = pWindow->colorSpace();
@@ -161,10 +169,27 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                          VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchain.preTransform = surfCapabilities.currentTransform;
-  swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchain.presentMode = isImmediate ?
-                          VK_PRESENT_MODE_IMMEDIATE_KHR :
-                          presentMode;
+
+
+  VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  if (!(surfCapabilities.supportedCompositeAlpha & compositeAlpha))
+  {
+      // pick the first available
+      for (VkCompositeAlphaFlagBitsKHR flag :
+               {VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+                VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+                VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR})
+      {
+          if (surfCapabilities.supportedCompositeAlpha & flag)
+          {
+              compositeAlpha = flag;
+              break;
+          }
+      }
+  }
+  
+  swapchain.compositeAlpha = compositeAlpha;
+  swapchain.presentMode = presentMode;
   swapchain.oldSwapchain = oldSwapchain;
   swapchain.clipped = VK_TRUE;
 
@@ -1102,6 +1127,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
 Fl_Vk_Window_Driver::Fl_Vk_Window_Driver(Fl_Vk_Window* win) :
     pWindow(win)
 {
+    swap_interval_ = 1;  // FIFO as a default swapchain mode
     m_instance = VK_NULL_HANDLE;
     m_gpu      = VK_NULL_HANDLE;
     m_device   = VK_NULL_HANDLE;

@@ -182,12 +182,6 @@ std::vector<const char*> Fl_Wayland_Vk_Window_Driver::get_instance_extensions() 
   return out;
 }
 
-void Fl_Wayland_Vk_Window_Driver::swap_interval(int interval) {}
-
-int Fl_Wayland_Vk_Window_Driver::swap_interval() const {
-  return -1;
-}
-
 
 int Fl_Wayland_Vk_Window_Driver::flush_begin() {
     struct wld_window* window = fl_wl_xid(pWindow);

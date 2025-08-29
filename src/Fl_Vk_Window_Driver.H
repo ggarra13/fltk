@@ -59,8 +59,8 @@ public:
   virtual float pixels_per_unit() { return 1; }
   virtual void before_show(int &) {}
   virtual void after_show() {}
-  virtual void swap_interval(int) {};
-  virtual int swap_interval() const {return 1;};
+  virtual void swap_interval(int x) { swap_interval_ = x; };
+  virtual int swap_interval() const {return swap_interval_;};
   virtual int flush_begin() { return 0; };  // return 1 to skip drawing
   virtual void invalidate();
   virtual int mode_(int /*m*/, const int * /*a*/) { return 0; }
@@ -112,6 +112,7 @@ protected:
   void prepare_depth();
   void prepare_framebuffers();
 
+  int swap_interval_;
   VkInstance m_instance;
   VkPhysicalDevice m_gpu;
   VkDevice m_device;
