@@ -181,7 +181,7 @@ static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   if (!win) return NULL;
   int delta_x = 0, delta_y = 0;
-  while (win->parent()) {
+  while (win && win->parent()) {
     delta_x += win->x();
     delta_y += win->y();
     win = win->window();
