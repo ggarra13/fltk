@@ -463,8 +463,6 @@ bool Fl_Vk_Window::vk_draw_begin() {
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
     }
     
-    begin_render_pass(frame.commandBuffer);
-
     frame.submitted = false;
     frame.active = true;
     return true;
