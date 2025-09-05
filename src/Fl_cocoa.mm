@@ -1143,6 +1143,7 @@ static void cocoaMouseHandler(NSEvent *theEvent)
       }
       break;
     case NSEventTypeMouseEntered :
+      if ([theEvent window]) update_e_xy_and_e_xy_root([theEvent window]);
       Fl::handle(FL_ENTER, window);
       break;
     case NSEventTypeMouseExited :
@@ -1465,7 +1466,6 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
   Fl_Window *window = [nsw getFl_Window];
   Fl::first_window(window);
   if (!window->parent()) [nsw orderFront:nil];
-  update_e_xy_and_e_xy_root(nsw);
   if (fl_sys_menu_bar && Fl_MacOS_Sys_Menu_Bar_Driver::window_menu_style()) {
     // select the corresponding Window menu item
     int index = Fl_MacOS_Sys_Menu_Bar_Driver::driver()->first_window_menu_item;
@@ -1474,8 +1474,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
       if (!item->label()) break;
       if (item->user_data() == window) {
         if (!item->value()) {
-          item->setonly();
-          fl_sys_menu_bar->update();
+          Fl_MacOS_Sys_Menu_Bar_Driver::driver()->setonly(item);
         }
         break;
       }
