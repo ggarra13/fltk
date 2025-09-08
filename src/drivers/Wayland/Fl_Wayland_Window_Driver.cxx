@@ -1930,6 +1930,13 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
           }
         }
       } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
+          
+        // Get screen boundaries
+        int screen_x, screen_y, screen_w, screen_h;
+        Fl::screen_xywh(screen_x, screen_y, screen_w, screen_h, pWindow->screen_num());
+        // Clamp coordinates to screen boundaries
+        X = fl_max(screen_x, fl_min(X, screen_x + screen_w - W));
+        Y = fl_max(screen_y, fl_min(Y, screen_y + screen_h - H));
         wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
         if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
         fl_win->configured_width = W;
@@ -1944,7 +1951,7 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
           xdg_toplevel_set_max_size(fl_win->xdg_toplevel, W, H);
         }
         xdg_surface_set_window_geometry(fl_win->xdg_surface, 0, 0, W, H);
-        //printf("xdg_surface_set_window_geometry: %dx%d\n",W, H);
+        //printf("xdg_surface_set_window_geometry: %dx%d depth=%d\n",W, H, depth);
       }
     } else {
       if (!in_handle_configure && xdg_toplevel()) {
