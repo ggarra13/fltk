@@ -178,19 +178,26 @@ struct wl_display *Fl_Wayland_Screen_Driver::wl_display = NULL;
 
 static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
                                        wl_fixed_t surface_x, wl_fixed_t surface_y) {
+  if (!surface) return NULL;
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   if (!win) return NULL;
+
   int delta_x = 0, delta_y = 0;
+  float f = Fl::screen_scale(win->screen_num());
+  
   while (win && win->parent()) {
     delta_x += win->x();
     delta_y += win->y();
     win = win->window();
   }
-  float f = Fl::screen_scale(win->screen_num());
+  
   Fl::e_x = wl_fixed_to_int(surface_x) / f + delta_x;
   Fl::e_x_root = Fl::e_x + win->x();
   Fl::e_y = wl_fixed_to_int(surface_y) / f + delta_y;
+  
+  if (!win) return NULL;
   int *poffset = Fl_Window_Driver::menu_offset_y(win);
+
   if (poffset) Fl::e_y -= *poffset;
   Fl::e_y_root = Fl::e_y + win->y();
   return win;

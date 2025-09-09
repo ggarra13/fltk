@@ -1841,6 +1841,7 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   xid_rect->xid->frame_cb = NULL;
 
   // Validate coordinates
+  // \@note: added by ggarra13
   if (!xid_rect->win->as_gl_window() && !xid_rect->win->as_vk_window())
   {
       int screen_x, screen_y, screen_w, screen_h;
@@ -1943,7 +1944,8 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
       } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
         parent->wait_for_expose();
 
-        // Don't mess with OpenGL or Vulkan Windows
+        // \@note: added by ggarra13.  Don't mess with OpenGL or Vulkan Windows'
+        //         positions.
         if (!pWindow->as_gl_window() && !pWindow->as_vk_window())
         {
             int screen_num = pWindow->screen_num();
