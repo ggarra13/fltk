@@ -178,36 +178,21 @@ struct wl_display *Fl_Wayland_Screen_Driver::wl_display = NULL;
 
 static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
                                        wl_fixed_t surface_x, wl_fixed_t surface_y) {
-  if (!surface) return NULL;
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   if (!win) return NULL;
-
   int delta_x = 0, delta_y = 0;
-  float f = Fl::screen_scale(win->screen_num());
-  
   while (win && win->parent()) {
     delta_x += win->x();
     delta_y += win->y();
     win = win->window();
   }
-  
-  Fl::e_x = Fl::e_x_root = wl_fixed_to_int(surface_x) / f + delta_x;
-  if (win)
-      Fl::e_x_root = Fl::e_x + win->x();
-  Fl::e_y = Fl::e_y_root = wl_fixed_to_int(surface_y) / f + delta_y;
-  
+  float f = Fl::screen_scale(win->screen_num());
+  Fl::e_x = wl_fixed_to_int(surface_x) / f + delta_x;
+  Fl::e_x_root = Fl::e_x + win->x();
+  Fl::e_y = wl_fixed_to_int(surface_y) / f + delta_y;
   int *poffset = Fl_Window_Driver::menu_offset_y(win);
   if (poffset) Fl::e_y -= *poffset;
-
-  if (win)
-      Fl::e_y_root = Fl::e_y + win->y();
-  fprintf(stderr, "e_x_root=%d e_y_root=%d surface_x=%d surface_y=%d\n",
-          Fl::e_x_root, Fl::e_y_root,
-          wl_fixed_to_int(surface_x),
-          wl_fixed_to_int(surface_y));
-  if (Fl::e_x_root < 0 || Fl::e_y_root < 0 ||
-      Fl::e_x_root > 1920 || Fl::e_y_root > 1920)
-      abort();
+  Fl::e_y_root = Fl::e_y + win->y();
   return win;
 }
 
@@ -216,9 +201,6 @@ static Fl_Window *need_leave = NULL;
 static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t serial,
         struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
   struct Fl_Wayland_Screen_Driver::seat *seat = (struct Fl_Wayland_Screen_Driver::seat*)data;
-  fprintf(stderr, "pointer_enter surface_x=%d surface_y=%d\n",
-          wl_fixed_to_int(surface_x),
-          wl_fixed_to_int(surface_y));
   Fl_Window *win = event_coords_from_surface(surface, surface_x, surface_y);
   
   static bool using_GTK = seat->gtk_shell &&
@@ -284,9 +266,6 @@ static void pointer_motion(void *data, struct wl_pointer *wl_pointer,
          uint32_t time, wl_fixed_t surface_x, wl_fixed_t surface_y) {
   struct Fl_Wayland_Screen_Driver::seat *seat =
     (struct Fl_Wayland_Screen_Driver::seat*)data;
-  fprintf(stderr, "pointer_motion surface_x=%d surface_y=%d\n",
-          wl_fixed_to_int(surface_x),
-          wl_fixed_to_int(surface_y));
   Fl_Window *win = event_coords_from_surface(seat->pointer_focus, surface_x, surface_y);
   if (!win) return;
   if (Fl::grab() && !Fl::grab()->menu_window() && Fl::grab() != win) {
@@ -323,14 +302,12 @@ static void pointer_button(void *data,
     gtk_surface1_titlebar_gesture(gtk_surface, serial, seat->wl_seat,
                                   GTK_SURFACE1_GESTURE_MIDDLE_CLICK);
     gtk_surface1_release(gtk_surface); // very necessary
-    fprintf(stderr, "%s %d serial=%d\n", __FUNCTION__, __LINE__, serial);
     return;
   }
   seat->serial = serial;
   int event = 0;
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(seat->pointer_focus);
   if (!win) return;
-    fprintf(stderr, "%s %d serial=%d\n", __FUNCTION__, __LINE__, serial);
   win = win->top_window();
   wld_event_time = time;
   int b = 0;
@@ -364,7 +341,6 @@ static void pointer_button(void *data,
   }
   // fprintf(stderr, "%s %s\n", fl_eventnames[event], win->label() ? win->label():"[]");
   Fl::handle(event, win);
-  fprintf(stderr, "%s %d serial=%d\n", __FUNCTION__, __LINE__, serial);
 }
 
 

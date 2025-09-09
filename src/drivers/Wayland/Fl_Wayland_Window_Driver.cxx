@@ -1839,18 +1839,6 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   struct xid_and_rect *xid_rect = (xid_and_rect *)data;
   wl_callback_destroy(cb);
   xid_rect->xid->frame_cb = NULL;
-
-  // Validate coordinates
-  // \@note: added by ggarra13
-  if (!xid_rect->win->as_gl_window() && !xid_rect->win->as_vk_window())
-  {
-      int screen_x, screen_y, screen_w, screen_h;
-      Fl::screen_xywh(screen_x, screen_y, screen_w, screen_h,
-                      xid_rect->X, xid_rect->Y);
-      xid_rect->X = fl_max(screen_x, fl_min(xid_rect->X, screen_x + screen_w - xid_rect->W));
-      xid_rect->Y = fl_max(screen_y, fl_min(xid_rect->Y, screen_y + screen_h - xid_rect->H));
-  }
-  
   if (xid_rect->need_resize) {
     xid_rect->win->Fl_Group::resize(xid_rect->X, xid_rect->Y, xid_rect->W, xid_rect->H);
     xid_rect->win->redraw();
@@ -1942,23 +1930,6 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
           }
         }
       } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
-        parent->wait_for_expose();
-
-        // \@note: added by ggarra13.  Don't mess with OpenGL or Vulkan Windows'
-        //         positions.
-        if (!pWindow->as_gl_window() && !pWindow->as_vk_window())
-        {
-            int screen_num = pWindow->screen_num();
-          
-            // Get screen boundaries
-            int screen_x, screen_y, screen_w, screen_h;
-            Fl::screen_xywh(screen_x, screen_y, screen_w, screen_h, X, Y);
-        
-            // Clamp coordinates to screen boundaries
-            X = fl_max(screen_x, fl_min(X * f, screen_x + screen_w - W));
-            Y = fl_max(screen_y, fl_min(Y * f, screen_y + screen_h - H));
-        }
-        
         wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
         if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
         fl_win->configured_width = W;
@@ -1973,7 +1944,7 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
           xdg_toplevel_set_max_size(fl_win->xdg_toplevel, W, H);
         }
         xdg_surface_set_window_geometry(fl_win->xdg_surface, 0, 0, W, H);
-        //printf("xdg_surface_set_window_geometry: %dx%d depth=%d\n",W, H, depth);
+        //printf("xdg_surface_set_window_geometry: %dx%d\n",W, H);
       }
     } else {
       if (!in_handle_configure && xdg_toplevel()) {
