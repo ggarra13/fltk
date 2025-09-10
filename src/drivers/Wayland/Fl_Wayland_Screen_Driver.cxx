@@ -351,6 +351,10 @@ static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
           wld_window::inside_window = false;
       Fl::handle(FL_LEAVE, need_leave);
     }
+    else
+    {
+        wld_window::inside_window = true;
+    }
   }
 }
 
