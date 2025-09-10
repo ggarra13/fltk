@@ -193,6 +193,31 @@ static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
   int *poffset = Fl_Window_Driver::menu_offset_y(win);
   if (poffset) Fl::e_y -= *poffset;
   Fl::e_y_root = Fl::e_y + win->y();
+
+  // Sanity check
+  if (Fl::e_x_root < 0 || Fl::e_y_root < 0)
+  {
+      Fl::warning("\nFl::e_x_root (%d) < 0 or Fl::e_y_root(%d) < 0\n",
+                  Fl::e_x_root, Fl::e_y_root);
+      
+      Fl::warning("FINAL    win=%p label=%s", win,
+                  win->label() ? win->label() : "no label");
+      Fl::warning("FINAL    win->x()=%d win->y()=%d", win->x(),
+                  win->y());
+      Fl::warning("FINAL     delta_x=%d  delta_y=%d", delta_x,
+                  delta_y);
+      win = Fl_Wayland_Window_Driver::surface_to_window(surface);
+      Fl::warning("ORIGINAL win=%p label=%s", win,
+                  win->label() ? win->label() : "no label");
+      Fl::warning("surface_x=%d surface_y=%d",
+                  wl_fixed_to_int(surface_x),
+                  wl_fixed_to_int(surface_y));
+      Fl::warning("scale=%f", f);
+      Fl::warning("Fl::e_x = %d, Fl::e_y = %d", Fl::e_x, Fl::e_y);
+      if (poffset)
+          Fl::warning("poffset=%d", *poffset);
+      abort(); // throw a stack trace.
+  }
   return win;
 }
 
