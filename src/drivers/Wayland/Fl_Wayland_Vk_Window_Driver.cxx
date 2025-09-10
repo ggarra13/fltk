@@ -108,26 +108,45 @@ Fl_Vk_Choice *Fl_Wayland_Vk_Window_Driver::find(int m, const int *alistp) {
 
 
 float Fl_Wayland_Vk_Window_Driver::pixels_per_unit() {
-  int ns = Fl_Window_Driver::driver(pWindow)->screen_num();
-  return Fl::screen_driver()->scale(ns);
+  int ns = pWindow->screen_num();
+  int wld_scale = (pWindow->shown() ?
+    Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale() : 1);
+  return wld_scale * Fl::screen_driver()->scale(ns);
 }
 
 
 int Fl_Wayland_Vk_Window_Driver::mode_(int m, const int *a) {
-  int oldmode = mode();
-  mode(m);
-  alist(a);
-  if (pWindow->shown()) {
-    g(find(m, a));
-    if (!g() || (oldmode ^ m) & (FL_DOUBLE | FL_STEREO)) {
-      pWindow->hide();
-      pWindow->show();
-    }
-  } else {
-    g(0);
-  }
+  mode(m | FL_DOUBLE);
   return 1;
 }
+
+void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
+  // like issue #967, but on Vulkan see #1292  -- this solves it
+  if (pWindow->m_surface != VK_NULL_HANDLE)
+  {
+    if (pWindow->parent()) { 
+      struct wld_window *xid = fl_wl_xid(pWindow);
+      if (xid->frame_cb || !xid->wl_surface || xid->inside_window) return;
+      
+      // Check if we are in presentation mode (no callback then).
+      int ns = pWindow->screen_num();
+      int minX, minY, maxW, maxH;
+      Fl::screen_work_area(minX, minY, maxW, maxH, ns);
+      if (pWindow->w() >= maxW && pWindow->h() >= maxH)
+          return;
+      
+      xid->frame_cb = wl_surface_frame(xid->wl_surface);
+      wl_callback_add_listener(xid->frame_cb,
+                               Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+      wl_display_flush(fl_wl_display());
+    }
+  }
+}
+
+void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
+    // This is handled automatically by recreate_swapchain() in Fl_Vk_Window.
+}
+
 
 void *Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char *procName) {
   return dlsym(RTLD_DEFAULT, procName);
@@ -163,15 +182,14 @@ std::vector<const char*> Fl_Wayland_Vk_Window_Driver::get_instance_extensions() 
   return out;
 }
 
-void Fl_Wayland_Vk_Window_Driver::swap_interval(int interval) {}
-
-int Fl_Wayland_Vk_Window_Driver::swap_interval() const {
-  return -1;
-}
-
 
 int Fl_Wayland_Vk_Window_Driver::flush_begin() {
-  return 0;
+    struct wld_window* window = fl_wl_xid(pWindow);
+    if (window && window->frame_cb && window->fl_win)
+    {
+        return 1;  // we have a callback, skip this frame
+    }
+    return 0;
 }
 
 Fl_Wayland_Vk_Window_Driver::~Fl_Wayland_Vk_Window_Driver() {}

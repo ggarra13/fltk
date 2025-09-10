@@ -486,6 +486,7 @@ void vk_shape_window::draw() {
     if (!m_swapchain || !cmd || !isFrameActive()) {
         return;
     }
+    begin_render_pass(cmd);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
@@ -504,6 +505,8 @@ void vk_shape_window::draw() {
     VkDeviceSize offsets[1] = {0};
     vkCmdBindVertexBuffers(cmd, 0, 1, &m_mesh.buf, offsets);
     vkCmdDraw(cmd, 3 * sides, 1, 0, 0); // Draw shape
+
+    end_render_pass(cmd);
 }
 
 void vk_shape_window::destroy_mesh()

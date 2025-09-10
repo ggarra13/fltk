@@ -181,7 +181,7 @@ static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   if (!win) return NULL;
   int delta_x = 0, delta_y = 0;
-  while (win->parent()) {
+  while (win && win->parent()) {
     delta_x += win->x();
     delta_y += win->y();
     win = win->window();
@@ -196,11 +196,13 @@ static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
   return win;
 }
 
+static Fl_Window *need_leave = NULL;
 
 static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t serial,
         struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
   struct Fl_Wayland_Screen_Driver::seat *seat = (struct Fl_Wayland_Screen_Driver::seat*)data;
   Fl_Window *win = event_coords_from_surface(surface, surface_x, surface_y);
+  
   static bool using_GTK = seat->gtk_shell &&
     (gtk_shell1_get_version(seat->gtk_shell) >= GTK_SURFACE1_TITLEBAR_GESTURE_SINCE_VERSION);
   if (!win && using_GTK) {
@@ -217,17 +219,23 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
     }
   }
   if (!win) return;
+  //fprintf(stderr, "pointer_enter window=%p\n", Fl_Wayland_Window_Driver::surface_to_window(surface));
   // use custom cursor if present
   struct wl_cursor *cursor =
-    fl_wl_xid(win)->custom_cursor ? fl_wl_xid(win)->custom_cursor->wl_cursor : NULL;
+      fl_wl_xid(win)->custom_cursor ? fl_wl_xid(win)->custom_cursor->wl_cursor : NULL;
   Fl_Wayland_Screen_Driver::do_set_cursor(seat, cursor);
   seat->serial = serial;
   seat->pointer_enter_serial = serial;
   set_event_xy(win);
-  Fl::handle(FL_ENTER, win);
-  //fprintf(stderr, "pointer_enter window=%p\n", win);
+  need_leave = NULL;
+  win = Fl_Wayland_Window_Driver::surface_to_window(surface);
+  wld_window::inside_window = true;
+  if (!win->parent())
+  {
+      Fl::handle(FL_ENTER, win);
+  }
   seat->pointer_focus = surface;
-}
+  }
 
 
 static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
@@ -237,11 +245,20 @@ static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   gtk_shell_surface = NULL;
   if (win) {
-    Fl::belowmouse(0);
+    //fprintf(stderr, "pointer_leave window=%p [%s]\n", win, (win->parent()?"sub":"top"));
     set_event_xy(win);
-    Fl::handle(FL_LEAVE, win->top_window());
+    need_leave = win->top_window(); // we leave a sub or toplevel window
+    wl_display_roundtrip(fl_wl_display()); // pointer_enter to other win, if applicable, will run
+    if (need_leave) { // we really left the sub-or-top win and did not enter another
+      extern Fl_Window *fl_xmousewin;
+      fl_xmousewin = 0;
+      // If we leave through the top of the window (to go to the title bar, mark
+      // window as not inside, so Vulkan slow code that fixes issue #1292 can kick in).
+      if (Fl::e_y_root < 50)
+          wld_window::inside_window = false;
+      Fl::handle(FL_LEAVE, need_leave);
+    }
   }
-//fprintf(stderr, "pointer_leave surface=%p window=%p\n", surface, win);
 }
 
 
@@ -825,7 +842,8 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     Fl::handle(event, win);
   }
   if (event == FL_KEYDOWN && status == XKB_COMPOSE_NOTHING &&
-      !(sym >= FL_Shift_L && sym <= FL_Alt_R)) {
+      !(sym >= FL_Shift_L && sym <= FL_Alt_R) &&
+      !(sym >= FL_F && sym <= FL_F_Last)) {
     // Handling of key repeats :
     // Use serial argument rather than time to detect repeated keys because
     // serial value changes at each key up or down in all tested OS and compositors,
@@ -1393,6 +1411,11 @@ static void sync_done(void *data, struct wl_callback *cb, uint32_t time) {
   }
   // Now all screens have been initialized
   scr_driver->screen_count_set( wl_list_length(&(scr_driver->outputs)) );
+  struct pair_bool *pair = (struct pair_bool*)wl_registry_get_user_data(scr_driver->wl_registry);
+  if (pair->found_gtk_shell || pair->found_wf_shell) {
+    Fl_Wayland_Screen_Driver::compositor = (pair->found_wf_shell ?
+                          Fl_Wayland_Screen_Driver::WAYFIRE : Fl_Wayland_Screen_Driver::MUTTER);
+  }
   if (scr_driver->seat) try_update_cursor(scr_driver->seat);
   if (Fl_Wayland_Screen_Driver::compositor != Fl_Wayland_Screen_Driver::OWL) scr_driver->init_workarea();
 }
@@ -1432,9 +1455,6 @@ void Fl_Wayland_Screen_Driver::open_display_platform() {
   struct wl_callback *registry_cb = wl_display_sync(wl_display);
   wl_callback_add_listener(registry_cb, &sync_listener, &registry_cb);
   while (registry_cb) wl_display_dispatch(wl_display);
-  if (pair.found_gtk_shell || pair.found_wf_shell) {
-    Fl_Wayland_Screen_Driver::compositor = (pair.found_wf_shell ? WAYFIRE : MUTTER);
-  }
   Fl::add_fd(wl_display_get_fd(wl_display), FL_READ, (Fl_FD_Handler)wayland_socket_callback,
              wl_display);
   fl_create_print_window();
@@ -1607,6 +1627,8 @@ static bool compute_full_and_maximized_areas(Fl_Wayland_Screen_Driver::output *o
     xdg_surface_destroy(xdg_surface2);
     wl_surface_destroy(wl_surface2);
     if (Wworkarea == Wfullscreen && Hworkarea < Hfullscreen && Hworkarea > Hfullscreen - 80)
+      found_workarea = true;
+    if (Hworkarea == Hfullscreen && Wworkarea < Wfullscreen && Wworkarea > Wfullscreen - 80)
       found_workarea = true;
   } else {
     Wworkarea = Wfullscreen;

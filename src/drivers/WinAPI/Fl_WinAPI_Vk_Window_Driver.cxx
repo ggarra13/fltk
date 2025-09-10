@@ -184,12 +184,6 @@ std::vector<const char*> Fl_WinAPI_Vk_Window_Driver::get_instance_extensions() {
   return out;
 }
 
-void Fl_WinAPI_Vk_Window_Driver::swap_interval(int interval) {}
-
-int Fl_WinAPI_Vk_Window_Driver::swap_interval() const {
-  return -1;
-}
-
 
 int Fl_WinAPI_Vk_Window_Driver::flush_begin() {
   return 0;

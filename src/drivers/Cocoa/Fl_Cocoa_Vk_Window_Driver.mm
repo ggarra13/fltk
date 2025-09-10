@@ -104,18 +104,6 @@ int Fl_Cocoa_Vk_Window_Driver::mode_(int m, const int *a) {
   return 1;
 }
 
-
-void Fl_Cocoa_Vk_Window_Driver::swap_interval(int n) {
-  GLint interval = (GLint)n;
-}
-
-int Fl_Cocoa_Vk_Window_Driver::swap_interval() const {
-  GLint interval = (GLint)-1;
-  return interval;
-}
-
-
-
 // convert BGRA to RGB and also exchange top and bottom
 static uchar *convert_BGRA_to_RGB(uchar *baseAddress, int w, int h, int mByteWidth)
 {

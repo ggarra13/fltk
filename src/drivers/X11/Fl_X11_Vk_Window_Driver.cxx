@@ -163,12 +163,6 @@ std::vector<const char*> Fl_X11_Vk_Window_Driver::get_instance_extensions() {
   return out;
 }
 
-void Fl_X11_Vk_Window_Driver::swap_interval(int interval) {}
-
-int Fl_X11_Vk_Window_Driver::swap_interval() const {
-  return -1;
-}
-
 
 int Fl_X11_Vk_Window_Driver::flush_begin() {
   return 0;

@@ -797,6 +797,8 @@ void cube_box::draw() {
     if (!m_swapchain || !cmd || !isFrameActive()) {
         return;
     }
+
+    begin_render_pass(cmd);
     
     // Set viewport
     VkViewport viewport = {};
@@ -832,6 +834,7 @@ void cube_box::draw() {
     vkCmdBindIndexBuffer(cmd, m_cube.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
     vkCmdDrawIndexed(cmd, 6*3*2, 1, 0, 0, 0); // 6 sides * 2 triangles * 3 verts
 
+    end_render_pass(cmd);
 }
 
 

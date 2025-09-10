@@ -59,14 +59,15 @@ public:
   virtual float pixels_per_unit() { return 1; }
   virtual void before_show(int &) {}
   virtual void after_show() {}
-  virtual void swap_interval(int) {};
-  virtual int swap_interval() const {return 1;};
-  virtual int flush_begin() { return 0; };
+  virtual void swap_interval(int x) { swap_interval_ = x; };
+  virtual int swap_interval() const {return swap_interval_;};
+  virtual int flush_begin() { return 0; };  // return 1 to skip drawing
   virtual void invalidate();
   virtual int mode_(int /*m*/, const int * /*a*/) { return 0; }
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers() {};
+  virtual void resize(int is_a_resize, int w, int h) {};
   virtual void prepare();
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);
@@ -111,6 +112,7 @@ protected:
   void prepare_depth();
   void prepare_framebuffers();
 
+  int swap_interval_;
   VkInstance m_instance;
   VkPhysicalDevice m_gpu;
   VkDevice m_device;

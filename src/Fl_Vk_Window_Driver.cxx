@@ -28,7 +28,6 @@
 
 
 #include <cassert>
-#include <iostream>
 #include <mutex>
 #include <stdexcept>
 #include <vector>
@@ -124,15 +123,42 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       return;
   }
 
-  // If not a double window, try to create a swapchain in
-  // VK_PRESENT_MODE_IMMEDIATE_KHR.
-  const bool isImmediate = !(pWindow->mode() & FL_DOUBLE);
+  // Choose present mode (e.g., prefer MAILBOX for low latency)
+  uint32_t presentModeCount;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
+                                            pWindow->m_surface,
+                                            &presentModeCount, nullptr);
+  VkPresentModeKHR* presentModes = (VkPresentModeKHR*)
+                                   malloc(presentModeCount * sizeof(VkPresentModeKHR));
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
+                                            pWindow->m_surface,
+                                            &presentModeCount, presentModes);
+  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  if (swap_interval() == 0)
+  {
+      presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+  }
+  bool found = false;
+  for (uint32_t i = 0; i < presentModeCount; i++) {
+      if (presentModes[i] == presentMode) {
+          found = true;
+          break;
+      }
+  }
+  free(presentModes);
+
+  if (!found)
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
-  swapchain.minImageCount = isImmediate ? 1 : 2;
-  if (swapchain.minImageCount < surfCapabilities.minImageCount) {
-    swapchain.minImageCount = surfCapabilities.minImageCount;
+
+  swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  if (surfCapabilities.maxImageCount > 0 &&
+      swapchain.minImageCount > surfCapabilities.maxImageCount)
+  {
+      swapchain.minImageCount = surfCapabilities.maxImageCount;
   }
   swapchain.imageFormat = pWindow->format();
   swapchain.imageColorSpace = pWindow->colorSpace();
@@ -143,10 +169,27 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                          VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchain.preTransform = surfCapabilities.currentTransform;
-  swapchain.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-  swapchain.presentMode = isImmediate ?
-                          VK_PRESENT_MODE_IMMEDIATE_KHR :
-                          VK_PRESENT_MODE_FIFO_KHR;
+
+
+  VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  if (!(surfCapabilities.supportedCompositeAlpha & compositeAlpha))
+  {
+      // pick the first available
+      for (VkCompositeAlphaFlagBitsKHR flag :
+               {VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+                VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+                VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR})
+      {
+          if (surfCapabilities.supportedCompositeAlpha & flag)
+          {
+              compositeAlpha = flag;
+              break;
+          }
+      }
+  }
+  
+  swapchain.compositeAlpha = compositeAlpha;
+  swapchain.presentMode = presentMode;
   swapchain.oldSwapchain = oldSwapchain;
   swapchain.clipped = VK_TRUE;
 
@@ -707,13 +750,35 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 void Fl_Vk_Window_Driver::create_device()
 {
     VkResult result;
+    
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynState3Features{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
+    };
+    
+    // Chain it to your main features struct
+    VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
-     // Assuming m_physicalDevice is set
-    VkPhysicalDeviceFeatures features = {};
-    vkGetPhysicalDeviceFeatures(gpu(), &features);
-    features.fillModeNonSolid = VK_TRUE;
-    features.robustBufferAccess = VK_TRUE;
+    // Assume you already have a VkPhysicalDevice
+    VkPhysicalDeviceColorWriteEnableFeaturesEXT colorWriteEnableFeatures = {};
+    colorWriteEnableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
+    deviceFeatures2.pNext = &dynState3Features;
 
+    // Assuming m_physicalDevice is set
+    vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
+
+    // Enable the desired fatures
+    if (dynState3Features.extendedDynamicState3ColorWriteMask) {
+        // Enable it
+        dynState3Features.extendedDynamicState3ColorWriteMask = VK_TRUE;
+    } else {
+        // Feature not supported on this GPU/driver
+        fprintf(stderr, "extendedDynamicState3ColorWriteMask not supported\n");
+    }
+
+    // The base features are in deviceFeatures2.features
+    // So you can modify them like this:
+    deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
 
     float queue_priorities = 1.0;
     VkDeviceQueueCreateInfo queueCreateInfo = {};
@@ -725,10 +790,9 @@ void Fl_Vk_Window_Driver::create_device()
 
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceInfo.pNext = NULL;
+    deviceInfo.pNext = &deviceFeatures2;
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueCreateInfo;
-    deviceInfo.pEnabledFeatures = &features;
     deviceInfo.enabledLayerCount = pWindow->ctx.enabled_layers.size();
     deviceInfo.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
     deviceInfo.enabledExtensionCount = pWindow->ctx.device_extensions.size();
@@ -1037,8 +1101,6 @@ void Fl_Vk_Window_Driver::destroy_resources()
   
     uint32_t i;
     VkResult result;
-
-    vkDeviceWaitIdle(pWindow->device());
     
     // Destroy resources in reverse creation order (first, those of window)
     pWindow->destroy_common_resources();
@@ -1065,6 +1127,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
 Fl_Vk_Window_Driver::Fl_Vk_Window_Driver(Fl_Vk_Window* win) :
     pWindow(win)
 {
+    swap_interval_ = 1;  // FIFO as a default swapchain mode
     m_instance = VK_NULL_HANDLE;
     m_gpu      = VK_NULL_HANDLE;
     m_device   = VK_NULL_HANDLE;

@@ -26,6 +26,11 @@
 #include "Fl_Vk_Context.H"
 #include "Fl_Window.H"
 
+// Declare a variable to hold the function pointer
+static PFN_vkCmdBeginDebugUtilsLabelEXT pfn_vkCmdBeginDebugUtilsLabelEXT = nullptr;
+static PFN_vkCmdEndDebugUtilsLabelEXT pfn_vkCmdEndDebugUtilsLabelEXT = nullptr;
+static PFN_vkSetDebugUtilsObjectNameEXT pfn_vkSetDebugUtilsObjectNameEXT = nullptr;
+
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
@@ -122,7 +127,7 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   Fl_Vk_Choice *g; // needed ?  we may need to use it translate
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
-    
+
   static int can_do(int, const int *);
   int mode(int, const int *);
   void destroy_common_resources();
@@ -300,9 +305,6 @@ public:
   static VmaAllocator m_allocator;
   
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
-  static PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT;
-  static PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT;
-  static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
 
   // Window's Vulkan context.
   Fl_Vk_Context ctx;
@@ -331,19 +333,19 @@ private:
   // Per frame data used internally.
   struct FrameData {
       VkSemaphore imageAcquiredSemaphore;
+      VkSemaphore drawCompleteSemaphore;
       VkFence fence;
       VkCommandBuffer commandBuffer;
       bool active;
       bool submitted;
-      VkResult lastSubmitResult;
 
       FrameData() :
           imageAcquiredSemaphore(VK_NULL_HANDLE),
+          drawCompleteSemaphore(VK_NULL_HANDLE),
           fence(VK_NULL_HANDLE),
           commandBuffer(VK_NULL_HANDLE),
           active(false),
-          submitted(false),
-          lastSubmitResult(VK_SUCCESS)
+          submitted(false)
           {
           }
   };
@@ -353,7 +355,6 @@ protected:
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
-  uint32_t                m_last_presented_buffer;
   
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;
