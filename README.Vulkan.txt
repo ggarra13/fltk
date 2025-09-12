@@ -73,11 +73,27 @@ on the various supported Linux distributions/OS.
 
 sudo apt install libvulkan-dev
 
-3.2 Fedora
-----------
+3.2 Fedora / Rocky Linux
+------------------------
 
 sudo dnf install vulkan-headers vulkan-loader-devel
 sudo dnf install vulkan-tools vulkan-validation-layers-devel
+sudo dnf install spirv-tools
+
+# This may not be found and may require compiling from source
+sudo dnf install shaderc
+
+# Compiling from source
+git clone https://github.com/google/shaderc.git
+cd shaderc
+git submodule update --init
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+sudo make install
+
+# Reboot
 
 
 3.3 macOS
