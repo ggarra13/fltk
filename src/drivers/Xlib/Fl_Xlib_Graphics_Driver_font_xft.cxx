@@ -118,6 +118,7 @@ static void correct_extents (float s, int &dx, int &dy, int &w, int &h) {
   }
 }
 
+
 #if ! USE_PANGO
 
 ///////////////////////////////////////////////////////////
