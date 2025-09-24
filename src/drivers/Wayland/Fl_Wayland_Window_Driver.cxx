@@ -1517,6 +1517,7 @@ void Fl_Wayland_Window_Driver::makeWindow()
     wait_for_expose_value = 0;
     pWindow->border(0);
     checkSubwindowFrame(); // make sure subwindow doesn't leak outside parent
+    if (can_expand_outside_parent_) parent->covered = true; // for #1307
 
   } else { // a window without decoration
     new_window->kind = UNFRAMED;
