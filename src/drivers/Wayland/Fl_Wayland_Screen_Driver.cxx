@@ -178,8 +178,6 @@ struct wl_display *Fl_Wayland_Screen_Driver::wl_display = NULL;
 
 static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
                                        wl_fixed_t surface_x, wl_fixed_t surface_y) {
-    static int kMinMove = 300;
-    static int old_x_root = -1, old_y_root = -1, old_x = -1, old_y = -1;
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   if (!win) return NULL;
   int delta_x = 0, delta_y = 0;
@@ -195,97 +193,6 @@ static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
   int *poffset = Fl_Window_Driver::menu_offset_y(win);
   if (poffset) Fl::e_y -= *poffset;
   Fl::e_y_root = Fl::e_y + win->y();
-  
-  // Sanity check
-  int top_y, bottom_y, left_x, right_x;
-  int sx, sy, sw, sh;
-
-  Fl::screen_xywh(sx, sy, sw, sh, 0);
-  top_y = sy;
-  bottom_y = sy + sh;
-  left_x = sx;
-  right_x = sx + sw;
-
-  for (int i = 1;i < Fl::screen_count();i++) {
-      Fl::screen_xywh(sx, sy, sw, sh, i);
-      if (sy < top_y) {
-          top_y = sy;
-      }
-      if ((sy + sh) > bottom_y) {
-          bottom_y = sy + sh;
-      }
-      if (sx < left_x) {
-          left_x = sx;
-      }
-      if ((sx + sw) > right_x) {
-          right_x = sx + sw;
-      }
-  }
-  
-  if (Fl::e_x_root < left_x || Fl::e_y_root < top_y)
-  {
-      Fl::e_x_root = old_x_root;
-      Fl::e_y_root = old_y_root;
-      Fl::e_x = old_x;
-      Fl::e_y = old_y;
-#ifndef NDEBUG
-      Fl::warning("Fl::e_x_root (%d) < %d or Fl::e_y_root(%d) < %d",
-                  Fl::e_x_root, left_x, Fl::e_y_root, top_y);
-      Fl::warning("\nFINAL    win=%p label=%s", win,
-                  win->label() ? win->label() : "no label");
-      Fl::warning("FINAL    win->x()=%d win->y()=%d", win->x(),
-                  win->y());
-      Fl::warning("FINAL     delta_x=%d  delta_y=%d", delta_x,
-                  delta_y);
-      win = Fl_Wayland_Window_Driver::surface_to_window(surface);
-      Fl::warning("ORIGINAL win=%p label=%s", win,
-                  win->label() ? win->label() : "no label");
-      Fl::warning("surface_x=%d surface_y=%d",
-                  wl_fixed_to_int(surface_x),
-                  wl_fixed_to_int(surface_y));
-      Fl::warning("scale=%f", f);
-      Fl::warning("Fl::e_x = %d, Fl::e_y = %d", Fl::e_x, Fl::e_y);
-      if (poffset)
-          Fl::warning("poffset=%d", *poffset);
-      abort(); // throw a stack trace.
-#endif
-  }
-  else
-  {
-      if (Fl::e_x_root > right_x || Fl::e_y_root > bottom_y)
-      {
-          Fl::e_x_root = old_x_root;
-          Fl::e_y_root = old_y_root;
-          Fl::e_x = old_x;
-          Fl::e_y = old_y;
-#ifndef NDEBUG
-          Fl::warning("Fl::e_x_root (%d) > %d or Fl::e_y_root(%d) > %d",
-                      Fl::e_x_root, right_x, Fl::e_y_root, bottom_y);
-          Fl::warning("\nFINAL    win=%p label=%s", win,
-                      win->label() ? win->label() : "no label");
-          Fl::warning("FINAL    win->x()=%d win->y()=%d", win->x(),
-                      win->y());
-          Fl::warning("FINAL     delta_x=%d  delta_y=%d", delta_x,
-                      delta_y);
-          win = Fl_Wayland_Window_Driver::surface_to_window(surface);
-          Fl::warning("ORIGINAL win=%p label=%s", win,
-                      win->label() ? win->label() : "no label");
-          Fl::warning("surface_x=%d surface_y=%d",
-                      wl_fixed_to_int(surface_x),
-                      wl_fixed_to_int(surface_y));
-          Fl::warning("scale=%f", f);
-          Fl::warning("Fl::e_x = %d, Fl::e_y = %d", Fl::e_x, Fl::e_y);
-          if (poffset)
-              Fl::warning("poffset=%d", *poffset);
-          abort(); // throw a stack trace.
-#endif
-      }
-
-      old_x_root = Fl::e_x_root;
-      old_x = Fl::e_x;
-      old_y_root = Fl::e_y_root;
-      old_y = Fl::e_y;
-  }
   return win;
 }
 
