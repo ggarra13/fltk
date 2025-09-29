@@ -716,6 +716,8 @@ void Fl_Vk_Window::flush() {
   
   // Submit and present
   swap_buffers();
+
+  clear_damage();
 }
 
 void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
