@@ -1827,36 +1827,6 @@ int Fl_Wayland_Window_Driver::set_cursor_4args(const Fl_RGB_Image *rgb, int hotx
   return 1;
 }
 
-struct xid_and_rect {
-  struct wld_window *xid;
-  Fl_Window *win;
-  int X, Y, W, H;
-  bool need_resize;
-};
-
-
-static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time) {
-  struct xid_and_rect *xid_rect = (xid_and_rect *)data;
-  wl_callback_destroy(cb);
-  xid_rect->xid->frame_cb = NULL;
-  if (xid_rect->need_resize) {
-    xid_rect->win->Fl_Group::resize(xid_rect->X, xid_rect->Y, xid_rect->W, xid_rect->H);
-    xid_rect->win->redraw();
-  } else {
-    xid_rect->win->Fl_Widget::resize(xid_rect->X, xid_rect->Y, xid_rect->W, xid_rect->H);
-    if (xid_rect->xid->buffer && xid_rect->xid->buffer->draw_buffer_needs_commit) {
-      // for scenarios where the child window is moved and its parent is simultaneously modified
-      Fl_Wayland_Graphics_Driver::buffer_commit(xid_rect->xid);
-    }
-  }
-  delete xid_rect;
-}
-
-
-static const struct wl_callback_listener surface_frame_listener = {
-  .done = surface_frame_done,
-};
-
 void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   static int depth = 0;
   struct wld_window *fl_win = fl_wl_xid(pWindow);
