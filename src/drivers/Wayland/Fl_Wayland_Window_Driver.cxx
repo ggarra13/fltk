@@ -1920,13 +1920,13 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   }
 
   if (fl_win && parent_xid) {
-      if (depth > 1) 
+      if (depth > 1)
+      {
           if (fl_win->subsurface) {
               wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
               wl_surface_commit(parent_xid->wl_surface);
           }
       } else if (is_a_move && !parent_xid->frame_cb) {
-      // } else if (is_a_move && !parent->damage() && !parent_xid->frame_cb) {
           // Use the frame callback mechanism applied to the object's parent window
           parent_xid->frame_cb = wl_surface_frame(parent_xid->wl_surface);
           wl_callback_add_listener(parent_xid->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, parent_xid);
