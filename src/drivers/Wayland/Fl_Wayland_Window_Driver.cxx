@@ -1898,11 +1898,11 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
       }
     } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
       wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
-      if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+      if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
       fl_win->configured_width = W;
       fl_win->configured_height = H;
     } else if (fl_win->xdg_surface) { // a window without border
-      if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+      if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
       fl_win->configured_width = W;
       fl_win->configured_height = H;
       W *= f; H *= f;
