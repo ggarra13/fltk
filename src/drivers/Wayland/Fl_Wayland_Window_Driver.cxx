@@ -1854,7 +1854,8 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   struct wld_window *parent_xid = parent ? fl_wl_xid(parent) : NULL;
   // When moving or resizing a subwindow independently from its parent, skip the move/resize
   // operation if the parent window is being redrawn, in line with the frame callback mechanism.
-  if (depth == 1 && fl_win && parent_xid && parent_xid->frame_cb && is_a_move) {
+  if (depth == 1 && fl_win && parent_xid && parent_xid->frame_cb && is_a_move &&
+      !pWindow->as_gl_window() && !pWindow->as_vk_window()) {
     depth--;
     return;
   }
