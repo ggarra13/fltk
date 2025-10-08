@@ -1825,28 +1825,6 @@ int Fl_Wayland_Window_Driver::set_cursor_4args(const Fl_RGB_Image *rgb, int hotx
   return 1;
 }
 
-
-// BEFORE-----------------------
-// 	uiMenuBar 0-30 visible?=1
-// 	uiTopBar 30-59 visible?=1
-// 	uiTileGroup 59-557 visible?=1
-// 	uiBottomBar 557-586 visible?=1
-// 	uiPixelBar 586-616 visible?=1
-// 	uiStatusBar 616-641 visible?=1
-// resize: win=0x58c77334c590 to 888x498
-// move win=0x58c773381f40 to 0x565
-// move win=0x58c773330e80 to 0x587
-// AFTER -----------------------
-// 	uiMenuBar 0-30 visible?=1
-// 	uiTopBar 30-59 visible?=1
-// 	uiTileGroup 59-587 visible?=1
-// 	uiBottomBar 587-616 visible?=1
-// 	uiPixelBar 586-616 visible?=0
-// 	uiStatusBar 616-641 visible?=1
-
-
-
-
 void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   static int depth = 0;
   struct wld_window *fl_win = fl_wl_xid(pWindow);
