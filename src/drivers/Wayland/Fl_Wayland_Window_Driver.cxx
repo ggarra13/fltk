@@ -14,8 +14,6 @@
 //     https://www.fltk.org/bugs.php
 //
 
-
-
 #include <FL/platform.H>
 #include "Fl_Wayland_Window_Driver.H"
 #include "Fl_Wayland_Screen_Driver.H"
@@ -1827,6 +1825,28 @@ int Fl_Wayland_Window_Driver::set_cursor_4args(const Fl_RGB_Image *rgb, int hotx
   return 1;
 }
 
+
+// BEFORE-----------------------
+// 	uiMenuBar 0-30 visible?=1
+// 	uiTopBar 30-59 visible?=1
+// 	uiTileGroup 59-557 visible?=1
+// 	uiBottomBar 557-586 visible?=1
+// 	uiPixelBar 586-616 visible?=1
+// 	uiStatusBar 616-641 visible?=1
+// resize: win=0x58c77334c590 to 888x498
+// move win=0x58c773381f40 to 0x565
+// move win=0x58c773330e80 to 0x587
+// AFTER -----------------------
+// 	uiMenuBar 0-30 visible?=1
+// 	uiTopBar 30-59 visible?=1
+// 	uiTileGroup 59-587 visible?=1
+// 	uiBottomBar 587-616 visible?=1
+// 	uiPixelBar 586-616 visible?=0
+// 	uiStatusBar 616-641 visible?=1
+
+
+
+
 void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   static int depth = 0;
   struct wld_window *fl_win = fl_wl_xid(pWindow);
@@ -1852,6 +1872,9 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   }
   Fl_Window *parent = this->parent() ? pWindow->window() : NULL;
   struct wld_window *parent_xid = parent ? fl_wl_xid(parent) : NULL;
+#if 0
+  // \@ggarra13: This optimization fails when the subwindow is inside a Fl_Flex that calls layout and just
+  // repositions a portion of the group.
   // When moving or resizing a subwindow independently from its parent, skip the move/resize
   // operation if the parent window is being redrawn, in line with the frame callback mechanism.
   if (depth == 1 && fl_win && parent_xid && parent_xid->frame_cb && is_a_move &&
@@ -1859,6 +1882,7 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
     depth--;
     return;
   }
+#endif
   if (is_a_resize) {
     if (pWindow->parent()) {
       if (W < 1) W = 1;
@@ -1934,14 +1958,20 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
       parent_xid->frame_cb = wl_surface_frame(parent_xid->wl_surface);
       wl_callback_add_listener(parent_xid->frame_cb,
                                Fl_Wayland_Graphics_Driver::p_surface_frame_listener, parent_xid);
-      if (fl_win->subsurface) wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
+      if (fl_win->subsurface) {
+          wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
+      }
       wl_surface_commit(parent_xid->wl_surface);
+    }
+    else if (is_a_move && fl_win->subsurface) {
+        // \@ggarra13: added as a last case to handle the ones we missed.
+        wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
+        wl_surface_commit(parent_xid->wl_surface);
     }
     checkSubwindowFrame(); // make sure subwindow doesn't leak outside parent
   }
   depth--;
 }
-
 
 static void crect_intersect(cairo_rectangle_int_t *to, cairo_rectangle_int_t *with) {
   int x = fl_max(to->x, with->x);
