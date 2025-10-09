@@ -1850,17 +1850,14 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   }
   Fl_Window *parent = this->parent() ? pWindow->window() : NULL;
   struct wld_window *parent_xid = parent ? fl_wl_xid(parent) : NULL;
-#if 0
-  // \@ggarra13: This optimization fails when the subwindow is inside a Fl_Flex that calls layout and just
-  // repositions a portion of the group.
   // When moving or resizing a subwindow independently from its parent, skip the move/resize
   // operation if the parent window is being redrawn, in line with the frame callback mechanism.
   if (depth == 1 && fl_win && parent_xid && parent_xid->frame_cb && is_a_move &&
-      !pWindow->as_gl_window() && !pWindow->as_vk_window()) {
+      !pWindow->as_gl_window() && !pWindow->as_vk_window() &&
+      pWindow->parent() == pWindow->window()) {
     depth--;
     return;
   }
-#endif
   if (is_a_resize) {
     if (pWindow->parent()) {
       if (W < 1) W = 1;
