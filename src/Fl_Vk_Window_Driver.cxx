@@ -1127,7 +1127,11 @@ void Fl_Vk_Window_Driver::destroy_resources()
 Fl_Vk_Window_Driver::Fl_Vk_Window_Driver(Fl_Vk_Window* win) :
     pWindow(win)
 {
-    swap_interval_ = 1;  // FIFO as a default swapchain mode
+#ifdef _WIN32
+    swap_interval_ = 0;  // MAILBOX as a default swapchain mode on Windows
+#else
+    swap_interval_ = 1;  // FIFO as a default swapchain mode on Linux and macOS
+#endif
     m_instance = VK_NULL_HANDLE;
     m_gpu      = VK_NULL_HANDLE;
     m_device   = VK_NULL_HANDLE;
