@@ -154,7 +154,14 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
 
-  swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+  {
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount + 1);
+  }
+  else
+  {
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  }
   if (surfCapabilities.maxImageCount > 0 &&
       swapchain.minImageCount > surfCapabilities.maxImageCount)
   {
@@ -1127,11 +1134,8 @@ void Fl_Vk_Window_Driver::destroy_resources()
 Fl_Vk_Window_Driver::Fl_Vk_Window_Driver(Fl_Vk_Window* win) :
     pWindow(win)
 {
-#ifdef _WIN32
-    swap_interval_ = 0;  // MAILBOX as a default swapchain mode on Windows
-#else
-    swap_interval_ = 1;  // FIFO as a default swapchain mode on Linux and macOS
-#endif
+    swap_interval_ = 0;  // MAILBOX as a default swapchain presentation mode
+
     m_instance = VK_NULL_HANDLE;
     m_gpu      = VK_NULL_HANDLE;
     m_device   = VK_NULL_HANDLE;
