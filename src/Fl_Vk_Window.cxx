@@ -51,10 +51,12 @@ static const uint64_t kFenceTimeout = 1'000'000'000;
 static const uint64_t kAcquireTimeout = 1'000'000'000;
 #endif
 
-static bool all_vulkan_windows_invisible()
+static bool all_vulkan_windows_invisible(const Fl_Window* ignore_win)
 {
     for (Fl_Window* win = Fl::first_window(); win != nullptr; win = Fl::next_window(win))
     {
+        if (win == ignore_win)
+            continue;
         if (win->visible() && win->as_vk_window())
         {
             return false;
@@ -136,16 +138,6 @@ void Fl_Vk_Window::recreate_swapchain() {
             }
             vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
             frame.commandBuffer = VK_NULL_HANDLE;
-        }
-        if (frame.fence != VK_NULL_HANDLE && frame.submitted)
-        {
-            result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
-                                     kFenceTimeout);
-            if (result != VK_SUCCESS) {
-                fprintf(stderr, "vkWaitForFences failed during cleanup: %s\n",
-                        string_VkResult(result));
-                return;
-            }
         }
         if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE)
         {
@@ -307,6 +299,7 @@ void Fl_Vk_Window::end_render_pass()
 }
 
 bool Fl_Vk_Window::vk_draw_begin() {
+    
     VkResult result;
 
     // Check if Vulkan is initialized
@@ -314,7 +307,8 @@ bool Fl_Vk_Window::vk_draw_begin() {
     {
         if (m_debugSync)
         {
-            fprintf(stderr, "Skipping vk_draw_begin: No swapchain\n");
+            fprintf(stderr, "%s Skipping vk_draw_begin: No swapchain\n",
+                    label() ? label() : "(unknown)");
         }
         return false;
     }
@@ -339,7 +333,9 @@ bool Fl_Vk_Window::vk_draw_begin() {
     if (frame.active && frame.fence != VK_NULL_HANDLE && frame.submitted)
     {
         if (m_debugSync) {
-            fprintf(stderr, "Waiting for frame %u fence\n", m_currentFrameIndex);
+            fprintf(stderr, "%s Waiting for frame %u fence\n",
+                    label() ? label() : "(unknown)",
+                    m_currentFrameIndex);
         }
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
                                  kFenceTimeout);
@@ -354,6 +350,16 @@ bool Fl_Vk_Window::vk_draw_begin() {
             frame.active = false;
             return false;
         }
+
+        // Reset the fence immediately after a successful wait.
+        result = vkResetFences(device(), 1, &frame.fence);
+        if (result != VK_SUCCESS)
+        {
+            fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
+            frame.active = false;
+            return false;
+        }
+        
         frame.active = false;
     }
 
@@ -361,7 +367,9 @@ bool Fl_Vk_Window::vk_draw_begin() {
     // Acquire next swapchain image
     if (m_debugSync)
     {
-        fprintf(stderr, "Acquiring image for frame %u\n", m_currentFrameIndex);
+        fprintf(stderr, "%s Acquiring image for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_currentFrameIndex);
     }
     result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
                                    frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
@@ -370,7 +378,8 @@ bool Fl_Vk_Window::vk_draw_begin() {
     {
         if (m_debugSync)
         {
-            fprintf(stderr, "vkAcquireNextImageKHR timed out\n");
+            fprintf(stderr, "%s vkAcquireNextImageKHR timed out\n",
+                    label() ? label() : "(unknown)");
         }
         return false;
     }
@@ -389,7 +398,8 @@ bool Fl_Vk_Window::vk_draw_begin() {
         if (m_swapchain == VK_NULL_HANDLE)
         {
             if (m_debugSync) {
-                fprintf(stderr, "Skipping vk_draw_begin: Swapchain recreation failed\n");
+                fprintf(stderr, "%s Skipping vk_draw_begin: Swapchain recreation failed\n",
+                    label() ? label() : "(unknown)");
             }
             return false;
         }
@@ -409,7 +419,9 @@ bool Fl_Vk_Window::vk_draw_begin() {
     }
 
     if (m_debugSync) {
-        fprintf(stderr, "Acquired image index %u for frame %u\n", m_current_buffer, m_currentFrameIndex);
+        fprintf(stderr, "%s Acquired image index %u for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_current_buffer, m_currentFrameIndex);
     }
 
     // Reset and begin command buffer
@@ -502,7 +514,8 @@ void Fl_Vk_Window::vk_draw_end()
     if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
         || !frame.active) {
         if (m_debugSync) {
-            fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
+            fprintf(stderr, "%s Skipping vk_draw_end: Invalid state\n",
+                    label() ? label() : "(unknown)");
         }
         frame.active = false;
         return;
@@ -558,7 +571,8 @@ void Fl_Vk_Window::swap_buffers() {
     if (m_swapchain == VK_NULL_HANDLE ||
         frame.commandBuffer == VK_NULL_HANDLE || !frame.active) {
         if (m_debugSync) {
-            fprintf(stderr, "Skipping swap_buffers: Invalid state\n");
+            fprintf(stderr, "%s Skipping swap_buffers: Invalid state\n",
+                    label() ? label() : "(unknown)");
         }
         frame.active = false;
         return;
@@ -579,24 +593,13 @@ void Fl_Vk_Window::swap_buffers() {
     submit_info.pSignalSemaphores = &buffer.semaphore;
 
     if (m_debugSync) {
-        fprintf(stderr, "Submitting frame %u for image index %u\n",
+        fprintf(stderr, "%s Submitting frame %u for image index %u\n",
+                label() ? label() : "(unknown)",
                 m_currentFrameIndex, m_current_buffer);
     }
 
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
-
-        // Reset fence
-        if (frame.fence != VK_NULL_HANDLE)
-        {
-            result = vkResetFences(device(), 1, &frame.fence);
-            if (result != VK_SUCCESS)
-            {
-                fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
-                frame.active = false;
-                return;
-            }
-        }
     
         result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
         if (result != VK_SUCCESS) {
@@ -630,7 +633,8 @@ void Fl_Vk_Window::swap_buffers() {
         present_info.pImageIndices = &m_current_buffer;
 
         if (m_debugSync) {
-            fprintf(stderr, "Presenting image index %u for frame %u\n",
+            fprintf(stderr, "%s Presenting image index %u for frame %u\n",
+                    label() ? label() : "(unknown)",
                     m_current_buffer, m_currentFrameIndex);
         }
         
@@ -901,7 +905,7 @@ void Fl_Vk_Window::shutdown_vulkan() {
     // Destroy instance
     if (m_instance != VK_NULL_HANDLE)
     {
-        if (all_vulkan_windows_invisible())
+        if (all_vulkan_windows_invisible(this))
         {
             delete m_queue;
             m_queue = nullptr;
@@ -917,7 +921,7 @@ void Fl_Vk_Window::shutdown_vulkan() {
                 vkDestroyDevice(m_device, nullptr);
                 m_device = VK_NULL_HANDLE;
             }
-            
+
             vkDestroyInstance(m_instance, nullptr);
             m_instance = VK_NULL_HANDLE;
         }

@@ -657,11 +657,12 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
         chosen_gpu = physicalDevices[best_device_index];
     }
 
-    // Assign the first GPU handle and free the array
-    pWindow->gpu() = m_gpu = chosen_gpu;
-    VK_FREE(physicalDevices);
+    // Assign the chosen GPU to both the driver and the window context
+    m_gpu = chosen_gpu;
+    pWindow->gpu() = m_gpu; // Ensure window's handle is also set correctly
     
-    // This is now freed after selection
+    // Free the array after using it
+    VK_FREE(physicalDevices);
     // --- GPU SELECTION LOGIC END ---
 
     // Look for device extensions
