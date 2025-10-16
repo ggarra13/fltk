@@ -542,6 +542,14 @@ void Fl_Vk_Window::show() {
   if (need_after)
     pVkWindowDriver->after_show();
 
+  // Initialize Vulkan
+  if (m_swapchain == VK_NULL_HANDLE) {
+      init_vulkan();
+      if (m_swapchain == VK_NULL_HANDLE) {
+          fprintf(stderr, "Vulkan initialization failed\n");
+          return;
+      }
+  }
 }
 
 int Fl_Vk_Window::mode(int m, const int *a) {
@@ -694,15 +702,6 @@ int Fl_Vk_Window::swap_interval() const {
 void Fl_Vk_Window::flush() {
   if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
       return;
-
-  // Initialize Vulkan
-  if (m_swapchain == VK_NULL_HANDLE) {
-      init_vulkan();
-      if (m_swapchain == VK_NULL_HANDLE) {
-          fprintf(stderr, "Vulkan initialization failed\n");
-          return;
-      }
-  }
   
   if (pVkWindowDriver->flush_begin() && !m_swapchain_needs_recreation)
       return;
@@ -897,8 +896,10 @@ void Fl_Vk_Window::shutdown_vulkan() {
 
     ctx.destroy();
 
+    m_surface = VK_NULL_HANDLE;
     m_swapchain = VK_NULL_HANDLE;
 
+    
     // Destroy instance
     if (m_instance != VK_NULL_HANDLE)
     {
@@ -1067,6 +1068,7 @@ void Fl_Vk_Window::init_vulkan() {
         wait_device();
         pVkWindowDriver->destroy_resources();
         pVkWindowDriver->destroy_surface();
+        m_swapchain_needs_recreation = true;
         return;
     }
 
