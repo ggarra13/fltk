@@ -407,9 +407,11 @@ void Fl_Wayland_Gl_Window_Driver::resize(int is_a_resize, int W, int H) {
 }
 
 void Fl_Wayland_Gl_Window_Driver::after_resize() {
-  struct wld_window *xid = fl_wl_xid(pWindow);
-  if (pWindow->parent() && xid && !xid->frame_cb)
+  Fl_Window *parent = (pWindow->parent() ? pWindow->window() : NULL);
+  struct wld_window *xid = (parent ? fl_wl_xid(parent) : NULL);
+  if (xid && !xid->frame_cb) {
     eglSwapBuffers(Fl_Wayland_Gl_Window_Driver::egl_display, egl_surface);
+  }
 }
 
 char Fl_Wayland_Gl_Window_Driver::swap_type() {
