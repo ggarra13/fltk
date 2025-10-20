@@ -1825,6 +1825,7 @@ int Fl_Wayland_Window_Driver::set_cursor_4args(const Fl_RGB_Image *rgb, int hotx
   return 1;
 }
 
+
 void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   static int depth = 0;
   struct wld_window *fl_win = fl_wl_xid(pWindow);
@@ -1851,17 +1852,15 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   Fl_Window *parent = this->parent() ? pWindow->window() : NULL;
   struct wld_window *parent_xid = parent ? fl_wl_xid(parent) : NULL;
 //printf("resize[%p] %dx%d is_a_resize=%d is_a_move=%d depth=%d parent_xid->frame_cb=%p\n", pWindow,W,H,is_a_resize,is_a_move,depth, (parent_xid?parent_xid->frame_cb:0) );
-  if (depth == 1 && fl_win && parent_xid && parent_xid->frame_cb) {
+  if (depth == 1 && fl_win && parent_xid && parent_xid->frame_cb && can_expand_outside_parent_) {
     // When moving or resizing a subwindow independently from its parent while the parent window
     // is being redrawn, the processing depends on whether the moved/resize window
     // is a draggable-subwindow. For a draggable subwindow having can_expand_outside_parent_ != 0,
     // skip the X,Y,W,H tuple to process only tuples received when parent window is ready.
     // This smoothes the movement of the draggable subwindow.
     // Process regular subwindows normally.
-    if ( can_expand_outside_parent_ ) {
-      depth--;
-      return;
-    }
+    depth--;
+    return;
   }
   if (is_a_resize) {
     if (pWindow->parent()) {
@@ -1951,6 +1950,7 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
   }
   depth--;
 }
+
 
 static void crect_intersect(cairo_rectangle_int_t *to, cairo_rectangle_int_t *with) {
   int x = fl_max(to->x, with->x);
