@@ -1947,11 +1947,6 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
         wl_surface_commit(parent_xid->wl_surface);
       }
     }
-    else if (is_a_move && fl_win->subsurface) {
-        // \@ggarra13: added as a last case to handle the ones we missed.
-        wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
-        wl_surface_commit(parent_xid->wl_surface);
-    }
     checkSubwindowFrame(); // make sure subwindow doesn't leak outside parent
   }
   depth--;
