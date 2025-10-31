@@ -347,19 +347,21 @@ bool Fl_Vk_Window::vk_draw_begin() {
             frame.active = false;
             return false;
         }
-
-        // Reset the fence immediately after a successful wait.
-        result = vkResetFences(device(), 1, &frame.fence);
-        if (result != VK_SUCCESS)
-        {
-            fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
-            frame.active = false;
-            return false;
-        }
-        
-        frame.active = false;
     }
 
+    // Reset the fence immediately after a successful wait.
+    result = vkResetFences(device(), 1, &frame.fence);
+    if (result != VK_SUCCESS)
+    {
+        fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
+        frame.active = false;
+        return false;
+    }
+    
+    // Now that we've waited (if necessary) and reset the fence,
+    // the frame is no longer considered 'active' (i.e., in flight).
+    frame.active = false;
+        
 
     // Acquire next swapchain image
     if (m_debugSync)
