@@ -291,6 +291,8 @@ void Fl_Tooltip::exit_(Fl_Widget *w) {
 #endif // DEBUG
 
   if (!widget_ || (w && w == window)) return;
+  if (window && Fl::belowmouse() == window) return;
+  
   widget_ = 0;
   Fl::remove_timeout(tooltip_timeout_);
   Fl::remove_timeout(recent_timeout);
