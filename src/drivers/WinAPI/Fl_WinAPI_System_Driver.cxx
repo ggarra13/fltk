@@ -194,9 +194,10 @@ char *Fl_WinAPI_System_Driver::utf2mbcs(const char *utf8) {
   len = fl_utf8toUtf16(utf8, len, (unsigned short *)mbwbuf, wn); // Convert string
   mbwbuf[len] = 0;
 
-  buf = (char*)realloc(buf, len * 6 + 1);
+  buf = (char*)realloc(buf, len * 6 + 2);
   len = (unsigned)wcstombs(buf, mbwbuf, len * 6);
   buf[len] = 0;
+  buf[len+1] = 0; // in case the result is a UTF-16 string
   return buf;
 }
 

@@ -219,6 +219,7 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   }
   if (!win) return;
   //fprintf(stderr, "pointer_enter window=%p\n", Fl_Wayland_Window_Driver::surface_to_window(surface));
+  seat->pointer_focus = surface;
   // use custom cursor if present
   struct wl_cursor *cursor =
     fl_wl_xid(win)->custom_cursor ? fl_wl_xid(win)->custom_cursor->wl_cursor : NULL;
@@ -230,6 +231,7 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   wld_window::inside_window = true;
   seat->pointer_focus = surface;
+  // Caution: with an Fl_Tooltip this call can hide the window being entered (#1317)
   if (!win->parent()) Fl::handle(FL_ENTER, win);
 }
 

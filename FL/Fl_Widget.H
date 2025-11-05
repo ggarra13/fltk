@@ -347,6 +347,8 @@ public:
       Returns the widget type value, which gives some information about the derived widget class
       to which the object belongs. Noticeably, the condition <tt>type() >= FL_WINDOW</tt> indicates
       a widget is an Fl_Window or derived object.
+
+      \note Known values for type_ are listed at the top of src/Fl_Widget.cxx .
    */
   uchar type() const {return type_;}
 
@@ -446,7 +448,7 @@ public:
       \param[in] new_box the new box type
       \see box(), Fl_Boxtype
    */
-  void box(Fl_Boxtype new_box) {box_ = new_box;}
+  void box(Fl_Boxtype new_box) {box_ = (uchar)new_box;}
 
   /** Gets the background color of the widget.
       \return current background color
@@ -525,7 +527,7 @@ public:
   /** Shortcut to set the label text and type in one call.
       \see label(const char *), labeltype(Fl_Labeltype)
    */
-  void label(Fl_Labeltype a, const char* b) {label_.type = a; label_.value = b;}
+  void label(Fl_Labeltype a, const char* b) {label_.type = (uchar)a; label_.value = b;}
 
   /** Gets the label type.
       \return the current label type.
@@ -541,7 +543,7 @@ public:
       \param[in] a new label type
       \see Fl_Labeltype
    */
-  void labeltype(Fl_Labeltype a) {label_.type = a;}
+  void labeltype(Fl_Labeltype a) {label_.type = (uchar)a;}
 
   /** Gets the label color.
       The default color is FL_FOREGROUND_COLOR.
