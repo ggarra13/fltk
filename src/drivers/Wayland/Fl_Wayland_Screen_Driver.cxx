@@ -229,11 +229,8 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   need_leave = NULL;
   win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   wld_window::inside_window = true;
-  if (!win->parent())
-  {
-      Fl::handle(FL_ENTER, win);
-  }
   seat->pointer_focus = surface;
+  if (!win->parent()) Fl::handle(FL_ENTER, win);
 }
 
 
