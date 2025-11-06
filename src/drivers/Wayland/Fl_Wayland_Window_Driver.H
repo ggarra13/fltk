@@ -165,7 +165,6 @@ struct wld_window {
   int floating_height;
   int state;
   bool covered; // specially for Mutter and issue #878
-  static bool   inside_window;  // specially for Vulkan, for issue #1292
 };
 
 

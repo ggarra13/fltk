@@ -229,7 +229,6 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   set_event_xy(win);
   need_leave = NULL;
   win = Fl_Wayland_Window_Driver::surface_to_window(surface);
-  wld_window::inside_window = true;
   seat->pointer_focus = surface;
   // Caution: with an Fl_Tooltip this call can hide the window being entered (#1317)
   if (!win->parent()) Fl::handle(FL_ENTER, win);
@@ -252,8 +251,6 @@ static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
       fl_xmousewin = 0;
       // If we leave through the top of the window (to go to the title bar, mark
       // window as not inside, so Vulkan slow code that fixes issue #1292 can kick in).
-      if (Fl::e_y_root < 50)
-          wld_window::inside_window = false;
       Fl::handle(FL_LEAVE, need_leave);
     }
   }

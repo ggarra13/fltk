@@ -1441,8 +1441,6 @@ bool Fl_Wayland_Window_Driver::process_menu_or_tooltip(struct wld_window *new_wi
   return false;
 }
 
-bool wld_window::inside_window = true;
-
 void Fl_Wayland_Window_Driver::makeWindow()
 {
   Fl_Group::current(0); // get rid of very common user bug: forgot end()
