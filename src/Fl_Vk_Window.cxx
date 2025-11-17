@@ -710,10 +710,8 @@ void Fl_Vk_Window::flush() {
       return;
       
   if (!vk_draw_begin())
-  {
-      fprintf(stderr, "Skipping draw due to Vulkan error\n");
       return;
-  }
+
   draw();  // User defined virtual draw function
   vk_draw_end();
   
