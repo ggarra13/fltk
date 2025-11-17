@@ -1036,6 +1036,7 @@ void Fl_Vk_Window::init_vulkan() {
             if (!vkSetHdrMetadataEXT)
             {
                 fprintf(stderr, "Failed to initialize vkSetHDRMetadataEXT - no HDR extension will be used.\n");
+                found_hdr = false;
             }
         }
     }
