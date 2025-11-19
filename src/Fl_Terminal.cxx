@@ -3463,6 +3463,7 @@ void Fl_Terminal::init_(int X,int Y,int W,int H,const char*L,int rows,int cols,i
   scrollbar = new Fl_Scrollbar(x(), y(), scrollbar_actual_size(), h());  // tmp xywh (changed later) **
   scrollbar->type(FL_VERTICAL);
   scrollbar->value(0);
+  scrollbar->linesize(3);       // consistent w/Fl_Text_Display -erco 11/17/25
   scrollbar->callback(scrollbar_cb, (void*)this);
 
   hscrollbar = new Fl_Scrollbar(x(), y(), w(), scrollbar_actual_size());  // tmp xywh (changed later) **
@@ -3473,6 +3474,7 @@ void Fl_Terminal::init_(int X,int Y,int W,int H,const char*L,int rows,int cols,i
   hscrollbar_style_ = SCROLLBAR_AUTO;
 
   resizable(0);
+  clip_children(1);           // clips scrollbars within box()
   Fl_Group::color(FL_BLACK);  // black bg by default
   update_screen(true);        // update internal vars after setting screen size/font
   clear_screen_home();        // clear screen, home cursor
@@ -3738,8 +3740,16 @@ void Fl_Terminal::draw(void) {
   Fl_Group::draw();
   // Draw that little square between the scrollbars:
   if (scrollbar->visible() && hscrollbar->visible()) {
-    fl_color(parent()->color());
-    fl_rectf(scrollbar->x(), hscrollbar->y(), scrollbar_actual_size(), scrollbar_actual_size());
+    int cx = x() + Fl::box_dx(box());
+    int cy = y() + Fl::box_dy(box());
+    int cw = w() - Fl::box_dw(box());
+    int ch = h() - Fl::box_dh(box());
+    fl_push_clip(cx,cy,cw,ch);
+    {
+      fl_color(parent()->color());
+      fl_rectf(scrollbar->x(), hscrollbar->y(), scrollbar_actual_size(), scrollbar_actual_size());
+    }
+    fl_pop_clip();
   }
   if (is_frame(box())) {
     // Is box() a frame? Fill area inside frame with rectf().
@@ -3748,19 +3758,16 @@ void Fl_Terminal::draw(void) {
     //
     fl_color(Fl_Group::color());
     // Draw flat field (inside border drawn by Fl_Group::draw() above)
-    int X = x() + Fl::box_dx(box());
-    int Y = y() + Fl::box_dy(box());
-    int W = w() - Fl::box_dw(box());
-    int H = h() - Fl::box_dh(box());
-    if (scrollbar->visible())  W -= scrollbar_actual_size();
-    if (hscrollbar->visible()) H -= scrollbar_actual_size();
-    fl_rectf(X,Y,W,H);
+    fl_rectf(scrn_.x(), scrn_.y(), scrn_.w(), scrn_.h());
   }
+
   //DEBUG  fl_color(0x80000000);     // dark red box inside margins
   //DEBUG  fl_rect(scrn_);
   fl_push_clip(scrn_.x(), scrn_.y(), scrn_.w(), scrn_.h());
+  {
     int Y = scrn_.y();
     draw_buff(Y);
+  }
   fl_pop_clip();
 }
 
