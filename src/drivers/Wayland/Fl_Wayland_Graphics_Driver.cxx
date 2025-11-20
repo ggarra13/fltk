@@ -126,6 +126,11 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   if (window->buffer && window->buffer->draw_buffer_needs_commit) {
     Fl_Wayland_Graphics_Driver::buffer_commit(window);
   }
+  else
+  {
+      wl_surface_damage_buffer(window->wl_surface, 0, 0, 1, 1);
+      wl_surface_commit(window->wl_surface);
+  }
 }
 
 
