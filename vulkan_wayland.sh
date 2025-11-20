@@ -8,20 +8,18 @@ set +e
 export VULKAN_SDK=/usr/
 
 #
-# To have it work on all graphic cards, use explicit sync.
+# Whether to use explicit sync or implicit sync.
 #
-# FLTK_VK_EXPLICIT_SYNC=1
+# GNOME48 and Kwin6 on Ubuntu 25.04 default is implicit sync.
+# GNOME49 and Kwin6 on Ubuntu 25.10 default is explicit sync.
 #
-# Whether to use explicit sync or implicit sync.  Sets the variable correctly
-# for each graphics card (currently only works in NVidia, that seems to
-# timeout on events on Vulkan).
+# Sets the variable correctly for each graphics card (currently only works
+# in NVidia, which seems to have a timeout when using HDR and has the events
+# issue).
 #
-# Setting this to 1 will work on all graphic cards, but with NVidia graphic
-# cards and Vulkan/Wayland/GNOME49 there's a performance drop of 1/2 (not
-# visible on a vk_cube but noticeable in my video player).
-# 
-#
-export FLTK_VK_EXPLICIT_SYNC=0
+if [[ -z $FLTK_VK_EXPLICIT_SYNC ]]; then
+    export FLTK_VK_EXPLICIT_SYNC=0
+fi
 
 cmake .. \
       -G Ninja \
