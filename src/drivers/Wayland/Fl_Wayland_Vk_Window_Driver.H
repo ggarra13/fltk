@@ -24,9 +24,9 @@
 #include <FL/vk.h>
 
 class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
+  static int explicit_sync;
   friend Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
-  Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
-    : Fl_Vk_Window_Driver(win) {};
+  Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win);
   virtual ~Fl_Wayland_Vk_Window_Driver();
   float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
