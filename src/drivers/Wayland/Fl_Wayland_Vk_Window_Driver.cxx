@@ -122,15 +122,12 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
   if (pWindow->m_surface != VK_NULL_HANDLE)
   {
     if (pWindow->parent()) { 
-      struct wld_window *xid = fl_wl_xid(pWindow);
-      if (xid->frame_cb || !xid->wl_surface) return;
+      struct wld_window* window = fl_wl_xid(pWindow);
+      if (window->frame_cb || !window->wl_surface) return;
       
-      // Force only if totally off-screen
-      if (wl_list_empty(&xid->outputs)) {
-        xid->frame_cb = wl_surface_frame(xid->wl_surface);
-        wl_callback_add_listener(xid->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-        wl_display_flush(fl_wl_display());
-      }
+      window->frame_cb = wl_surface_frame(window->wl_surface);
+      wl_callback_add_listener(window->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
+      wl_display_flush(fl_wl_display());
     }
   }
 }
@@ -147,9 +144,17 @@ void *Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char *procName) {
 void Fl_Wayland_Vk_Window_Driver::create_surface() {
   VkWaylandSurfaceCreateInfoKHR createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
-  createInfo.display = fl_wl_display();
-  createInfo.surface = fl_wl_surface(fl_wl_xid(pWindow));
 
+  struct wl_display* display = fl_wl_display();
+  if (!display) Fl::fatal("Wayland display is nullptr!");
+
+  createInfo.display = display;
+
+  struct wl_surface* surface = fl_wl_surface(fl_wl_xid(pWindow));
+  if (!surface) Fl::fatal("Wayland surface is nullptr!");
+
+  createInfo.surface = surface;
+  
   if (vkCreateWaylandSurfaceKHR(pWindow->ctx.instance, &createInfo, nullptr,
                                 &pWindow->m_surface) !=
       VK_SUCCESS) {
