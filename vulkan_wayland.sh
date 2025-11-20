@@ -7,6 +7,22 @@ set +e
 
 export VULKAN_SDK=/usr/
 
+#
+# To have it work on all graphic cards, use explicit sync.
+#
+# FLTK_VK_EXPLICIT_SYNC=1
+#
+# Whether to use explicit sync or implicit sync.  Sets the variable correctly
+# for each graphics card (currently only works in NVidia, that seems to
+# timeout on events on Vulkan).
+#
+# Setting this to 1 will work on all graphic cards, but with NVidia graphic
+# cards and Vulkan/Wayland/GNOME49 there's a performance drop of 1/2 (not
+# visible on a vk_cube but noticeable in my video player).
+# 
+#
+export FLTK_VK_EXPLICIT_SYNC=0
+
 cmake .. \
       -G Ninja \
       -D CMAKE_CXX_STANDARD=17 \
