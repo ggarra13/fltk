@@ -54,6 +54,24 @@ Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w) {
   return new Fl_Wayland_Vk_Window_Driver(w);
 }
 
+// Wayland's new methodology requires explicit sync
+int Fl_Wayland_Vk_Window_Driver::explicit_sync = -1;
+
+Fl_Wayland_Vk_Window_Driver::Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
+    : Fl_Vk_Window_Driver(win)
+{
+    char* var = fl_getenv("FLTK_VK_EXPLICIT_SYNC");
+    if (var && strcmp(var, "0") == 0)
+    {
+        fl_putenv("__NV_DISABLE_EXPLICIT_SYNC=1");
+        explicit_sync = 0;
+    }
+    else
+    {
+        explicit_sync = 1;
+    }
+}
+
 int Fl_Wayland_Vk_Window_Driver::genlistsize() {
 #if USE_XFT || FLTK_USE_CAIRO
   return 256;
@@ -99,10 +117,6 @@ Fl_Vk_Choice *Fl_Wayland_Vk_Window_Driver::find(int m, const int *alistp) {
 
   g = new Fl_Wayland_Vk_Choice(m, alistp, first);
   first = g;
-
-  // \@todo: choose visual
-  // g->pixelformat = pixelformat;
-
   return g;
 }
 
@@ -122,14 +136,25 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
   if (pWindow->m_surface != VK_NULL_HANDLE)
   {
     if (pWindow->parent()) { 
-      struct wld_window *xid = fl_wl_xid(pWindow);
-      if (xid->frame_cb || !xid->wl_surface) return;
-      
-      // Force only if totally off-screen
-      if (wl_list_empty(&xid->outputs)) {
-        xid->frame_cb = wl_surface_frame(xid->wl_surface);
-        wl_callback_add_listener(xid->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-        wl_display_flush(fl_wl_display());
+      struct wld_window* window = fl_wl_xid(pWindow);
+      if (window->frame_cb || !window->wl_surface) return;
+
+      if (explicit_sync == 0)
+      {
+          // Force only if totally off-screen
+          if (wl_list_empty(&window->outputs)) {
+              window->frame_cb = wl_surface_frame(window->wl_surface);
+              wl_callback_add_listener(window->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
+              wl_display_flush(fl_wl_display());
+          }
+      }
+      else
+      {
+          window->frame_cb = wl_surface_frame(window->wl_surface);
+          wl_callback_add_listener(window->frame_cb,
+                                   Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
+          wl_display_flush(fl_wl_display());
+
       }
     }
   }
@@ -147,9 +172,17 @@ void *Fl_Wayland_Vk_Window_Driver::GetProcAddress(const char *procName) {
 void Fl_Wayland_Vk_Window_Driver::create_surface() {
   VkWaylandSurfaceCreateInfoKHR createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
-  createInfo.display = fl_wl_display();
-  createInfo.surface = fl_wl_surface(fl_wl_xid(pWindow));
 
+  struct wl_display* display = fl_wl_display();
+  if (!display) Fl::fatal("Wayland display is nullptr!");
+
+  createInfo.display = display;
+
+  struct wl_surface* surface = fl_wl_surface(fl_wl_xid(pWindow));
+  if (!surface) Fl::fatal("Wayland surface is nullptr!");
+
+  createInfo.surface = surface;
+  
   if (vkCreateWaylandSurfaceKHR(pWindow->ctx.instance, &createInfo, nullptr,
                                 &pWindow->m_surface) !=
       VK_SUCCESS) {
