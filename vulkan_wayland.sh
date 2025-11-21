@@ -14,8 +14,8 @@ export VULKAN_SDK=/usr/
 # GNOME49 and Kwin6 on Ubuntu 25.10 default is explicit sync.
 #
 # Sets the variable correctly for each graphics card (currently only works
-# in NVidia, which seems to have a timeout when using HDR and has the events
-# issue).
+# in NVidia, which seems to have a timeout when using HDR it with events on
+# both GNOME49 and Kwin6.2).
 #
 if [[ -z $FLTK_VK_EXPLICIT_SYNC ]]; then
     export FLTK_VK_EXPLICIT_SYNC=0
