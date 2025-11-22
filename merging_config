@@ -18,9 +18,8 @@
 	remote = origin
 	merge = refs/heads/vk_test
 [remote "upstream"]
-	url = https:fltk/fltk.git
-	fetch = +refs/heads/*:refs/remotes/origin/*
+	url = https://github.com/fltk/fltk.git
+	fetch = +refs/heads/*:refs/remotes/upstream/*
 [branch "original"]
 	remote = upstream
-	fetch = +refs/heads/*:refs/remotes/origin/*
-	
+	merge = refs/heads/master	
