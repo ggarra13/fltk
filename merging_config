@@ -22,4 +22,4 @@
 	fetch = +refs/heads/*:refs/remotes/upstream/*
 [branch "original"]
 	remote = upstream
-	merge = refs/heads/master	
+	merge = refs/heads/master
