@@ -23,3 +23,9 @@
 [branch "original"]
 	remote = upstream
 	merge = refs/heads/master
+[remote "via"]
+	url = https://github.com/via/fltk.git
+	fetch = +refs/heads/*:refs/remotes/via/*
+[branch "touchpad"]
+	remote = via
+	merge = refs/heads/master
