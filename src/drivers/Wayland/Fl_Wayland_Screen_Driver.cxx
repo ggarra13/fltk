@@ -1685,9 +1685,6 @@ void Fl_Wayland_Screen_Driver::init_workarea()
           workarea_xywh[1] = output->y; // pixels
           workarea_xywh[2] = Wfullscreen * output->wld_scale; // pixels
           workarea_xywh[3] = Hfullscreen * output->wld_scale; // pixels
-          
-          Fl::warning("Fl_Wayland_Screen_Driver: Did not find workarea for %p",
-                      output);
       }
     }
     Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
