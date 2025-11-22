@@ -1578,6 +1578,7 @@ static bool compute_full_and_maximized_areas(Fl_Wayland_Screen_Driver::output *o
                                              int& Wworkarea, int& Hworkarea) {
   if (Fl_Wayland_Screen_Driver::compositor == Fl_Wayland_Screen_Driver::unspecified) {
     Wfullscreen = 0;
+    Fl::warning("Wayland compositor unknown");
     return false;
   }
   bool found_workarea = false;
@@ -1610,10 +1611,13 @@ static bool compute_full_and_maximized_areas(Fl_Wayland_Screen_Driver::output *o
     xdg_toplevel_destroy(xdg_toplevel2);
     xdg_surface_destroy(xdg_surface2);
     wl_surface_destroy(wl_surface2);
-    if (Wworkarea == Wfullscreen && Hworkarea < Hfullscreen && Hworkarea > Hfullscreen - 80)
+    if (Wworkarea > 0 && Hworkarea > 0) {
       found_workarea = true;
-    if (Hworkarea == Hfullscreen && Wworkarea < Wfullscreen && Wworkarea > Wfullscreen - 80)
-      found_workarea = true;
+    }
+    // if (Wworkarea == Wfullscreen && Hworkarea < Hfullscreen && Hworkarea > Hfullscreen - 80)
+    //   found_workarea = true;
+    // if (Hworkarea == Hfullscreen && Wworkarea < Wfullscreen && Wworkarea > Wfullscreen - 80)
+    //   found_workarea = true;
   } else {
     Wworkarea = Wfullscreen;
     Hworkarea = Hfullscreen;
@@ -1660,6 +1664,7 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
 
 void Fl_Wayland_Screen_Driver::init_workarea()
 {
+  init();
   wl_display_roundtrip(Fl_Wayland_Screen_Driver::wl_display); // important after screen removal
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
@@ -1674,48 +1679,62 @@ void Fl_Wayland_Screen_Driver::init_workarea()
         workarea_xywh[2] = Wworkarea * output->wld_scale; // pixels
         workarea_xywh[3] = Hworkarea * output->wld_scale; // pixels
       }
+      else
+      {
+          workarea_xywh[0] = output->x; // pixels
+          workarea_xywh[1] = output->y; // pixels
+          workarea_xywh[2] = Wfullscreen * output->wld_scale; // pixels
+          workarea_xywh[3] = Hfullscreen * output->wld_scale; // pixels
+          
+          Fl::warning("Fl_Wayland_Screen_Driver: Did not find workarea for %p",
+                      output);
+      }
     }
+    Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
   }
-  Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
 }
 
 
 int Fl_Wayland_Screen_Driver::x() {
-  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
+  init_workarea();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
   }
+  assert(workarea_xywh[0] >= 0);
   return workarea_xywh[0] / (output->gui_scale * output->wld_scale);
 }
 
 
 int Fl_Wayland_Screen_Driver::y() {
-  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
+  init_workarea();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
   }
+  assert(workarea_xywh[1] >= 0);
   return workarea_xywh[1] / (output->gui_scale * output->wld_scale);
 }
 
 
 int Fl_Wayland_Screen_Driver::w() {
-  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
+  init_workarea();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
   }
+  assert(workarea_xywh[2] > 0);
   return workarea_xywh[2] / (output->gui_scale * output->wld_scale);
 }
 
 
 int Fl_Wayland_Screen_Driver::h() {
-  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
+  init_workarea();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
   }
+  assert(workarea_xywh[3] > 0);
   return workarea_xywh[3] / (output->gui_scale * output->wld_scale);
 }
 
@@ -1730,10 +1749,13 @@ void Fl_Wayland_Screen_Driver::screen_work_area(int &X, int &Y, int &W, int &H, 
   if (num_screens < 0) init();
   if (n < 0 || n >= num_screens) n = 0;
   if (n == 0) { // for the main screen, these return the work area
-    X = Fl::x();
-    Y = Fl::y();
-    W = Fl::w();
-    H = Fl::h();
+    // \@bug: These make the window hang.
+    // X = Fl::x();
+    // Y = Fl::y();
+    // W = Fl::w();
+    // H = Fl::h();
+    // if (X < 0 || Y < 0 || W < 0 || H < 0)
+        screen_xywh(X, Y, W, H, n);
   } else { // for other screens, work area is full screen,
     screen_xywh(X, Y, W, H, n);
   }
