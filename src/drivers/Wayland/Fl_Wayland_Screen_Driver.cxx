@@ -1798,12 +1798,12 @@ void Fl_Wayland_Screen_Driver::screen_work_area(int &X, int &Y, int &W, int &H, 
   if (num_screens < 0) init();
   if (n < 0 || n >= num_screens) n = 0;
   if (n == 0) { // for the main screen, these return the work area
-    // \@bug: These make the window hang.
-    X = Fl::x();
-    Y = Fl::y();
-    W = Fl::w();
-    H = Fl::h();
-    if (X < 0 || Y < 0 || W < 0 || H < 0)
+    // \@bug: These make the window hang on (K)Ubuntu 25.10.
+    // X = Fl::x();
+    // Y = Fl::y();
+    // W = Fl::w();
+    // H = Fl::h();
+    // if (X < 0 || Y < 0 || W < 0 || H < 0)
         screen_xywh(X, Y, W, H, n);
   } else { // for other screens, work area is full screen,
     screen_xywh(X, Y, W, H, n);
