@@ -303,8 +303,11 @@ if(VULKAN_FOUND)
     
     fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
     fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
+    fl_create_example(vk_fullscreen vk_fullscreen.cxx "${VKDEMO_LIBS}")	
     if (HAS_GLM)
 	fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
+    else()
+        message(WARNING "No glm-dev package.  vk_cube will not be built!")
     endif()
 endif(VULKAN_FOUND)
     
@@ -391,10 +394,13 @@ if(FLTK_BUILD_SHARED_LIBS)
   if(VULKAN_FOUND)
     fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
     fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
-
+    fl_create_example(vk_fullscreen-shared vk_fullscreen.cxx "${VKDEMO_SHARED}")
+      
     if (HAS_GLM)
       fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
-    endif()
+    else()
+        message(WARNING "No glm-dev package.  vk_cube-shared will not be built!")
+    endif(HAS_GLM)
   endif(VULKAN_FOUND)
 endif(FLTK_BUILD_SHARED_LIBS)
 
