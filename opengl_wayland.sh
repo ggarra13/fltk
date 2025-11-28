@@ -45,4 +45,4 @@ ninja
 
 #bin/test/shape-shared
 #bin/test/cube-shared
-bin/test/fullscreen-shared
+bin/test/fullscreen
