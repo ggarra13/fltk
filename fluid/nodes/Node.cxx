@@ -537,6 +537,8 @@ Node::~Node() {
   if (Fluid.proj.tree.last == this) Fluid.proj.tree.last = prev;
   if (Fluid.proj.tree.first == this) Fluid.proj.tree.first = next;
   if (Fluid.proj.tree.current == this) Fluid.proj.tree.current = nullptr;
+  if (current_widget == this) current_widget = nullptr;
+  if (current_node == this) current_node = nullptr;
   if (parent) parent->remove_child(this);
   if (name_) free((void*)name_);
   if (label_) free((void*)label_);
@@ -699,7 +701,7 @@ void Node::add(Node *anchor, Strategy strategy) {
   { // make sure that we have no duplicate uid's
     Node *tp = this;
     do {
-      tp->set_uid(tp->uid_);
+      tp->ensure_unique_uid();
       tp = tp->next;
     } while (tp!=end && tp!=nullptr);
   }
@@ -752,7 +754,7 @@ void Node::insert(Node *g) {
   { // make sure that we have no duplicate uid's
     Node *tp = this;
     do {
-      tp->set_uid(tp->uid_);
+      tp->ensure_unique_uid();
       tp = tp->next;
     } while (tp!=end && tp!=nullptr);
   }
@@ -951,7 +953,7 @@ void Node::read_property(fld::io::Project_Reader &f, const char *c) {
     const char *hex = f.read_word();
     int x = 0;
     if (hex)
-      x = sscanf(hex, "%04x", &x);
+      sscanf(hex, "%04x", &x); // defaults x to 0 if format fails
     set_uid(x);
   } else if (!strcmp(c,"label"))
     label(f.read_word());
@@ -1265,21 +1267,27 @@ void Node::write_code2(fld::io::Code_Writer&) {
  until we find one that is unique.
 
  \param[in] suggested_uid the preferred uid for this node
- \return the actualt uid that was given to the node
+ \return the actual uid that was given to the node
  */
 unsigned short Node::set_uid(unsigned short suggested_uid) {
+  // if there is no suggestion, come up with a random number
   if (suggested_uid==0)
     suggested_uid = (unsigned short)rand();
+  // loop until we find a unique number
   for (;;) {
+    // loop through every node in the project
     Node *tp = Fluid.proj.tree.first;
     for ( ; tp; tp = tp->next) {
+      // abort if the suggested id is already taken
       if (tp!=this && tp->uid_==suggested_uid) {
         break;
       }
     }
+    // we are done if we have not fund the suggested id anywhere else
     if (tp==nullptr) {
       break;
     }
+    // try again with another random number
     suggested_uid = (unsigned short)rand();
   }
   uid_ = suggested_uid;
