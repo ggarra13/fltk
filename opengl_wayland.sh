@@ -1,25 +1,9 @@
 #!/usr/bin/env bash
 
-mkdir -p build_wayland/
-cd build_wayland
+mkdir -p build_opengl_wayland/
+cd build_opengl_wayland
 
 set +e
-
-export VULKAN_SDK=/usr/
-
-#
-# Whether to use explicit sync or implicit sync.
-#
-# GNOME48 and Kwin6 on Ubuntu 25.04 default is implicit sync.
-# GNOME49 and Kwin6 on Ubuntu 25.10 default is explicit sync.
-#
-# Sets the variable correctly for each graphics card (currently only works
-# in NVidia, which seems to have a timeout when using HDR it with events on
-# both GNOME49 and Kwin6.2).
-#
-if [[ -z $FLTK_VK_EXPLICIT_SYNC ]]; then
-    export FLTK_VK_EXPLICIT_SYNC=0
-fi
 
 cmake .. \
       -G Ninja \
@@ -29,8 +13,8 @@ cmake .. \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
       -D FLTK_BUILD_FORMS=OFF \
-      -D FLTK_BUILD_GL=OFF \
-      -D FLTK_BUILD_VK=ON \
+      -D FLTK_BUILD_GL=ON \
+      -D FLTK_BUILD_VK=OFF \
       -D FLTK_BUILD_PDF_DOCS=OFF \
       -D FLTK_BUILD_HTML_DOCS=OFF \
       -D FLTK_BUILD_OPTIONS=OFF \
@@ -59,7 +43,6 @@ cmake .. \
 
 ninja
 
-#bin/test/vk_shape-shared
-#bin/test/vk_shape_textured-shared
-#bin/test/vk_cube-shared
-bin/test/vk_fullscreen-shared
+#bin/test/shape-shared
+#bin/test/cube-shared
+bin/test/fullscreen

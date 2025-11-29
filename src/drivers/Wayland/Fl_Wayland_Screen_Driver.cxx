@@ -181,7 +181,7 @@ static Fl_Window *event_coords_from_surface(struct wl_surface *surface,
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(surface);
   if (!win) return NULL;
   int delta_x = 0, delta_y = 0;
-  while (win && win->parent()) {
+  while (win->parent()) {
     delta_x += win->x();
     delta_y += win->y();
     win = win->window();
@@ -249,8 +249,6 @@ static void pointer_leave(void *data, struct wl_pointer *wl_pointer,
     if (need_leave) { // we really left the sub-or-top win and did not enter another
       extern Fl_Window *fl_xmousewin;
       fl_xmousewin = 0;
-      // If we leave through the top of the window (to go to the title bar, mark
-      // window as not inside, so Vulkan slow code that fixes issue #1292 can kick in).
       Fl::handle(FL_LEAVE, need_leave);
     }
   }
@@ -378,50 +376,6 @@ static struct wl_pointer_listener pointer_listener = {
   pointer_motion,
   pointer_button,
   pointer_axis
-};
-
-
-static void touch_down(void *data,
-         struct wl_touch *wl_touch,
-         uint32_t serial,
-         uint32_t time,
-         wl_surface *surface,
-         int id,
-         wl_fixed_t x,
-         wl_fixed_t y)
-{
-  if (id != 0) return;
-  Fl_Window *win = event_coords_from_surface(surface, x, y);
-  if (!win) return;
-  struct Fl_Wayland_Screen_Driver::seat *seat = (struct Fl_Wayland_Screen_Driver::seat*)data;
-  seat->pointer_focus = surface;
-  pointer_button(data, NULL, serial, time, BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
-}
-
-
-void touch_up(void* data, wl_touch* wl_touch, uint serial, uint time, int id) {
-  if (id != 0) return;
-  pointer_button(data, NULL, serial, time, BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
-}
-
-
-void touch_motion(void* data, wl_touch* wl_touch, uint time, int id,
-                  wl_fixed_t x, wl_fixed_t y) {
-  if (id != 0) return;
-  pointer_motion(data, NULL, time, x, y);
-}
-
-
-void touch_frame(void* data, wl_touch* wl_touch) { }
-void touch_cancel(void* data, wl_touch* wl_touch) { }
-
-
-static struct wl_touch_listener touch_listener = {
-  touch_down,
-  touch_up,
-  touch_motion,
-  touch_frame,
-  touch_cancel,
 };
 
 
@@ -1099,14 +1053,6 @@ static void seat_capabilities(void *data, struct wl_seat *wl_seat, uint32_t capa
     wl_pointer_release(seat->wl_pointer);
     seat->wl_pointer = NULL;
   }
-  
-  if ((capabilities & WL_SEAT_CAPABILITY_TOUCH) && !seat->wl_touch) {
-      seat->wl_touch = wl_seat_get_touch(wl_seat);
-      wl_touch_add_listener(seat->wl_touch, &touch_listener, seat);
-    } else if (!(capabilities & WL_SEAT_CAPABILITY_TOUCH) && seat->wl_touch) {
-      wl_touch_release(seat->wl_touch);
-      seat->wl_touch = NULL;
-    }
 
   bool have_keyboard = seat->xkb_context && (capabilities & WL_SEAT_CAPABILITY_KEYBOARD);
   if (have_keyboard && seat->wl_keyboard == NULL) {
@@ -1663,13 +1609,10 @@ static bool compute_full_and_maximized_areas(Fl_Wayland_Screen_Driver::output *o
     xdg_toplevel_destroy(xdg_toplevel2);
     xdg_surface_destroy(xdg_surface2);
     wl_surface_destroy(wl_surface2);
-    if (Wworkarea > 0 && Hworkarea > 0) {
+    if (Wworkarea == Wfullscreen && Hworkarea < Hfullscreen && Hworkarea > Hfullscreen - 80)
       found_workarea = true;
-    }
-    // if (Wworkarea == Wfullscreen && Hworkarea < Hfullscreen && Hworkarea > Hfullscreen - 80)
-    //   found_workarea = true;
-    // if (Hworkarea == Hfullscreen && Wworkarea < Wfullscreen && Wworkarea > Wfullscreen - 80)
-    //   found_workarea = true;
+    if (Hworkarea == Hfullscreen && Wworkarea < Wfullscreen && Wworkarea > Wfullscreen - 80)
+      found_workarea = true;
   } else {
     Wworkarea = Wfullscreen;
     Hworkarea = Hfullscreen;
@@ -1716,8 +1659,8 @@ static int workarea_xywh[4] = { -1, -1, -1, -1 };
 
 void Fl_Wayland_Screen_Driver::init_workarea()
 {
-  init();
   wl_display_roundtrip(Fl_Wayland_Screen_Driver::wl_display); // important after screen removal
+  bool need_init_workarea = true;
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     int Wfullscreen, Hfullscreen, Wworkarea, Hworkarea;
@@ -1730,22 +1673,19 @@ void Fl_Wayland_Screen_Driver::init_workarea()
         workarea_xywh[1] = output->y; // pixels
         workarea_xywh[2] = Wworkarea * output->wld_scale; // pixels
         workarea_xywh[3] = Hworkarea * output->wld_scale; // pixels
-      }
-      else
-      {
-          workarea_xywh[0] = output->x; // pixels
-          workarea_xywh[1] = output->y; // pixels
-          workarea_xywh[2] = Wfullscreen * output->wld_scale; // pixels
-          workarea_xywh[3] = Hfullscreen * output->wld_scale; // pixels
+        need_init_workarea = false;
       }
     }
-    Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
   }
+  if (need_init_workarea) {
+    screen_xywh(workarea_xywh[0], workarea_xywh[1], workarea_xywh[2], workarea_xywh[3], 0);
+  }
+  Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
 }
 
 
 int Fl_Wayland_Screen_Driver::x() {
-  init_workarea();
+  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
@@ -1756,7 +1696,7 @@ int Fl_Wayland_Screen_Driver::x() {
 
 
 int Fl_Wayland_Screen_Driver::y() {
-  init_workarea();
+  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
@@ -1767,7 +1707,7 @@ int Fl_Wayland_Screen_Driver::y() {
 
 
 int Fl_Wayland_Screen_Driver::w() {
-  init_workarea();
+  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
@@ -1778,7 +1718,7 @@ int Fl_Wayland_Screen_Driver::w() {
 
 
 int Fl_Wayland_Screen_Driver::h() {
-  init_workarea();
+  if (!Fl_Wayland_Screen_Driver::wl_registry) open_display();
   Fl_Wayland_Screen_Driver::output *output;
   wl_list_for_each(output, &outputs, link) {
     break;
@@ -1798,13 +1738,10 @@ void Fl_Wayland_Screen_Driver::screen_work_area(int &X, int &Y, int &W, int &H, 
   if (num_screens < 0) init();
   if (n < 0 || n >= num_screens) n = 0;
   if (n == 0) { // for the main screen, these return the work area
-    // \@bug: These make the window hang on (K)Ubuntu 25.10.
-    // X = Fl::x();
-    // Y = Fl::y();
-    // W = Fl::w();
-    // H = Fl::h();
-    // if (X < 0 || Y < 0 || W < 0 || H < 0)
-        screen_xywh(X, Y, W, H, n);
+    X = Fl::x();
+    Y = Fl::y();
+    W = Fl::w();
+    H = Fl::h();
   } else { // for other screens, work area is full screen,
     screen_xywh(X, Y, W, H, n);
   }
