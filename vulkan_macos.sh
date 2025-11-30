@@ -70,9 +70,10 @@ cmake .. \
       -D FLTK_USE_SYSTEM_LIBDECOR=OFF \
       -D FLTK_USE_LIBDECOR_GTK=OFF
 
-ninja &> compile.log
+ninja
 
 
-bin/test/vk_shape-shared
-bin/test/vk_shape_textured-shared
-bin/test/vk_cube-shared
+open bin/test/vk_shape-shared.app
+open bin/test/vk_shape_textured-shared.app
+open bin/test/vk_cube-shared.app
+open bin/test/vk_fullscreen-shared.app
