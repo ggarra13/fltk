@@ -1076,7 +1076,7 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
   endif(OPENGL_FOUND)
 
   if(VULKAN_FOUND)
-    target_link_libraries(fltk-shared PUBLIC ${VULKAN_LIBRARIES})
+    target_link_libraries(fltk-shared PRIVATE ${VULKAN_LIBRARIES})
     target_include_directories(fltk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
   endif(VULKAN_FOUND)
 
