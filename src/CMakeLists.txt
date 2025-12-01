@@ -1020,7 +1020,7 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
 
   if(FLTK_USE_VK)
     fl_add_library(fltk_vk SHARED "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
-    target_link_libraries(fltk_vk-shared PUBLIC ${VULKAN_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
+    target_link_libraries(fltk_vk-shared PRIVATE ${VULKAN_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
     # target_include_directories(fltk_vk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
 
     # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
