@@ -713,9 +713,11 @@ if(FLTK_BUILD_VK)
 	glslang
 	shaderc_combined
 	SPIRV-Tools)
+    set(VULKAN_FOUND TRUE)
+    set(HAVE_VK TRUE)
 else(FLTK_BUILD_VK)
-  set(VK_FOUND FALSE)
-  set(HAVE_VK FALSE)
+    set(VULKAN_FOUND FALSE)
+    set(HAVE_VK FALSE)
 endif(FLTK_BUILD_VK)
 
 mark_as_advanced(OPENGL_LIB) # internal cache variable, not relevant for users
@@ -765,6 +767,7 @@ if(OPENGL_FOUND)
   endif(FLTK_BACKEND_X11)
 endif(OPENGL_FOUND)
 
+set(FLTK_VULKAN_FOUND FALSE)
 if(VULKAN_FOUND)
   set(FLTK_VULKAN_FOUND TRUE)
   
