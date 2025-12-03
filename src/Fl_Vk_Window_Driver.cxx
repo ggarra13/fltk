@@ -949,6 +949,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] += 5000;
             hdrMonitorFound = true;
             break;
+        // @bug: these are not handled in MoltenVK yet.
         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
             scores[i] += 4000;
             hdrMonitorFound = true;
