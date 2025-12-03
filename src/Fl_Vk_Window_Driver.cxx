@@ -945,20 +945,16 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] += 500; // SDR baseline
             break;
 #elif __arm64__ // macOS Apple Silicon
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 5000;
+            hdrMonitorFound = true;
+            break;
         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
             scores[i] += 4000;
             hdrMonitorFound = true;
             break;
         case VK_COLOR_SPACE_HDR10_HLG_EXT:
             scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
             hdrMonitorFound = true;
             break;
         //! We don't handle Dolbyvision yet, so it gets a low score for now.
