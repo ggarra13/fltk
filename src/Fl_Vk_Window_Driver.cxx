@@ -923,7 +923,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         switch (format.colorSpace)
         {
 #ifdef __APPLE__
-#ifdef __x86_64__ // macOS Intel
+#if defined(__x86_64__) // macOS Intel
         case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
             scores[i] += 5000;
             hdrMonitorFound = true;
@@ -944,8 +944,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
             scores[i] += 500; // SDR baseline
             break;
-#endif
-#if defined(__arm64__) || defined(__ARM64__) // macOS Apple Silicon
+#elif defined(__arm64__) || defined(__ARM64__) // macOS Apple Silicon
         case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
             scores[i] += 5000;
             hdrMonitorFound = true;
