@@ -957,6 +957,10 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] += 2000;
             hdrMonitorFound = true;
             break;
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+            scores[i] += 1500;
+            hdrMonitorFound = true;
+            break;
         //! We don't handle Dolbyvision yet, so it gets a low score for now.
         case VK_COLOR_SPACE_DOLBYVISION_EXT:
             scores[i] += 1000;
