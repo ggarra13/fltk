@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-mkdir -p build_x11/
-cd build_x11
+mkdir -p build_vk_x11/
+cd build_vk_x11
 
 set +e
 

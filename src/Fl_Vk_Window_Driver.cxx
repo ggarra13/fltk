@@ -132,6 +132,11 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   if (swap_interval() == 0)
   {
       presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+#ifdef __linux__
+      // \@bug in NVidia drivers or compositors when two MAILBOX_KHR windows are
+      //       used.
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;
+#endif
   }
   bool found = false;
   for (uint32_t i = 0; i < presentModeCount; i++) {
@@ -151,19 +156,25 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
   {
+#ifdef DEBUG_PRESENTATION_MODE
       std::cerr << pWindow->label() << " VK_PRESENT_MODE_MAILBOX_KHR"
                 << std::endl;
+#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   else if (presentMode == VK_PRESENT_MODE_FIFO_KHR)
-  {
+  {      
+#ifdef DEBUG_PRESENTATION_MODE
       std::cerr << pWindow->label() << " VK_PRESENT_MODE_FIFO_KHR"
                 << std::endl;
+#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   else
   {
+#ifdef DEBUG_PRESENTATION_MODE
       std::cerr << pWindow->label() << " VK_PRESENT_MODE_ Unknown" << std::endl;
+#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   if (surfCapabilities.maxImageCount > 0 &&

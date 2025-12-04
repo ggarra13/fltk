@@ -714,7 +714,6 @@ if(FLTK_BUILD_VK)
 	shaderc_combined
 	SPIRV-Tools)
     set(VULKAN_FOUND TRUE)
-    set(HAVE_VK TRUE)
 else(FLTK_BUILD_VK)
     set(VULKAN_FOUND FALSE)
     set(HAVE_VK FALSE)

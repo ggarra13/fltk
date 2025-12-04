@@ -2,7 +2,7 @@
 # CMakeLists.txt used to build test and demo apps by the CMake build system
 #
 # Copyright 2004-2025 by Bill Spitzak and others.
-#
+#s
 # This library is free software. Distribution and use rights are outlined in
 # the file "COPYING" which should have been included with this file.  If this
 # file is missing or damaged, see the license at:

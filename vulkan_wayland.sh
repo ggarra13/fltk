@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-mkdir -p build_wayland/
-cd build_wayland
+mkdir -p build_vk_wayland/
+cd build_vk_wayland
 
 set +e
 

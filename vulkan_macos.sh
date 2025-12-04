@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-mkdir -p build_macos/
-cd build_macos
+mkdir -p build_vk_macos/
+cd build_vk_macos
 
 if [[ -z "$VULKAN_SDK" ]]; then
     export VULKAN_SDK=/usr/local

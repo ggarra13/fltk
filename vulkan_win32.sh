@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
-#rm -rf build_win32
-mkdir -p build_win32/
-cd build_win32
+mkdir -p build_vk_win32/
+cd build_vk_win32
 
 set +e
 

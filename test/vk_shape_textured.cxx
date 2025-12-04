@@ -44,7 +44,10 @@
  */
 
 #define NOMINMAX
-#include <config.h>
+#ifndef HAVE_VK
+#include <config.h> // needed only for 'HAVE_VK'
+#endif
+
 #include <FL/platform.H>
 #include <FL/Fl.H>
 #include <FL/Fl_Window.H>

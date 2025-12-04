@@ -14,12 +14,17 @@
 //     https://www.fltk.org/bugs.php
 //
 
-#define HAVE_VK
+// Define 'HAVE_VK=1' on the compiler commandline to build this program
+// w/o 'config.h' (needs FLTK lib with VK), for instance like:
+//   $ fltk-config --use-vk --compile cube.cxx -DHAVE_VK=1
+// Use '-DHAVE_VK=0' to build and test w/o OpenVK support.
 
-// Uncomment the next line to test w/o Vulkan (see also above)
+#ifndef HAVE_VK
+#include <config.h> // needed only for 'HAVE_VK'
+#endif
+
+// ... or uncomment the next line to test w/o Vulkan (see also above)
 // #undef HAVE_VK
-
-#include <iostream>
 
 #include <FL/Fl.H>
 #include <FL/fl_ask.H>

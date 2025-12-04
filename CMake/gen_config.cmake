@@ -101,7 +101,7 @@ set(CONFIG_H_IN config.h.in)
 set(CONFIG_H config.h)
 
 # generate the header file
-
+message(STATUS "HAVE_VK=${HAVE_VK}")
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/${CONFIG_H_IN}"
   "${CMAKE_CURRENT_BINARY_DIR}/${CONFIG_H}"
