@@ -14,7 +14,18 @@
 //
 
 
-#include <config.h>
+// Define 'HAVE_VK=1' on the compiler commandline to build this program
+// w/o 'config.h' (needs FLTK lib with VK), for instance like:
+//   $ fltk-config --use-vk --compile cube.cxx -DHAVE_VK=1
+// Use '-DHAVE_VK=0' to build and test w/o OpenVK support.
+
+#ifndef HAVE_VK
+#include <config.h> // needed only for 'HAVE_VK'
+#endif
+
+// ... or uncomment the next line to test w/o Vulkan (see also above)
+// #undef HAVE_VK
+
 #include <FL/Fl.H>
 #include <FL/Fl_Single_Window.H>
 #include <FL/Fl_Hor_Slider.H>

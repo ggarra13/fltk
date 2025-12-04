@@ -79,11 +79,6 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
-void Fl_Vk_Window_Driver::get_size(int& W, int& H)
-{
-    W = pWindow->pixel_w();
-    H = pWindow->pixel_h();
-}
 
 // Recreates m_swapchain and m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
@@ -104,8 +99,8 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   }
 
   // Set swapchain extent to match window size, clamped to capabilities
-  int W, H;
-  get_size(W, H);
+  int W = pWindow->pixel_w();
+  int H = pWindow->pixel_h();
   
   VkExtent2D swapchainExtent = { (uint32_t)W, (uint32_t)H };
   
@@ -137,6 +132,11 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   if (swap_interval() == 0)
   {
       presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+#ifdef __linux__
+      // \@bug in NVidia drivers or compositors when two MAILBOX_KHR windows are
+      //       used.
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;
+#endif
   }
   bool found = false;
   for (uint32_t i = 0; i < presentModeCount; i++) {
@@ -156,10 +156,25 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
   {
-      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount + 1);
+#ifdef DEBUG_PRESENTATION_MODE
+      std::cerr << pWindow->label() << " VK_PRESENT_MODE_MAILBOX_KHR"
+                << std::endl;
+#endif
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  }
+  else if (presentMode == VK_PRESENT_MODE_FIFO_KHR)
+  {      
+#ifdef DEBUG_PRESENTATION_MODE
+      std::cerr << pWindow->label() << " VK_PRESENT_MODE_FIFO_KHR"
+                << std::endl;
+#endif
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   else
   {
+#ifdef DEBUG_PRESENTATION_MODE
+      std::cerr << pWindow->label() << " VK_PRESENT_MODE_ Unknown" << std::endl;
+#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   if (surfCapabilities.maxImageCount > 0 &&
@@ -286,8 +301,9 @@ void Fl_Vk_Window_Driver::prepare_depth() {
       }
   }
   
-  int W, H;
-  get_size(W, H);
+  int W = pWindow->pixel_w();
+  int H = pWindow->pixel_h();
+  
   
   VkImageCreateInfo image = {};
   image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -381,9 +397,9 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   attachments[0] = VK_NULL_HANDLE;        // Color attachment
   attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
 
-  int W, H;
-  get_size(W, H);
-  
+  int W = pWindow->pixel_w();
+  int H = pWindow->pixel_h();    
+
   VkFramebufferCreateInfo fb_info = {};
   fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
   fb_info.pNext = NULL;

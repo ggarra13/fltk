@@ -103,8 +103,7 @@ public:
   VkDevice device() { return m_device; }
   VkQueue queue() { return m_queue; }
   uint32_t queueFamily() { return m_queueFamilyIndex; }
-  void get_size(int& W, int& H);
-
+  
 protected:
   void create_device();
   void init_instance();

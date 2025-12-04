@@ -198,13 +198,6 @@ void Fl_Wayland_Vk_Window_Driver::create_surface() {
 void Fl_Wayland_Vk_Window_Driver::make_current_before() {}
 
 
-static signed char swap_interval_type = -1;
-
-static void init_swap_interval() {
-  if (swap_interval_type != -1)
-    return;
-}
-
 std::vector<const char*> Fl_Wayland_Vk_Window_Driver::get_instance_extensions() {
   std::vector<const char*> out;
   out.push_back("VK_KHR_surface");

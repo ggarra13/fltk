@@ -255,8 +255,8 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer cmd)
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
 
-    int W, H;
-    pVkWindowDriver->get_size(W, H);
+    int W = pixel_w();
+    int H = pixel_h();
     
     rp_begin.renderArea.extent.width = W;
     rp_begin.renderArea.extent.height = H;
@@ -1132,6 +1132,7 @@ std::vector<const char*> Fl_Vk_Window::get_device_extensions()
     return out;
 }
 
+// Required instance extensions
 std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 {
     std::vector<const char*> out;
@@ -1139,6 +1140,7 @@ std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
     return out;
 }
 
+// Optional instance extensions
 std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
     std::vector<const char*> out;
