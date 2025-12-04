@@ -14,9 +14,7 @@
 //     https://www.fltk.org/bugs.php
 //
 
-#ifndef HAVE_VK
-#include <config.h> // needed only for 'HAVE_VK'
-#endif
+#define HAVE_VK
 
 // Uncomment the next line to test w/o Vulkan (see also above)
 // #undef HAVE_VK
