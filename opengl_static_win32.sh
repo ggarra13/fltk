@@ -15,6 +15,6 @@ cmake .. \
       -D FLTK_BUILD_FLUID=ON \
       -D FLTK_BUILD_GL=ON
 
-ninja
+ninja -v
 
 bin/test/gl_overlay

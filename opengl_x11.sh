@@ -20,6 +20,6 @@ cmake .. \
       -D FLTK_BACKEND_WAYLAND=OFF \
       -D FLTK_BACKEND_X11=ON
 
-ninja
+ninja -v
 
-bin/test/gl_overlay
+bin/test/shape

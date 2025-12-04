@@ -41,7 +41,7 @@ cmake .. \
       -D FLTK_BACKEND_WAYLAND=ON \
       -D FLTK_BACKEND_X11=OFF
 
-ninja
+ninja -v
 
 #bin/test/shape-shared
 #bin/test/cube-shared

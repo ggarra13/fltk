@@ -45,7 +45,7 @@ cmake .. \
       -D FLTK_BACKEND_WAYLAND=OFF \
       -D FLTK_BACKEND_X11=ON
 
-ninja
+ninja -v
 
 bin/test/vk_shape-shared
 #bin/test/vk_shape_textured-shared

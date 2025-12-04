@@ -48,7 +48,7 @@ cmake .. \
 
 export PATH=$PWD/lib:$PATH
 
-ninja
+ninja -v
 
 bin/test/vk_shape-shared
 bin/test/vk_shape_textured-shared

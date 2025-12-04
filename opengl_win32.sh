@@ -17,7 +17,7 @@ cmake .. \
       -D FLTK_BACKEND_WAYLAND=OFF \
       -D FLTK_BACKEND_X11=OFF
 
-ninja
+ninja -v
 
 export PATH=$PWD/lib/:$PATH
 bin/test/shape-shared
