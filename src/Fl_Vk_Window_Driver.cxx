@@ -129,8 +129,6 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                             pWindow->m_surface,
                                             &presentModeCount, presentModes);
   VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-  std::cerr << "Fl_Vk_Window_Driver::swap_interval = " << swap_interval()
-            << std::endl;
   if (swap_interval() == 0)
   {
       presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
