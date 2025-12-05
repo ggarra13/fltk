@@ -667,8 +667,12 @@ void Fl_Vk_Window::swap_buffers() {
  \param[in] frames set the number of vertical frame blanks between Vulkan
     buffer swaps
  */
-void Fl_Vk_Window::swap_interval(int frames) {
-  pVkWindowDriver->swap_interval(frames);
+void Fl_Vk_Window::swap_interval(int value) {
+    if (pVkWindowDriver->swap_interval() != value)
+    {
+        pVkWindowDriver->swap_interval(value);
+        m_swapchain_needs_recreation = true;
+    }
 }
 
 /**

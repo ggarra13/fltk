@@ -16,6 +16,7 @@
 //
 
 // #define FLTK_CHECK_SIZES 1
+// #define DEBUG_PRESENTATION_MODE
 
 #define VMA_IMPLEMENTATION
 
@@ -79,7 +80,6 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 }
 
 
-
 // Recreates m_swapchain and m_buffers
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
@@ -129,14 +129,11 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                             pWindow->m_surface,
                                             &presentModeCount, presentModes);
   VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  std::cerr << "Fl_Vk_Window_Driver::swap_interval = " << swap_interval()
+            << std::endl;
   if (swap_interval() == 0)
   {
       presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
-#ifdef __linux__
-      // \@bug in NVidia drivers or compositors when two MAILBOX_KHR windows are
-      //       used.
-      presentMode = VK_PRESENT_MODE_FIFO_KHR;
-#endif
   }
   bool found = false;
   for (uint32_t i = 0; i < presentModeCount; i++) {
