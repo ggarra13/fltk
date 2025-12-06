@@ -807,10 +807,6 @@ int main(int argc, char **argv) {
   slider.bounds(3,40);
   y+=30;
 
-  Fl_Toggle_Light_Button b1(50,y,window.w()-60,30,"Double Buffered");
-  b1.callback(double_cb,&sw);
-  y+=30;
-
   Fl_Input i1(50,y,window.w()-60,30, "Input");
   y+=30;
 
