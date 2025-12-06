@@ -922,6 +922,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     bool hdrMonitorFound = false;
     VkColorSpaceKHR color_space;
     std::vector<int> scores(formats.size());
+    i = 0;
     for (const auto& format : formats)
     {
         scores[i] = 0;
@@ -1004,7 +1005,33 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] += 500; // Default to SDR
             break;
 #endif
-#else   // Windows and Linux
+#elif defined(__linux__)
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+            scores[i] += 4000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:
+            scores[i] += 3000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 2000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+            scores[i] += 1500;
+            hdrMonitorFound = true;
+            break;
+        //! \@todo: We don't handle Dolbyvision yet, so it gets a low score
+        //!         for now.
+        case VK_COLOR_SPACE_DOLBYVISION_EXT:
+            scores[i] += 1000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            scores[i] += 500; // SDR baseline
+            break;
+#elif defined(_WINDOWS)   // Windows and Linux
         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
             scores[i] += 4000;
             hdrMonitorFound = true;
@@ -1033,6 +1060,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
 #endif
             
         default:
+            Fl::warning("Unknown Colorspace for your OS");
             break;
         }
 
