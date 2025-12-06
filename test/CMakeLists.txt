@@ -111,11 +111,11 @@ endif()
 # Note: use "${VKDEMO_LIBS}" for their library parameter
 #        or "${VKDEMO_SHARED}" to build with shared FLTK libraries
 if(VULKAN_FOUND)
-  set(VKDEMO_LIBS fltk::vk)
+  set(VKDEMO_LIBS fltk::vk fltk::fltk Vulkan::Vulkan Vulkan::shaderc_combined)
   if(MSVC)
     set(VKDEMO_SHARED "call_main;fltk::fltk-shared;Vulkan::shaderc_combined")
   else()
-    set(VKDEMO_SHARED fltk::vk-shared Vulkan::shaderc_combined)
+    set(VKDEMO_SHARED fltk::vk-shared fltk::fltk-shared Vulkan::Vulkan Vulkan::shaderc_combined)
   endif()
 else()
   if(MSVC)
