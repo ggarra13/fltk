@@ -781,20 +781,50 @@ if(VULKAN_FOUND)
     list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
   endif(WIN32)
   if (Vulkan_shaderc_combined_FOUND)
+if(WIN32)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+	set(_Vulkan_hint_executable_search_paths
+	    "$ENV{VULKAN_SDK}/bin"
+	)
+	set(_Vulkan_hint_library_search_paths
+	    "$ENV{VULKAN_SDK}/lib"
+	    "$ENV{VULKAN_SDK}/bin"
+	)
+    else()
+	set(_Vulkan_hint_executable_search_paths
+	    "$ENV{VULKAN_SDK}/bin32"
+	    "$ENV{VULKAN_SDK}/bin"
+	)
+	set(_Vulkan_hint_library_search_paths
+	    "$ENV{VULKAN_SDK}/lib32"
+	    "$ENV{VULKAN_SDK}/bin32"
+	    "$ENV{VULKAN_SDK}/lib"
+	    "$ENV{VULKAN_SDK}/bin"
+	)
+    endif()
+else()
+    set(_Vulkan_hint_executable_search_paths
+	"$ENV{VULKAN_SDK}/bin"
+    )
+    set(_Vulkan_hint_library_search_paths
+	"$ENV{VULKAN_SDK}/lib"
+    )
+endif()
+
       list(APPEND VULKAN_LIBRARIES
 	  Vulkan::shaderc_combined
+	  Vulkan::SPIRV-Tools
+	  Vulkan::glslang
       )
-      if(UNIX AND NOT APPLE)
-	  find_library(SPIRV_Tools_opt_LIBRARY SPIRV-Tools-opt)
-	  if(SPIRV_Tools_opt_LIBRARY)
-	      list(APPEND VULKAN_LIBRARIES ${SPIRV_Tools_opt_LIBRARY})
-	  endif()
-	  list(APPEND VULKAN_LIBRARIES
-	      Vulkan::SPIRV-Tools
-	      Vulkan::glslang
-	      )
+      find_library(SPIRV-Tools-opt_LIBRARY SPIRV-Tools-opt
+	  HINTS
+	  ${_Vulkan_hint_library_search_paths})
+      if (NOT SPIRV-Tools-opt_LIBRARY)
+	  message(FATAL_ERROR "SPIRV-Tools-opt library not found!")
       endif()
-      
+      list(APPEND VULKAN_LIBRARIES
+	  ${SPIRV-Tools-opt_LIBRARY}
+      )
   else()
       message(FATAL_ERROR "shaderc_combined not found!")
   endif()
@@ -859,6 +889,7 @@ else(FLTK_USE_PTHREADS)
   set(HAVE_PTHREAD_H 0)
 
 endif(FLTK_USE_PTHREADS)
+
 
 set(debug_threads 0) # set to 1 to show debug info
 if(debug_threads)

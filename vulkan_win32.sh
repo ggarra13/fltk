@@ -1,13 +1,21 @@
 #!/usr/bin/env bash
 
+#rm -rf build_vk_win32
 mkdir -p build_vk_win32/
 cd build_vk_win32
 
 set +e
 
 if [[ -z "$VULKAN_SDK" ]]; then
-    export VULKAN_SDK=/C/VulkanSDK/
+    export VULKAN_ROOT=/C/VulkanSDK
+    export SDK_VERSION=`ls -d /C/VulkanSDK/* | sed -e "s#/C/VulkanSDK/##" | sed -e "s#/##"`
+    if [[ -e $VULKAN_ROOT/$SDK_VERSION ]]; then
+	export VULKAN_SDK=$VULKAN_ROOT/$SDK_VERSION
+    else
+	export VULKAN_SDK=$VULKAN_ROOT 
+    fi
 fi
+
 
 cmake .. \
       -G Ninja \
