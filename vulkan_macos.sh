@@ -5,9 +5,10 @@ cd build_vk_macos
 
 if [[ -z "$VULKAN_SDK" ]]; then
     export VULKAN_SDK=/usr/local
-    if [ ! -d $VULKAN_SDK/include/vulkan/vulkan.h ]; then
+    if [ ! -e $VULKAN_SDK/include/vulkan/vulkan.h ]; then
 	export VULKAN_SDK=/opt/homebrew
     fi
+    echo "VULKAN_SDK=$VULKAN_SDK"
 fi
 
 #
