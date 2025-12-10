@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#rm -rf build_vk_win32
+rm -rf build_vk_win32
 mkdir -p build_vk_win32/
 cd build_vk_win32
 

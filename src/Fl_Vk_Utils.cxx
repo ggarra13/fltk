@@ -4,6 +4,41 @@
 #include <stdexcept>
 #include <cstring>
 
+
+//! Function used to compile optimize to SPIRV code (needs SPIRV-Tools-opt)
+std::vector<uint32_t> optimize_spirv(const std::vector<uint32_t>& spirv)
+{
+    // spvtools::SpirvTools tools(SPV_ENV_VULKAN_1_2);
+
+    // // Optional: validate input first
+    // if (!tools.Validate(spirv.data(), spirv.size())) {
+    //     std::cerr << "Input SPIR-V is invalid!" << std::endl;
+    // }
+    
+    spvtools::Optimizer optimizer(SPV_ENV_VULKAN_1_2);
+
+    // Choose optimization passes (example: performance)
+    optimizer.RegisterPerformancePasses();
+
+    // None of these work.
+    // optimizer.RegisterPass(CreateStripDebugInfoPass());
+    // optimizer.RegisterPass(CreateEliminateDeadConstantPass());
+    // optimizer.RegisterPass(CreateAggressiveDCEPass());
+    // optimizer.RegisterPass(CreatePrivateToLocalPass());
+    // optimizer.RegisterPass(CreateScalarReplacementPass());    
+    // optimizer.RegisterVulkanPasses();
+
+    std::vector<uint32_t> optimized_spirv;
+    bool success = optimizer.Run(spirv.data(), spirv.size(), &optimized_spirv,
+                                 spvtools::OptimizerOptions());
+    if (!success) {
+        std::cerr << "SPIRV-Tools optimization failed!" << std::endl;
+        return spirv; // return original on failure
+    }
+
+    return optimized_spirv;
+}
+
 std::vector<uint32_t> compile_glsl_to_spirv(const std::string &source_code,
                                             shaderc_shader_kind shader_kind,
                                             const std::string &filename,
@@ -39,7 +74,9 @@ std::vector<uint32_t> compile_glsl_to_spirv(const std::string &source_code,
   }
 
   // Return the SPIR-V bytecode as a vector of uint32_t
-  return std::vector<uint32_t>(result.cbegin(), result.cend());
+  const std::vector<uint32_t> spirv = std::vector<uint32_t>(result.cbegin(), result.cend());
+
+  return optimize_spirv(spirv);
 }
 
 // Example usage in your Vulkan code
@@ -60,7 +97,6 @@ VkShaderModule create_shader_module(VkDevice device,
   }
   return shader_module;
 }
-
 
 // Example usage in your Vulkan code
 VkShaderModule create_shader_module(VkDevice device,

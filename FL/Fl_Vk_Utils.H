@@ -5,6 +5,8 @@
 
 #include <FL/vk.h>
 #include <shaderc/shaderc.hpp>
+#include <spirv-tools/optimizer.hpp>
+#include <spirv-tools/libspirv.hpp>
 
 #include <iostream>
 #include <string>
@@ -23,6 +25,10 @@ FL_EXPORT
 VkShaderModule
 create_shader_module(VkDevice device,
                      const std::vector<uint32_t>& spirv_code);
+
+//! Function used to compile optimize to SPIRV code (needs SPIRV-Tools-opt)
+FL_EXPORT
+std::vector<uint32_t> optimize_spirv(const std::vector<uint32_t>& spirv);
 
 //! Function to create a shader module from SPIRV byte code in a C array with length.
 FL_EXPORT
