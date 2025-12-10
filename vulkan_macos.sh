@@ -5,6 +5,9 @@ cd build_vk_macos
 
 if [[ -z "$VULKAN_SDK" ]]; then
     export VULKAN_SDK=/usr/local
+    if [ ! -d $VULKAN_SDK/include/vulkan/vulkan.h ]; then
+	export VULKAN_SDK=/opt/homebrew
+    fi
 fi
 
 #
@@ -73,7 +76,7 @@ cmake .. \
 ninja -v
 
 
-open bin/test/vk_shape-shared.app
-open bin/test/vk_shape_textured-shared.app
-open bin/test/vk_cube-shared.app
-open bin/test/vk_fullscreen-shared.app
+bin/test/vk_shape-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared
+bin/test/vk_fullscreen-shared
