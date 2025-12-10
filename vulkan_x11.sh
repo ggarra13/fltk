@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+rm -rf build_vk_x11/
 mkdir -p build_vk_x11/
 cd build_vk_x11
 
@@ -48,5 +49,5 @@ cmake .. \
 ninja -v
 
 bin/test/vk_shape-shared
-#bin/test/vk_shape_textured-shared
-#bin/test/vk_cube-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared

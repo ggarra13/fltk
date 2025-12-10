@@ -62,17 +62,11 @@ Fl_Wayland_Vk_Window_Driver::Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
 {
     if (explicit_sync == -1)
     {
-        char* var = fl_getenv("FLTK_VK_EXPLICIT_SYNC");
-        if (var && strcmp(var, "0") == 0)
+        explicit_sync = 1;
+        char* var = fl_getenv("__NV_DISABLE_EXPLICIT_SYNC");
+        if (var && strcmp(var, "1") == 0)
         {
-#ifdef __linux__
-            fl_putenv("__NV_DISABLE_EXPLICIT_SYNC=1");
             explicit_sync = 0;
-#endif
-        }
-        else
-        {
-            explicit_sync = 1;
         }
     }
 }

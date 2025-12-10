@@ -1,25 +1,12 @@
 #!/usr/bin/env bash
 
+rm -rf build_vk_wayland/
 mkdir -p build_vk_wayland/
 cd build_vk_wayland
 
 set +e
 
 export VULKAN_SDK=/usr/
-
-#
-# Whether to use explicit sync or implicit sync.
-#
-# GNOME48 and Kwin6 on Ubuntu 25.04 default is implicit sync.
-# GNOME49 and Kwin6 on Ubuntu 25.10 default is explicit sync.
-#
-# Sets the variable correctly for each graphics card (currently only works
-# in NVidia, which seems to have a timeout when using HDR it with events on
-# both GNOME49 and Kwin6.2).
-#
-if [[ -z $FLTK_VK_EXPLICIT_SYNC ]]; then
-    export FLTK_VK_EXPLICIT_SYNC=0
-fi
 
 cmake .. \
       -G Ninja \
@@ -59,7 +46,18 @@ cmake .. \
 
 ninja -v
 
-#bin/test/vk_shape-shared
-#bin/test/vk_shape_textured-shared
-#bin/test/vk_cube-shared
+#
+# Whether to use explicit sync or implicit sync.
+#
+# GNOME48 and Kwin6 on Ubuntu 25.04 default is implicit sync.
+# GNOME49 and Kwin6 on Ubuntu 25.10 default is explicit sync.
+#
+# Sets the variable correctly for each graphics card (currently only works
+# in NVidia, which seems to have a timeout with events on both GNOME49 and
+# Kwin6.2).
+#
+
+bin/test/vk_shape-shared
+bin/test/vk_shape_textured-shared
+bin/test/vk_cube-shared
 bin/test/vk_fullscreen-shared

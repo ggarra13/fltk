@@ -813,17 +813,28 @@ endif()
 
       list(APPEND VULKAN_LIBRARIES
 	  Vulkan::shaderc_combined
-	  Vulkan::SPIRV-Tools
 	  Vulkan::glslang
       )
+      set(SPIRV-Tools-opt_LIBRARY )
       find_library(SPIRV-Tools-opt_LIBRARY SPIRV-Tools-opt
 	  HINTS
 	  ${_Vulkan_hint_library_search_paths})
       if (NOT SPIRV-Tools-opt_LIBRARY)
 	  message(FATAL_ERROR "SPIRV-Tools-opt library not found!")
       endif()
+      set(SPIRV-Tools-link_LIBRARY )
+      if (UNIX AND NOT APPLE)
+	  find_library(SPIRV-Tools-link_LIBRARY SPIRV-Tools-link
+	      HINTS
+	      ${_Vulkan_hint_library_search_paths})
+	  if (NOT SPIRV-Tools-link_LIBRARY)
+	      message(FATAL_ERROR "SPIRV-Tools-link library not found!")
+	  endif()
+      endif()
       list(APPEND VULKAN_LIBRARIES
 	  ${SPIRV-Tools-opt_LIBRARY}
+	  Vulkan::SPIRV-Tools
+	  ${SPIRV-Tools-link_LIBRARY}
       )
   else()
       message(FATAL_ERROR "shaderc_combined not found!")
