@@ -1057,11 +1057,11 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
             scores[i] += 500; // SDR baseline
             break;
-#endif
-            
+#else
         default:
             Fl::warning("Unknown Colorspace for your OS");
             break;
+#endif
         }
 
         switch (format.format)
