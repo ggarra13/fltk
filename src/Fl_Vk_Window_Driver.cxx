@@ -155,7 +155,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       std::cerr << pWindow->label() << " VK_PRESENT_MODE_MAILBOX_KHR"
                 << std::endl;
 #endif
-      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount + 1);
   }
   else if (presentMode == VK_PRESENT_MODE_FIFO_KHR)
   {      
