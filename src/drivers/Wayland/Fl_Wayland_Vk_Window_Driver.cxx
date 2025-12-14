@@ -60,15 +60,6 @@ int Fl_Wayland_Vk_Window_Driver::explicit_sync = -1;
 Fl_Wayland_Vk_Window_Driver::Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
     : Fl_Vk_Window_Driver(win)
 {
-    if (explicit_sync == -1)
-    {
-        explicit_sync = 1;
-        char* var = fl_getenv("__NV_DISABLE_EXPLICIT_SYNC");
-        if (var && strcmp(var, "1") == 0)
-        {
-            explicit_sync = 0;
-        }
-    }
 }
 
 int Fl_Wayland_Vk_Window_Driver::genlistsize() {
@@ -138,22 +129,11 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
       struct wld_window* window = fl_wl_xid(pWindow);
       if (window->frame_cb || !window->wl_surface) return;
 
-      if (explicit_sync == 0)
-      {
-          // Force only if totally off-screen
-          if (wl_list_empty(&window->outputs)) {
-              window->frame_cb = wl_surface_frame(window->wl_surface);
-              wl_callback_add_listener(window->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
-              wl_display_flush(fl_wl_display());
-          }
-      }
-      else
-      {
+      // Force only if totally off-screen
+      if (wl_list_empty(&window->outputs)) {
           window->frame_cb = wl_surface_frame(window->wl_surface);
-          wl_callback_add_listener(window->frame_cb,
-                                   Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
+          wl_callback_add_listener(window->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
           wl_display_flush(fl_wl_display());
-
       }
     }
   }
