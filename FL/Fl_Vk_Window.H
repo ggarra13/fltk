@@ -336,16 +336,12 @@ private:
       VkSemaphore drawCompleteSemaphore;
       VkFence fence;
       VkCommandBuffer commandBuffer;
-      bool active;
-      bool submitted;
 
       FrameData() :
           imageAcquiredSemaphore(VK_NULL_HANDLE),
           drawCompleteSemaphore(VK_NULL_HANDLE),
           fence(VK_NULL_HANDLE),
-          commandBuffer(VK_NULL_HANDLE),
-          active(false),
-          submitted(false)
+          commandBuffer(VK_NULL_HANDLE)
           {
           }
   };
@@ -407,9 +403,6 @@ public:
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
       return m_frames[m_currentFrameIndex].commandBuffer;
-  }
-  bool isFrameActive() const {
-      return m_frames[m_currentFrameIndex].active;
   }
   uint32_t getCurrentBufferIndex() const {
       return m_current_buffer;

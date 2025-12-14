@@ -146,7 +146,6 @@ void Fl_Vk_Window::recreate_swapchain() {
             vkDestroyFence(device(), frame.fence, nullptr);
             frame.fence = VK_NULL_HANDLE;
         }
-        frame.active = false;
     }
 
     // Destroy old command pool
@@ -234,7 +233,6 @@ void Fl_Vk_Window::recreate_swapchain() {
                 return;
             }
         }
-        frame.active = false;
     }
     
     // \@bug: this makes the code crash on draw() to invalid command buffer
@@ -285,11 +283,9 @@ void Fl_Vk_Window::end_render_pass(VkCommandBuffer cmd)
 void Fl_Vk_Window::end_render_pass()
 {
     FrameData& frame = m_frames[m_currentFrameIndex];
-    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
-        || !frame.active)
+    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE)
     {
         fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
-        frame.active = false;
         return;
     }
     end_render_pass(frame.commandBuffer);
@@ -327,7 +323,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     FrameData& frame = m_frames[m_currentFrameIndex];
 
     // Wait for this frame’s previous use
-    if (frame.active && frame.fence != VK_NULL_HANDLE && frame.submitted)
+    if (frame.fence != VK_NULL_HANDLE)
     {
         if (m_debugSync) {
             fprintf(stderr, "%s Waiting for frame %u fence\n",
@@ -344,7 +340,6 @@ bool Fl_Vk_Window::vk_draw_begin() {
         }
         if (result != VK_SUCCESS) {
             fprintf(stderr, "Fl_Vk_Window - vkWaitForFences failed: %s\n", string_VkResult(result));
-            frame.active = false;
             return false;
         }
     }
@@ -354,15 +349,9 @@ bool Fl_Vk_Window::vk_draw_begin() {
     if (result != VK_SUCCESS)
     {
         fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
-        frame.active = false;
         return false;
     }
     
-    // Now that we've waited (if necessary) and reset the fence,
-    // the frame is no longer considered 'active' (i.e., in flight).
-    frame.active = false;
-        
-
     // Acquire next swapchain image
     if (m_debugSync)
     {
@@ -475,8 +464,6 @@ bool Fl_Vk_Window::vk_draw_begin() {
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
     }
     
-    frame.submitted = false;
-    frame.active = true;
     return true;
 }
 
@@ -510,13 +497,12 @@ void Fl_Vk_Window::vk_draw_end()
     end_render_pass();
 
     FrameData& frame = m_frames[m_currentFrameIndex];
-    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE
-        || !frame.active) {
+    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE)
+    {
         if (m_debugSync) {
             fprintf(stderr, "%s Skipping vk_draw_end: Invalid state\n",
                     label() ? label() : "(unknown)");
         }
-        frame.active = false;
         return;
     }
 
@@ -524,7 +510,6 @@ void Fl_Vk_Window::vk_draw_end()
     if (result != VK_SUCCESS)
     {
         fprintf(stderr, "vkEndCommandBuffer failed: %s\n", string_VkResult(result));
-        frame.active = false;
         return;
     }
 }
@@ -568,12 +553,11 @@ void Fl_Vk_Window::swap_buffers() {
     // Check state
     FrameData& frame = m_frames[m_currentFrameIndex];
     if (m_swapchain == VK_NULL_HANDLE ||
-        frame.commandBuffer == VK_NULL_HANDLE || !frame.active) {
+        frame.commandBuffer == VK_NULL_HANDLE) {
         if (m_debugSync) {
             fprintf(stderr, "%s Skipping swap_buffers: Invalid state\n",
                     label() ? label() : "(unknown)");
         }
-        frame.active = false;
         return;
     }
 
@@ -604,53 +588,50 @@ void Fl_Vk_Window::swap_buffers() {
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkQueueSubmit failed: %s\n",
                     string_VkResult(result));
-            frame.active = false;
-            return;
-        }
-
-        frame.submitted = true;
-
-
-        pVkWindowDriver->swap_buffers();
-
-        // Update HDR metadata if changed
-        if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-            m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-        {
-            vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-            m_previous_hdr_metadata = m_hdr_metadata;
-            m_hdr_metadata_changed = false;
-        }
-        
-        // Present swapchain image
-        VkPresentInfoKHR present_info = {};
-        present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        present_info.waitSemaphoreCount = 1;
-        present_info.pWaitSemaphores = &buffer.semaphore;
-        present_info.swapchainCount = 1;
-        present_info.pSwapchains = &m_swapchain;
-        present_info.pImageIndices = &m_current_buffer;
-
-        if (m_debugSync) {
-            fprintf(stderr, "%s Presenting image index %u for frame %u\n",
-                    label() ? label() : "(unknown)",
-                    m_current_buffer, m_currentFrameIndex);
-        }
-        
-        result = vkQueuePresentKHR(queue(), &present_info);
-        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
-            result == VK_NOT_READY) {
-            m_swapchain_needs_recreation = true;
-            return;
-        }
-        else if (result != VK_SUCCESS)
-        {
-            fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
-                    string_VkResult(result));
-            frame.active = false;
             return;
         }
     }
+
+
+    pVkWindowDriver->swap_buffers();
+    
+    // Update HDR metadata if changed
+    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+    {
+        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+        m_previous_hdr_metadata = m_hdr_metadata;
+        m_hdr_metadata_changed = false;
+    }
+        
+    // Present swapchain image
+    VkPresentInfoKHR present_info = {};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = &buffer.semaphore;
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = &m_swapchain;
+    present_info.pImageIndices = &m_current_buffer;
+
+    if (m_debugSync) {
+        fprintf(stderr, "%s Presenting image index %u for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_current_buffer, m_currentFrameIndex);
+    }
+        
+    result = vkQueuePresentKHR(queue(), &present_info);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+        result == VK_NOT_READY) {
+        m_swapchain_needs_recreation = true;
+        return;
+    }
+    else if (result != VK_SUCCESS)
+    {
+        fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
+                string_VkResult(result));
+        return;
+    }
+    
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
@@ -1116,7 +1097,6 @@ void Fl_Vk_Window::init_vulkan() {
             shutdown_vulkan();
             return;
         }
-        frame.active = false;
     }
 
     m_currentFrameIndex = 0;
