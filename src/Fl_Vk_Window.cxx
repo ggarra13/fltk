@@ -511,7 +511,8 @@ void Fl_Vk_Window::vk_draw_end()
     end_render_pass();
 
     FrameData& frame = m_frames[m_currentFrameIndex];
-    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE) {
+    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE)
+    {
         if (m_debugSync) {
             fprintf(stderr, "%s Skipping vk_draw_end: Invalid state\n",
                     label() ? label() : "(unknown)");
@@ -586,7 +587,7 @@ void Fl_Vk_Window::swap_buffers() {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &frame.commandBuffer;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
+    submit_info.pSignalSemaphores = &buffer.semaphore;
 
     if (m_debugSync) {
         fprintf(stderr, "%s Submitting frame %u for image index %u\n",
@@ -603,45 +604,6 @@ void Fl_Vk_Window::swap_buffers() {
                     string_VkResult(result));
             return;
         }
-    }
-
-    pVkWindowDriver->swap_buffers();
-
-    // Update HDR metadata if changed
-    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-    {
-        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-        m_previous_hdr_metadata = m_hdr_metadata;
-        m_hdr_metadata_changed = false;
-    }
-        
-    // Present swapchain image
-    VkPresentInfoKHR present_info = {};
-    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-    present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
-    present_info.swapchainCount = 1;
-    present_info.pSwapchains = &m_swapchain;
-    present_info.pImageIndices = &m_current_buffer;
-
-    if (m_debugSync) {
-        fprintf(stderr, "%s Presenting image index %u for frame %u\n",
-                label() ? label() : "(unknown)",
-                m_current_buffer, m_currentFrameIndex);
-    }
-        
-    result = vkQueuePresentKHR(queue(), &present_info);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
-        result == VK_NOT_READY) {
-        m_swapchain_needs_recreation = true;
-        return;
-    }
-    else if (result != VK_SUCCESS)
-    {
-        fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
-                string_VkResult(result));
-        return;
     }
 
 
