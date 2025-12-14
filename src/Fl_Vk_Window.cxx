@@ -587,7 +587,7 @@ void Fl_Vk_Window::swap_buffers() {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &frame.commandBuffer;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
+    submit_info.pSignalSemaphores = &buffer.semaphore;
 
     if (m_debugSync) {
         fprintf(stderr, "%s Submitting frame %u for image index %u\n",
