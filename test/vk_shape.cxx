@@ -494,9 +494,7 @@ void vk_shape_window::draw() {
         return;
     
     VkCommandBuffer cmd = getCurrentCommandBuffer();
-    if (!m_swapchain || !cmd || !isFrameActive()) {
-        return;
-    }
+
     begin_render_pass(cmd);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);

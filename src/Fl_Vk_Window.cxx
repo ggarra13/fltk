@@ -365,7 +365,6 @@ bool Fl_Vk_Window::vk_draw_begin() {
         fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
         return false;
     }
-            
 
     // Acquire next swapchain image
     if (m_debugSync)
@@ -512,7 +511,8 @@ void Fl_Vk_Window::vk_draw_end()
     end_render_pass();
 
     FrameData& frame = m_frames[m_currentFrameIndex];
-    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE) {
+    if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE)
+    {
         if (m_debugSync) {
             fprintf(stderr, "%s Skipping vk_draw_end: Invalid state\n",
                     label() ? label() : "(unknown)");
@@ -606,8 +606,9 @@ void Fl_Vk_Window::swap_buffers() {
         }
     }
 
-    pVkWindowDriver->swap_buffers();
 
+    pVkWindowDriver->swap_buffers();
+    
     // Update HDR metadata if changed
     if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
         m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
@@ -621,7 +622,7 @@ void Fl_Vk_Window::swap_buffers() {
     VkPresentInfoKHR present_info = {};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
+    present_info.pWaitSemaphores = &buffer.semaphore;
     present_info.swapchainCount = 1;
     present_info.pSwapchains = &m_swapchain;
     present_info.pImageIndices = &m_current_buffer;
@@ -644,6 +645,7 @@ void Fl_Vk_Window::swap_buffers() {
                 string_VkResult(result));
         return;
     }
+    
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();

@@ -797,9 +797,6 @@ void cube_box::draw() {
     vkUnmapMemory(device(), m_cube.uniformMemory);
     
     VkCommandBuffer cmd = getCurrentCommandBuffer();
-    if (!m_swapchain || !cmd || !isFrameActive()) {
-        return;
-    }
 
     begin_render_pass(cmd);
     
