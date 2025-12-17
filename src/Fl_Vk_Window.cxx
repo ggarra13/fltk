@@ -577,6 +577,15 @@ void Fl_Vk_Window::swap_buffers() {
 
     Fl_Vk_SwapchainBuffer& buffer = m_buffers[m_current_buffer];
 
+    // Update HDR metadata if changed
+    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+    {
+        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+        m_previous_hdr_metadata = m_hdr_metadata;
+        m_hdr_metadata_changed = false;
+    }
+    
     // Submit command buffer
     VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     VkSubmitInfo submit_info = {};
@@ -608,15 +617,6 @@ void Fl_Vk_Window::swap_buffers() {
 
 
     pVkWindowDriver->swap_buffers();
-    
-    // Update HDR metadata if changed
-    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-    {
-        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-        m_previous_hdr_metadata = m_hdr_metadata;
-        m_hdr_metadata_changed = false;
-    }
         
     // Present swapchain image
     VkPresentInfoKHR present_info = {};
