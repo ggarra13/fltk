@@ -358,6 +358,12 @@ bool Fl_Vk_Window::vk_draw_begin() {
         }
     }
 
+    if (m_debugSync) {
+        fprintf(stderr, "%s Resetting fence for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_currentFrameIndex);
+    }
+    
     // Reset the fence immediately after a successful wait.
     result = vkResetFences(device(), 1, &frame.fence);
     if (result != VK_SUCCESS)
@@ -645,7 +651,12 @@ void Fl_Vk_Window::swap_buffers() {
                 string_VkResult(result));
         return;
     }
-    
+
+    if (m_debugSync) {
+        fprintf(stderr, "%s Presented image index %u for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_current_buffer, m_currentFrameIndex);
+    }
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
@@ -693,6 +704,12 @@ int Fl_Vk_Window::swap_interval() const {
 
 
 void Fl_Vk_Window::flush() {
+
+    if (m_debugSync) {
+        fprintf(stderr, "%s flush for frame %u\n",
+                label() ? label() : "(unknown)", m_currentFrameIndex);
+    }
+    
   if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
       return;
 
@@ -706,11 +723,25 @@ void Fl_Vk_Window::flush() {
   }
   
   if (pVkWindowDriver->flush_begin() && !m_swapchain_needs_recreation)
+  {
+      if (m_debugSync) {
+          fprintf(stderr, "%s pVkWindowDriver->flush_begin failed "
+                  "for frame %u\n",
+                  label() ? label() : "(unknown)", m_currentFrameIndex);
+      }
       return;
-      
+  }
+  
   if (!vk_draw_begin())
+  {
+      if (m_debugSync) {
+          fprintf(stderr, "%s vk_draw_begin failed "
+                  "for frame %u\n",
+                  label() ? label() : "(unknown)", m_currentFrameIndex);
+      }
       return;
-
+  }
+  
   draw();  // User defined virtual draw function
   vk_draw_end();
   
