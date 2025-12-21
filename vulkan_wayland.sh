@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo ""
-echo "Needs sudo permissions to install the Vulkan components on Ubuntu"
+echo "Intalling Vulkan components on Ubuntu (needs sudo permissions)"
 echo ""
 sudo apt install libvulkan-dev glslang-dev libshaderc-dev spirv-tools
 
@@ -54,7 +54,7 @@ cmake .. \
 
 ninja -v
 
-# bin/test/vk_shape-shared
-# bin/test/vk_shape_textured-shared
+#bin/test/vk_shape-shared
+#bin/test/vk_shape_textured-shared
 bin/test/vk_cube-shared
-# bin/test/vk_fullscreen-shared
+#bin/test/vk_fullscreen-shared
