@@ -3,7 +3,7 @@
 echo ""
 echo "Intalling Vulkan components on Ubuntu (needs sudo permissions)"
 echo ""
-sudo apt install libvulkan-dev glslang-dev libshaderc-dev spirv-tools
+sudo apt install libvulkan-dev glslang-dev libshaderc-dev spirv-tools libglm-dev
 
 rm -rf build_vk_wayland/
 mkdir -p build_vk_wayland/
