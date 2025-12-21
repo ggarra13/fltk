@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-#rm -rf build_vk_wayland/
+sudo apt install libvulkan-dev glslang-dev libshaderc-dev spirv-tools
+
+rm -rf build_vk_wayland/
 mkdir -p build_vk_wayland/
 cd build_vk_wayland
 
