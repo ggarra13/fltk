@@ -639,7 +639,13 @@ void Fl_Vk_Window::swap_buffers() {
                 m_current_buffer, m_currentFrameIndex);
     }
         
-    result = vkQueuePresentKHR(queue(), &present_info);
+
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex());
+        
+        result = vkQueuePresentKHR(queue(), &present_info);
+    }
+    
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
         result == VK_NOT_READY) {
         m_swapchain_needs_recreation = true;
