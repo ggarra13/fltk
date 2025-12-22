@@ -581,8 +581,6 @@ void Fl_Vk_Window::swap_buffers() {
         return;
     }
 
-    Fl_Vk_SwapchainBuffer& buffer = m_buffers[m_current_buffer];
-
     // Update HDR metadata if changed
     if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
         m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
@@ -594,6 +592,8 @@ void Fl_Vk_Window::swap_buffers() {
     
     // Submit command buffer
     VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    // Prepare Submit Info
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.waitSemaphoreCount = 1;
@@ -602,7 +602,7 @@ void Fl_Vk_Window::swap_buffers() {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &frame.commandBuffer;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &buffer.semaphore;
+    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
 
     if (m_debugSync) {
         fprintf(stderr, "%s Submitting frame %u for image index %u\n",
@@ -628,7 +628,7 @@ void Fl_Vk_Window::swap_buffers() {
     VkPresentInfoKHR present_info = {};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &buffer.semaphore;
+    present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
     present_info.swapchainCount = 1;
     present_info.pSwapchains = &m_swapchain;
     present_info.pImageIndices = &m_current_buffer;
