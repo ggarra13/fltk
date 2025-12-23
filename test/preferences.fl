@@ -188,7 +188,7 @@ Fl_Input::paste_menu_text = gettext("Paste");} {}
           callback {[](Fl_Widget*, void*)
 {
   puts("The shoe is the sign!");
-}} selected
+};} selected
           xywh {0 0 100 20}
         }
         MenuItem {} {
@@ -229,7 +229,7 @@ Fl_Input::paste_menu_text = gettext("Paste");} {}
   } else {
     puts("Don't shave.");
   }
-}}
+};}
         comment {// Testing lambdas for callbacks}
         xywh {25 212 105 24} down_box DOWN_BOX
       }
