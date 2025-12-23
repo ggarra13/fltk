@@ -71,7 +71,7 @@ on the various supported Linux distributions/OS.
 3.1 Debian and Derivatives (like Ubuntu, Mint, RaspberryPiOS)
 -------------------------------------------------------------
 
-sudo apt install libvulkan-dev 
+sudo apt install libvulkan-dev glslang-dev libshaderc-dev spirv-tools
 
 3.2 Fedora / Rocky Linux
 ------------------------

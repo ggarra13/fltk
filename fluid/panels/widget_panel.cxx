@@ -31,6 +31,7 @@
 #include <FL/fl_ask.H>
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_File_Chooser.H>
+#include <ctype.h>
 #define ZERO_ENTRY 1000
 extern const char* when_symbol_name(int n);
 extern void set_whenmenu(int n);
@@ -2636,11 +2637,10 @@ static void cb_Attribute(Fl_Input* o, void* v) {
   Class_Node* nd = (Class_Node*)current_node;
 
   if (v == LOAD) {
-    o->value( nd->prefix() );
+    o->value( nd->prefix().c_str() );
   } else {
-    const char *nn = nd->prefix();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
+    auto nn = nd->prefix();
+    if (nn != o->value())
     {
       nd->prefix( o->value() );
       Fluid.proj.set_modflag(1);
@@ -2657,12 +2657,36 @@ static void cb_Class(Fl_Input* o, void* v) {
     o->value( nd->name() );
   } else {
     const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
+    char *nv = strdup( o->value() );
+    // There is an inconsistency in the project file reader, so this string
+    // must not coantain anything but alphanumeric and underscore characters.
+    char *s = (char*)nv;
+    char *d = (char*)nv;
+    while (*s) {
+      if (isalnum((unsigned char)*s) || *s == '_') {
+        *d++ = *s;
+      }
+      s++;
+    }
+    *d = 0;
+    // The class name must not be empty either
+    if (*nv == 0) {
+      free((void*)nv);
+      nv = strdup("MyClass");
+    }
+    // The class name may have changed, so update the widget
+    o->value( nv );
+    // Now copy the new name into the node if it changed
+    if (   ( nn && (strcmp(nn, nv) != 0))
+        || (!nn && (strcmp("", nv) != 0)) )
     {
-      nd->name( o->value() );
+      nd->name( nv );
       Fluid.proj.set_modflag(1);
       redraw_browser();
+    }
+    // Don't forget to clean up
+    if (nv) {
+      free((void*)nv);
     }
   }
 }
@@ -2672,13 +2696,11 @@ static void cb_Base(Fl_Input* o, void* v) {
   Class_Node* nd = (Class_Node*)current_node;
 
   if (v == LOAD) {
-    o->value( nd->base_class_name() );
+    o->value( nd->base_class().c_str() );
   } else {
-    const char *nn = nd->base_class_name();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
-    {
-      nd->base_class_name( o->value() );
+    auto nn = nd->base_class();
+    if (nn != o->value()) {
+      nd->base_class( o->value() );
       Fluid.proj.set_modflag(1);
     }
   }

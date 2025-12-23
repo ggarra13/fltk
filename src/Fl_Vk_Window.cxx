@@ -358,6 +358,12 @@ bool Fl_Vk_Window::vk_draw_begin() {
         }
     }
 
+    if (m_debugSync) {
+        fprintf(stderr, "%s Resetting fence for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_currentFrameIndex);
+    }
+    
     // Reset the fence immediately after a successful wait.
     result = vkResetFences(device(), 1, &frame.fence);
     if (result != VK_SUCCESS)
@@ -575,10 +581,19 @@ void Fl_Vk_Window::swap_buffers() {
         return;
     }
 
-    Fl_Vk_SwapchainBuffer& buffer = m_buffers[m_current_buffer];
-
+    // Update HDR metadata if changed
+    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
+    {
+        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
+        m_previous_hdr_metadata = m_hdr_metadata;
+        m_hdr_metadata_changed = false;
+    }
+    
     // Submit command buffer
     VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+
+    // Prepare Submit Info
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.waitSemaphoreCount = 1;
@@ -587,7 +602,7 @@ void Fl_Vk_Window::swap_buffers() {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &frame.commandBuffer;
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &buffer.semaphore;
+    submit_info.pSignalSemaphores = &frame.drawCompleteSemaphore;
 
     if (m_debugSync) {
         fprintf(stderr, "%s Submitting frame %u for image index %u\n",
@@ -608,21 +623,12 @@ void Fl_Vk_Window::swap_buffers() {
 
 
     pVkWindowDriver->swap_buffers();
-    
-    // Update HDR metadata if changed
-    if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
-        m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
-    {
-        vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
-        m_previous_hdr_metadata = m_hdr_metadata;
-        m_hdr_metadata_changed = false;
-    }
         
     // Present swapchain image
     VkPresentInfoKHR present_info = {};
     present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &buffer.semaphore;
+    present_info.pWaitSemaphores = &frame.drawCompleteSemaphore;
     present_info.swapchainCount = 1;
     present_info.pSwapchains = &m_swapchain;
     present_info.pImageIndices = &m_current_buffer;
@@ -633,7 +639,13 @@ void Fl_Vk_Window::swap_buffers() {
                 m_current_buffer, m_currentFrameIndex);
     }
         
-    result = vkQueuePresentKHR(queue(), &present_info);
+
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex());
+        
+        result = vkQueuePresentKHR(queue(), &present_info);
+    }
+    
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
         result == VK_NOT_READY) {
         m_swapchain_needs_recreation = true;
@@ -645,7 +657,12 @@ void Fl_Vk_Window::swap_buffers() {
                 string_VkResult(result));
         return;
     }
-    
+
+    if (m_debugSync) {
+        fprintf(stderr, "%s Presented image index %u for frame %u\n",
+                label() ? label() : "(unknown)",
+                m_current_buffer, m_currentFrameIndex);
+    }
 
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
@@ -693,6 +710,12 @@ int Fl_Vk_Window::swap_interval() const {
 
 
 void Fl_Vk_Window::flush() {
+
+    if (m_debugSync) {
+        fprintf(stderr, "%s flush for frame %u\n",
+                label() ? label() : "(unknown)", m_currentFrameIndex);
+    }
+    
   if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
       return;
 
@@ -706,11 +729,25 @@ void Fl_Vk_Window::flush() {
   }
   
   if (pVkWindowDriver->flush_begin() && !m_swapchain_needs_recreation)
+  {
+      if (m_debugSync) {
+          fprintf(stderr, "%s pVkWindowDriver->flush_begin failed "
+                  "for frame %u\n",
+                  label() ? label() : "(unknown)", m_currentFrameIndex);
+      }
       return;
-      
+  }
+  
   if (!vk_draw_begin())
+  {
+      if (m_debugSync) {
+          fprintf(stderr, "%s vk_draw_begin failed "
+                  "for frame %u\n",
+                  label() ? label() : "(unknown)", m_currentFrameIndex);
+      }
       return;
-
+  }
+  
   draw();  // User defined virtual draw function
   vk_draw_end();
   

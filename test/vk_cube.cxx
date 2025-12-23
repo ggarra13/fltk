@@ -149,7 +149,7 @@ public:
         m_wire_pipeline = VK_NULL_HANDLE; 
         // Turn on validations
         m_validate = true;
-    
+        //m_debugSync = true;
     }
 };
 
@@ -1025,7 +1025,7 @@ void makeform(const char *name) {
   grid->row_gap(2, 50);         // gap below sliders for labels
 
   // left Vk window
-  lt_cube = new cube_box(0, 0, 350, 350);
+  lt_cube = new cube_box(0, 0, 350, 350, "Left Cube");
 
   // center group
   wire  = new Fl_Radio_Light_Button(    0, 0, 100, 25, "Wire");
@@ -1041,7 +1041,7 @@ void makeform(const char *name) {
   exit_button->tooltip("Display statistics (fps) and\nchoose to exit or continue\n");
 
   // right VK window
-  rt_cube = new cube_box(0, 0, 350, 350);
+  rt_cube = new cube_box(0, 0, 350, 350, "Right Cube");
 
   // assign widgets to grid positions (R=row, C=col) and sizes
   // RS=rowspan, CS=colspan: R, C, RS, CS, optional alignment

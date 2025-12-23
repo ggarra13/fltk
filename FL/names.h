@@ -1,7 +1,7 @@
 //
 // Event and other names header file for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2024 by Bill Spitzak and others.
+// Copyright 1998-2025 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -47,7 +47,7 @@
   }
   \endcode
  */
-std::map<int, const char*> fl_eventnames = {
+static std::map<int, const char*> fl_eventnames = {
   { FL_NO_EVENT, "FL_NO_EVENT" },
   { FL_PUSH, "FL_PUSH" },
   { FL_RELEASE, "FL_RELEASE" },
@@ -78,6 +78,8 @@ std::map<int, const char*> fl_eventnames = {
   { FL_ZOOM_EVENT, "FL_ZOOM_EVENT" },
   { FL_BEFORE_TOOLTIP, "FL_BEFORE_TOOLTIP" },
   { FL_BEFORE_MENU, "FL_BEFORE_MENU" },
+  { FL_APP_ACTIVATE, "FL_APP_ACTIVATE" },
+  { FL_APP_DEACTIVATE, "FL_APP_DEACTIVATE" },
   { /*FL_EVENT_*/ 30, "FL_EVENT_30" }, // not yet defined, just in case it /will/ be defined ...
   { /*FL_EVENT_*/ 31, "FL_EVENT_31" }, // not yet defined, just in case it /will/ be defined ...
   { /*FL_EVENT_*/ 32, "FL_EVENT_32" },  // not yet defined, just in case it /will/ be defined ...

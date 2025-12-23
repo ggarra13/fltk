@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-rm -rf build_vk_wayland/
+#rm -rf build_vk_wayland/
 mkdir -p build_vk_wayland/
 cd build_vk_wayland
 
@@ -8,10 +8,13 @@ set +e
 
 export VULKAN_SDK=/usr/
 
+
+BUILD_TYPE=Release
+
 cmake .. \
       -G Ninja \
       -D CMAKE_CXX_STANDARD=17 \
-      -D CMAKE_BUILD_TYPE=Debug \
+      -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
       -D FLTK_BUILD_FLUID=OFF \
@@ -59,5 +62,6 @@ ninja -v
 
 bin/test/vk_shape-shared
 bin/test/vk_shape_textured-shared
+bin/test/cube-shared
 bin/test/vk_cube-shared
 bin/test/vk_fullscreen-shared

@@ -38,13 +38,11 @@ struct Fl_Vk_SwapchainBuffer {
     VkImage image;
     VkImageView view;
     VkFramebuffer framebuffer;
-    VkSemaphore   semaphore;
 
     Fl_Vk_SwapchainBuffer() :
         image(VK_NULL_HANDLE),
         view(VK_NULL_HANDLE),
-        framebuffer(VK_NULL_HANDLE),
-        semaphore(VK_NULL_HANDLE)
+        framebuffer(VK_NULL_HANDLE)
         {
         }
     
@@ -60,12 +58,6 @@ struct Fl_Vk_SwapchainBuffer {
             {
                 vkDestroyImageView(device, view, NULL);
                 view = VK_NULL_HANDLE;
-            }
-
-            if (semaphore != VK_NULL_HANDLE)
-            {
-                vkDestroySemaphore(device, semaphore, NULL);
-                semaphore = VK_NULL_HANDLE;
             }
             
             // image belongs to the swapchain (must not destroy).

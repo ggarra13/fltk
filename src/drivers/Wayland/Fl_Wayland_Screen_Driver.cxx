@@ -36,6 +36,9 @@
 #include <xkbcommon/xkbcommon-compose.h>
 #include "text-input-client-protocol.h"
 #include "gtk-shell-client-protocol.h"
+#if HAVE_XDG_DIALOG
+#  include "xdg-dialog-client-protocol.h"
+#endif
 #include <assert.h>
 #include <sys/mman.h>
 #include <poll.h>
@@ -1327,6 +1330,11 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
     scr_driver->text_input_base = (struct zwp_text_input_manager_v3 *)
       wl_registry_bind(wl_registry, id, &zwp_text_input_manager_v3_interface, 1);
 //printf("scr_driver->text_input_base=%p version=%d\n",scr_driver->text_input_base,version);
+#if HAVE_XDG_DIALOG
+  } else if (strcmp(interface, xdg_wm_dialog_v1_interface.name) == 0) {
+    scr_driver->xdg_wm_dialog = (struct xdg_wm_dialog_v1 *)
+      wl_registry_bind(wl_registry, id, &xdg_wm_dialog_v1_interface, 1);
+#endif // HAVE_XDG_DIALOG
   }
 }
 
@@ -1360,27 +1368,61 @@ static const struct wl_registry_listener registry_listener = {
 
 extern int fl_send_system_handlers(void *);
 
+static void wayland_socket_callback(int fd, struct wl_display *display)
+{
+  if (fl_send_system_handlers(NULL))
+    return;
 
-static void wayland_socket_callback(int fd, struct wl_display *display) {
-  if (fl_send_system_handlers(NULL)) return;
-  struct pollfd fds = (struct pollfd) { fd, POLLIN, 0 };
-  do {
-    if (wl_display_dispatch(display) == -1) {
-      int err = wl_display_get_error(display);
-      if (err == EPROTO) {
-        const struct wl_interface *interface;
-        int code = wl_display_get_protocol_error(display, &interface, NULL);
-        Fl::fatal("Fatal error no %d in Wayland protocol: %s", code,
-                  (interface ? interface->name : "unknown") );
-      } else {
-        Fl::fatal("Fatal error while communicating with the Wayland server: %s",
-                  strerror(errno));
-      }
+  struct pollfd fds = {
+    .fd = fd,
+    .events = POLLIN | POLLERR | POLLHUP,
+    .revents = 0
+  };
+
+  /* Try to prepare for reading */
+  if (wl_display_prepare_read(display) == -1) {
+    /* Events already pending */
+    wl_display_dispatch_pending(display);
+    return;
+  }
+
+  /* Socket is readable (we are in fd callback) */
+  if (poll(&fds, 1, 0) <= 0) {
+    wl_display_cancel_read(display);
+    return;
+  }
+
+  if (fds.revents & (POLLERR | POLLHUP)) {
+    wl_display_cancel_read(display);
+    goto fatal;
+  }
+
+  /* Read events (never blocks here) */
+  if (wl_display_read_events(display) == -1)
+    goto fatal;
+
+  /* Dispatch everything we just read */
+  if (wl_display_dispatch_pending(display) == -1)
+    goto fatal;
+
+  /* Flush outgoing requests */
+  wl_display_flush(display);
+  return;
+
+fatal:
+  {
+    int err = wl_display_get_error(display);
+    if (err == EPROTO) {
+      const struct wl_interface *interface;
+      int code = wl_display_get_protocol_error(display, &interface, NULL);
+      Fl::fatal("Fatal error %d in Wayland protocol: %s",
+                code, interface ? interface->name : "unknown");
+    } else {
+      Fl::fatal("Fatal error while communicating with Wayland server: %s",
+                strerror(errno));
     }
   }
-  while (poll(&fds, 1, 0) > 0);
 }
-
 
 Fl_Wayland_Screen_Driver::Fl_Wayland_Screen_Driver() : Fl_Unix_Screen_Driver() {
   libdecor_context = NULL;
@@ -1388,6 +1430,9 @@ Fl_Wayland_Screen_Driver::Fl_Wayland_Screen_Driver() : Fl_Unix_Screen_Driver() {
   text_input_base = NULL;
   reset_cursor();
   wl_registry = NULL;
+#if HAVE_XDG_DIALOG
+  xdg_wm_dialog = NULL;
+#endif
 }
 
 
@@ -1562,7 +1607,7 @@ static void xdg_toplevel_configure(void *v, struct xdg_toplevel *xdg_toplevel,
   struct configure_s *data = (struct configure_s*)v;
   data->W = width;
   data->H = height;
-  data->state = (states ? *(uint32_t *)(states->data) : 0);
+  data->state = (width && height && states ? *(uint32_t *)(states->data) : 0);
 }
 
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {
