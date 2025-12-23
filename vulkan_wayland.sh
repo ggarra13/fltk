@@ -14,7 +14,7 @@ set +e
 export VULKAN_SDK=/usr/
 
 
-BUILD_TYPE=Release
+BUILD_TYPE=Debug
 
 cmake .. \
       -G Ninja \
