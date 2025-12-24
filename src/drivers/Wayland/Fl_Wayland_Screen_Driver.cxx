@@ -36,6 +36,9 @@
 #include <xkbcommon/xkbcommon-compose.h>
 #include "text-input-client-protocol.h"
 #include "gtk-shell-client-protocol.h"
+#if HAVE_XDG_DIALOG
+#  include "xdg-dialog-client-protocol.h"
+#endif
 #include <assert.h>
 #include <sys/mman.h>
 #include <poll.h>
@@ -1327,6 +1330,11 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
     scr_driver->text_input_base = (struct zwp_text_input_manager_v3 *)
       wl_registry_bind(wl_registry, id, &zwp_text_input_manager_v3_interface, 1);
 //printf("scr_driver->text_input_base=%p version=%d\n",scr_driver->text_input_base,version);
+#if HAVE_XDG_DIALOG
+  } else if (strcmp(interface, xdg_wm_dialog_v1_interface.name) == 0) {
+    scr_driver->xdg_wm_dialog = (struct xdg_wm_dialog_v1 *)
+      wl_registry_bind(wl_registry, id, &xdg_wm_dialog_v1_interface, 1);
+#endif // HAVE_XDG_DIALOG
   }
 }
 
@@ -1422,6 +1430,9 @@ Fl_Wayland_Screen_Driver::Fl_Wayland_Screen_Driver() : Fl_Unix_Screen_Driver() {
   text_input_base = NULL;
   reset_cursor();
   wl_registry = NULL;
+#if HAVE_XDG_DIALOG
+  xdg_wm_dialog = NULL;
+#endif
 }
 
 
@@ -1596,7 +1607,7 @@ static void xdg_toplevel_configure(void *v, struct xdg_toplevel *xdg_toplevel,
   struct configure_s *data = (struct configure_s*)v;
   data->W = width;
   data->H = height;
-  data->state = (states ? *(uint32_t *)(states->data) : 0);
+  data->state = (width && height && states ? *(uint32_t *)(states->data) : 0);
 }
 
 static const struct xdg_toplevel_listener xdg_toplevel_listener = {

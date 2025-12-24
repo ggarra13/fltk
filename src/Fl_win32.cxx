@@ -1213,6 +1213,7 @@ static Fl_Window *resize_bug_fix;
 
 extern void fl_save_pen(void);
 extern void fl_restore_pen(void);
+extern LRESULT fl_win32_tablet_handler(MSG& msg);
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     
@@ -1469,7 +1470,9 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
           if ((GetAsyncKeyState(VK_LWIN) | GetAsyncKeyState(VK_RWIN)) & ~1)
             state |= FL_META;
           Fl::e_state = state;
-          return 0;
+          Fl::handle(FL_APP_ACTIVATE, nullptr);
+        } else {
+          Fl::handle(FL_APP_DEACTIVATE, nullptr);
         }
         break;
 
@@ -1823,10 +1826,13 @@ content  key    keyboard layout
 
         return 0;
 
-      default:
+      default: {
+        LRESULT ret = fl_win32_tablet_handler(fl_msg);
+        if (ret != -1)
+          return ret;
         if (Fl::handle(0, 0))
           return 0;
-        break;
+        break; }
     } // switch (uMsg)
   } // if (window)
   return DefWindowProcW(hWnd, uMsg, wParam, lParam);
@@ -2195,9 +2201,14 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
     Fl_Window *hint = Fl::first_window();
     if (hint) {
       nscreen = Fl_Window_Driver::driver(hint->top_window())->screen_num();
-    } else {
-      int mx, my;
+    } else if (Fl::screen_driver()->screen_count() > 1 ) {
+      // put the new window on same screen as mouse
+      int mx, my, X, Y, W, H;
       nscreen = Fl::screen_driver()->get_mouse(mx, my);
+      Fl::screen_xywh(X, Y, W, H, nscreen);
+      if (mx + w->w() >= X + W) mx = X + W - w->w();
+      if (my + w->h() >= Y + H) my = Y + H - w->h();
+      w->position(mx, my);
     }
   }
   Fl_Window_Driver::driver(w)->screen_num(nscreen);
