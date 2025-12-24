@@ -1416,28 +1416,6 @@ fatal:
   }
 }
 
-#if 0
-static void wayland_socket_callback(int fd, struct wl_display *display) {
-  if (fl_send_system_handlers(NULL)) return;
-  struct pollfd fds = (struct pollfd) { fd, POLLIN, 0 };
-  do {
-    if (wl_display_dispatch(display) == -1) {
-      int err = wl_display_get_error(display);
-      if (err == EPROTO) {
-        const struct wl_interface *interface;
-        int code = wl_display_get_protocol_error(display, &interface, NULL);
-        Fl::fatal("Fatal error no %d in Wayland protocol: %s", code,
-                  (interface ? interface->name : "unknown") );
-      } else {
-        Fl::fatal("Fatal error while communicating with the Wayland server: %s",
-                  strerror(errno));
-      }
-    }
-  }
-  while (poll(&fds, 1, 0) > 0);
-}
-#endif
-
 Fl_Wayland_Screen_Driver::Fl_Wayland_Screen_Driver() : Fl_Unix_Screen_Driver() {
   libdecor_context = NULL;
   seat = NULL;
