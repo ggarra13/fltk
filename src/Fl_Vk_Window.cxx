@@ -141,11 +141,6 @@ void Fl_Vk_Window::recreate_swapchain() {
             vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
             frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
         }
-        if (frame.drawCompleteSemaphore != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(device(), frame.drawCompleteSemaphore, nullptr);
-            frame.drawCompleteSemaphore = VK_NULL_HANDLE;
-        }
         if (frame.fence != VK_NULL_HANDLE)
         {
             vkDestroyFence(device(), frame.fence, nullptr);
@@ -222,15 +217,6 @@ void Fl_Vk_Window::recreate_swapchain() {
                 return;
             }
         }
-        if (frame.drawCompleteSemaphore == VK_NULL_HANDLE) {
-            result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr,
-                                       &frame.drawCompleteSemaphore);
-            if (result != VK_SUCCESS) {
-                fprintf(stderr, "vkCreateSemaphore (drawComplete) failed: %s\n", string_VkResult(result));
-                shutdown_vulkan();
-                return;
-            }
-        }
         if (frame.fence == VK_NULL_HANDLE) {
             result = vkCreateFence(device(), &fenceInfo, nullptr, &frame.fence);
             if (result != VK_SUCCESS) {
@@ -249,8 +235,6 @@ void Fl_Vk_Window::recreate_swapchain() {
         }
     }
     
-    // \@bug: this makes the code crash on draw() to invalid command buffer
-    // m_currentFrameIndex = 0;  
     m_swapchain_needs_recreation = false;
 }
 
@@ -639,7 +623,12 @@ void Fl_Vk_Window::swap_buffers() {
                 m_current_buffer, m_currentFrameIndex);
     }
         
-    result = vkQueuePresentKHR(queue(), &present_info);
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex());
+    
+        result = vkQueuePresentKHR(queue(), &present_info);
+    }
+    
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
         result == VK_NOT_READY) {
         m_swapchain_needs_recreation = true;
@@ -904,10 +893,6 @@ void Fl_Vk_Window::shutdown_vulkan() {
             vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
             frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
         }
-        if (frame.drawCompleteSemaphore != VK_NULL_HANDLE) {
-            vkDestroySemaphore(device(), frame.drawCompleteSemaphore, nullptr);
-            frame.drawCompleteSemaphore = VK_NULL_HANDLE;
-        }
         if (frame.fence != VK_NULL_HANDLE) {
             // Wait for fence to ensure no pending operations
             result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
@@ -1130,13 +1115,6 @@ void Fl_Vk_Window::init_vulkan() {
     for (auto& frame : m_frames) {
         result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr,
                                    &frame.imageAcquiredSemaphore);
-        if (result != VK_SUCCESS) {
-            fprintf(stderr, "vkCreateSemaphore failed: %s\n", string_VkResult(result));
-            shutdown_vulkan();
-            return;
-        }
-        result = vkCreateSemaphore(device(), &semaphoreInfo, nullptr,
-                                   &frame.drawCompleteSemaphore);
         if (result != VK_SUCCESS) {
             fprintf(stderr, "vkCreateSemaphore failed: %s\n", string_VkResult(result));
             shutdown_vulkan();
