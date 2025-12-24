@@ -17,7 +17,7 @@ cmake .. \
       -D CMAKE_BUILD_TYPE=${BUILD_TYPE} \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=OFF \
-      -D FLTK_BUILD_FLUID=OFF \
+      -D FLTK_BUILD_FLUID=ON \
       -D FLTK_BUILD_FORMS=OFF \
       -D FLTK_BUILD_GL=OFF \
       -D FLTK_BUILD_VK=ON \
