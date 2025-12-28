@@ -49,19 +49,7 @@ cmake .. \
 
 ninja -v
 
-#
-# Whether to use explicit sync or implicit sync.
-#
-# GNOME48 and Kwin6 on Ubuntu 25.04 default is implicit sync.
-# GNOME49 and Kwin6 on Ubuntu 25.10 default is explicit sync.
-#
-# Sets the variable correctly for each graphics card (currently only works
-# in NVidia, which seems to have a timeout with events on both GNOME49 and
-# Kwin6.2).
-#
-
 bin/test/vk_shape-shared
 bin/test/vk_shape_textured-shared
-bin/test/cube-shared
 bin/test/vk_cube-shared
 bin/test/vk_fullscreen-shared

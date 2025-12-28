@@ -894,12 +894,42 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         // Create global resources
         pWindow->m_device = m_device;
         pWindow->m_queue->queue = m_queue;
-        
+
+        uint32_t apiVersion = VK_API_VERSION_1_0;
+        vkEnumerateInstanceVersion(&apiVersion);
+
+        VmaVulkanFunctions funcs{};
+        funcs.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+        funcs.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+        funcs.vkAllocateMemory = vkAllocateMemory;
+        funcs.vkFreeMemory = vkFreeMemory;
+        funcs.vkMapMemory = vkMapMemory;
+        funcs.vkUnmapMemory = vkUnmapMemory;
+        funcs.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges;
+        funcs.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges;
+        funcs.vkBindBufferMemory = vkBindBufferMemory;
+        funcs.vkBindImageMemory = vkBindImageMemory;
+        funcs.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+        funcs.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+        funcs.vkCreateBuffer = vkCreateBuffer;
+        funcs.vkDestroyBuffer = vkDestroyBuffer;
+        funcs.vkCreateImage = vkCreateImage;
+        funcs.vkDestroyImage = vkDestroyImage;
+
         // Create Vma allocator
         VmaAllocatorCreateInfo allocatorInfo = {};
         allocatorInfo.physicalDevice = pWindow->gpu();
         allocatorInfo.device = m_device;
         allocatorInfo.instance = pWindow->instance();
+        allocatorInfo.vulkanApiVersion = apiVersion;
+        allocatorInfo.flags = VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+
+        // \@todo:
+        //       VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT
+                
+        allocatorInfo.pVulkanFunctions = &funcs;
+
+
         vmaCreateAllocator(&allocatorInfo, &pWindow->m_allocator);
     }
 
