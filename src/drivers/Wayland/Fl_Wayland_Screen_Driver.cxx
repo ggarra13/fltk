@@ -1362,43 +1362,33 @@ extern int fl_send_system_handlers(void *);
 
 static void wayland_socket_callback(int fd, struct wl_display *display)
 {
-  if (fl_send_system_handlers(NULL))
-    return;
+  if (fl_send_system_handlers(NULL)) return;
 
-  struct pollfd fds = {
-    .fd = fd,
-    .events = POLLIN | POLLERR | POLLHUP,
-    .revents = 0
-  };
-
-  /* Try to prepare for reading */
   if (wl_display_prepare_read(display) == -1) {
-    /* Events already pending */
     wl_display_dispatch_pending(display);
     return;
   }
 
-  /* Socket is readable (we are in fd callback) */
+  // Now we have the lock - flush outgoing requests
+  wl_display_flush(display);
+
+  struct pollfd fds = (struct pollfd) { fd, POLLIN, 0 };
   if (poll(&fds, 1, 0) <= 0) {
     wl_display_cancel_read(display);
-    return;
+    return;                // nothing to read right now
   }
-
+  
   if (fds.revents & (POLLERR | POLLHUP)) {
     wl_display_cancel_read(display);
     goto fatal;
   }
-
-  /* Read events (never blocks here) */
+  
   if (wl_display_read_events(display) == -1)
     goto fatal;
 
-  /* Dispatch everything we just read */
   if (wl_display_dispatch_pending(display) == -1)
     goto fatal;
 
-  /* Flush outgoing requests */
-  wl_display_flush(display);
   return;
 
 fatal:
@@ -1415,6 +1405,7 @@ fatal:
     }
   }
 }
+
 
 Fl_Wayland_Screen_Driver::Fl_Wayland_Screen_Driver() : Fl_Unix_Screen_Driver() {
   libdecor_context = NULL;
