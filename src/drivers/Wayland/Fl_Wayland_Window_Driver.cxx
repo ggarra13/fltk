@@ -23,6 +23,9 @@
 #include "../../../libdecor/build/fl_libdecor.h"
 #include "xdg-shell-client-protocol.h"
 #include "gtk-shell-client-protocol.h"
+#if HAVE_XDG_DIALOG
+#  include "xdg-dialog-client-protocol.h"
+#endif
 #include <pango/pangocairo.h>
 #include <FL/Fl_Overlay_Window.H>
 #include <FL/Fl_Tooltip.H>
@@ -475,6 +478,12 @@ void Fl_Wayland_Window_Driver::hide() {
       wl_subsurface_destroy(wld_win->subsurface);
       wld_win->subsurface = NULL;
     }
+#if HAVE_XDG_DIALOG
+    if (wld_win->xdg_dialog) {
+      xdg_dialog_v1_destroy(wld_win->xdg_dialog);
+      wld_win->xdg_dialog = NULL;
+    }
+#endif
     if (wld_win->kind == DECORATED) {
       libdecor_frame_unref(wld_win->frame);
       wld_win->frame = NULL;
@@ -873,6 +882,26 @@ static void scan_subwindows(Fl_Group *g, void (*f)(Fl_Window *)) {
   }
 }
 
+// Generate FL_APP_ACTIVATE and FL_APP_DEACTIVATE events
+static bool app_has_active_window = false;
+
+// If a window is deactivated, check after a short delay if any other window has
+// become active. If not, send an FL_APP_DEACTIVATE event.
+static void deferred_check_app_deactivate(void*) {
+  if (!app_has_active_window) return;
+  app_has_active_window = false;
+  // Check all FLTK windows to see if any are still active
+  for (Fl_Window *w = Fl::first_window(); w; w = Fl::next_window(w)) {
+    if (w->visible_r()) {
+      struct wld_window* xid = fl_wl_xid(w);
+      if (xid && (xid->state & LIBDECOR_WINDOW_STATE_ACTIVE)) {
+        app_has_active_window = true;
+        break;
+      }
+    }
+  }
+  if (!app_has_active_window) Fl::handle(FL_APP_DEACTIVATE, nullptr);
+}
 
 static void handle_configure(struct libdecor_frame *frame,
      struct libdecor_configuration *configuration, void *user_data)
@@ -973,7 +1002,13 @@ static void handle_configure(struct libdecor_frame *frame,
   if (is_2nd_run) driver->wait_for_expose_value = 0;
 //fprintf(stderr, "handle_configure fl_win=%p size:%dx%d state=%x wait_for_expose_value=%d is_2nd_run=%d\n", window->fl_win, width,height,window_state,driver->wait_for_expose_value, is_2nd_run);
 
+  // When no window is active, and one window gets activated, generate an FL_APP_ACTIVATE event
   if (window_state & LIBDECOR_WINDOW_STATE_ACTIVE) {
+    if (!app_has_active_window) {
+      app_has_active_window = true;
+      Fl::handle(FL_APP_ACTIVATE, nullptr);
+    }
+
     if (Fl_Wayland_Screen_Driver::compositor == Fl_Wayland_Screen_Driver::WESTON) {
       // After click on titlebar, weston calls wl_keyboard_enter() for a
       // titlebar-related surface that FLTK can't identify, so we send FL_FOCUS here.
@@ -987,6 +1022,12 @@ static void handle_configure(struct libdecor_frame *frame,
     }
   } else if (window_state & LIBDECOR_WINDOW_STATE_SUSPENDED) { // window is minimized
     Fl::handle(FL_HIDE, window->fl_win);
+  }
+
+  // When a window gets deactivated and there are no other active windows,
+  // generate an FL_APP_DEACTIVATE event
+  if ( ((window_state & LIBDECOR_WINDOW_STATE_ACTIVE) == 0) && app_has_active_window) {
+    Fl::add_timeout(0.1, deferred_check_app_deactivate, nullptr);
   }
 
   if (window->fl_win->border())
@@ -1562,23 +1603,30 @@ void Fl_Wayland_Window_Driver::makeWindow()
   if (pWindow->modal() || pWindow->non_modal()) {
     if (pWindow->modal()) Fl::modal_ = pWindow;
     if (new_window->kind == DECORATED && first_xid && first_xid->kind == DECORATED) {
-     if (first_xid->frame) libdecor_frame_set_parent(new_window->frame, first_xid->frame);
+      if (first_xid->frame) libdecor_frame_set_parent(new_window->frame, first_xid->frame);
     } else if (new_window->kind == UNFRAMED && new_window->xdg_toplevel && first_xid) {
       Fl_Wayland_Window_Driver *top_dr = Fl_Wayland_Window_Driver::driver(first_xid->fl_win);
       if (top_dr->xdg_toplevel()) xdg_toplevel_set_parent(new_window->xdg_toplevel,
                                                           top_dr->xdg_toplevel());
     }
-    if (scr_driver->seat->gtk_shell && pWindow->modal() &&
-        (new_window->kind == DECORATED || new_window->kind == UNFRAMED)) {
-      // Useful to position modal windows above their parent with "gnome-shell --version" ≤ 45.2,
-      // useless but harmless with "gnome-shell --version" ≥ 46.0.
-      struct gtk_surface1 *gtk_surface = gtk_shell1_get_gtk_surface(scr_driver->seat->gtk_shell,
-                                                                    new_window->wl_surface);
-      gtk_surface1_set_modal(gtk_surface);
-      if (gtk_surface1_get_version(gtk_surface) >= GTK_SURFACE1_RELEASE_SINCE_VERSION)
-        gtk_surface1_release(gtk_surface); // very necessary
-      else
-        gtk_surface1_destroy(gtk_surface);
+    if (new_window->kind == DECORATED || new_window->kind == UNFRAMED) {
+#if HAVE_XDG_DIALOG
+      if (scr_driver->xdg_wm_dialog) {
+        new_window->xdg_dialog = xdg_wm_dialog_v1_get_xdg_dialog(scr_driver->xdg_wm_dialog, xdg_toplevel());
+        if (pWindow->modal()) xdg_dialog_v1_set_modal(new_window->xdg_dialog);
+      } else
+#endif
+      if (scr_driver->seat->gtk_shell && pWindow->modal()) {
+        // Useful to position modal windows above their parent with "gnome-shell --version" ≤ 45.2,
+        // useless but harmless with "gnome-shell --version" ≥ 46.0.
+        struct gtk_surface1 *gtk_surface = gtk_shell1_get_gtk_surface(scr_driver->seat->gtk_shell,
+                                                                        new_window->wl_surface);
+        gtk_surface1_set_modal(gtk_surface);
+        if (gtk_surface1_get_version(gtk_surface) >= GTK_SURFACE1_RELEASE_SINCE_VERSION)
+          gtk_surface1_release(gtk_surface); // very necessary
+        else
+          gtk_surface1_destroy(gtk_surface);
+      }
     }
   }
 
@@ -1876,7 +1924,7 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
     depth--;
     return;
   }
-  
+
   if (is_a_resize) {
     if (pWindow->as_overlay_window() && other_xid) {
       destroy_double_buffer();

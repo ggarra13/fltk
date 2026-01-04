@@ -1499,12 +1499,16 @@ const Fl_Menu_Item* Fl_Menu_Item::pulldown(
       pp.menubar_button_helper = nullptr;
     }
     initial_item = 0; // stop the startup code
+    if (pp.current_menu_ix < 0 || pp.current_menu_ix >= pp.num_menus) {
+      initial_item = 0; // turn off startup code
+      continue;
+    }
     pp.menu_window[pp.current_menu_ix]->autoscroll(pp.current_item_ix);
 
   STARTUP:
     Menu_Window& cw = *pp.menu_window[pp.current_menu_ix];
     const Fl_Menu_Item* m = pp.current_item;
-    if (!m->selectable()) { // pointing at inactive item
+    if (!m || !m->selectable()) { // pointing at inactive item
       cw.set_selected(-1);
       initial_item = 0; // turn off startup code
       continue;
@@ -1640,8 +1644,8 @@ const Fl_Menu_Item* Fl_Menu_Item::test_shortcut() const {
 
 /** The Fl_Window from which currently displayed popups originate.
   Optionally, gives also the height of the display containing this window.
-  \parmm[out]display_height return the height of the display here.
-  \return pointe to the owning window
+  \param[out] display_height return the height of the display here.
+  \return pointer to the owning window
 */
 Fl_Window *Fl_Window_Driver::menu_parent(int *display_height) {
   if (display_height) *display_height = Menu_Window::display_height_;

@@ -1,7 +1,7 @@
 #
 # CMakeLists.txt to build docs for the FLTK project using CMake (www.cmake.org)
 #
-# Copyright 1998-2024 by Bill Spitzak and others.
+# Copyright 1998-2025 by Bill Spitzak and others.
 #
 # This library is free software. Distribution and use rights are outlined in
 # the file "COPYING" which should have been included with this file.  If this
@@ -103,6 +103,7 @@ if(FLTK_BUILD_HTML_DOCS)
 
   set(GENERATE_HTML  YES)
   set(GENERATE_LATEX NO)
+  set(EXTRA_SECTIONS "HTML_SECTIONS")
   set(LATEX_HEADER   "")
   set(DOXYFILE       "Doxyfile")
   set(LOGFILE        "${CMAKE_CURRENT_BINARY_DIR}/${DOXYFILE}_error.log")
@@ -152,9 +153,12 @@ if(FLTK_BUILD_PDF_DOCS)
 
   set(GENERATE_HTML  NO)
   set(GENERATE_LATEX YES)
+  set(EXTRA_SECTIONS "LATEX_SECTIONS")
   set(LATEX_HEADER   "${CMAKE_CURRENT_BINARY_DIR}/fltk-book.tex")
   set(DOXYFILE       "Doxybook")
   set(LOGFILE        "${CMAKE_CURRENT_BINARY_DIR}/${DOXYFILE}_error.log")
+
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
   # configure Doxygen input file for PDF docs (Doxybook.in)
 
@@ -187,7 +191,7 @@ if(FLTK_BUILD_PDF_DOCS)
   # generate LaTeX title fltk-title.tex and make_pdf script
 
   configure_file(
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/fltk-title.tex.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/fltk-title.tex.in
     ${CMAKE_CURRENT_BINARY_DIR}/fltk-title.tex
     @ONLY
   )
@@ -198,7 +202,39 @@ if(FLTK_BUILD_PDF_DOCS)
     @ONLY
   )
 
-  # generate fltk.pdf
+  # Generate code snapshots (images with international characters).
+  # Note: File names (even from different folders) must be unique !
+
+  set(image_output_dir "${CMAKE_CURRENT_BINARY_DIR}/generated")
+  set(_deps)
+  set(image_input_sources
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/unicode.dox
+      # ${CMAKE_CURRENT_SOURCE_DIR}/src/cmp.dox   # more documentation files
+      # ${FLTK_SOURCE_DIR}/src/Fl.cxx             # example source file
+  )
+
+  # Generate one custom command and one timestamp per input file
+  # so dependencies can be used to generate the images only if
+  # the source file was changes.
+  # Variable `_deps` is used to make the final PDF generation
+  # depend on all input files.
+
+  foreach(_infile ${image_input_sources})
+    get_filename_component(_name "${_infile}" NAME)
+    set(_timestamp ${image_output_dir}/${_name}.timestamp)
+    list(APPEND _deps ${_timestamp})
+    # create custom command
+    add_custom_command(
+      OUTPUT  ${_timestamp}
+      COMMAND touch ${_timestamp}
+      COMMAND code_snapshot ${_infile}
+      DEPENDS ${_infile}
+      WORKING_DIRECTORY ${image_output_dir}
+      COMMENT "Generating code snapshots (PNG) from '${_infile}'"
+    )
+  endforeach()
+
+  # Now generate the PDF file (fltk.pdf)
 
   add_custom_command(
     OUTPUT  ${CMAKE_CURRENT_BINARY_DIR}/fltk.pdf
@@ -209,8 +245,11 @@ if(FLTK_BUILD_PDF_DOCS)
     COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYFILE}
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/make_pdf
     COMMAND cp -f latex/refman.pdf fltk.pdf
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${DOXYFILE}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
+            ${CMAKE_CURRENT_BINARY_DIR}/${DOXYFILE}.in
+            ${CMAKE_CURRENT_BINARY_DIR}/${DOXYFILE}
             ${CMAKE_CURRENT_BINARY_DIR}/fltk-title.tex
+            ${_deps} # source files processed to generate PNG's
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating PDF documentation" VERBATIM
   )
@@ -220,6 +259,7 @@ if(FLTK_BUILD_PDF_DOCS)
   add_custom_target(pdf
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/fltk.pdf
   )
+  add_dependencies(pdf code_snapshot)
 
 endif(FLTK_BUILD_PDF_DOCS)
 

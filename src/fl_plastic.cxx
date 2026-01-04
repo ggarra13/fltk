@@ -1,10 +1,11 @@
 //
-// "Plastic" drawing routines for the Fast Light Tool Kit (FLTK).
+// "Plastic" scheme drawing routines for the Fast Light Tool Kit (FLTK).
 //
 // These box types provide a cross between Aqua and KDE buttons; kindof
 // like translucent plastic buttons...
 //
-// Copyright 2001-2010 by Michael Sweet.
+// Copyright 2001-2005 by Michael Sweet.
+// Copyright 2006-2025 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -17,56 +18,103 @@
 //     https://www.fltk.org/bugs.php
 //
 
+/**
+  \file src/fl_plastic.cxx
+  \brief Implementation of the \c 'plastic' scheme.
+*/
+
 // Box drawing code for an obscure box type.
 // These box types are in separate files so they are not linked
 // in if not used.
 
 #include <FL/Fl.H>
+#include <FL/Fl_Scheme.H>
 #include <FL/fl_draw.H>
-#include "flstring.h"
 
-//
-// Uncomment the following line to restore the old plastic box type
-// appearance.
-//
+#include <cassert>
 
-//#define USE_OLD_PLASTIC_BOX
-#define USE_OLD_PLASTIC_COLOR
+// Globals
 
-extern const uchar *fl_gray_ramp();
+extern const uchar *fl_gray_ramp();     // in src/fl_boxtype.cxx
 
-inline Fl_Color shade_color(uchar gc, Fl_Color bc) {
-#ifdef USE_OLD_PLASTIC_COLOR
-  return fl_color_average((Fl_Color)gc, bc, 0.75f);
-#else
-  unsigned      grgb = Fl::get_color((Fl_Color)gc),
-                brgb = Fl::get_color(bc);
-  int           red, green, blue, gray;
+// Module globals (static)
+
+static float plastic_average = -1.00f;  // plastic color average: not yet set
+static int av_min =  10;                // min. supported average
+static int av_def =  75;                // default average (up to FLTK 1.4)
+static int av_max = 100;                // max. supported average
 
 
-  gray  = ((grgb >> 24) & 255);
-  red   = gray * ((brgb >> 24) & 255) / 255 + gray * gray / 510;
-  gray  = ((grgb >> 16) & 255);
-  green = gray * ((brgb >> 16) & 255) / 255 + gray * gray / 510;
-  gray  = ((grgb >> 8) & 255);
-  blue  = gray * ((brgb >> 8) & 255) / 255 + gray * gray / 510;
+// clamp and set color average value
 
-  if (red > 255)
-    red = 255;
-
-  if (green > 255)
-    green = 255;
-
-  if (blue > 255)
-    blue = 255;
-
-  if (Fl::draw_box_active())
-    return fl_rgb_color(red, green, blue);
+static void set_color_average(int av) {
+  if (av < av_min)
+    plastic_average = av_min / 100.f;
+  else if (av > av_max)
+    plastic_average = av_max / 100.f;
   else
-    return fl_color_average(FL_GRAY, fl_rgb_color(red, green, blue), 0.75f);
-#endif // USE_OLD_PLASTIC_COLOR
+    plastic_average = av / 100.f;
 }
 
+/**
+  Set the color average value of the 'plastic' scheme in percent.
+
+  Legal values are in the range [ 10 ... 100 ], other values are clamped. The
+  default value is 75 which is backwards compatible with FLTK 1.4 and earlier.
+
+  Higher values make the colors in boxes etc. appear "more gray" whereas lower
+  values make colors appear more like the original color. The recommended value
+  is about 40 to 60 but this is left to the user.
+
+  If this method is not called then the environment variable \c FLTK_PLASTIC_AVERAGE
+  can be used to set the color average. The environment variable must be a pure
+  numeric (integer) value in the given range, otherwise the behavior is undefined.
+
+  However, calling \b this method takes precedence over the environment variable.
+  This method can be called at any time (e.g. to view dynamic changes). This will
+  permanently change the appearance for all later box / background drawings.
+
+  For details see GitHub Issue 464: "RFE: plastic scheme with faithful colors".
+
+  \note Program developers are supposed to use this method to apply "better"
+    values than the default (1.4) look and feel. End users are supposed to use
+    the environment variable for programs that \b don't use
+    Fl_Scheme::plastic_color_average().
+
+  Include the following header:
+  \code
+    #include <FL/Fl_Scheme.H>
+  \endcode
+
+  \param[in]  av  color average value in the documented range.
+
+  \since 1.5.0
+*/
+void Fl_Scheme::plastic_color_average(int av) {
+  set_color_average(av);
+}
+
+// Get 'plastic' color average from environment variable 'FLTK_PLASTIC_AVERAGE'
+// unless it has already been set.
+// See GitHub Issue # 464: "RFE: plastic scheme with faithful colors"
+
+static float plastic_color_average() {
+  if (plastic_average < 0.0f) {               // only once
+    char *envvar = fl_getenv("FLTK_PLASTIC_AVERAGE");
+    if (envvar) {                             // convert and store env. var.
+      int temp = atoi(envvar);                // may be 0, but will be clamped
+      set_color_average(temp);                // clamp and set value
+    } else {
+      plastic_average = av_def / 100.0f;      // set default value
+    }
+  }
+  assert(plastic_average >= 0);
+  return plastic_average;
+}
+
+inline Fl_Color shade_color(uchar gc, Fl_Color bc) {
+  return fl_color_average((Fl_Color)gc, bc, plastic_color_average());
+}
 
 static void frame_rect(int x, int y, int w, int h, const char *c, Fl_Color bc) {
   const uchar *g = fl_gray_ramp();
@@ -86,7 +134,6 @@ static void frame_rect(int x, int y, int w, int h, const char *c, Fl_Color bc) {
     fl_line(x - b, y, x - b, y + h, x, y + h + b);
   }
 }
-
 
 static void frame_round(int x, int y, int w, int h, const char *c, Fl_Color bc) {
   const uchar *g = fl_gray_ramp();
@@ -140,7 +187,6 @@ static void frame_round(int x, int y, int w, int h, const char *c, Fl_Color bc) 
     }
   }
 }
-
 
 static void shade_rect(int x, int y, int w, int h, const char *c, Fl_Color bc) {
   const uchar *g = fl_gray_ramp();
@@ -267,11 +313,9 @@ static void shade_round(int x, int y, int w, int h, const char *c, Fl_Color bc) 
   }
 }
 
-
-static void up_frame(int x, int y, int w, int h, Fl_Color c) {
+void fl_plastic_up_frame(int x, int y, int w, int h, Fl_Color c) {
   frame_rect(x, y, w, h - 1, "KLDIIJLM", c);
 }
-
 
 static void narrow_thin_box(int x, int y, int w, int h, Fl_Color c) {
   if (h<=0 || w<=0) return;
@@ -289,77 +333,44 @@ static void narrow_thin_box(int x, int y, int w, int h, Fl_Color c) {
   }
 }
 
-
-static void thin_up_box(int x, int y, int w, int h, Fl_Color c) {
-#ifdef USE_OLD_PLASTIC_BOX
-  shade_rect(x + 2, y + 2, w - 4, h - 5, "RVQNOPQRSTUVWVQ", c);
-  up_frame(x, y, w, h, c);
-#else
+void fl_plastic_thin_up_box(int x, int y, int w, int h, Fl_Color c) {
   if (w > 4 && h > 4) {
     shade_rect(x + 1, y + 1, w - 2, h - 3, "RQOQSUWQ", c);
     frame_rect(x, y, w, h - 1, "IJLM", c);
   } else {
     narrow_thin_box(x, y, w, h, c);
   }
-#endif // USE_OLD_PLASTIC_BOX
 }
 
-
-static void up_box(int x, int y, int w, int h, Fl_Color c) {
-#ifdef USE_OLD_PLASTIC_BOX
-  shade_rect(x + 2, y + 2, w - 4, h - 5, "RVQNOPQRSTUVWVQ", c);
-  up_frame(x, y, w, h, c);
-#else
+void fl_plastic_up_box(int x, int y, int w, int h, Fl_Color c) {
   if (w > 8 && h > 8) {
     shade_rect(x + 1, y + 1, w - 2, h - 3, "RVQNOPQRSTUVWVQ", c);
     frame_rect(x, y, w, h - 1, "IJLM", c);
   } else {
-    thin_up_box(x, y, w, h, c);
+    fl_plastic_thin_up_box(x, y, w, h, c);
   }
-#endif // USE_OLD_PLASTIC_BOX
 }
 
-
-static void up_round(int x, int y, int w, int h, Fl_Color c) {
+void fl_plastic_up_round(int x, int y, int w, int h, Fl_Color c) {
   shade_round(x, y, w, h, "RVQNOPQRSTUVWVQ", c);
   frame_round(x, y, w, h, "IJLM", c);
 }
 
-
-static void down_frame(int x, int y, int w, int h, Fl_Color c) {
+void fl_plastic_down_frame(int x, int y, int w, int h, Fl_Color c) {
   frame_rect(x, y, w, h - 1, "LLLLTTRR", c);
 }
 
-
-static void down_box(int x, int y, int w, int h, Fl_Color c) {
+void fl_plastic_down_box(int x, int y, int w, int h, Fl_Color c) {
   if (w > 6 && h > 6) {
     shade_rect(x + 2, y + 2, w - 4, h - 5, "STUVWWWVT", c);
-    down_frame(x, y, w, h, c);
+    fl_plastic_down_frame(x, y, w, h, c);
   }
   else {
     narrow_thin_box(x, y, w, h, c);
   }
 }
 
-
-static void down_round(int x, int y, int w, int h, Fl_Color c) {
+void fl_plastic_down_round(int x, int y, int w, int h, Fl_Color c) {
   shade_round(x, y, w, h, "STUVWWWVT", c);
   frame_round(x, y, w, h, "IJLM", c);
-}
-
-
-extern void fl_round_focus(Fl_Boxtype bt, int x, int y, int w, int h, Fl_Color fg, Fl_Color bg);
-extern void fl_internal_boxtype(Fl_Boxtype, Fl_Box_Draw_F*, Fl_Box_Draw_Focus_F* =NULL);
-
-Fl_Boxtype fl_define_FL_PLASTIC_UP_BOX() {
-  fl_internal_boxtype(_FL_PLASTIC_UP_BOX, up_box);
-  fl_internal_boxtype(_FL_PLASTIC_DOWN_BOX, down_box);
-  fl_internal_boxtype(_FL_PLASTIC_UP_FRAME, up_frame);
-  fl_internal_boxtype(_FL_PLASTIC_DOWN_FRAME, down_frame);
-  fl_internal_boxtype(_FL_PLASTIC_THIN_UP_BOX, thin_up_box);
-  fl_internal_boxtype(_FL_PLASTIC_THIN_DOWN_BOX, down_box);
-  fl_internal_boxtype(_FL_PLASTIC_ROUND_UP_BOX, up_round, fl_round_focus);
-  fl_internal_boxtype(_FL_PLASTIC_ROUND_DOWN_BOX, down_round, fl_round_focus);
-
-  return _FL_PLASTIC_UP_BOX;
 }

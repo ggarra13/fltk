@@ -455,6 +455,19 @@ int storestring(const char *n, const char * & p, int nostrip) {
   return 1;
 }
 
+// C++11 version, still using the original to copy all the side effects.
+int storestring(const std::string& n, std::string& p, int nostrip) {
+  const char *buffer { nullptr };
+  int ret = storestring(n.c_str(), buffer);
+  if (buffer) {
+    p = buffer;
+    free((void*)buffer);
+  } else {
+    p.clear();
+  }
+  return ret;
+}
+
 /** Update the `visible` flag for `p` and all its descendants.
  \param[in] p start here and update all descendants
  */
@@ -889,9 +902,9 @@ void Node::write(fld::io::Project_Writer &f) {
   f.write_word(type_name());
 
   if (is_class()) {
-    const char * p =  ((Class_Node*)this)->prefix();
-    if (p &&  strlen(p))
-      f.write_word(p);
+    auto p = ((Class_Node*)this)->prefix();
+    if (!p.empty())
+      f.write_word(p.c_str());
   }
 
   f.write_word(name());
