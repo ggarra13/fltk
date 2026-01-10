@@ -1,7 +1,7 @@
 //
 // C function Node header file for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2025 by Bill Spitzak and others.
+// Copyright 1998-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -49,21 +49,25 @@ class Function_Node : public Node
 public:
   typedef Node super;
   static Function_Node prototype;
+
 private:
-  const char* return_type_;
-  char public_, declare_c_, constructor, havewidgets;
+  std::string return_type_;
+  char public_ = 0;
+  char declare_c_ = 0;
+  char constructor = 0;
+  char havewidgets = 0;
+
 public:
-  Function_Node();
-  ~Function_Node();
+  Function_Node() = default;
+  ~Function_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write_code1(fld::io::Code_Writer& f) override;
   void write_code2(fld::io::Code_Writer& f) override;
   void open() override;
   int ismain() {return name_ == nullptr;}
   const char *type_name() override {return "Function";}
-  const char *title() override {
-    return name() ? name() : "main()";
-  }
+  const char *title() override { return name() ? name() : "main()"; }
   int can_have_children() const override {return 1;}
   int is_code_block() const override {return 1;}
   int is_public() const override;
@@ -72,8 +76,8 @@ public:
   void write_properties(fld::io::Project_Writer &f) override;
   void read_property(fld::io::Project_Reader &f, const char *) override;
   int has_signature(const char *, const char*) const;
-  const char *return_type() { return return_type_; }
-  void return_type(const char *t) { storestring(t, return_type_); }
+  std::string return_type() const { return return_type_; }
+  void return_type(const std::string& t) { storestring(t, return_type_); }
   char visibility() { return public_; }
   void visibility(char v) { public_ = v; }
   char declare_c() { return declare_c_; }
@@ -87,13 +91,17 @@ class Code_Node : public Node
 public:
   typedef Node super;
   static Code_Node prototype;
-  int cursor_position_;
-  int code_input_scroll_row;
-  int code_input_scroll_col;
+
 private:
+  int cursor_position_ = 0;
+  int code_input_scroll_row_ = 0;
+  int code_input_scroll_col_ = 0;
   ExternalCodeEditor editor_;
+
 public:
-  Code_Node();
+  Code_Node() = default;
+  ~Code_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write(fld::io::Project_Writer &f) override;
   void write_code1(fld::io::Code_Writer& f) override;
@@ -107,6 +115,12 @@ public:
   int is_editing();
   int reap_editor();
   int handle_editor_changes();
+  int cursor_position() { return cursor_position_; }
+  int code_input_scroll_row() { return code_input_scroll_row_; }
+  int code_input_scroll_col() { return code_input_scroll_col_; }
+  void save_editor_state(int pos, int row, int col) {
+    cursor_position_ = pos; code_input_scroll_row_ = row; code_input_scroll_col_ = col;
+  }
 };
 
 // ---- CodeBlock_Node declaration
@@ -116,11 +130,14 @@ class CodeBlock_Node : public Node
 public:
   typedef Node super;
   static CodeBlock_Node prototype;
+  
 private:
-  const char* after;
+  std::string end_code_;
+
 public:
-  CodeBlock_Node();
-  ~CodeBlock_Node();
+  CodeBlock_Node() = default;
+  ~CodeBlock_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write_code1(fld::io::Code_Writer& f) override;
   void write_code2(fld::io::Code_Writer& f) override;
@@ -133,8 +150,8 @@ public:
   bool is_a(Type inType) const override { return (inType==Type::CodeBlock) ? true : super::is_a(inType); }
   void write_properties(fld::io::Project_Writer &f) override;
   void read_property(fld::io::Project_Reader &f, const char *) override;
-  const char *end_code() { return after; }
-  void end_code(const char *c) { storestring(c, after); }
+  std::string end_code() const { return end_code_; }
+  void end_code(const std::string& c) { storestring(c, end_code_); }
 };
 
 // ---- Decl_Node declaration
@@ -144,12 +161,15 @@ class Decl_Node : public Node
 public:
   typedef Node super;
   static Decl_Node prototype;
+
 protected:
-  char public_; // public = 0, private = 1, protected = 2
-  char static_;
+  char public_ = 0; // public = 0, private = 1, protected = 2
+  char static_ = 1;
 
 public:
-  Decl_Node();
+  Decl_Node() = default;
+  ~Decl_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write_code1(fld::io::Code_Writer& f) override;
   void write_code2(fld::io::Code_Writer& f) override { }
@@ -173,13 +193,15 @@ class Data_Node : public Decl_Node
 public:
   typedef Decl_Node super;
   static Data_Node prototype;
+
 private:
-  const char *filename_ { nullptr };
-  int output_format_ { 0 };
+  std::string filename_;
+  int output_format_ = 0;
 
 public:
-  Data_Node();
-  ~Data_Node();
+  Data_Node() = default;
+  ~Data_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write_code1(fld::io::Code_Writer& f) override;
   void write_code2(fld::io::Code_Writer& f) override {}
@@ -189,8 +211,8 @@ public:
   void read_property(fld::io::Project_Reader &f, const char *) override;
   Type type() const override { return Type::Data; }
   bool is_a(Type inType) const override { return (inType==Type::Data) ? true : super::is_a(inType); }
-  void filename(const char* fn);
-  const char* filename() { return filename_; }
+  void filename(const std::string& fn) { storestring(fn, filename_); }
+  std::string filename() const { return filename_; }
   int output_format() { return output_format_; }
   void output_format(int fmt) { output_format_ = fmt; }
 };
@@ -208,13 +230,15 @@ public:
     STATIC_IN_HEADER = 4,
     STATIC_IN_SOURCE = 8
   };
+
 private:
-  const char* after { nullptr };      ///< code after all children of this block
-  int write_map_ { CODE_IN_SOURCE };  ///< see enum above
+  std::string end_code_;            ///< code after all children of this block
+  int write_map_ = CODE_IN_SOURCE;  ///< see enum above
 
 public:
-  DeclBlock_Node();
-  ~DeclBlock_Node();
+  DeclBlock_Node() = default;
+  ~DeclBlock_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write_static(fld::io::Code_Writer& f) override;
   void write_static_after(fld::io::Code_Writer& f) override;
@@ -229,8 +253,8 @@ public:
   int is_public() const override;
   Type type() const override { return Type::DeclBlock; }
   bool is_a(Type inType) const override { return (inType==Type::DeclBlock) ? true : super::is_a(inType); }
-  const char *end_code() { return after; }
-  void end_code(const char *c) { storestring(c, after); }
+  std::string end_code() const { return end_code_; }
+  void end_code(const std::string& p) { storestring(p, end_code_); }
   int write_map() { return write_map_; }
   void write_map(int v) { write_map_ = v; }
 };
@@ -242,11 +266,16 @@ class Comment_Node : public Node
 public:
   typedef Node super;
   static Comment_Node prototype;
+
 private:
-  char in_c_, in_h_, style_;
+  char in_c_ = 1;
+  char in_h_ = 1;
+  char style_ = 0;
 
 public:
-  Comment_Node();
+  Comment_Node() = default;
+  ~Comment_Node() override = default;
+
   Node *make(Strategy strategy) override;
   void write_code1(fld::io::Code_Writer& f) override;
   void write_code2(fld::io::Code_Writer& f) override { }
@@ -270,17 +299,20 @@ class Class_Node : public Node
 public:
   typedef Node super;
   static Class_Node prototype;
+
 private:
   std::string base_class_;
   std::string prefix_;
-  char public_;
+  char public_ = 1;
+
 public:
-  Class_Node();
-  ~Class_Node();
-  // state variables for output:
+  Class_Node() = default;
+  ~Class_Node() override = default;
+
+  // State variables used when writing code to file
   char write_public_state; // true when public: has been printed
   Class_Node* parent_class; // save class if nested
-//
+
   Node *make(Strategy strategy) override;
   void write_code1(fld::io::Code_Writer& f) override;
   void write_code2(fld::io::Code_Writer& f) override;
@@ -296,14 +328,13 @@ public:
   void read_property(fld::io::Project_Reader &f, const char *) override;
 
   /** Get base class access and name. */
-  std::string base_class() { return base_class_; }
+  std::string base_class() const { return base_class_; }
   /** Set base class access and name, i.e. `public Fl_Widget`. */
   void base_class(const std::string& name) { storestring(name, base_class_); }
 
   char visibility() { return public_; }
   void visibility(char v) { public_ = v; }
 
-  // class prefix attribute access
   /** Get the text between `class` and the class name */
   std::string prefix() const { return prefix_; }
   /** Set the text between `class` and the class name */

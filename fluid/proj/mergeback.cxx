@@ -613,18 +613,29 @@ int Mergeback::merge_back(const std::string &s, const std::string &p, Task task)
  files with the project file. If MergeBack is not enabled, it displays
  a message to the user. It handles both batch and interactive modes.
 
- \return int - Returns 1 if the project filename is not available,
-               0 if MergeBack is not enabled,
-               or the result of the merge_back function.
+ \return 2 if mergeback is called recursively
+ \return 1 if the project filename is not available
+ \return 0 if MergeBack is not enabled, or the result of the merge_back function.
+ \see Mergeback::merge_back(const std::string &s, const std::string &p, Task task)
  */
-int mergeback_code_files(Project &proj)
+int mergeback_code_files(Project &proj, Mergeback::Feedback feedback)
 {
+  static bool recursion_lock = false;
+  if (recursion_lock) return 2;
+  recursion_lock = true;
+
   Fluid.flush_text_widgets();
-  if (!proj.proj_filename) return 1;
+  if (!proj.proj_filename) {
+    recursion_lock = false;
+    return 1;
+  }
   if (!proj.write_mergeback_data) {
-    fl_message("MergeBack is not enabled for this project.\n"
-               "Please enable MergeBack in the project settings\n"
-               "dialog and re-save the project file and the code.");
+    if (feedback & Mergeback::CHATTY) {
+      fl_message("MergeBack is not enabled for this project.\n"
+                 "Please enable MergeBack in the project settings\n"
+                 "dialog and re-save the project file and the code.");
+    }
+    recursion_lock = false;
     return 0;
   }
 
@@ -633,7 +644,7 @@ int mergeback_code_files(Project &proj)
 #if 1
   if (!Fluid.batch_mode) {
     // Depending on the workflow in interactive mode, an external copy of
-    // Fluid may have written the source code elswhere (e.g. in a CMake setup).
+    // Fluid may have written the source code elsewhere (e.g. in a CMake setup).
     // Fluid tries to keep track of the last write location of a source file
     // matching a project, and uses that location instead.
     // TODO: this is not working as expected yet.
@@ -656,15 +667,37 @@ int mergeback_code_files(Project &proj)
   }
   if (!Fluid.batch_mode) proj.leave_project_dir();
 
-  if (c==0) fl_message("Comparing\n  \"%s\"\nto\n  \"%s\"\n\n"
-                       "MergeBack found no external modifications\n"
-                       "in the source code.",
-                       code_filename.c_str(), proj_filename.c_str());
-  if (c==-2) fl_message("No corresponding source code file found.");
+  if (feedback & Mergeback::CHATTY) {
+    if (c==0) fl_message("Comparing\n  \"%s\"\nto\n  \"%s\"\n\n"
+                         "MergeBack found no external modifications\n"
+                         "in the source code.",
+                         code_filename.c_str(), proj_filename.c_str());
+    if (c==-2) fl_message("No corresponding source code file found.");
+  }
+  recursion_lock = false;
   return c;
 }
 
 void mergeback_cb(Fl_Widget *, void *) {
-  mergeback_code_files(Fluid.proj);
+  mergeback_code_files(Fluid.proj, Mergeback::CHATTY);
 }
 
+void mergeback_on_load() {
+  mergeback_code_files(Fluid.proj, Mergeback::QUIET);
+}
+
+static void deferred_mergeback_handler(void*) {
+  Fl::remove_idle(deferred_mergeback_handler);
+  mergeback_code_files(Fluid.proj, Mergeback::QUIET);
+}
+
+static int app_event_handler(int event) {
+  if (event == FL_APP_ACTIVATE) {
+    Fl::add_idle(deferred_mergeback_handler, nullptr);
+  }
+  return 0;
+}
+
+void start_auto_mergeback() {
+  Fl::add_handler(app_event_handler);
+}

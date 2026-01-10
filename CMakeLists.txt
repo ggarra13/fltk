@@ -282,13 +282,23 @@ include(CMake/export.cmake)
 # options to build test/demo and example programs
 #######################################################################
 
+# general test programs for FLTK development
+
 if(FLTK_BUILD_TEST)
   add_subdirectory(test)
 endif(FLTK_BUILD_TEST)
 
+# example programs for FLTK users
+
 if(FLTK_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif(FLTK_BUILD_EXAMPLES)
+
+# screenshot programs for FLTK developers
+
+if(FLTK_BUILD_SCREENSHOTS)
+  add_subdirectory(screenshots)
+endif(FLTK_BUILD_SCREENSHOTS)
 
 #######################################################################
 # Create and install version config file 'FLTKConfigVersion.cmake'
@@ -388,16 +398,22 @@ feature_summary(WHAT ALL DESCRIPTION "Configuration Summary for ${_descr} --\n")
 
 # FLTK specific build configuration and options (see macros in fl_summary.cmake)
 
-#                "title"               dir  build (bool)             option to set
-fl_summary_build("Static libraries"    lib  TRUE                     "n/a")
-fl_summary_build("Shared libraries"    lib  FLTK_BUILD_SHARED_LIBS   FLTK_BUILD_SHARED_LIBS)
-fl_summary_build("The forms library"   lib  FLTK_BUILD_FORMS         FLTK_BUILD_FORMS)
-fl_summary_build("The OpenGL library"  lib  FLTK_USE_GL              FLTK_BUILD_GL)
-fl_summary_build("The Vulkan library"  lib  FLTK_USE_VK              FLTK_BUILD_VK)
-fl_summary_build("fluid"               bin  FLTK_BUILD_FLUID         FLTK_BUILD_FLUID)
-fl_summary_build("fltk-options"        bin  FLTK_BUILD_FLTK_OPTIONS  FLTK_BUILD_FLTK_OPTIONS)
-fl_summary_build("Test programs"     bin/test      FLTK_BUILD_TEST      FLTK_BUILD_TEST)
-fl_summary_build("Example programs"  bin/examples  FLTK_BUILD_EXAMPLES  FLTK_BUILD_EXAMPLES)
+#                "title"               dir    build (bool)              option to set
+fl_summary_build("Static libraries"    lib    TRUE                      "n/a")
+fl_summary_build("Shared libraries"    lib    FLTK_BUILD_SHARED_LIBS    FLTK_BUILD_SHARED_LIBS)
+fl_summary_build("The forms library"   lib    FLTK_BUILD_FORMS          FLTK_BUILD_FORMS)
+fl_summary_build("The OpenGL library"  lib    FLTK_USE_GL               FLTK_BUILD_GL)
+fl_summary_build("The Vulkan library"  lib    FLTK_USE_VK               FLTK_BUILD_VK)
+fl_summary_build("Pen/tablet support"  lib    FLTK_OPTION_PEN_SUPPORT   FLTK_OPTION_PEN_SUPPORT)
+
+message(STATUS "")
+
+fl_summary_build("fluid"               bin    FLTK_BUILD_FLUID          FLTK_BUILD_FLUID)
+fl_summary_build("fltk-options"        bin    FLTK_BUILD_FLTK_OPTIONS   FLTK_BUILD_FLTK_OPTIONS)
+fl_summary_build("Test programs"       bin/test        FLTK_BUILD_TEST        FLTK_BUILD_TEST)
+fl_summary_build("Example programs"    bin/examples    FLTK_BUILD_EXAMPLES    FLTK_BUILD_EXAMPLES)
+fl_summary_build("Screenshot programs" bin/screenshots FLTK_BUILD_SCREENSHOTS FLTK_BUILD_SCREENSHOTS)
+>>>>>>> original
 
 message(STATUS "")
 

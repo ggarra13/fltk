@@ -106,7 +106,8 @@ and calls corresponding listeners.
 
 The core protocol defines also a number of mostly opaque structures whose names begin with \c wl_.
 The names of symbols and types defined by the other protocols FLTK uses begin with \c xdg_,
-\c zwp_text_input_v3, \c zxdg_toplevel_decoration_, \c gtk_shell1_ and \c gtk_surface1_.
+\c zwp_text_input_v3, \c zxdg_toplevel_decoration_, \c gtk_shell1_, \c gtk_surface1_
+and \c wp_cursor_shape_.
 FLTK defines a few structures holding Wayland-related data.
 The names of FLTK-defined structures don't begin with \c wl_. For example,
 <tt>struct wld_window</tt> (see \ref wld_window) is used to store all Wayland-specific data associated
@@ -159,6 +160,7 @@ wayland-scanner client-header $PROTOCOLS/stable/xdg-shell/xdg-shell.xml xdg-shel
 Similar operations are performed for FLTK to use protocols
 <a href=https://wayland.app/protocols/xdg-dialog-v1>XDG dialog windows</a>,
 <a href=https://wayland.app/protocols/xdg-decoration-unstable-v1>XDG decoration</a>,
+<a href=https://wayland.app/protocols/cursor-shape-v1>Cursor shape</a>,
 <a href=https://wayland.app/protocols/text-input-unstable-v3>Text input</a>
 and <a href=https://wayland.app/protocols/gtk-shell>GTK Shell</a>.
 
@@ -312,25 +314,29 @@ The prototype of function \c registry_handle_global is:
 static void registry_handle_global(void *user_data, struct wl_registry *wl_registry,
            uint32_t id, const char *interface, uint32_t version)
 \endcode
+
 Each time Wayland calls \c registry_handle_global(), \c interface and \c version give the name
 and version of a component or feature of the Wayland system.
 Here is the list of the \c interface value for all protocols and system features relevant for FLTK:
-<table>
- <tr><th>Interface  </th><th>How FLTK uses this interface</th> </tr>
- <tr><td>wl_compositor </td><td> create wl_surface objects </td> </tr>
- <tr><td>wl_subcompositor </td><td>create subwindows </td> </tr>
- <tr><td>wl_shm </td><td> create shared memory pools and buffers</td> </tr>
- <tr><td>wl_seat </td><td> create the unique "seat"</td> </tr>
- <tr><td>wl_data_device </td><td> support of copy/paste/drag-n-drop</td> </tr>
- <tr><td>wl_output </td><td>received once for each display </td> </tr>
- <tr><td>xdg_wm_base </td><td>create mapped windows </td> </tr>
- <tr><td>xdg_wm_dialog_v1 </td><td>create dialogs related to other windows</td> </tr>
- <tr><td>gtk_shell1 </td><td>indicates Mutter is in use + titlebar gestures</td> </tr>
- <tr><td>weston_desktop_shell </td><td> indicates Weston is in use</td></tr>
- <tr><td>org_kde_plasma_shell </td><td> indicates KDE/Plasma is in use</td></tr>
- <tr><td>zwp_text_input_manager_v3 </td><td>interface with Text Input Methods </td></tr>
- <tr><td>zxdg_decoration_manager_v1 </td><td>select between CSD and SSD modes </td></tr>
-</table>
+
+  Interface                          | How FLTK uses this interface
+  -----------------------------------|-----------------------------------------------
+  wl_compositor                      | create wl_surface objects
+  wl_subcompositor                   | create subwindows
+  wl_shm                             | create shared memory pools and buffers
+  wl_seat                            | create the unique "seat"
+  wl_data_device                     | support of copy/paste/drag-n-drop
+  wl_output                          | received once for each display
+  xdg_wm_base                        | create mapped windows
+  xdg_wm_dialog_v1                   | create dialogs related to other windows
+  wp_cursor_shape_manager_v1         | set cursor images using enumerated cursors
+  gtk_shell1                         | indicates Mutter is in use + titlebar gestures
+  weston_desktop_shell               | indicates Weston is in use
+  org_kde_plasma_shell               | indicates KDE/Plasma is in use
+  zwp_text_input_manager_v3          | interface with Text Input Methods
+  zxdg_decoration_manager_v1         | select between CSD and SSD modes
+
+
 Wayland compositors typically support several other protocols (e.g., \c zxdg_output_manager_v1)
 that FLTK does not use.
 
@@ -981,6 +987,15 @@ menu) and double-click (maximize the window) events on titlebars which may diver
 from \c gnome-tweaks settings.
 
 \section wayland-cursor Wayland cursors
+
+When the running compositor supports it, FLTK uses protocol
+<a href=https://wayland.app/protocols/cursor-shape-v1>Cursor shape</a> that offers an optional
+way to set cursor images using enumerated cursor shapes. With this protocol, it's enough to call
+function \c wp_cursor_shape_device_v1_set_shape() inside \c pointer_enter() to set the cursor
+shape when the pointer enters a given surface.
+
+If the running compositor doesn't support this protocol or to define custom cursor shapes, FLTK
+uses another approach as follows.
 
 Wayland defines types <tt>struct wl_cursor</tt> and <tt>struct wl_cursor_theme</tt> to hold
 cursor-related data.

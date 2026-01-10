@@ -232,6 +232,11 @@ FLTK_BUILD_GL - default ON
     Build the OpenGL support library fltk_gl (fltk::gl) and enable OpenGL
     support in user programs using fltk_gl.
 
+FLTK_BUILD_SCREENSHOTS - default OFF
+    Build the programs in the "screenshots" directory for developers
+    who want to create or modify screenshots for documentation.
+    Please see 'screenshots/README.txt' for details and instructions.
+
 FLTK_BUILD_SHARED_LIBS - default OFF
     Normally FLTK is built as static libraries which makes more portable
     binaries. If you want to use shared libraries, setting this option ON
@@ -279,6 +284,16 @@ FLTK_OPTION_OPTIM - default EMPTY
     Extra optimization flags for the C and C++ compilers, for instance
     "-Wall -Wno-deprecated-declarations". Example:
     cmake -D FLTK_BUILD_EXAMPLES=on -D FLTK_OPTION_OPTIM="-Wall -Wextra -pedantic" ..
+
+FLTK_OPTION_PEN_SUPPORT - default ON
+    Pen support is relatively small and should be included by default, but
+    this option allows to switch it off if not needed.
+    Note: on some older systems or build platforms (notably "classic" MinGW)
+    compiling and building pen support may not be possible. As of this writing
+    (Jan. 2026) we don't use dynamic (CMake) tests to find out whether building
+    is possible or not. Instead users are encouraged to report build errors and
+    switch this option off to allow to proceed building FLTK 1.5.0.
+    Note: this option is WIP and may be removed later w/o further notice.
 
 FLTK_OPTION_PRINT_SUPPORT - default ON
     When turned off, the Fl_Printer class does nothing and the

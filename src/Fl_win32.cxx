@@ -1282,6 +1282,10 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             SetWindowPos(hWnd, NULL, lParam_rect->left, lParam_rect->top,
                          lParam_rect->right - lParam_rect->left,
                          lParam_rect->bottom - lParam_rect->top, flags);
+            if (ns >= 0) {
+              scale = Fl::screen_driver()->scale(ns);
+              EnumChildWindows(hWnd, child_window_cb, (LPARAM)&scale);
+            }
           }
         }
         return 0;
@@ -1749,13 +1753,14 @@ content  key    keyboard layout
 
       case WM_CAPTURECHANGED:
         moving_window = false;
+        resize_bug_fix = 0;
         return 0;
 
       case WM_MOVE: {
         if (IsIconic(hWnd) || window->parent()) {
           break;
         }
-        resize_bug_fix = window;
+        if (moving_window) resize_bug_fix = window;
         POINTS pts = MAKEPOINTS(lParam);
         int nx = pts.x, ny = pts.y;
         // detect when window centre changes screen
@@ -1841,9 +1846,11 @@ content  key    keyboard layout
         return 0;
 
       default: {
+#if defined(FLTK_HAVE_PEN_SUPPORT)
         LRESULT ret = fl_win32_tablet_handler(fl_msg);
         if (ret != -1)
           return ret;
+#endif
         if (Fl::handle(0, 0))
           return 0;
         break; }

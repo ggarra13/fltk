@@ -2,7 +2,7 @@
 // Definition of the Wayland Screen interface
 // for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 2010-2024 by Bill Spitzak and others.
+// Copyright 2010-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -96,7 +96,7 @@ public:
   static bool insertion_point_location(int *px, int *py, int *pwidth, int *pheight);
   static bool own_output(struct wl_output *output);
   static void do_set_cursor(struct Fl_Wayland_Screen_Driver::seat *,
-                            struct wl_cursor *wl_cursor = NULL);
+                            struct wl_cursor *wl_cursor = NULL, Fl_Cursor c = FL_CURSOR_NONE);
 // member variables
   struct wl_cursor *xc_cursor[cursor_count]; // one for each element of enum cursor_shapes
   struct wl_registry *wl_registry;
@@ -110,6 +110,10 @@ public:
   struct zwp_text_input_manager_v3 *text_input_base;
 #if HAVE_XDG_DIALOG
   struct xdg_wm_dialog_v1 *xdg_wm_dialog;
+#endif
+#if HAVE_CURSOR_SHAPE
+  struct wp_cursor_shape_manager_v1 *wp_cursor_shape_manager;
+  struct wp_cursor_shape_device_v1 *wp_cursor_shape_device;
 #endif
 
 // constructor

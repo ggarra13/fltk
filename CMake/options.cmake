@@ -2,7 +2,7 @@
 # Main CMakeLists.txt to build the FLTK project using CMake (www.cmake.org)
 # Originally written by Michael Surette
 #
-# Copyright 1998-2025 by Bill Spitzak and others.
+# Copyright 1998-2026 by Bill Spitzak and others.
 #
 # This library is free software. Distribution and use rights are outlined in
 # the file "COPYING" which should have been included with this file.  If this
@@ -319,6 +319,14 @@ if(UNIX)
     else()
       set(HAVE_XDG_DIALOG 0)
     endif()
+    if(EXISTS ${PROTOCOLS}/staging/cursor-shape/cursor-shape-v1.xml AND
+        EXISTS ${PROTOCOLS}/stable/tablet/tablet-v2.xml)
+      set(HAVE_CURSOR_SHAPE 1)
+      message(STATUS "Found dev files for Wayland protocols 'Cursor shape' and 'Tablet'")
+      message(STATUS "  ==> option FLTK_USE_DBUS can be turned OFF if 'Cursor shape'-enabled wayland compositor is used.")
+    else()
+      set(HAVE_CURSOR_SHAPE 0)
+    endif()
     if(FLTK_BACKEND_X11)
       include(FindX11)
     endif()
@@ -459,24 +467,35 @@ option(FLTK_BUILD_SHARED_LIBS
 
 #######################################################################
 
-option(FLTK_OPTION_PRINT_SUPPORT      "allow print support"        ON)
-option(FLTK_OPTION_FILESYSTEM_SUPPORT "allow file system support"  ON)
+option(FLTK_OPTION_PRINT_SUPPORT      "allow print support"          ON)
+option(FLTK_OPTION_FILESYSTEM_SUPPORT "allow file system support"    ON)
+option(FLTK_OPTION_PEN_SUPPORT        "include Pen/Tablet support"   ON)
 
-option(FLTK_BUILD_FORMS        "Build forms compatibility library" OFF)
-option(FLTK_BUILD_FLUID        "Build FLUID"                       ON)
-option(FLTK_BUILD_FLTK_OPTIONS "Build fltk-options"                ON)
-option(FLTK_BUILD_EXAMPLES     "Build example programs"            OFF)
+option(FLTK_BUILD_FORMS        "Build forms compatibility library"   OFF)
+option(FLTK_BUILD_FLUID        "Build FLUID"                         ON)
+option(FLTK_BUILD_FLTK_OPTIONS "Build fltk-options"                  ON)
+option(FLTK_BUILD_EXAMPLES     "Build example programs"              OFF)
+option(FLTK_BUILD_SCREENSHOTS  "Build screenshot programs for docs"  OFF)
 
 if(FLTK_IS_TOPLEVEL)
-  option(FLTK_BUILD_TEST       "Build test/demo programs"          ON)
+  option(FLTK_BUILD_TEST       "Build test/demo programs"            ON)
 else()
-  option(FLTK_BUILD_TEST       "Build test/demo programs"          OFF)
+  option(FLTK_BUILD_TEST       "Build test/demo programs"            OFF)
 endif()
+
+
+# set variables to generate config.h or fl_config.h
 
 if(FLTK_BUILD_FORMS)
   set(FLTK_HAVE_FORMS 1)
 else()
   set(FLTK_HAVE_FORMS 0)
+endif()
+
+if(FLTK_OPTION_PEN_SUPPORT)
+  set(FLTK_HAVE_PEN_SUPPORT 1)
+else()
+  set(FLTK_HAVE_PEN_SUPPORT 0)
 endif()
 
 #######################################################################
