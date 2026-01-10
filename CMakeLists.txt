@@ -413,7 +413,6 @@ fl_summary_build("fltk-options"        bin    FLTK_BUILD_FLTK_OPTIONS   FLTK_BUI
 fl_summary_build("Test programs"       bin/test        FLTK_BUILD_TEST        FLTK_BUILD_TEST)
 fl_summary_build("Example programs"    bin/examples    FLTK_BUILD_EXAMPLES    FLTK_BUILD_EXAMPLES)
 fl_summary_build("Screenshot programs" bin/screenshots FLTK_BUILD_SCREENSHOTS FLTK_BUILD_SCREENSHOTS)
->>>>>>> original
 
 message(STATUS "")
 
