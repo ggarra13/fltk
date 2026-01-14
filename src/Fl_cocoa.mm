@@ -1,7 +1,7 @@
 //
 // macOS-Cocoa specific code for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2025 by Bill Spitzak and others.
+// Copyright 1998-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -98,6 +98,8 @@ static BOOL through_drawRect = NO;
 static BOOL through_Fl_X_flush = NO;
 static BOOL views_use_CA = NO; // YES means views are layer-backed, as on macOS 10.14 when linked with SDK 10.14
 static int im_enabled = -1;
+static Fl_Widget *previous_focus = NULL; // restore lost focus when character palette window appears
+
 // OS version-dependent pasteboard type names.
 // Some, but not all, versions of the 10.6 SDK for PPC lack the 3 symbols below (PR #761)
 #if (MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_6) || defined(__POWERPC__)
@@ -1488,6 +1490,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
     [nsw setLevel:NSNormalWindowLevel];
     fixup_window_levels();
   }
+  previous_focus = Fl::focus();
   Fl::handle( FL_UNFOCUS, window);
   fl_unlock_function();
 }
@@ -2573,10 +2576,16 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   if ([[self window] firstResponder] != self) {
     return NO;
   }
+  NSUInteger mods = [theEvent modifierFlags];
+  NSString *pure = [theEvent charactersIgnoringModifiers];
+  // detect Function+e to open character palette
+  if ((mods & NSEventModifierFlagFunction) && [pure isEqualToString:@"e"] ) {
+      [NSApp orderFrontCharacterPalette:self];
+      return YES;
+  }
   fl_lock_function();
   cocoaKeyboardHandler(theEvent);
   BOOL handled;
-  NSUInteger mods = [theEvent modifierFlags];
   Fl_Window *w = [(FLWindow*)[theEvent window] getFl_Window];
   if ( (mods & NSEventModifierFlagControl) || (mods & NSEventModifierFlagCommand) ) {
     NSString *s = [theEvent characters];
@@ -2586,6 +2595,13 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
     [FLView prepareEtext:s];
     Fl::compose_state = 0;
     handled = Fl::handle(FL_KEYBOARD, w);
+    if (!handled) {
+      // detect Ctrl+Command+Space to open character palette, if not used before as shortcut
+      if ( (mods & NSEventModifierFlagControl) && (mods & NSEventModifierFlagCommand) &&
+             !(mods & (NSEventModifierFlagShift|NSEventModifierFlagOption)) && [pure isEqualToString:@" "] ) {
+          [NSApp orderFrontCharacterPalette:self];
+        }
+      }
   }
   else {
     in_key_event = YES;
@@ -2941,7 +2957,9 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   // insertText sent during handleEvent of a key without text cannot be processed in a single FL_KEYBOARD event.
   // Occurs with deadkey followed by non-text key
   if (!in_key_event || !has_text_key) {
+    if (palette && !Fl::focus()) Fl::focus(previous_focus);
     Fl::handle(FL_KEYBOARD, target);
+    if (palette) previous_focus = NULL;
     Fl::e_length = 0;
     }
   else need_handle = YES;

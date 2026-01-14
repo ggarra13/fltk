@@ -150,8 +150,8 @@ cairo_t *Fl::cairo_make_current(Fl_Window *wi) {
 #if defined(FLTK_USE_WAYLAND)
   if (fl_wl_display()) { // true means using wayland backend
     struct wld_window *xid = fl_wl_xid(wi);
-    if (!xid->buffer)
-      return NULL; // this may happen with GL windows
+    if (!xid || !xid->buffer)
+      return NULL; // this may happen with GL windows or if window is not shown
     cairo_ctxt = xid->buffer->draw_buffer.cairo_;
     Fl::Private::cairo_state_.cc(cairo_ctxt, false);
     return cairo_ctxt;
@@ -168,8 +168,6 @@ cairo_t *Fl::cairo_make_current(Fl_Window *wi) {
   if (fl_gc == Fl::Private::cairo_state_.gc() && fl_xid(wi) == (Window)Fl::Private::cairo_state_.window())
     return Fl::cairo_cc();
 
-  Fl::Private::cairo_state_.window((void *)fl_xid(wi));
-
   // Scale the Cairo context appropriately. This is platform dependent
 
 #if !defined(USE_MAC_OS)
@@ -182,6 +180,8 @@ cairo_t *Fl::cairo_make_current(Fl_Window *wi) {
   // on macOS, scaling is done before by Fl_Window::make_current(), on Windows, the size is not used
   cairo_ctxt = Fl::Private::cairo_make_current(fl_gc, wi->w(), wi->h());
 #endif
+
+  Fl::Private::cairo_state_.window((void *)fl_xid(wi));
 
 #if !defined(USE_MAC_OS)
   cairo_scale(cairo_ctxt, scale, scale);
@@ -209,6 +209,8 @@ static cairo_surface_t *cairo_create_surface(void *gc, int W, int H) {
 #endif
 }
 
+
+#if 0 // this non-public function appears not to be used anywhere in FLTK
 /**
   Creates a Cairo context from a \a gc only, gets its window size or
   offscreen size if fl_window is null.
@@ -251,6 +253,7 @@ cairo_t *Fl::Private::cairo_make_current(void *gc) {
   cairo_state_.cc(c);
   return c;
 }
+#endif
 
 /**
   Creates a Cairo context from a \p gc and the given size.
