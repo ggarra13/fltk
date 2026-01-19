@@ -3266,6 +3266,8 @@ void Fl_Cocoa_Window_Driver::makeWindow()
   FLWindow *cw = [[FLWindow alloc] initWithFl_W:w
                                     contentRect:crect
                                       styleMask:winstyle];
+  
+  [cw setAnimationBehavior:NSWindowAnimationBehaviorNone];
   [cw setFrameOrigin:crect.origin];
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_12
   if (fl_mac_os_version >= 101200) {
