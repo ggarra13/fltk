@@ -98,7 +98,6 @@ static BOOL through_drawRect = NO;
 static BOOL through_Fl_X_flush = NO;
 static BOOL views_use_CA = NO; // YES means views are layer-backed, as on macOS 10.14 when linked with SDK 10.14
 static int im_enabled = -1;
-static Fl_Widget *previous_focus = NULL; // restore lost focus when character palette window appears
 
 // OS version-dependent pasteboard type names.
 // Some, but not all, versions of the 10.6 SDK for PPC lack the 3 symbols below (PR #761)
@@ -1490,8 +1489,9 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
     [nsw setLevel:NSNormalWindowLevel];
     fixup_window_levels();
   }
-  previous_focus = Fl::focus();
-  Fl::handle( FL_UNFOCUS, window);
+  // Situations such as opening a character palette produce windowDidResignKey but
+  // [NSApp keyWindow] remains set to the resigning window. In that case, don't send FL_UNFOCUS
+  if ([NSApp keyWindow] != nsw) Fl::handle(FL_UNFOCUS, window);
   fl_unlock_function();
 }
 - (void)windowDidBecomeKey:(NSNotification *)notif
@@ -2955,11 +2955,24 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   BOOL has_text_key = Fl::e_keysym <= '~' || Fl::e_keysym == FL_Iso_Key ||
                       (Fl::e_keysym >= FL_KP && Fl::e_keysym <= FL_KP_Last && Fl::e_keysym != FL_KP_Enter);
   // insertText sent during handleEvent of a key without text cannot be processed in a single FL_KEYBOARD event.
-  // Occurs with deadkey followed by non-text key
+  // Occurs with deadkey followed by non-text key. Occurs also with emoji palette.
   if (!in_key_event || !has_text_key) {
-    if (palette && !Fl::focus()) Fl::focus(previous_focus);
+    if (fl_utf_nb_char((const uchar*)Fl::e_text, Fl::e_length) > 1) {
+      // Some emojis are expressed by a series of Unicode points
+      const char *p = Fl::e_text, *end = Fl::e_text + Fl::e_length;
+      int len;
+      while (p < end) { // loop over all unicode points of the series
+        unsigned u = fl_utf8decode(p, end, &len); // extract one such unicode point
+        if ((u >= 0xFE00 && u <= 0xFE0F)      // variation selectors
+            || u == 0x200D   // zero-width joiner
+            || (u >= 0x1F3FB && u <= 0x1F3FF) // EMOJI MODIFIERS FITZPATRICK TYPE
+            ) { // remove context-dependent unicode points
+          memmove((void*)p, p + len, (end - (p+len)) + 1);
+          Fl::e_length -= len; end -= len;
+        } else p += len; // keep other unicode points
+      }
+    }
     Fl::handle(FL_KEYBOARD, target);
-    if (palette) previous_focus = NULL;
     Fl::e_length = 0;
     }
   else need_handle = YES;
