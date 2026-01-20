@@ -3254,7 +3254,9 @@ void Fl_Cocoa_Window_Driver::makeWindow()
                                     contentRect:crect
                                       styleMask:winstyle];
   
+  // The following line fixes FLTK bug #1362
   [cw setAnimationBehavior:NSWindowAnimationBehaviorNone];
+  
   [cw setFrameOrigin:crect.origin];
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_12
   if (fl_mac_os_version >= 101200) {
