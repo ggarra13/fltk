@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 cp -rf merging_config ../.git/config
 git fetch --all
