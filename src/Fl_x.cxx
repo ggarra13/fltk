@@ -101,7 +101,6 @@ extern Fl_Window *fl_xmousewin;
 
 static void open_display_i(Display *d); // open display (internal)
 extern int fl_send_system_handlers(void *e);
-extern int fl_utf8_remove_context_dependent(char *text, int len);
 
 #if FLTK_CONSOLIDATE_MOTION
 static Fl_Window *send_motion;
@@ -1834,7 +1833,6 @@ int fl_handle(const XEvent& thisevent)
         Status status;
         len = XUtf8LookupString(Fl_X11_Screen_Driver::xim_ic, (XKeyPressedEvent *)&xevent.xkey,
                              kp_buffer, kp_buffer_len, &keysym, &status);
-        len = fl_utf8_remove_context_dependent(kp_buffer, len);
 
         while (status == XBufferOverflow && kp_buffer_len < 50000) {
           kp_buffer_len = kp_buffer_len * 5 + 1;
