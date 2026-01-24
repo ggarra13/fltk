@@ -792,7 +792,7 @@ void Fl_Vk_Window_Driver::create_device()
         dynState3Features.extendedDynamicState3ColorWriteMask = VK_TRUE;
     } else {
         // Feature not supported on this GPU/driver
-        fprintf(stderr, "extendedDynamicState3ColorWriteMask not supported\n");
+        //fprintf(stderr, "extendedDynamicState3ColorWriteMask not supported\n");
     }
 
     // The base features are in deviceFeatures2.features

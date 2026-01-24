@@ -3146,7 +3146,8 @@ int Fl_X11_Window_Driver::set_cursor(const Fl_RGB_Image *image, int hotx, int ho
   if (!cursor)
     return 0;
 
-  image = (Fl_RGB_Image*)image->copy();
+  image = (Fl_RGB_Image*)image->copy(image->w(), image->h());
+  ((Fl_RGB_Image*)image)->normalize();
   const int extra_data = image->ld() ? (image->ld()-image->w()*image->d()) : 0;
   const uchar *i = (const uchar*)*image->data();
   XcursorPixel *o = cursor->pixels;
