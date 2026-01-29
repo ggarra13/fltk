@@ -266,13 +266,18 @@ public:
   inline const VkRenderPass&         renderPass() const { return m_renderPass; }
   inline const VkPipeline&             pipeline() const { return m_pipeline; }
 
-  // Returns a vector with currently used insance extensions
+  //! Returns a vector with currently used instance extensions
   inline const std::vector<const char*>
       getCurrentInstanceExtensions() const { return ctx.instance_extensions; }
+
+  //! Returns a vector with currently used device extensions
   inline const std::vector<const char*>
       getCurrentDeviceExtensions() const { return ctx.device_extensions; }
 
   inline void setValidationLayers(bool v) { v = m_validate; }
+
+  //! Recreate swapchain on next draw
+  inline void reinit_swapchain() { m_swapchain_needs_recreation = true; }
 
   // Access the current back buffer (the one you're rendering to)
   VkImage get_back_buffer_image() const {
