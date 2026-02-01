@@ -350,14 +350,6 @@ bool Fl_Vk_Window::vk_draw_begin() {
                 label() ? label() : "(unknown)",
                 m_currentFrameIndex);
     }
-    
-    // Reset the fence immediately after a successful wait.
-    result = vkResetFences(device(), 1, &frame.fence);
-    if (result != VK_SUCCESS)
-    {
-        fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
-        return false;
-    }
 
     // Acquire next swapchain image
     if (m_debugSync)
@@ -599,7 +591,15 @@ void Fl_Vk_Window::swap_buffers() {
                 label() ? label() : "(unknown)",
                 m_currentFrameIndex, m_current_buffer);
     }
-
+   
+    // Reset the fence before submit.
+    result = vkResetFences(device(), 1, &frame.fence);
+    if (result != VK_SUCCESS)
+    {
+        fprintf(stderr, "vkResetFences failed: %s\n", string_VkResult(result));
+        return;
+    }
+    
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
     
