@@ -101,6 +101,9 @@ void Fl_Vk_Window::destroy_common_resources() {
         vkDestroyRenderPass(device(), m_renderPass, NULL);
         m_renderPass = VK_NULL_HANDLE;
     }
+
+    // Reset depth layout
+    m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 void Fl_Vk_Window::recreate_swapchain() {
@@ -445,7 +448,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     if (has_depth || has_stencil) {
         VkImageMemoryBarrier barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.oldLayout = m_currentDepthLayout;
         barrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -461,11 +464,14 @@ bool Fl_Vk_Window::vk_draw_begin() {
         barrier.subresourceRange.layerCount = 1;
         barrier.srcAccessMask = 0;
         barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                                VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;xs
         vkCmdPipelineBarrier(frame.commandBuffer,
-                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
                              0, 0, nullptr, 0, nullptr, 1, &barrier);
+
+        // Always update tracked layout after (even if skipped)
+        m_currentDepthLayout = barrier.newLayout;
     }
     
     return true;
@@ -646,7 +652,7 @@ void Fl_Vk_Window::swap_buffers() {
                 label() ? label() : "(unknown)",
                 m_current_buffer, m_currentFrameIndex);
     }
-
+    
     // Advance to next frame
     m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
 }
@@ -1208,6 +1214,7 @@ void Fl_Vk_Window::init() {
   // Swapchain info
   m_pixels_per_unit = 0.F;
   m_swapchain = VK_NULL_HANDLE;
+  m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   // For drawing
   m_in_render_pass = false;

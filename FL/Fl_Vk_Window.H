@@ -359,6 +359,7 @@ protected:
   
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;
+  VkImageLayout           m_currentDepthLayout;
 
   //! Flag used to handle resizes (swapchain and other resources recreation)
   bool                   m_swapchain_needs_recreation;
