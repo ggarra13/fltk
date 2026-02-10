@@ -427,6 +427,7 @@ void Fl_Vk_Window_Driver::init_instance()
     };
     
     /* Look for validation layers *//* Look for validation layers */
+#ifndef NDEBUG
     VkBool32 validation_found = 0;
     if (pWindow->m_validate) {
         uint32_t instance_layer_count = 0;
@@ -457,6 +458,7 @@ void Fl_Vk_Window_Driver::init_instance()
                       "vkCreateInstance Failure");
         }
     }
+#endif
     
     /* Look for instance extensions */
     {
