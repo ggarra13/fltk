@@ -939,14 +939,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         {
 #ifdef __APPLE__
 #if defined(__x86_64__) // macOS Intel
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 5000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT:
-            scores[i] += 4500;
-            hdrMonitorFound = true;
-            break;
+        // Other Apple architectures (future-proofing)
         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
             scores[i] += 4000;
             hdrMonitorFound = true;
@@ -955,37 +948,26 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] += 3000;
             hdrMonitorFound = true;
             break;
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 2000;
+            hdrMonitorFound = true;
+            break;
         //! We don't handle Dolbyvision yet, so it gets a low score for now.
         case VK_COLOR_SPACE_DOLBYVISION_EXT:
             scores[i] += 1000;
             hdrMonitorFound = true;
             break;
-        case VK_COLOR_SPACE_BT2020_LINEAR_EXT:
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
             scores[i] += 1500;
             hdrMonitorFound = true;
             break;
-        case VK_COLOR_SPACE_ADOBERGB_LINEAR_EXT:
-            scores[i] += 2500;
-            hdrMonitorFound = true;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // SDR baseline
+            scores[i] += 500; // Default to SDR
             break;
         default:
             break;
 #elif defined(__arm64__) || defined(__ARM64__) // macOS Apple Silicon
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 5000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT:
-            scores[i] += 4500;
-            hdrMonitorFound = true;
-            break;
-        // @bug: these are not handled in MoltenVK yet.
+        // Other Apple architectures (future-proofing)
         case VK_COLOR_SPACE_HDR10_ST2084_EXT:
             scores[i] += 4000;
             hdrMonitorFound = true;
@@ -994,13 +976,21 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] += 3000;
             hdrMonitorFound = true;
             break;
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 2000;
+            hdrMonitorFound = true;
+            break;
         //! We don't handle Dolbyvision yet, so it gets a low score for now.
         case VK_COLOR_SPACE_DOLBYVISION_EXT:
             scores[i] += 1000;
             hdrMonitorFound = true;
             break;
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+            scores[i] += 1500;
+            hdrMonitorFound = true;
+            break;
         case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // SDR baseline
+            scores[i] += 500; // Default to SDR
             break;
         default:
             break;
@@ -1090,8 +1080,33 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         default:
             break;
 #else
+            //Fl::warning("Unknown Colorspace for your OS");
+        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+            scores[i] += 4000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_HDR10_HLG_EXT:
+            scores[i] += 3000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+            scores[i] += 2000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+            scores[i] += 1500;
+            hdrMonitorFound = true;
+            break;
+        //! \@todo: We don't handle Dolbyvision yet, so it gets a low score
+        //!         for now.
+        case VK_COLOR_SPACE_DOLBYVISION_EXT:
+            scores[i] += 1000;
+            hdrMonitorFound = true;
+            break;
+        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+            scores[i] += 500; // SDR baseline
+            break;
         default:
-            Fl::warning("Unknown Colorspace for your OS");
             break;
 #endif
         }
