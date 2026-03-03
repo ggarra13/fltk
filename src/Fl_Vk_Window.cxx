@@ -1214,7 +1214,12 @@ std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
     std::vector<const char*> out;
-    out.push_back("VK_EXT_swapchain_colorspace");
+    out.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+    out.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
+    // For HDR support
+    out.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+
     return out;
 }
 

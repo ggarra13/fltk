@@ -912,277 +912,267 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     pWindow->device() = pWindow->m_device;
     pWindow->ctx.safe_thread_queue = pWindow->m_queue;
     pWindow->ctx.allocator = pWindow->m_allocator;
-    
-    uint32_t formatCount;
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
-    VK_CHECK(result);
 
-    std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    result = vkGetPhysicalDeviceSurfaceFormatsKHR(
-        pWindow->gpu(), pWindow->m_surface, &formatCount, formats.data());
-    VK_CHECK(result);
-
-    // Look for HDR10 or HLG if present
     bool hdrMonitorFound = false;
     VkColorSpaceKHR color_space;
-    std::vector<int> scores(formats.size());
-    i = 0;
-    for (const auto& format : formats)
-    {
-        scores[i] = 0;
-        if (pWindow->log_level() > 5)
-        {
-            printf("[%d] format = %s color space = %s\n",
-                   i, string_VkFormat(format.format),
-                   string_VkColorSpaceKHR(format.colorSpace));
-        }
-        switch (format.colorSpace)
-        {
-#ifdef __APPLE__
-#if defined(__x86_64__) // macOS Intel
-        // Other Apple architectures (future-proofing)
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            scores[i] += 4000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        //! We don't handle Dolbyvision yet, so it gets a low score for now.
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            scores[i] += 1000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // Default to SDR
-            break;
-        default:
-            break;
-#elif defined(__arm64__) || defined(__ARM64__) // macOS Apple Silicon
-        // Other Apple architectures (future-proofing)
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            scores[i] += 4000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        //! We don't handle Dolbyvision yet, so it gets a low score for now.
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            scores[i] += 1000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // Default to SDR
-            break;
-        default:
-            break;
-#else
-        // Other Apple architectures (future-proofing)
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            scores[i] += 4000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        //! We don't handle Dolbyvision yet, so it gets a low score for now.
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            scores[i] += 1000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // Default to SDR
-            break;
-        default:
-            break;
-#endif
-#elif defined(__linux__)
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            scores[i] += 4000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
-            hdrMonitorFound = true;
-            break;
-        //! \@todo: We don't handle Dolbyvision yet, so it gets a low score
-        //!         for now.
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            scores[i] += 1000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // SDR baseline
-            break;
-        default:
-            break;
-#elif defined(_WINDOWS)   // Windows and Linux
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            scores[i] += 4000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
-            hdrMonitorFound = true;
-            break;
-        //! \@todo: We don't handle Dolbyvision yet, so it gets a low score
-        //!         for now.
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            scores[i] += 1000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // SDR baseline
-            break;
-        default:
-            break;
-#else
-            //Fl::warning("Unknown Colorspace for your OS");
-        case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-            scores[i] += 4000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_HDR10_HLG_EXT:
-            scores[i] += 3000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
-            scores[i] += 2000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
-            scores[i] += 1500;
-            hdrMonitorFound = true;
-            break;
-        //! \@todo: We don't handle Dolbyvision yet, so it gets a low score
-        //!         for now.
-        case VK_COLOR_SPACE_DOLBYVISION_EXT:
-            scores[i] += 1000;
-            hdrMonitorFound = true;
-            break;
-        case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
-            scores[i] += 500; // SDR baseline
-            break;
-        default:
-            break;
-#endif
-        }
-
-        switch (format.format)
-        {
-            // Accept 16-bit formats for everything
-        case VK_FORMAT_R16G16B16_UNORM:
-        case VK_FORMAT_R16G16B16A16_UNORM:
-            scores[i] += 2000;
-            break;
-        case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
-        case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
-            scores[i] += 1500;
-            break;
-        case VK_FORMAT_R8G8B8A8_UNORM:
-        case VK_FORMAT_B8G8R8A8_UNORM:
-        case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
-            scores[i] += 500;
-            break;
-        default:
-            break;
-        }
-
-        ++i;
-    }
-
     VkFormat view_format;
-    if (!hdrMonitorFound)
-    {
-        bool foundLinear = false;
-        for (const auto& format : formats)
-        {
-            // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
-            if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
-                format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+
+    // 1. Get the function pointer
+    auto fpGetPhysicalDeviceSurfaceFormats2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormats2KHR>(
+        vkGetInstanceProcAddr(pWindow->instance(), "vkGetPhysicalDeviceSurfaceFormats2KHR")
+        );
+
+    if (fpGetPhysicalDeviceSurfaceFormats2KHR) {
+        // 2. Set up the surface info
+        VkPhysicalDeviceSurfaceInfo2KHR surfaceInfo = {};
+        surfaceInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR;
+        surfaceInfo.surface = pWindow->m_surface;
+
+        // 3. Get the count
+        uint32_t formatCount;
+        fpGetPhysicalDeviceSurfaceFormats2KHR(pWindow->gpu(), &surfaceInfo, &formatCount, nullptr);
+
+        // 4. Get the formats
+        std::vector<VkSurfaceFormat2KHR> formats2(formatCount);
+        // Look for HDR10 if present
+        std::vector<int> scores(formatCount);
+        for (auto& f : formats2) f.sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
+        
+        fpGetPhysicalDeviceSurfaceFormats2KHR(pWindow->gpu(), &surfaceInfo, &formatCount, formats2.data());
+
+        // 5. Access the formats
+        int i = 0;
+        for (const auto& f : formats2) {
+            scores[i] = 0;
+            VkFormat fmt = f.surfaceFormat.format;
+            VkColorSpaceKHR space = f.surfaceFormat.colorSpace;
+            switch(space)
             {
-                view_format = VK_FORMAT_B8G8R8A8_UNORM;
-                color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-                foundLinear = true;
+            case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+                scores[i] += 4000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_HDR10_HLG_EXT:
+                scores[i] += 3000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+                scores[i] += 2000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+                scores[i] += 1500;
+                hdrMonitorFound = true;
+                break;
+                //! \@todo: We don't handle Dolbyvision yet, so it gets a
+                //! low score for now.
+            case VK_COLOR_SPACE_DOLBYVISION_EXT:
+                scores[i] += 1000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+                scores[i] += 500; // SDR baseline
+                break;
+            default:
                 break;
             }
-        }
-        if (!foundLinear)
-        {
-            // Fallback to first supported format (usually works)
-            view_format = formats[0].format;
-            color_space = formats[0].colorSpace;
-            if (pWindow->log_level() > 2)
+
+            switch (fmt)
             {
-                fprintf(stderr, "No ideal linear format found, using fallback\n");
+                // Accept 16-bit formats for everything
+            case VK_FORMAT_R16G16B16_UNORM:
+            case VK_FORMAT_R16G16B16A16_UNORM:
+                scores[i] += 2000;
+                break;
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+                scores[i] += 1500;
+                break;
+            case VK_FORMAT_R8G8B8A8_UNORM:
+            case VK_FORMAT_B8G8R8A8_UNORM:
+            case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+                scores[i] += 500;
+                break;
+            default:
+                break;
             }
+
+            ++i;
+        }
+        
+        if (!hdrMonitorFound)
+        {
+            bool foundLinear = false;
+            for (const auto& f : formats2)
+            {
+                // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
+                if (f.surfaceFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
+                    f.surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                {
+                    view_format = VK_FORMAT_B8G8R8A8_UNORM;
+                    color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+                    foundLinear = true;
+                    break;
+                }
+            }
+            if (!foundLinear)
+            {
+                // Fallback to first supported format (usually works)
+                view_format = formats2[0].surfaceFormat.format;
+                color_space = formats2[0].surfaceFormat.colorSpace;
+                if (pWindow->log_level() > 2)
+                {
+                    fprintf(stderr, "No ideal linear format found, using fallback\n");
+                }
+            }
+        }
+        else
+        {
+            // Default clips and washed out colors
+            int best_score = 0;
+            for (unsigned i = 0; i < formats2.size(); ++i)
+            {
+                if (scores[i] > best_score)
+                {
+                    best_score = scores[i];
+                    view_format = formats2[i].surfaceFormat.format;
+                    color_space = formats2[i].surfaceFormat.colorSpace;
+                }
+            }
+        }
+        
+        // Handle undefined format case
+        if (formatCount == 1 &&
+            formats2[0].surfaceFormat.format == VK_FORMAT_UNDEFINED)
+        {
+            view_format = VK_FORMAT_B8G8R8A8_UNORM;
+            color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
         }
     }
     else
     {
-        // Default clips and washed out colors
-        int best_score = 0;
-        for (unsigned i = 0; i < formats.size(); ++i)
+        uint32_t formatCount;
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+            pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
+        VK_CHECK(result);
+
+        std::vector<VkSurfaceFormatKHR> formats(formatCount);
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+            pWindow->gpu(), pWindow->m_surface, &formatCount, formats.data());
+        VK_CHECK(result);
+    
+        // Look for HDR10 if present
+        std::vector<int> scores(formats.size());
+        i = 0;
+        for (const auto& format : formats)
         {
-            if (scores[i] > best_score)
+            scores[i] = 0;
+            if (pWindow->log_level() > 5)
             {
-                best_score = scores[i];
-                view_format = formats[i].format;
-                color_space = formats[i].colorSpace;
+                printf("[%d] format = %s color space = %s\n",
+                       i, string_VkFormat(format.format),
+                       string_VkColorSpaceKHR(format.colorSpace));
+            }
+            switch (format.colorSpace)
+            {
+            case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+                scores[i] += 4000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_HDR10_HLG_EXT:
+                scores[i] += 3000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+                scores[i] += 2000;
+                hdrMonitorFound = true;
+                break;
+                //! We don't handle Dolbyvision yet, so it gets a low score for now.
+            case VK_COLOR_SPACE_DOLBYVISION_EXT:
+                scores[i] += 1000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+                scores[i] += 1500;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+                scores[i] += 500; // Default to SDR
+                break;
+            default:
+                break;
+            }
+
+            switch (format.format)
+            {
+                // Accept 16-bit formats for everything
+            case VK_FORMAT_R16G16B16A16_UNORM:
+                scores[i] += 2000;
+                break;
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+                scores[i] += 1500;
+                break;
+            case VK_FORMAT_R8G8B8A8_UNORM:
+            case VK_FORMAT_B8G8R8A8_UNORM:
+            case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+                scores[i] += 500;
+                break;
+            default:
+                break;
+            }
+
+            ++i;
+
+        }
+
+        if (!hdrMonitorFound)
+        {
+            bool foundLinear = false;
+            for (const auto& format : formats)
+            {
+                // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
+                if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
+                    format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                {
+                    view_format = VK_FORMAT_B8G8R8A8_UNORM;
+                    color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+                    foundLinear = true;
+                    break;
+                }
+            }
+            if (!foundLinear)
+            {
+                // Fallback to first supported format (usually works)
+                view_format = formats[0].format;
+                color_space = formats[0].colorSpace;
+                if (pWindow->log_level() > 2)
+                {
+                    fprintf(stderr, "No ideal linear format found, using fallback\n");
+                }
             }
         }
-    }
-
-    // Handle undefined format case
-    if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
-    {
-        view_format = VK_FORMAT_B8G8R8A8_UNORM;
-        color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        else
+        {
+            // Default clips and washed out colors
+            int best_score = 0;
+            for (unsigned i = 0; i < formats.size(); ++i)
+            {
+                if (scores[i] > best_score)
+                {
+                    best_score = scores[i];
+                    view_format = formats[i].format;
+                    color_space = formats[i].colorSpace;
+                }
+            }
+        }
+        
+        // Handle undefined format case
+        if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
+        {
+            view_format = VK_FORMAT_B8G8R8A8_UNORM;
+            color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        }
     }
 
     pWindow->ctx.format = view_format;
