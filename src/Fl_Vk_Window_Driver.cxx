@@ -946,6 +946,13 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             scores[i] = 0;
             VkFormat fmt = f.surfaceFormat.format;
             VkColorSpaceKHR space = f.surfaceFormat.colorSpace;
+
+            if (pWindow->log_level() > 3)
+            {
+                printf("[%d] format = %s color space = %s\n",
+                       i, string_VkFormat(fmt),
+                       string_VkColorSpaceKHR(space));
+            }
             switch(space)
             {
             case VK_COLOR_SPACE_HDR10_ST2084_EXT:
@@ -979,8 +986,6 @@ void Fl_Vk_Window_Driver::init_colorspace() {
 
             switch (fmt)
             {
-                // Accept 16-bit formats for everything
-            case VK_FORMAT_R16G16B16_UNORM:
             case VK_FORMAT_R16G16B16A16_UNORM:
                 scores[i] += 2000;
                 break;
@@ -1003,16 +1008,17 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         if (!hdrMonitorFound)
         {
             bool foundLinear = false;
-            for (const auto& f : formats2)
+            int best_score = 0;
+            for (unsigned i = 0; i < formats2.size(); ++i)
             {
-                // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
-                if (f.surfaceFormat.format == VK_FORMAT_B8G8R8A8_UNORM &&
-                    f.surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                if (scores[i] > best_score &&
+                    formats2[i].surfaceFormat.colorSpace ==
+                    VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
                 {
-                    view_format = VK_FORMAT_B8G8R8A8_UNORM;
-                    color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+                    best_score = scores[i];
+                    view_format = formats2[i].surfaceFormat.format;
+                    color_space = formats2[i].surfaceFormat.colorSpace;
                     foundLinear = true;
-                    break;
                 }
             }
             if (!foundLinear)
@@ -1022,7 +1028,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                 color_space = formats2[0].surfaceFormat.colorSpace;
                 if (pWindow->log_level() > 2)
                 {
-                    fprintf(stderr, "No ideal linear format found, using fallback\n");
+                    fprintf(stderr, "No ideal format found, using fallback\n");
                 }
             }
         }
@@ -1067,7 +1073,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         for (const auto& format : formats)
         {
             scores[i] = 0;
-            if (pWindow->log_level() > 5)
+            if (pWindow->log_level() > 3)
             {
                 printf("[%d] format = %s color space = %s\n",
                        i, string_VkFormat(format.format),
@@ -1129,16 +1135,16 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         if (!hdrMonitorFound)
         {
             bool foundLinear = false;
-            for (const auto& format : formats)
+            int best_score = 0;
+            for (unsigned i = 0; i < formats.size(); ++i)
             {
-                // Prefer UNORM with SRGB_NONLINEAR (linear output intent)
-                if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
-                    format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                if (scores[i] > best_score &&
+                    formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
                 {
-                    view_format = VK_FORMAT_B8G8R8A8_UNORM;
-                    color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+                    best_score = scores[i];
+                    view_format = formats[i].format;
+                    color_space = formats[i].colorSpace;
                     foundLinear = true;
-                    break;
                 }
             }
             if (!foundLinear)
@@ -1148,13 +1154,12 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                 color_space = formats[0].colorSpace;
                 if (pWindow->log_level() > 2)
                 {
-                    fprintf(stderr, "No ideal linear format found, using fallback\n");
+                    fprintf(stderr, "No ideal format found, using fallback\n");
                 }
             }
         }
         else
         {
-            // Default clips and washed out colors
             int best_score = 0;
             for (unsigned i = 0; i < formats.size(); ++i)
             {
@@ -1180,10 +1185,10 @@ void Fl_Vk_Window_Driver::init_colorspace() {
 
     if (pWindow->log_level() > 2)
     {
-        printf("%p\tSelected window format = %s\n"
-               "%p\tSelected window color space = %s\n",
-               pWindow, string_VkFormat(view_format),
-               pWindow, string_VkColorSpaceKHR(color_space));
+        printf("\tSelected window format = %s\n"
+               "\tSelected window color space = %s\n",
+               string_VkFormat(view_format),
+               string_VkColorSpaceKHR(color_space));
     }
 }
 
