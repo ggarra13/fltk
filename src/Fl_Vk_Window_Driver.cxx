@@ -28,6 +28,7 @@
 
 
 
+#include <algorithm>
 #include <cassert>
 #include <mutex>
 #include <stdexcept>
@@ -99,15 +100,17 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   }
 
   // Set swapchain extent to match window size, clamped to capabilities
-  int W = pWindow->pixel_w();
-  int H = pWindow->pixel_h();
+  uint32_t W = pWindow->pixel_w();
+  uint32_t H = pWindow->pixel_h();
+
+  VkExtent2D swapchainExtent = surfCapabilities.currentExtent;
+
+
   
-  VkExtent2D swapchainExtent = { (uint32_t)W, (uint32_t)H };
-  
-  swapchainExtent.width = FLTK_CLAMP(swapchainExtent.width,
+  swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
                                      surfCapabilities.minImageExtent.width,
                                      surfCapabilities.maxImageExtent.width);
-  swapchainExtent.height = FLTK_CLAMP(swapchainExtent.height,
+  swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
                                       surfCapabilities.minImageExtent.height,
                                       surfCapabilities.maxImageExtent.height);
     
@@ -392,8 +395,22 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   attachments[0] = VK_NULL_HANDLE;        // Color attachment
   attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
 
-  int W = pWindow->pixel_w();
-  int H = pWindow->pixel_h();    
+  uint32_t W = pWindow->pixel_w();
+  uint32_t H = pWindow->pixel_h();    
+
+  VkSurfaceCapabilitiesKHR capabilities;
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
+                                            pWindow->m_surface, &capabilities);
+
+  // Use this extent for BOTH your Swapchain and your Framebuffer
+  VkExtent2D swapchainExtent = capabilities.currentExtent;
+  swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
+                                     capabilities.minImageExtent.width,
+                                     capabilities.maxImageExtent.width);
+  swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
+                                      capabilities.minImageExtent.height,
+                                      capabilities.maxImageExtent.height);
+
 
   VkFramebufferCreateInfo fb_info = {};
   fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -403,8 +420,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   bool has_stencil = pWindow->mode() & FL_STENCIL;
   fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
   fb_info.pAttachments = attachments;
-  fb_info.width = W;
-  fb_info.height = H;
+  fb_info.width = swapchainExtent.width;
+  fb_info.height = swapchainExtent.height;
   fb_info.layers = 1;
 
   VkResult result;

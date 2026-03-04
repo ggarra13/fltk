@@ -29,6 +29,7 @@
 #include <FL/fl_utf8.h>
 #include <FL/platform.H>
 
+#include <algorithm>
 #include <iostream>
 
 #define FLTK_ADD_DEVICE_EXTENSION(name) \
@@ -273,14 +274,24 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer cmd)
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
 
-    int W = pixel_w();
-    int H = pixel_h();
+    VkSurfaceCapabilitiesKHR capabilities;
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(),
+                                              m_surface, &capabilities);
+    uint32_t W = pixel_w();
+    uint32_t H = pixel_h();
     
-    rp_begin.renderArea.extent.width = W;
-    rp_begin.renderArea.extent.height = H;
+  // Use this extent for BOTH your Swapchain and your Framebuffer
+    VkExtent2D swapchainExtent = capabilities.currentExtent;
+    swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
+                                       capabilities.minImageExtent.width,
+                                       capabilities.maxImageExtent.width);
+    swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
+                                        capabilities.minImageExtent.height,
+                                        capabilities.maxImageExtent.height);
+    rp_begin.renderArea.extent = swapchainExtent;
     rp_begin.clearValueCount = (mode() & FL_DEPTH || mode() & FL_STENCIL) ? 2 : 1;
     rp_begin.pClearValues = clear_values;
-
+    
     vkCmdBeginRenderPass(cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
     m_in_render_pass = true;
 }
