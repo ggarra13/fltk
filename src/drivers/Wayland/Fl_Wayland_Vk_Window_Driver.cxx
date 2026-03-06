@@ -112,6 +112,7 @@ Fl_Vk_Choice *Fl_Wayland_Vk_Window_Driver::find(int m, const int *alistp) {
 
 
 float Fl_Wayland_Vk_Window_Driver::pixels_per_unit() {
+    //! \@note:  must NOT scale by Wayland's wld_scale here.
     return Fl::screen_driver()->scale(pWindow->screen_num());
 }
 
