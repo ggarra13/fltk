@@ -130,22 +130,14 @@ void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
 
     // Wait for all operations to complete on the device, not queue.
-    wait_device();
-
-    // Validate surface
-    VkSurfaceCapabilitiesKHR surfCapabilities;
-    result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &surfCapabilities);
-    if (result == VK_ERROR_SURFACE_LOST_KHR || result != VK_SUCCESS) {
-        pVkWindowDriver->destroy_surface();
-        pVkWindowDriver->create_surface();
-        if (m_surface == VK_NULL_HANDLE) {
-            fprintf(stderr, "Failed to recreate surface\n");
-            m_swapchain_needs_recreation = true;
-            return;
-        }
+    //wait_device();
+    for (auto& frame : m_frames)
+    {
+        if (frame.fence != VK_NULL_HANDLE)
+            vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
     }
     
-    // 1. OPTIMIZATION: Reset the command pool instead of destroying it
+    // Reset the command pool instead of destroying it
     if (commandPool() != VK_NULL_HANDLE)
     {
         for (auto& frame : m_frames)
@@ -183,9 +175,17 @@ void Fl_Vk_Window::recreate_swapchain() {
         }
     }
 
+
+    // // Save old swapchain BEFORE destroying resources
+    // // Why does saving and assigning it later crashes. 
+    // VkSwapchainKHR old_swapchain = m_swapchain;
+    // m_swapchain = VK_NULL_HANDLE;
+    
     // Destroy old swapchain resources
     pVkWindowDriver->destroy_resources();
 
+    // m_swapchain = old_swapchain;
+    
     // Recreate swapchain
     pVkWindowDriver->prepare();
     if (m_swapchain == VK_NULL_HANDLE)

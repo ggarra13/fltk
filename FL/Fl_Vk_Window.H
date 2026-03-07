@@ -73,17 +73,18 @@ struct Fl_Vk_Depth {
     VkFormat format;
     
     VkImage image;
-    VkDeviceMemory mem;
     VkImageView view;
+    VmaAllocation allocation;  // use this instead
 
     Fl_Vk_Depth() :
+        format(VK_FORMAT_UNDEFINED),
         image(VK_NULL_HANDLE),
-        mem(VK_NULL_HANDLE),
-        view(VK_NULL_HANDLE)
+        view(VK_NULL_HANDLE),
+        allocation(VK_NULL_HANDLE)
         {
         };
 
-    void destroy(VkDevice& device)
+    void destroy(VkDevice& device, VmaAllocator allocator)
         {
             if (view != VK_NULL_HANDLE)
             {
@@ -91,16 +92,13 @@ struct Fl_Vk_Depth {
                 view = VK_NULL_HANDLE;
             }
 
-            if (image != VK_NULL_HANDLE)
+            // vmaDestroyImage replaces both vkDestroyImage AND vkFreeMemory.
+            // It is safe to call with VK_NULL_HANDLE for both fields.
+            if (image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)
             {
-                vkDestroyImage(device, image, NULL);
-                image = VK_NULL_HANDLE;
-            }
-
-            if (mem != VK_NULL_HANDLE)
-            {
-                vkFreeMemory(device, mem, NULL);
-                mem = VK_NULL_HANDLE;
+                vmaDestroyImage(allocator, image, allocation);
+                image      = VK_NULL_HANDLE;
+                allocation = VK_NULL_HANDLE;
             }
         }
 };

@@ -288,133 +288,88 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
 // Prepare depth/stencil resources for window
 void Fl_Vk_Window_Driver::prepare_depth() {
-  bool has_depth = pWindow->mode() & FL_DEPTH;
-  bool has_stencil = pWindow->mode() & FL_STENCIL;
+    bool has_depth   = pWindow->mode() & FL_DEPTH;
+    bool has_stencil = pWindow->mode() & FL_STENCIL;
 
-  if (!has_depth && !has_stencil) {
-    pWindow->m_depth.view = VK_NULL_HANDLE; // Ensure no invalid reference
-    pWindow->m_depth.image = VK_NULL_HANDLE;
-    pWindow->m_depth.mem = VK_NULL_HANDLE;
-    return;
-  }
+    if (!has_depth && !has_stencil) {
+        // Leave depth zeroed; m_currentDepthLayout stays UNDEFINED.
+        return;
+    }
 
-  VkFormat depth_format = VK_FORMAT_D16_UNORM;
-  uint32_t aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    VkFormat   depth_format = VK_FORMAT_D16_UNORM;
+    uint32_t   aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT;
 
-  if (has_stencil)
-  {
-      if (has_depth)
-      {
-          depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
-          aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-      }
-      else
-      {
-        depth_format = VK_FORMAT_S8_UINT;
-        aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
-      }
-  }
-  
-  uint32_t W = pWindow->pixel_w();
-  uint32_t H = pWindow->pixel_h();
-  
-  VkSurfaceCapabilitiesKHR capabilities;
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
-                                            pWindow->m_surface, &capabilities);
+    if (has_stencil) {
+        if (has_depth) {
+            depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
+            aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        } else {
+            depth_format = VK_FORMAT_S8_UINT;
+            aspectMask   = VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    }
 
-  // Use this extent for BOTH your Swapchain and your Framebuffer
-  VkExtent2D swapchainExtent = capabilities.currentExtent;
-  swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
-                                     capabilities.minImageExtent.width,
-                                     capabilities.maxImageExtent.width);
-  swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
-                                      capabilities.minImageExtent.height,
-                                      capabilities.maxImageExtent.height);
-  
-  
-  VkImageCreateInfo image = {};
-  image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  image.pNext = NULL;
-  image.imageType = VK_IMAGE_TYPE_2D;
-  image.format = depth_format;
-  image.extent = { swapchainExtent.width, swapchainExtent.height, 1};
-  image.mipLevels = 1;
-  image.arrayLayers = 1;
-  image.samples = VK_SAMPLE_COUNT_1_BIT;
-  image.tiling = VK_IMAGE_TILING_OPTIMAL;
-  image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-  image.flags = 0;
+    // Use the already-resolved swapchain extent (no extra driver query needed).
+    const VkExtent2D& ext = pWindow->m_swapchainExtent;
 
-  VkMemoryAllocateInfo mem_alloc = {};
-  mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  mem_alloc.pNext = NULL;
-  mem_alloc.allocationSize = 0;
-  mem_alloc.memoryTypeIndex = 0;
+    // --- VkImageCreateInfo is unchanged from the original ---
+    VkImageCreateInfo image_info = {};
+    image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_info.imageType     = VK_IMAGE_TYPE_2D;
+    image_info.format        = depth_format;
+    image_info.extent        = { ext.width, ext.height, 1 };
+    image_info.mipLevels     = 1;
+    image_info.arrayLayers   = 1;
+    image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    image_info.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_info.flags         = 0;
 
-  VkImageSubresourceRange subresourceRange = {};
-  subresourceRange.aspectMask = aspectMask;
-  subresourceRange.baseMipLevel = 0;
-  subresourceRange.levelCount = 1;
-  subresourceRange.baseArrayLayer = 0;
-  subresourceRange.layerCount = 1;
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    // Prefer dedicated allocation for depth images — drivers often benefit from
+    // this hint for large render targets (it avoids sub-allocating inside a
+    // shared heap block, reducing aliasing risk).
+    alloc_info.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 
+    pWindow->m_depth.format = depth_format;
 
-  VkImageViewCreateInfo view = {};
-  view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  view.pNext = NULL;
-  view.image = VK_NULL_HANDLE;
-  view.format = depth_format;
-  view.subresourceRange = subresourceRange;
-  view.flags = 0;
-  view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    // Single call replaces vkCreateImage + vkGetImageMemoryRequirements +
+    // vkAllocateMemory + vkBindImageMemory.
+    VkResult result = vmaCreateImage(
+        pWindow->m_allocator,
+        &image_info,
+        &alloc_info,
+        &pWindow->m_depth.image,
+        &pWindow->m_depth.allocation,
+        nullptr
+    );
+    
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vmaCreateImage (depth) failed: %s\n", string_VkResult(result));
+        return;
+    }
 
-  VkMemoryRequirements mem_reqs;
+    // Image view creation is unchanged.
+    VkImageSubresourceRange subresourceRange = {};
+    subresourceRange.aspectMask     = aspectMask;
+    subresourceRange.baseMipLevel   = 0;
+    subresourceRange.levelCount     = 1;
+    subresourceRange.baseArrayLayer = 0;
+    subresourceRange.layerCount     = 1;
 
-  VkResult result;
-  pWindow->m_depth.format = depth_format;
+    VkImageViewCreateInfo view_info = {};
+    view_info.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image            = pWindow->m_depth.image;
+    view_info.viewType         = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format           = depth_format;
+    view_info.subresourceRange = subresourceRange;
 
-  /* create image */
-  result = vkCreateImage(pWindow->device(), &image, NULL,
-                         &pWindow->m_depth.image);
-  VK_CHECK(result);
+    result = vkCreateImageView(pWindow->device(), &view_info, nullptr,
+                               &pWindow->m_depth.view);
+    VK_CHECK(result);
 
-  /* get memory requirements for this object */
-  vkGetImageMemoryRequirements(pWindow->device(),
-                               pWindow->m_depth.image, &mem_reqs);
-
-  /* select memory size and type */
-  mem_alloc.allocationSize = mem_reqs.size;
-  mem_alloc.memoryTypeIndex = findMemoryType(pWindow->gpu(),
-                                             mem_reqs.memoryTypeBits, 0);
-
-  /* allocate memory */
-  result = vkAllocateMemory(pWindow->device(), &mem_alloc, NULL,
-                            &pWindow->m_depth.mem);
-  VK_CHECK(result);
-
-  /* bind memory */
-  result = vkBindImageMemory(pWindow->device(), pWindow->m_depth.image, pWindow->m_depth.mem, 0);
-  VK_CHECK(result);
-
-  VkCommandBuffer cmd = beginSingleTimeCommands(pWindow->device(),
-                                                pWindow->commandPool());
-  {
-      std::lock_guard<std::mutex> lock(pWindow->queue_mutex());
-      set_image_layout(cmd, pWindow->m_depth.image,
-                       aspectMask,
-                       VK_IMAGE_LAYOUT_UNDEFINED,
-                       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                       0, VK_PIPELINE_STAGE_HOST_BIT,
-                       0, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
-      endSingleTimeCommands(cmd, pWindow->device(),
-                            pWindow->commandPool(),
-                            pWindow->queue());
-  }
-
-  /* create image view */
-  view.image = pWindow->m_depth.image;
-  result = vkCreateImageView(pWindow->device(), &view, NULL, &pWindow->m_depth.view);
-  VK_CHECK(result);
+    pWindow->m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 
@@ -427,19 +382,6 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   uint32_t W = pWindow->pixel_w();
   uint32_t H = pWindow->pixel_h();    
 
-  VkSurfaceCapabilitiesKHR capabilities;
-  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
-                                            pWindow->m_surface, &capabilities);
-
-  // Use this extent for BOTH your Swapchain and your Framebuffer
-  VkExtent2D swapchainExtent = capabilities.currentExtent;
-  swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
-                                     capabilities.minImageExtent.width,
-                                     capabilities.maxImageExtent.width);
-  swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
-                                      capabilities.minImageExtent.height,
-                                      capabilities.maxImageExtent.height);
-
 
   VkFramebufferCreateInfo fb_info = {};
   fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -449,8 +391,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   bool has_stencil = pWindow->mode() & FL_STENCIL;
   fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
   fb_info.pAttachments = attachments;
-  fb_info.width = swapchainExtent.width;
-  fb_info.height = swapchainExtent.height;
+  fb_info.width = W;
+  fb_info.height = H;
   fb_info.layers = 1;
 
   VkResult result;
@@ -1276,7 +1218,7 @@ void Fl_Vk_Window_Driver::destroy_resources()
     pWindow->m_buffers.clear();
 
     // Then, depth/stencils if present
-    pWindow->m_depth.destroy(pWindow->device());
+    pWindow->m_depth.destroy(pWindow->device(), pWindow->m_allocator);
   
     // Destroy swapchain
     if (pWindow->m_swapchain != VK_NULL_HANDLE)
