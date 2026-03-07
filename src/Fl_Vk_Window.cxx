@@ -175,16 +175,16 @@ void Fl_Vk_Window::recreate_swapchain() {
         }
     }
 
-
-    // // Save old swapchain BEFORE destroying resources
-    // // Why does saving and assigning it later crashes. 
-    // VkSwapchainKHR old_swapchain = m_swapchain;
-    // m_swapchain = VK_NULL_HANDLE;
+    // Save old swapchain BEFORE destroying resources
+    // Why does saving and assigning it later crashes in
+    // begin_render_pass(VkCommandBuffer)
+    VkSwapchainKHR old_swapchain = m_swapchain;
+    m_swapchain = VK_NULL_HANDLE;
     
     // Destroy old swapchain resources
     pVkWindowDriver->destroy_resources();
 
-    // m_swapchain = old_swapchain;
+    m_swapchain = old_swapchain;
     
     // Recreate swapchain
     pVkWindowDriver->prepare();

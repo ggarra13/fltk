@@ -85,6 +85,7 @@ static VkBool32 check_layers(uint32_t check_count, const char **check_names,
 void Fl_Vk_Window_Driver::prepare_buffers() {
   VkResult result;
   VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
+  
   pWindow->m_swapchain = VK_NULL_HANDLE;
 
   // Get surface capabilities
@@ -128,6 +129,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
     
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
+      !pWindow->m_buffers.empty() &&
       swapchainExtent.width == pWindow->m_swapchainExtent.width &&
       swapchainExtent.height == pWindow->m_swapchainExtent.height) {
       pWindow->m_swapchain = oldSwapchain;
