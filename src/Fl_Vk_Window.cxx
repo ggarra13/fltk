@@ -763,6 +763,7 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
   pVkWindowDriver->resize(is_a_resize, W, H);
 
   if (is_a_resize) {
+      m_swapchainExtent = {0, 0};
       m_swapchain_needs_recreation = true;
   }
 }
