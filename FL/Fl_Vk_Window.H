@@ -328,6 +328,7 @@ public:
   float              m_depthStencil;
 
   //! The surface and its format gotten from the Window driver.
+  VkExtent2D         m_swapchainExtent;
   VkSurfaceKHR       m_surface;
   VkSurfaceFormatKHR m_surfaceFormat;
 
@@ -429,7 +430,11 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
-  int pixel_w() { return int(pixels_per_unit() * w() + 0.5f); }
+  int pixel_w() {
+      if (m_swapchain != VK_NULL_HANDLE && m_swapchainExtent.width  > 0)
+          return (int)m_swapchainExtent.width;
+      return int(pixels_per_unit() * w() + 0.5f);
+  }
   
   /** Gives the window height in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
@@ -440,8 +445,12 @@ public:
    between low and high resolution displays and automatically adjusts the returned value.
    \version 1.3.4
    */
-  int pixel_h() { return int(pixels_per_unit() * h() + 0.5f); }
-
+  int pixel_h() {
+    if (m_swapchain != VK_NULL_HANDLE && m_swapchainExtent.height > 0)
+        return (int)m_swapchainExtent.height;
+    return int(pixels_per_unit() * h() + 0.5f);  // pre-swapchain estimate only
+  }
+  
   virtual ~Fl_Vk_Window();
   /**
     Creates a new Fl_Vk_Window widget using the given size, and label string.

@@ -103,8 +103,20 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   uint32_t W = pWindow->pixel_w();
   uint32_t H = pWindow->pixel_h();
 
-  VkExtent2D swapchainExtent = surfCapabilities.currentExtent;
-
+  VkExtent2D swapchainExtent;
+  if (surfCapabilities.currentExtent.width != 0xFFFFFFFF) {
+      // Compositor dictates the size (always the case on Wayland).
+      // It is already guaranteed to be aligned to buffer_scale.
+      swapchainExtent = surfCapabilities.currentExtent;
+  } else {
+      // Surface size is flexible (X11/Win32) — use our pixel estimate, clamped.
+      swapchainExtent.width  = std::clamp(W,
+                                          surfCapabilities.minImageExtent.width,
+                                          surfCapabilities.maxImageExtent.width);
+      swapchainExtent.height = std::clamp(H,
+                                          surfCapabilities.minImageExtent.height,
+                                          surfCapabilities.maxImageExtent.height);
+}
 
   
   swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
@@ -116,10 +128,14 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
     
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
-      swapchainExtent.width == W && swapchainExtent.height == H) {
+      swapchainExtent.width == pWindow->m_swapchainExtent.width &&
+      swapchainExtent.height == pWindow->m_swapchainExtent.height) {
       pWindow->m_swapchain = oldSwapchain;
       return;
   }
+
+  // Store the authorative extent for this window
+  pWindow->m_swapchainExtent = swapchainExtent;
 
   // Choose present mode (e.g., prefer MAILBOX for low latency)
   uint32_t presentModeCount;
@@ -299,8 +315,21 @@ void Fl_Vk_Window_Driver::prepare_depth() {
       }
   }
   
-  int W = pWindow->pixel_w();
-  int H = pWindow->pixel_h();
+  uint32_t W = pWindow->pixel_w();
+  uint32_t H = pWindow->pixel_h();
+  
+  VkSurfaceCapabilitiesKHR capabilities;
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
+                                            pWindow->m_surface, &capabilities);
+
+  // Use this extent for BOTH your Swapchain and your Framebuffer
+  VkExtent2D swapchainExtent = capabilities.currentExtent;
+  swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
+                                     capabilities.minImageExtent.width,
+                                     capabilities.maxImageExtent.width);
+  swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
+                                      capabilities.minImageExtent.height,
+                                      capabilities.maxImageExtent.height);
   
   
   VkImageCreateInfo image = {};
@@ -308,7 +337,7 @@ void Fl_Vk_Window_Driver::prepare_depth() {
   image.pNext = NULL;
   image.imageType = VK_IMAGE_TYPE_2D;
   image.format = depth_format;
-  image.extent = { (uint32_t)W, (uint32_t)H, 1};
+  image.extent = { swapchainExtent.width, swapchainExtent.height, 1};
   image.mipLevels = 1;
   image.arrayLayers = 1;
   image.samples = VK_SAMPLE_COUNT_1_BIT;

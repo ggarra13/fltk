@@ -48,8 +48,8 @@
 static const uint64_t kFenceTimeout = UINT64_MAX;
 static const uint64_t kAcquireTimeout = UINT64_MAX;
 #else
-static const uint64_t kFenceTimeout = 1000000000;
-static const uint64_t kAcquireTimeout = 1000000000;
+static const uint64_t kFenceTimeout   = 10000000;
+static const uint64_t kAcquireTimeout = 10000000;
 #endif
 
 static int g_active_vulkan_windows = 0;
@@ -145,37 +145,42 @@ void Fl_Vk_Window::recreate_swapchain() {
         }
     }
     
-    // Free existing command buffers
-    for (auto& frame : m_frames)
-    {
-        if (frame.commandBuffer != VK_NULL_HANDLE)
-        {
-            // Reset command buffer to release any resource references
-            result = vkResetCommandBuffer(frame.commandBuffer, 0);
-            if (result != VK_SUCCESS) {
-                fprintf(stderr, "vkResetCommandBuffer failed for frame %p: %s\n",
-                        &frame, string_VkResult(result));
-            }
-            vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
-            frame.commandBuffer = VK_NULL_HANDLE;
-        }
-        if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
-            frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
-        }
-        if (frame.fence != VK_NULL_HANDLE)
-        {
-            vkDestroyFence(device(), frame.fence, nullptr);
-            frame.fence = VK_NULL_HANDLE;
-        }
-    }
-
-    // Destroy old command pool
+    // 1. OPTIMIZATION: Reset the command pool instead of destroying it
     if (commandPool() != VK_NULL_HANDLE)
     {
-        vkDestroyCommandPool(device(), commandPool(), nullptr);
-        commandPool() = VK_NULL_HANDLE;
+        for (auto& frame : m_frames)
+        {
+            if (frame.commandBuffer != VK_NULL_HANDLE)
+            {
+                vkFreeCommandBuffers(device(), commandPool(), 1, &frame.commandBuffer);
+                frame.commandBuffer = VK_NULL_HANDLE;
+            }
+            if (frame.imageAcquiredSemaphore != VK_NULL_HANDLE)
+            {
+                vkDestroySemaphore(device(), frame.imageAcquiredSemaphore, nullptr);
+                frame.imageAcquiredSemaphore = VK_NULL_HANDLE;
+            }
+            if (frame.fence != VK_NULL_HANDLE)
+            {
+                vkDestroyFence(device(), frame.fence, nullptr);
+                frame.fence = VK_NULL_HANDLE;
+            }
+        }
+        
+        // Recycle the memory. Much faster than vkDestroyCommandPool!
+        vkResetCommandPool(device(), commandPool(), VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
+    } else {
+        // Only create the pool if it literally doesn't exist yet
+        VkCommandPoolCreateInfo cmd_pool_info = {};
+        cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        cmd_pool_info.queueFamilyIndex = ctx.queueFamilyIndex;
+        cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        result = vkCreateCommandPool(device(), &cmd_pool_info, nullptr, &commandPool());
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vkCreateCommandPool failed: %s\n", string_VkResult(result));
+            m_swapchain_needs_recreation = true;
+            return;
+        }
     }
 
     // Destroy old swapchain resources
@@ -196,6 +201,16 @@ void Fl_Vk_Window::recreate_swapchain() {
         m_swapchain_needs_recreation = true;
         return;
     }
+
+    // 2. FIX: Cache the old swapchain so destroy_resources doesn't kill it!
+    VkSwapchainKHR old_swapchain = m_swapchain;
+    m_swapchain = VK_NULL_HANDLE;
+
+    // Destroy old framebuffers, image views, and depth buffers
+    pVkWindowDriver->destroy_resources();
+
+    // 3. FIX: Restore the old swapchain so prepare() can use it for smooth transitions
+    m_swapchain = old_swapchain;
     
     // Recreate swapchain
     pVkWindowDriver->prepare();
@@ -273,22 +288,7 @@ void Fl_Vk_Window::begin_render_pass(VkCommandBuffer cmd)
     rp_begin.framebuffer = m_buffers[m_current_buffer].framebuffer;
     rp_begin.renderArea.offset.x = 0;
     rp_begin.renderArea.offset.y = 0;
-
-    VkSurfaceCapabilitiesKHR capabilities;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(),
-                                              m_surface, &capabilities);
-    uint32_t W = pixel_w();
-    uint32_t H = pixel_h();
-    
-  // Use this extent for BOTH your Swapchain and your Framebuffer
-    VkExtent2D swapchainExtent = capabilities.currentExtent;
-    swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
-                                       capabilities.minImageExtent.width,
-                                       capabilities.maxImageExtent.width);
-    swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
-                                        capabilities.minImageExtent.height,
-                                        capabilities.maxImageExtent.height);
-    rp_begin.renderArea.extent = swapchainExtent;
+    rp_begin.renderArea.extent = { (uint32_t)pixel_w(), (uint32_t)pixel_h() };
     rp_begin.clearValueCount = (mode() & FL_DEPTH || mode() & FL_STENCIL) ? 2 : 1;
     rp_begin.pClearValues = clear_values;
     
@@ -1275,6 +1275,7 @@ void Fl_Vk_Window::init() {
   // Swapchain info
   m_pixels_per_unit = 0.F;
   m_swapchain = VK_NULL_HANDLE;
+  m_swapchainExtent = {0, 0};
   m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   // For drawing
