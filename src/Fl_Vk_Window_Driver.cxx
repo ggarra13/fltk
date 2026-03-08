@@ -937,7 +937,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             VkFormat fmt = f.surfaceFormat.format;
             VkColorSpaceKHR space = f.surfaceFormat.colorSpace;
 
-            if (pWindow->log_level() > 3)
+            if (pWindow->log_level() > 1)
             {
                 printf("[%d] format = %s color space = %s\n",
                        i, string_VkFormat(fmt),
@@ -1016,7 +1016,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                 // Fallback to first supported format (usually works)
                 view_format = formats2[0].surfaceFormat.format;
                 color_space = formats2[0].surfaceFormat.colorSpace;
-                if (pWindow->log_level() > 2)
+                if (pWindow->log_level() > 1)
                 {
                     fprintf(stderr, "No ideal format found, using fallback\n");
                 }
@@ -1063,7 +1063,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
         for (const auto& format : formats)
         {
             scores[i] = 0;
-            if (pWindow->log_level() > 3)
+            if (pWindow->log_level() > 1)
             {
                 printf("[%d] format = %s color space = %s\n",
                        i, string_VkFormat(format.format),
@@ -1142,7 +1142,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
                 // Fallback to first supported format (usually works)
                 view_format = formats[0].format;
                 color_space = formats[0].colorSpace;
-                if (pWindow->log_level() > 2)
+                if (pWindow->log_level() > 1)
                 {
                     fprintf(stderr, "No ideal format found, using fallback\n");
                 }
