@@ -1523,7 +1523,7 @@ const Fl_Menu_Item* Fl_Menu_Item::pulldown(
     if (m==initial_item) initial_item=0; // stop the startup code if item found
     if (m->submenu()) {
       if (menubar)
-          cw->position(cw->x(), origY);
+          cw.position(cw.x(), origY);
       if (pp.create_submenu(Fl_Rect { X, Y, W, H }, cw, m, initial_item, menubar))
         goto STARTUP;
     } else { // !m->submenu():
