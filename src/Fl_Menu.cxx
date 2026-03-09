@@ -1044,7 +1044,8 @@ void Menu_Window::autoscroll(item_index_t n) {
   int Y = y()+Fl::box_dx(box())+2+n*item_height;
 
   int xx, ww;
-  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, this->screen_num());
+  int screen_idx = Fl::screen_num(x(), y());
+  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, screen_idx);
   if (n==0 && Y <= scr_y + item_height) {
     Y = scr_y - Y + 10;
   } else if (Y <= scr_y + item_height) {
@@ -1423,7 +1424,6 @@ const Fl_Menu_Item* Fl_Menu_Item::pulldown(
 
   int XX, YY, WW;
   Fl::screen_xywh(XX, YY, WW, Menu_Window::display_height_, Menu_Window::parent_->screen_num());
-  int origY = Y;
   Menu_Window mw(this, X, Y, W, H, initial_item, title, (bool)menubar);
   Fl::grab(mw);
   // If we grab the mouse pointer, we should also make sure that it is visible.
@@ -1522,8 +1522,6 @@ const Fl_Menu_Item* Fl_Menu_Item::pulldown(
 
     if (m==initial_item) initial_item=0; // stop the startup code if item found
     if (m->submenu()) {
-      if (menubar)
-          cw.position(cw.x(), origY);
       if (pp.create_submenu(Fl_Rect { X, Y, W, H }, cw, m, initial_item, menubar))
         goto STARTUP;
     } else { // !m->submenu():
