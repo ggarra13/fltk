@@ -1044,7 +1044,8 @@ void Menu_Window::autoscroll(item_index_t n) {
   int Y = y()+Fl::box_dx(box())+2+n*item_height;
 
   int xx, ww;
-  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, Fl::first_window()->screen_num());
+  int screen_idx = Fl::screen_num(x(), y());
+  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, screen_idx);
   if (n==0 && Y <= scr_y + item_height) {
     Y = scr_y - Y + 10;
   } else if (Y <= scr_y + item_height) {
