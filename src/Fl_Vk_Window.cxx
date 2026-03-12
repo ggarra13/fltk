@@ -130,12 +130,16 @@ void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
 
     // Wait for all operations to complete on the device, not queue.
-    //wait_device();
-    for (auto& frame : m_frames)
-    {
-        if (frame.fence != VK_NULL_HANDLE)
-            vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
-    }
+    wait_device();
+
+    //// \@bug: Using these for faster swapchain recreation would sometimes lead
+    ////        to a vkSemaphore validation error.
+    ////
+    // for (auto& frame : m_frames)
+    // {
+    //     if (frame.fence != VK_NULL_HANDLE)
+    //         vkWaitForFences(device(), 1, &frame.fence, VK_TRUE, UINT64_MAX);
+    // }
     
     // Reset the command pool instead of destroying it
     if (commandPool() != VK_NULL_HANDLE)
