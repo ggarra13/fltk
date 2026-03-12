@@ -1044,6 +1044,12 @@ void Menu_Window::autoscroll(item_index_t n) {
   int Y = y()+Fl::box_dx(box())+2+n*item_height;
 
   int xx, ww;
+
+  // Find the screen index for this menu which may not been mapped yet.
+  // Manolo was using Fl::first_window()->screen_num(), but that was not
+  // working properly on my two monitor setup where I would have the first
+  // window on one monitor and the menu (like the context menu of an
+  // Fl_Multiline_Input on another.
   int screen_idx = Fl::screen_num(x(), y());
   Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, screen_idx);
   if (n==0 && Y <= scr_y + item_height) {
