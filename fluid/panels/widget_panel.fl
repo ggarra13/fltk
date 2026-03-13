@@ -519,7 +519,7 @@ Function {make_widget_panel()} {uid 9310
 } {
   Fl_Window {} {uid 30ee
     comment {Use a Double Window to avoid flickering.} open
-    xywh {444 254 420 400} type Double labelsize 11 align 80 resizable hotspot
+    xywh {444 253 420 400} type Double labelsize 11 align 80 resizable hotspot
     code0 {o->size_range(o->w(), o->h());} size_range {420 400 0 0} visible
   } {
     Fl_Wizard tabs_wizard {uid 647f
@@ -528,13 +528,13 @@ Function {make_widget_panel()} {uid 9310
     } {
       Fl_Tabs widget_tabs {uid ce20
         callback {if (current_widget)
-  propagate_load((Fl_Group *)o,v);}
+  propagate_load((Fl_Group *)o,v);} open
         xywh {10 10 400 350} selection_color 12 labelsize 11 labelcolor 7 when 0
         code0 {o->show();}
       } {
         Fl_Group wp_gui_tab {uid b76b
           label GUI
-          callback propagate_load open selected
+          callback propagate_load open
           xywh {10 30 400 330} labelsize 11 when 0 resizable
         } {
           Fl_Group {} {uid d70c
@@ -1562,7 +1562,7 @@ Use 'Backspace' key to clear.} xywh {95 210 310 20} box DOWN_BOX color 7 selecti
           }
           Fl_Group wp_gui_xclass {uid ccce
             label {X Class:}
-            callback propagate_load
+            callback propagate_load open
             xywh {95 235 300 20} labelfont 1 labelsize 11 align 4
           } {
             Fl_Input {} {uid f009
@@ -1601,7 +1601,7 @@ Use 'Backspace' key to clear.} xywh {95 210 310 20} box DOWN_BOX color 7 selecti
   Fluid.proj.undo.checkpoint();
   ((Fl_Window*)(current_widget->o))->border(o->value());
   Fluid.proj.set_modflag(1);
-}}
+}} selected
               tooltip {Add a border around the window.} xywh {195 235 60 20} selection_color 1 labelsize 11
             }
             Fl_Light_Button {} {uid 457d
@@ -2506,12 +2506,16 @@ wCallback->do_callback(wCallback, v);} open
           } {
             Fl_Input {} {uid c214
               callback {if (v == LOAD) {
-  o->value(current_widget->user_data());
+  o->value(current_widget->user_data().c_str());
 } else {
   int mod = 0;
   const char *c = o->value();
   const char *d = c_check(c);
-  if (d) {fl_message("Error in user_data: %s",d); haderror = 1; return;}
+  if (d) {
+    fl_message("Error in user_data: %s",d);
+    haderror = 1;
+    return;
+  }
   for (Node *n: Fluid.proj.tree.all_selected_nodes()) {
     n->user_data(c);
     mod = 1;
@@ -2560,22 +2564,33 @@ wCallback->do_callback(wCallback, v);} open
             Fl_Input_Choice {} {uid 3ee9
               callback {static const char *dflt = "void*";
 if (v == LOAD) {
-  const char *c = current_widget->user_data_type();
-  if (!c) c = dflt;
-  o->value(c);
+  std::string c = current_widget->user_data_type();
+  if (c.empty()) c = dflt;
+  o->value(c.c_str());
 } else {
   int mod = 0;
   const char *c = o->value();
   const char *d = c_check(c);
-  if (!*c) o->value(dflt);
-  else if (!strcmp(c,dflt)) c = nullptr;
+  if (!*c) {
+    o->value(dflt);
+  } else if (!strcmp(c,dflt)) {
+    c = nullptr;
+  }
   if (!d) {
     if (c && *c && c[strlen(c)-1] != '*' && strcmp(c,"long"))
       d = "must be pointer or long";
   }
-  if (d) {fl_message("Error in type: %s",d); haderror = 1; return;}
+  if (d) {
+    fl_message("Error in type: %s",d);
+    o->value("void*");
+    haderror = 1;
+    // return; // Don't return. A good value must still be set.
+  }
   for (Node *q: Fluid.proj.tree.all_selected_nodes()) {
-    q->user_data_type(c);
+    if (c)
+      q->user_data_type(c);
+    else
+      q->user_data_type("");
     mod = 1;
   }
   if (mod) Fluid.proj.set_modflag(1);

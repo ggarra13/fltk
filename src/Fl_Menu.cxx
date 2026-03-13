@@ -29,6 +29,8 @@
 #include <stdio.h>
 #include "flstring.h"
 
+#include <iostream>
+
 // This file will declare:
 class Menu_Window_Basetype;
 class Menu_Title_Window;
@@ -183,6 +185,8 @@ protected:
     end();
     set_modal();
     clear_border();
+    // Put it on same screen as that where Menu_Window::parent_ is.
+    screen_num(Fl_Window_Driver::menu_parent(NULL)->screen_num());
   }
 
 public:
@@ -1046,7 +1050,7 @@ void Menu_Window::autoscroll(item_index_t n) {
   int xx, ww;
 
   // Find the screen index for this menu which may not been mapped yet.
-  // Manolo was using Fl::first_window()->screen_num(), but that was not
+  // Manolo was using this->screeen_num(), but that was not
   // working properly on my two monitor setup where I would have the first
   // window on one monitor and the menu (like the context menu of an
   // Fl_Multiline_Input on another).

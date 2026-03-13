@@ -1,7 +1,7 @@
 //
 // Definition of Apple Cocoa window driver.
 //
-// Copyright 1998-2018 by Bill Spitzak and others.
+// Copyright 1998-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -72,51 +72,22 @@ void Fl_Cocoa_Window_Driver::flush_overlay()
 
 void Fl_Cocoa_Window_Driver::draw_begin()
 {
-  if (!Fl_Surface_Device::surface()->driver()->has_feature(Fl_Graphics_Driver::NATIVE)) return;
-  CGContextRef my_gc = (CGContextRef)Fl_Surface_Device::surface()->driver()->gc();
-  if (shape_data_) {
-# if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_4
-    if (shape_data_->mask && (&CGContextClipToMask != NULL)) {
+  if (shape_data_ && Fl_Surface_Device::surface()->driver()->has_feature(Fl_Graphics_Driver::NATIVE)) {
+    CGContextRef my_gc = (CGContextRef)Fl_Surface_Device::surface()->driver()->gc();
+    if (shape_data_->mask) {
       CGContextClipToMask(my_gc, CGRectMake(0,0,w(),h()), shape_data_->mask); // requires Mac OS 10.4
     }
     CGContextSaveGState(my_gc);
-# endif
   }
 }
 
 
 void Fl_Cocoa_Window_Driver::draw_end()
 {
-  // on OS X, windows have no frame. Before OS X 10.7, to resize a window, we drag the lower right
-  // corner. This code draws a little ribbed triangle for dragging.
-  if (fl_mac_os_version < 100700 && !parent() && is_resizable()) {
-    int minw, minh, maxw, maxh, set;
-    set = pWindow->get_size_range(&minw, &minh, &maxw, &maxh, NULL, NULL, NULL);
-    if (!set || minh != maxh || minw != maxw) {
-      int dx = Fl::box_dw(pWindow->box())-Fl::box_dx(pWindow->box());
-      int dy = Fl::box_dh(pWindow->box())-Fl::box_dy(pWindow->box());
-      if (dx<=0) dx = 1;
-      if (dy<=0) dy = 1;
-      int x1 = w()-dx-1, x2 = x1, y1 = h()-dx-1, y2 = y1;
-      Fl_Color c[4] = {
-        pWindow->color(),
-        fl_color_average(pWindow->color(), FL_WHITE, 0.7f),
-        fl_color_average(pWindow->color(), FL_BLACK, 0.6f),
-        fl_color_average(pWindow->color(), FL_BLACK, 0.8f),
-      };
-      int i;
-      for (i=dx; i<12; i++) {
-        fl_color(c[i&3]);
-        fl_line(x1--, y1, x2, y2--);
-      }
-    }
-  }
-# if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_4
-  if (Fl_Surface_Device::surface()->driver()->has_feature(Fl_Graphics_Driver::NATIVE)) {
+  if (shape_data_ && Fl_Surface_Device::surface()->driver()->has_feature(Fl_Graphics_Driver::NATIVE)) {
     CGContextRef my_gc = (CGContextRef)Fl_Surface_Device::surface()->driver()->gc();
-    if (shape_data_) CGContextRestoreGState(my_gc);
+    CGContextRestoreGState(my_gc);
   }
-# endif
 }
 
 
@@ -187,7 +158,6 @@ void Fl_Cocoa_Window_Driver::shape_alpha_(Fl_Image* img, int offset) {
 
 
 void Fl_Cocoa_Window_Driver::shape(const Fl_Image* img) {
-# if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_4
   if (shape_data_) {
     if (shape_data_->mask) { CGImageRelease(shape_data_->mask); }
   }
@@ -203,7 +173,6 @@ void Fl_Cocoa_Window_Driver::shape(const Fl_Image* img) {
   else if (d == 0) shape_bitmap_((Fl_Image*)img);
   else if (d == 2 || d == 4) shape_alpha_((Fl_Image*)img, d - 1);
   else if ((d == 1 || d == 3) && img->count() == 1) shape_alpha_((Fl_Image*)img, 0);
-#endif
   pWindow->border(false);
 }
 
@@ -281,19 +250,6 @@ bool Fl_Cocoa_Window_Driver::through_resize() {
 void Fl_Cocoa_Window_Driver::through_resize(bool b) {
   if (b) window_flags_ |= through_resize_mask;
   else window_flags_ &= ~through_resize_mask;
-}
-
-
-// clip the graphics context to rounded corners
-void Fl_Cocoa_Window_Driver::clip_to_rounded_corners(CGContextRef gc, int w, int h) {
-  const CGFloat radius = 7.5;
-  CGContextMoveToPoint(gc, 0, 0);
-  CGContextAddLineToPoint(gc, 0, h - radius);
-  CGContextAddArcToPoint(gc, 0, h,  radius, h, radius);
-  CGContextAddLineToPoint(gc, w - radius, h);
-  CGContextAddArcToPoint(gc, w, h, w, h - radius, radius);
-  CGContextAddLineToPoint(gc, w, 0);
-  CGContextClip(gc);
 }
 
 const Fl_Image* Fl_Cocoa_Window_Driver::shape() {

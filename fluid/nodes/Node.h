@@ -164,13 +164,14 @@ protected:
   const char *name_;
   /** Label text of a widget. */
   const char *label_;
-  /** If it is just a word, it's the name of the callback function. Otherwise
-   it is the full callback C++ code. Can be nullptr. */
+  /** If it is just a word, it's the name of the callback function. If it starts
+   with a '[', it's a lambda function. Otherwise it is the full callback
+   C++ code. Can be nullptr. */
   const char *callback_;
   /** Widget user data field as C++ text. */
-  const char *user_data_;
+  std::string user_data_;
   /** Widget user data type as C++ text, usually `void*` or `long`. */
-  const char *user_data_type_;
+  std::string user_data_type_;
   /** Optional comment for every node in the graph. Visible in browser and
    panels, and will also be copied to the source code. */
   const char *comment_;
@@ -234,10 +235,11 @@ public:
   void label(const char *);
   const char *callback() const {return callback_;}
   void callback(const char *);
-  const char *user_data() const {return user_data_;}
-  void user_data(const char *);
-  const char *user_data_type() const {return user_data_type_;}
-  void user_data_type(const char *);
+  std::string user_data() const { return user_data_; }
+  void user_data(const std::string&);
+  std::string user_data_type() const { return user_data_type_; }
+  std::string user_data_type_or_voidp() const { return user_data_type_.empty() ? "void*" : user_data_type_; }
+  void user_data_type(const std::string&);
   const char *comment() { return comment_; }
   void comment(const char *);
 
@@ -304,7 +306,7 @@ public:
   /** Check if this Type is of the give type Type or derived from that type Type. */
   virtual bool is_a(Type inType) const { return (inType==Type::Base_); }
 
-  const char* class_name(const int need_nest) const;
+  const char* class_name(int need_nest) const;
   bool is_in_class() const;
 
   int has_function(const char*, const char*) const;

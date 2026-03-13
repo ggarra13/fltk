@@ -512,8 +512,6 @@ Node::Node() :
   name_(nullptr),
   label_(nullptr),
   callback_(nullptr),
-  user_data_(nullptr),
-  user_data_type_(nullptr),
   comment_(nullptr),
   uid_(0),
   parent(nullptr),
@@ -556,8 +554,6 @@ Node::~Node() {
   if (name_) free((void*)name_);
   if (label_) free((void*)label_);
   if (callback_) free((void*)callback_);
-  if (user_data_) free((void*)user_data_);
-  if (user_data_type_) free((void*)user_data_type_);
   if (comment_) free((void*)comment_);
 }
 
@@ -848,12 +844,12 @@ void Node::callback(const char *n) {
   storestring(n,callback_);
 }
 
-void Node::user_data(const char *n) {
-  storestring(n,user_data_);
+void Node::user_data(const std::string& n) {
+  storestring(n, user_data_);
 }
 
-void Node::user_data_type(const char *n) {
-  storestring(n,user_data_type_);
+void Node::user_data_type(const std::string& n) {
+  storestring(n, user_data_type_);
 }
 
 void Node::comment(const char *n) {
@@ -938,12 +934,12 @@ void Node::write_properties(fld::io::Project_Writer &f) {
     f.write_word("label");
     f.write_word(label());
   }
-  if (user_data()) {
+  if (!user_data().empty()) {
     f.write_indent(level+1);
     f.write_word("user_data");
     f.write_word(user_data());
   }
-  if (user_data_type()) {
+  if (!user_data_type().empty()) {
     f.write_word("user_data_type");
     f.write_word(user_data_type());
   }
@@ -1224,7 +1220,7 @@ const char *Node::callback_name(fld::io::Code_Writer& f) {
  \return the name of the enclosing class, or names of the enclosing classes
  in a static buffe (don't call free), or nullptr if this Type is not inside a class
  */
-const char* Node::class_name(const int need_nest) const {
+const char* Node::class_name(int need_nest) const {
   Node* p = parent;
   while (p) {
     if (p->is_class()) {

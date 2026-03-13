@@ -122,8 +122,7 @@ int fl_utf8len(char c)
 
 
 /**
- Returns the byte length of the UTF-8 sequence with first byte \p c,
- or -1 if \p c is not valid.
+ Returns the byte length of the UTF-8 sequence with first byte \p c, or 1 if \p c is not valid.
 
  This function can be used to scan faulty UTF-8 sequences, albeit
  ignoring invalid codes.
@@ -1318,8 +1317,13 @@ unsigned fl_utf8toa(const char* src, unsigned srclen,
       dst[count] = c;
       p++;
     } else {
-      int len; unsigned ucs = fl_utf8decode(p,e,&len);
-      p += len;
+      unsigned ucs = 0x100;
+      int len = fl_utf8len(*p);
+      if (len > 2) p = fl_utf8_next_composed_char(p, e);
+      else {
+        ucs = fl_utf8decode(p,e,&len);
+        p += len;
+      }
       if (ucs < 0x100) dst[count] = ucs;
       else dst[count] = '?';
     }
@@ -1329,9 +1333,11 @@ unsigned fl_utf8toa(const char* src, unsigned srclen,
   while (p < e) {
     if (!(*p & 0x80)) p++;
     else {
-      int len;
-      fl_utf8decode(p,e,&len);
-      p += len;
+      int len = fl_utf8len1(*p);
+      if (len > 2) p = fl_utf8_next_composed_char(p, e);
+      else {
+        p += len;
+      }
     }
     ++count;
   }
@@ -1631,31 +1637,40 @@ unsigned fl_utf8from_mb(char* dst, unsigned dstlen, const char* src, unsigned sr
 
 
 /**
- Returns pointer to beginning of next unicode character after potentially composed character.
- Some unicode characters (example: 👩‍✈️ "woman pilot") are composed of several unicode points. They may pair two successive
- codepoints with U+200D (zero-width joiner) and may qualify any component with variation selectors or Fitzpatrick emoji modifiers.
- Most flag emojis are composed of 2 successive "regional indicator symbols" from range [U+1F1E6 , U+1F1FF].
+ Returns pointer to beginning of character after given location in UTF8 string accounting for emoji sequences.
+ While Unicode encodes most characters as a single codepoint, some emojis (examples: 👩‍✈️ "woman pilot",
+ 🇸🇲 "San Marino flag", 9️⃣ "keycap 9") are encoded via an <b>emoji sequence</b>, that is, they are
+ represented by sequences of consecutive Unicode points. An emoji sequence may pair two codepoints with
+ "zero-width joiner" and may qualify any component with "variation selectors" or "Fitzpatrick emoji modifiers".
+ Most flag emojis are encoded with two consecutive "regional indicator symbols". Keycap emojis are encoded
+ with key + "emoji variation selector" + "combining enclosing keycap".
+
+ Use this function to advance to the next character within a UTF8 string processing an entire emoji sequence
+ if present as a single character.
  \param from points to a location within a UTF8 string. If this location is inside the UTF8
  encoding of a codepoint or is an invalid byte, this function returns \p from + 1.
  \param end points past last codepoint of the string.
- \return pointer to beginning of first codepoint after potentially composed character that begins at \p from.
+ \return pointer to beginning of first codepoint after character, possibly an emoji sequence, that begins at \p from.
  */
 const char *fl_utf8_next_composed_char(const char *from, const char *end) {
-  int skip = fl_utf8len1(*from);
-  if (skip <= 2) return from + skip;
-  unsigned u = fl_utf8decode(from, end, NULL);
-  if (u >= 0x1F1E6 && u <= 0x1F1FF) { // a 1st regional indicator symbol can be a flag
-    u = fl_utf8decode(from + skip, end, NULL);
-    if (u >= 0x1F1E6 && u <= 0x1F1FF) { // a 2nd regional indicator symbol gives a flag
-      return from + 2 * skip;
+  int skip = fl_utf8len(*from);
+  if (skip == -1) return from + 1;
+  unsigned u;
+  if (skip >= 4) {
+    u = fl_utf8decode(from, end, NULL);
+    if (u >= 0x1F1E6 && u <= 0x1F1FF) { // a 1st regional indicator symbol can be a flag
+      u = fl_utf8decode(from + skip, end, NULL);
+      if (u >= 0x1F1E6 && u <= 0x1F1FF) { // a 2nd regional indicator symbol gives a flag
+        return from + 2 * skip;
+      }
+    } else if (u == 0x1F3F4) { // “waving black flag” may start subdivision flags (e.g. 🏴󠁧󠁢󠁷󠁬󠁳󠁿)
+      const char *next = from + skip;
+      do {
+        u = fl_utf8decode(next, end, NULL);
+        next += fl_utf8len1(*next);
+        if (u == 0xE007F) return next; // ends with "cancel tag"
+      } while (u >= 0xE0020 && u <= 0xE007E); // any series of "tag components"
     }
-  } else if (u == 0x1F3F4) { // “waving black flag” may start subdivision flags (e.g. 🏴󠁧󠁢󠁷󠁬󠁳󠁿)
-    const char *next = from + skip;
-    do {
-      u = fl_utf8decode(next, end, NULL);
-      next += fl_utf8len1(*next);
-      if (u == 0xE007F) return next; // ends with "cancel tag"
-    } while (u >= 0xE0020 && u <= 0xE007E); // any series of "tag components"
   }
   from += skip; // skip 1st codepoint
   while (from < end) {
@@ -1667,6 +1682,8 @@ const char *fl_utf8_next_composed_char(const char *from, const char *end) {
       from += fl_utf8len(*from); // skip variation selector
     } else if (u >= 0x1F3FB && u <= 0x1F3FF) { // EMOJI MODIFIER FITZPATRICK
       from += fl_utf8len(*from); // skip modifier
+    } else if (u == 0x20E3) { // combining enclosing keycap (e.g., 9️⃣*️⃣#️⃣9︎⃣)
+      from += fl_utf8len(*from); // skip it
     } else break;
   }
   return from;
@@ -1674,12 +1691,14 @@ const char *fl_utf8_next_composed_char(const char *from, const char *end) {
 
 
 /**
- Returns pointer to beginning of previous potentially composed character before given unicode character.
- See fl_utf8_next_composed_char() for a hint about what is a composed unicode character.
+ Returns pointer to beginning of character before given location in UTF8 string accounting for emoji sequences.
+ See fl_utf8_next_composed_char() for a hint about what is an emoji sequence.
+ Use this function to step back to the previous character within a UTF8 string processing an entire emoji sequence
+ if present as a single character.
  \param from points to a location within a UTF8 string. If this location is inside the UTF8
  encoding of a codepoint or is an invalid byte, this function returns \p from - 1.
  \param begin points to start of first codepoint of the string.
- \return pointer to beginning of first potentially composed character before the codepoint that begins at \p from.
+ \return pointer to beginning of first character, possibly an emoji sequence, before the codepoint that begins at \p from.
  */
 const char *fl_utf8_previous_composed_char(const char *from, const char *begin) {
   int l = fl_utf8len(*from);
@@ -1707,6 +1726,8 @@ const char *fl_utf8_previous_composed_char(const char *from, const char *begin) 
     if (u >= 0xFE00 && u <= 0xFE0F) { // a variation selector
       from = fl_utf8back(from - 1, begin, NULL);
     } else if (u >= 0x1F3FB && u <= 0x1F3FF) { // EMOJI MODIFIER FITZPATRICK
+      from = fl_utf8back(from - 1, begin, NULL);
+    } else if (u == 0x20E3) { // combining enclosing keycap
       from = fl_utf8back(from - 1, begin, NULL);
     } else if (from > begin) {
       keep = fl_utf8back(from - 1, begin, NULL);

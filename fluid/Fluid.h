@@ -186,7 +186,7 @@ public: // Methods
   void sort_selected();
   // Show or hide the widget bin.
   void toggle_widget_bin();
-  // Open a dialog to show the HTML help page form the FLTK documentation folder.
+  // Open a dialog to show the HTML help page from the FLTK documentation folder.
   void show_help(const char *name);
   // Open the "About" dialog.
   void about();
