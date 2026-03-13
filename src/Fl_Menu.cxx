@@ -29,6 +29,8 @@
 #include <stdio.h>
 #include "flstring.h"
 
+#include <iostream>
+
 // This file will declare:
 class Menu_Window_Basetype;
 class Menu_Title_Window;
@@ -184,7 +186,10 @@ protected:
     set_modal();
     clear_border();
     // Put it on same screen as that where Menu_Window::parent_ is.
-    screen_num(Fl_Window_Driver::menu_parent(NULL)->screen_num());
+    int screen = Fl_Window_Driver::menu_parent(NULL)->screen_num();
+    std::cerr << this << " menu_parent=" << Fl_Window_Driver::menu_parent(NULL)
+              << " screen=" << screen << std::endl;
+    screen_num(screen);
   }
 
 public:
