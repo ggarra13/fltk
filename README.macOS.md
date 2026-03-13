@@ -31,10 +31,9 @@ _README.macOS.md - Building FLTK under Apple macOS_
 
 <a name="introduction"></a>
 ## Introduction
-
-FLTK supports macOS version 10.3 Panther and above. At the time of writing (Feb. 2022),
-FLTK compiles and runs fine on the most recent macOS 12 Monterey for both Intel
-processors and Apple Silicon.
+FLTK 1.5 supports macOS version 10.7 Lion and above. At the time of writing (Feb. 2026),
+FLTK compiles and runs fine on the most recent macOS 26 Tahoe for both Intel (x86_64)
+and Apple Silicon (arm64) processors.
 
 FLTK 1.5 supports the following build environments on the macOS
 platform:
@@ -42,7 +41,7 @@ platform:
 * [_cmake_ and _Xcode_](#build_cmake_xcode), no shell needed
 * [_cmake_ and _make_](#build_cmake_make) from the command line
 
-All environments will generate Unix style static libraries and macOS style app bundles.
+All environments will generate Unix style static or dynamic libraries and macOS style app bundles.
 
 
 <a name="build_cmake_xcode"></a>
@@ -232,6 +231,10 @@ cmake -B build/Makefile -G "Unix Makefiles" -D CMAKE_BUILD_TYPE=Debug .
 
 Replace 'Debug' with 'Release' if you want to build a release version.
 
+A number of configuration options listed in file `README.CMake.txt` can be added 
+to this command line if desired. For example, add `-D FLTK_BUILD_SHARED_LIBS=1`
+to build also the FLTK libraries as shared `.dylib` files.
+
 _CMake_ runs a number of tests to find external headers, libraries, and tools.
 The configuration summary should not show any errors. You can now continue to build FLTK.
 
@@ -341,5 +344,5 @@ to have CMake put your *Info.plist* file in the resulting macOS application bund
 - Dec 04 2018 - Albrecht: fix typo (lowercase fluid.app) for case sensitive macOS
 - Dec 28 2018 - Matt: complete rework for FLTK 1.4
 - Mar 01 2021 - Albrecht: minor updates, macOS Big Sur and Apple Silicon M1 (ARM)
-- Feb 23 2022 - Manolo: install autoconf without brew
 - Mar 22 2025 - Matt: update for FLTK 1.5
+- Feb 28 2026 - Manolo: change minimum supported macOS version and mention dynamic libraries

@@ -2396,19 +2396,23 @@ Fl_Group *wp_cpp_callback=(Fl_Group *)0;
 static void cb_13(Fl_Input* o, void* v) {
 //ﬂ ▼ ---------------------- callback -~~=~-~----==~-=~~=~-= ▼ ﬂ//
   if (v == LOAD) {
-    o->value(current_widget->user_data());
+    o->value(current_widget->user_data().c_str());
   } else {
     int mod = 0;
     const char *c = o->value();
     const char *d = c_check(c);
-    if (d) {fl_message("Error in user_data: %s",d); haderror = 1; return;}
+    if (d) {
+      fl_message("Error in user_data: %s",d);
+      haderror = 1;
+      return;
+    }
     for (Node *n: Fluid.proj.tree.all_selected_nodes()) {
       n->user_data(c);
       mod = 1;
     }
     if (mod) Fluid.proj.set_modflag(1);
   }
-//ﬂ ▲ ----------=~-=-~--~--=----------~-~=-~=~-~~---=-~~-~-- ▲ ﬂ//
+//ﬂ ▲ ----------=~-=-~--~--=-----------~=--~~~~=~-=~-~=-~==~ ▲ ﬂ//
 }
 
 static void cb_When(Fl_Menu_Button* o, void* v) {
@@ -2445,27 +2449,38 @@ static void cb_14(Fl_Input_Choice* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~~---~-~~~~=~~-~~=~~~~ ▼ ﬂ//
   static const char *dflt = "void*";
   if (v == LOAD) {
-    const char *c = current_widget->user_data_type();
-    if (!c) c = dflt;
-    o->value(c);
+    std::string c = current_widget->user_data_type();
+    if (c.empty()) c = dflt;
+    o->value(c.c_str());
   } else {
     int mod = 0;
     const char *c = o->value();
     const char *d = c_check(c);
-    if (!*c) o->value(dflt);
-    else if (!strcmp(c,dflt)) c = nullptr;
+    if (!*c) {
+      o->value(dflt);
+    } else if (!strcmp(c,dflt)) {
+      c = nullptr;
+    }
     if (!d) {
       if (c && *c && c[strlen(c)-1] != '*' && strcmp(c,"long"))
         d = "must be pointer or long";
     }
-    if (d) {fl_message("Error in type: %s",d); haderror = 1; return;}
+    if (d) {
+      fl_message("Error in type: %s",d);
+      o->value("void*");
+      haderror = 1;
+      // return; // Don't return. A good value must still be set.
+    }
     for (Node *q: Fluid.proj.tree.all_selected_nodes()) {
-      q->user_data_type(c);
+      if (c)
+        q->user_data_type(c);
+      else
+        q->user_data_type("");
       mod = 1;
     }
     if (mod) Fluid.proj.set_modflag(1);
   }
-//ﬂ ▲ ----------~=~~=~~~=--~--------------=~~-~-~~~~-=~-~=-- ▲ ﬂ//
+//ﬂ ▲ ----------~=~~=~~~=--~----------~~-~=~---~=~--~=----=~ ▲ ﬂ//
 }
 
 Fl_Menu_Item menu_4[] = {

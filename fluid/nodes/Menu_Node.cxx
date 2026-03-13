@@ -323,8 +323,9 @@ void Menu_Item_Node::write_static(fld::io::Code_Writer& f) {
     f.write_h_once("#include <FL/Fl_Multi_Label.H>");
   }
   if (callback() && is_name(callback()) && !user_defined(callback()))
-    f.write_h_once("extern void %s(Fl_Menu_*, %s);", callback(),
-                  user_data_type() ? user_data_type() : "void*");
+    f.write_h_once("extern void %s(Fl_Menu_*, %s);",
+                   callback(),
+                   user_data_type_or_voidp().c_str());
   for (int n=0; n < NUM_EXTRA_CODE; n++) {
     if (!extra_code(n).empty() && isdeclare(extra_code(n).c_str()))
       f.write_h_once("%s", extra_code(n).c_str());
@@ -348,8 +349,8 @@ void Menu_Item_Node::write_static(fld::io::Code_Writer& f) {
       f.write_c("\nstatic void %s(Fl_Menu_*", cn);
     }
     if (use_o) f.write_c(" o");
-    const char* ut = user_data_type() ? user_data_type() : "void*";
-    f.write_c(", %s", ut);
+    std::string ut = user_data_type_or_voidp();
+    f.write_c(", %s", ut.c_str());
     if (use_v) f.write_c(" v");
     f.write_c(") {\n");
     f.tag(Mergeback::Tag::GENERIC, Mergeback::Tag::MENU_CALLBACK, 0);
@@ -372,7 +373,7 @@ void Menu_Item_Node::write_static(fld::io::Code_Writer& f) {
     // k is the name of the enclosing class (or classes)
     if (k) {
       // Implement the callback as a static member function
-      f.write_c("void %s::%s(Fl_Menu_* o, %s v) {\n", k, cn, ut);
+      f.write_c("void %s::%s(Fl_Menu_* o, %s v) {\n", k, cn, ut.c_str());
       // Find the Fl_Menu_ container for this menu item
       Node* t = parent; while (t->is_a(Type::Menu_Item)) t = t->parent;
       if (t) {
@@ -463,8 +464,10 @@ int Menu_Item_Node::flags() {
   if (!o->active()) i |= FL_MENU_INACTIVE;
   if (!o->visible()) i |= FL_MENU_INVISIBLE;
   if (can_have_children()) {
-    if (user_data() == nullptr) i |= FL_SUBMENU;
-    else i |= FL_SUBMENU_POINTER;
+    if (user_data().empty())
+      i |= FL_SUBMENU;
+    else
+      i |= FL_SUBMENU_POINTER;
   }
   if (hotspot()) i |= FL_MENU_DIVIDER;
   if (menu_headline()) i |= FL_MENU_HEADLINE;
@@ -537,8 +540,8 @@ void Menu_Item_Node::write_item(fld::io::Code_Writer& f) {
     }
   } else
     f.write_c(" 0,");
-  if (user_data())
-    f.write_c(" (void*)(%s),", user_data());
+  if (!user_data().empty())
+    f.write_c(" (void*)(%s),", user_data().c_str());
   else
     f.write_c(" 0,");
   f.write_c(" %d, (uchar)%s, %d, %d, %d", flags(),
@@ -582,10 +585,10 @@ void Menu_Item_Node::write_code1(fld::io::Code_Writer& f) {
   if (callback()) {
     if (!is_name(callback()) && (callback()[0] != '[') && class_name(1)) {
       const char* cn = callback_name(f);
-      const char* ut = user_data_type() ? user_data_type() : "void*";
+      std::string ut = user_data_type_or_voidp();
       f.write_public(0);
-      f.write_h("%sinline void %s_i(Fl_Menu_*, %s);\n", f.indent(1), cn, ut);
-      f.write_h("%sstatic void %s(Fl_Menu_*, %s);\n", f.indent(1), cn, ut);
+      f.write_h("%sinline void %s_i(Fl_Menu_*, %s);\n", f.indent(1), cn, ut.c_str());
+      f.write_h("%sstatic void %s(Fl_Menu_*, %s);\n", f.indent(1), cn, ut.c_str());
     }
   }
 

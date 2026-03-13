@@ -693,7 +693,7 @@ static void deferred_mergeback_handler(void*) {
 
 static int app_event_handler(int event) {
   if (event == FL_APP_ACTIVATE) {
-    Fl::add_idle(deferred_mergeback_handler, nullptr);
+    Fl::add_timeout(0.5, deferred_mergeback_handler, nullptr);
   }
   return 0;
 }

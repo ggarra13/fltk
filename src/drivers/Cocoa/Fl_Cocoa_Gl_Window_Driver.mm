@@ -1,7 +1,7 @@
 //
 // Class Fl_Cocoa_Gl_Window_Driver for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 2021-2022 by Bill Spitzak and others.
+// Copyright 2021-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -112,33 +112,15 @@ static NSOpenGLPixelFormat* mode_to_NSOpenGLPixelFormat(int m, const int *alistp
       //list[n++] = AGL_STEREO;
       attribs[n++] = 6/*NSOpenGLPFAStereo*/;
     }
-    if ((m & FL_MULTISAMPLE) && fl_mac_os_version >= 100400) {
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_4
+    if (m & FL_MULTISAMPLE) {
       attribs[n++] = NSOpenGLPFAMultisample; // 10.4
-#endif
       attribs[n++] = NSOpenGLPFASampleBuffers; attribs[n++] = (NSOpenGLPixelFormatAttribute)1;
       attribs[n++] = NSOpenGLPFASamples; attribs[n++] = (NSOpenGLPixelFormatAttribute)4;
     }
-#if MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
-#define NSOpenGLPFAOpenGLProfile      (NSOpenGLPixelFormatAttribute)99
-#define kCGLPFAOpenGLProfile          NSOpenGLPFAOpenGLProfile
-#define NSOpenGLProfileVersionLegacy  (NSOpenGLPixelFormatAttribute)0x1000
-#define NSOpenGLProfileVersion3_2Core  (NSOpenGLPixelFormatAttribute)0x3200
-#define kCGLOGLPVersion_Legacy        NSOpenGLProfileVersionLegacy
-#endif
-    if (fl_mac_os_version >= 100700) {
-      attribs[n++] = NSOpenGLPFAOpenGLProfile;
-      attribs[n++] =  (m & FL_OPENGL3) ? NSOpenGLProfileVersion3_2Core : NSOpenGLProfileVersionLegacy;
-    }
+    attribs[n++] = NSOpenGLPFAOpenGLProfile;
+    attribs[n++] =  (m & FL_OPENGL3) ? NSOpenGLProfileVersion3_2Core : NSOpenGLProfileVersionLegacy;
   } else {
     while (alistp[n] && n < 30) {
-      if (alistp[n] == kCGLPFAOpenGLProfile) {
-        if (fl_mac_os_version < 100700) {
-          if (alistp[n+1] != kCGLOGLPVersion_Legacy) return nil;
-          n += 2;
-          continue;
-        }
-      }
       attribs[n] = (NSOpenGLPixelFormatAttribute)alistp[n];
       n++;
     }
@@ -191,12 +173,7 @@ static NSOpenGLContext *create_GLcontext_for_window(
   if (shared_ctx && !context) context = [[NSOpenGLContext alloc] initWithFormat:pixelformat shareContext:nil];
   if (context) {
     NSView *view = [fl_xid(window) contentView];
-    if (view && fl_mac_os_version >= 100700) {
-      //replaces  [view setWantsBestResolutionOpenGLSurface:YES]  without compiler warning
-      typedef void (*bestResolutionIMP)(id, SEL, BOOL);
-      static bestResolutionIMP addr = (bestResolutionIMP)[NSView instanceMethodForSelector:@selector(setWantsBestResolutionOpenGLSurface:)];
-      addr(view, @selector(setWantsBestResolutionOpenGLSurface:), Fl::use_high_res_GL() != 0);
-    }
+    [view setWantsBestResolutionOpenGLSurface:(Fl::use_high_res_GL() != 0)];
     [context setView:view];
     if (Fl_Cocoa_Window_Driver::driver(window)->subRect()) {
       remove_gl_context_opacity(context);
@@ -274,11 +251,9 @@ void Fl_Cocoa_Gl_Window_Driver::after_show() {
       [shared_gl1_ctxt retain];
     }
     [view addSubview:gl1view];
-  #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
-    if (fl_mac_os_version >= 100700 && Fl::use_high_res_GL()) {
+    if (Fl::use_high_res_GL()) {
       [gl1view setWantsBestResolutionOpenGLSurface:YES];
     }
-  #endif
     [gl1ctxt setView:gl1view];
     remove_gl_context_opacity(gl1ctxt);
   }
@@ -286,7 +261,7 @@ void Fl_Cocoa_Gl_Window_Driver::after_show() {
 
 float Fl_Cocoa_Gl_Window_Driver::pixels_per_unit()
 {
-  int retina = (fl_mac_os_version >= 100700 && Fl::use_high_res_GL() && Fl_X::flx(pWindow) &&
+  int retina = (Fl::use_high_res_GL() && Fl_X::flx(pWindow) &&
           Fl_Cocoa_Window_Driver::driver(pWindow)->mapped_to_retina()) ? 2 : 1;
   return retina * Fl_Graphics_Driver::default_driver().scale();
 }
@@ -434,28 +409,6 @@ void Fl_Cocoa_Gl_Window_Driver::gl_start() {
   [(NSOpenGLContext*)gl_start_context update];
 }
 
-// convert BGRA to RGB and also exchange top and bottom
-static uchar *convert_BGRA_to_RGB(uchar *baseAddress, int w, int h, int mByteWidth)
-{
-  uchar *newimg = new uchar[3*w*h];
-  uchar *to = newimg;
-  for (int i = h-1; i >= 0; i--) {
-    uchar *from = baseAddress + i * mByteWidth;
-    for (int j = 0; j < w; j++, from += 4) {
-#if defined(__ppc__) && __ppc__
-      memcpy(to, from + 1, 3);
-      to += 3;
-#else
-      *(to++) = *(from+2);
-      *(to++) = *(from+1);
-      *(to++) = *from;
-#endif
-    }
-  }
-  delete[] baseAddress;
-  return newimg;
-}
-
 
 static Fl_RGB_Image *cgimage_to_rgb4(CGImageRef img) {
   int w = (int)CGImageGetWidth(img);
@@ -480,42 +433,16 @@ Fl_RGB_Image* Fl_Cocoa_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int 
   if (factor != 1) {
     w *= factor; h *= factor; x *= factor; y *= factor;
   }
-#if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_5
-  if (fl_mac_os_version >= 100500) {
-    NSWindow *nswin = (NSWindow*)fl_mac_xid(pWindow);
-    CGImageRef img_full = Fl_Cocoa_Window_Driver::capture_decorated_window_10_5(nswin);
-    int bt =  [nswin frame].size.height - [[nswin contentView] frame].size.height;
-    bt *= (factor / Fl_Graphics_Driver::default_driver().scale());
-    CGRect cgr = CGRectMake(x, y + bt, w, h); // add vertical offset to bypass titlebar
-    CGImageRef cgimg = CGImageCreateWithImageInRect(img_full, cgr); // 10.4
-    CGImageRelease(img_full);
-    Fl_RGB_Image *rgb = cgimage_to_rgb4(cgimg);
-    CGImageRelease(cgimg);
-    return rgb;
-  }
-#endif
-  [(NSOpenGLContext*)glw->context() makeCurrentContext];
-// to capture also the overlay and for directGL demo
-  [(NSOpenGLContext*)glw->context() flushBuffer];
-  // Read OpenGL context pixels directly.
-  // For extra safety, save & restore OpenGL states that are changed
-  glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
-  glPixelStorei(GL_PACK_ALIGNMENT, 4); /* Force 4-byte alignment */
-  glPixelStorei(GL_PACK_ROW_LENGTH, 0);
-  glPixelStorei(GL_PACK_SKIP_ROWS, 0);
-  glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
-  // Read a block of pixels from the frame buffer
-  int mByteWidth = w * 4;
-  mByteWidth = (mByteWidth + 3) & ~3;    // Align to 4 bytes
-  uchar *baseAddress = new uchar[mByteWidth * h];
-  glReadPixels(x, glw->pixel_h() - (y+h), w, h,
-               GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, baseAddress);
-  glPopClientAttrib();
-  baseAddress = convert_BGRA_to_RGB(baseAddress, w, h, mByteWidth);
-  Fl_RGB_Image *img = new Fl_RGB_Image(baseAddress, w, h, 3, 3 * w);
-  img->alloc_array = 1;
-  [(NSOpenGLContext*)glw->context() flushBuffer];
-  return img;
+  NSWindow *nswin = (NSWindow*)fl_mac_xid(pWindow);
+  CGImageRef img_full = Fl_Cocoa_Window_Driver::capture_decorated_window_10_5(nswin);
+  int bt =  [nswin frame].size.height - [[nswin contentView] frame].size.height;
+  bt *= (factor / Fl_Graphics_Driver::default_driver().scale());
+  CGRect cgr = CGRectMake(x, y + bt, w, h); // add vertical offset to bypass titlebar
+  CGImageRef cgimg = CGImageCreateWithImageInRect(img_full, cgr); // 10.4
+  CGImageRelease(img_full);
+  Fl_RGB_Image *rgb = cgimage_to_rgb4(cgimg);
+  CGImageRelease(cgimg);
+  return rgb;
 }
 
 

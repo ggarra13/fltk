@@ -142,6 +142,7 @@ function(fl_create_example NAME SOURCES LIBRARIES)
 
   ##############################################################################
   # Copy macOS "bundle wrapper" (shell script) to target directory.
+  # Add ad-hoc signature.
   # The "custom command" will be executed "POST_BUILD".
   ##############################################################################
 
@@ -152,6 +153,7 @@ function(fl_create_example NAME SOURCES LIBRARIES)
       TARGET ${TARGET_NAME} POST_BUILD
       COMMAND cp ${FLTK_SOURCE_DIR}/CMake/macOS-bundle-wrapper.in ${WRAPPER}
       COMMAND chmod u+x,g+x,o+x ${WRAPPER}
+      COMMAND codesign -s - $<TARGET_BUNDLE_DIR:${TARGET_NAME}>
       BYPRODUCTS ${WRAPPER}
       # COMMENT "Creating macOS bundle wrapper script ${WRAPPER}"
       VERBATIM
