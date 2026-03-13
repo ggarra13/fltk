@@ -183,6 +183,8 @@ protected:
     end();
     set_modal();
     clear_border();
+    // Put it on same screen as that where Menu_Window::parent_ is.
+    screen_num(Fl_Window_Driver::menu_parent(NULL)->screen_num());
   }
 
 public:
@@ -1050,8 +1052,7 @@ void Menu_Window::autoscroll(item_index_t n) {
   // working properly on my two monitor setup where I would have the first
   // window on one monitor and the menu (like the context menu of an
   // Fl_Multiline_Input on another.
-  int screen_idx = Fl::screen_num(x(), y());
-  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, screen_idx);
+  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, this->screen_num());
   if (n==0 && Y <= scr_y + item_height) {
     Y = scr_y - Y + 10;
   } else if (Y <= scr_y + item_height) {
