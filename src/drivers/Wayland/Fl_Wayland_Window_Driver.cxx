@@ -2128,6 +2128,11 @@ void Fl_Wayland_Window_Driver::menu_window_area(int &X, int &Y, int &W, int &H, 
 
 
 int Fl_Wayland_Window_Driver::wld_scale() {
+  if (pWindow->parent())
+  {
+      return Fl_Wayland_Window_Driver::driver(pWindow->window())->wld_scale();
+  }
+    
   Fl_X *flx = Fl_X::flx(pWindow);
   struct wld_window *xid = (flx ? (struct wld_window *)flx->xid : NULL);
   if (!xid || wl_list_empty(&xid->outputs)) {
