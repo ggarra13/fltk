@@ -728,6 +728,13 @@ static void surface_enter(void *data, struct wl_surface *wl_surface,
     (Fl_Wayland_Screen_Driver::output*)wl_output_get_user_data(wl_output);
   if (output == NULL)
     return;
+  // Detect when the parent window of an active menu window enters a screen. If so, we are
+  // moving a window with active menus to a new screen. We want to close all menus.
+  if (Fl::modal() && Fl::modal()->menu_window() &&
+      Fl_Window_Driver::menu_parent() == window->fl_win) {
+    Fl::e_x_root = 1000000;
+    Fl::modal()->handle(FL_PUSH); // simulate a distant click to close menus
+  }
 
   bool list_was_empty = wl_list_empty(&window->outputs);
   struct Fl_Wayland_Window_Driver::surface_output *surface_output =
@@ -2128,12 +2135,7 @@ void Fl_Wayland_Window_Driver::menu_window_area(int &X, int &Y, int &W, int &H, 
 
 
 int Fl_Wayland_Window_Driver::wld_scale() {
-  if (pWindow->parent())
-  {
-      return Fl_Wayland_Window_Driver::driver(pWindow->window())->wld_scale();
-  }
-    
-  Fl_X *flx = Fl_X::flx(pWindow);
+  Fl_X *flx = Fl_X::flx(pWindow->top_window());
   struct wld_window *xid = (flx ? (struct wld_window *)flx->xid : NULL);
   if (!xid || wl_list_empty(&xid->outputs)) {
     int scale = 1;
