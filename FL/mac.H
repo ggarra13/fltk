@@ -45,6 +45,7 @@ typedef class FLWindow *Window; // pointer to the FLWindow objective-c class
 #if (defined(FL_LIBRARY) || defined(FL_INTERNALS)) // this part must be compiled when building the FLTK libraries
 
 // Standard MacOS C/C++ includes...
+#include <CoreFoundation/CoreFoundation.h>
 #include <ApplicationServices/ApplicationServices.h>
 #undef check // because of Fl::check()
 
