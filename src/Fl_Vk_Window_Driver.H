@@ -94,6 +94,7 @@ public:
   virtual void create_surface() = 0;
   virtual void destroy_surface();
   virtual void destroy_resources();
+  virtual bool has_hdr_monitor() { return true; }
 
   void init_colorspace();
   void init_vk(int requested_device_index = -1);

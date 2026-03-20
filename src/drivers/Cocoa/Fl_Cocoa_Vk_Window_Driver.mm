@@ -195,6 +195,23 @@ std::vector<const char*> Fl_Cocoa_Vk_Window_Driver::get_instance_extensions()
     return out;
 }
 
+
+bool Fl_Cocoa_Vk_Window_Driver::has_hdr_monitor()
+{
+    bool out = false;
+    NSScreen *mainScreen = [NSScreen mainScreen];
+
+    // Check if the OS version supports EDR queries
+    if ([mainScreen respondsToSelector:@selector(maximumExtendedDynamicRangeColorComponentValue)]) {
+        CGFloat maxEDR = [mainScreen maximumExtendedDynamicRangeColorComponentValue];
+        
+        // If maxEDR is exactly or very close to 2.0, the monitor is in SDR mode (0-200 nits).
+        // If it's > 2.0, you have HDR headroom available.
+        out = maxEDR > 2.01; 
+    }
+    return out;
+}
+
 void Fl_Cocoa_Vk_Window_Driver::create_surface()
 {
     FLWindow* window = fl_xid(pWindow);

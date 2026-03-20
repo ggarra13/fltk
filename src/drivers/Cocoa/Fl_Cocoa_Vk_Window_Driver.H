@@ -40,6 +40,7 @@ class Fl_Cocoa_Vk_Window_Driver : public Fl_Vk_Window_Driver {
 #endif
   std::vector<const char*> get_instance_extensions() FL_OVERRIDE;
   void create_surface() FL_OVERRIDE;
+  bool has_hdr_monitor() FL_OVERRIDE;
 };
 
 #endif // HAVE_VK

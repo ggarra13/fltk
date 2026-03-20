@@ -903,6 +903,7 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     pWindow->ctx.safe_thread_queue = pWindow->m_queue;
     pWindow->ctx.allocator = pWindow->m_allocator;
 
+    bool hasHDRMonitor = has_hdr_monitor();
     bool hdrMonitorFound = false;
     VkColorSpaceKHR color_space;
     VkFormat view_format;
@@ -946,12 +947,18 @@ void Fl_Vk_Window_Driver::init_colorspace() {
             switch(space)
             {
             case VK_COLOR_SPACE_HDR10_ST2084_EXT:
-                scores[i] += 4000;
-                hdrMonitorFound = true;
+                if (hasHDRMonitor)
+                {
+                    scores[i] += 4000;
+                    hdrMonitorFound = true;
+                }
                 break;
             case VK_COLOR_SPACE_HDR10_HLG_EXT:
-                scores[i] += 3000;
-                hdrMonitorFound = true;
+                if (hasHDRMonitor)
+                {
+                    scores[i] += 3000;
+                    hdrMonitorFound = true;
+                }
                 break;
             case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
                 scores[i] += 2000;
