@@ -272,6 +272,7 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   seat->serial = serial;
   seat->pointer_enter_serial = serial;
   Fl_Wayland_Screen_Driver::do_set_cursor(seat, cursor, Fl_Wayland_Window_Driver::driver(win)->standard_cursor());
+  checkdouble(); // fix for #1383
   set_event_xy(win);
   need_leave = NULL;
   win = Fl_Wayland_Window_Driver::surface_to_window(surface);
@@ -1422,31 +1423,12 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 
-static void wayland_socket_callback(int fd, struct wl_display *display)
+static void libdecor_fd_callback(int fd, struct libdecor *libdecor_context)
 {
-  if (wl_display_prepare_read(display) == -1) {
-    wl_display_dispatch_pending(display);
-    return;
-  }
-  wl_display_flush(display);
-  struct pollfd fds = (struct pollfd) { fd, POLLIN, 0 };
-  if (poll(&fds, 1, 0) <= 0) {
-    wl_display_cancel_read(display);
-    return;
-  }
-  if (fds.revents & (POLLERR | POLLHUP)) {
-    wl_display_cancel_read(display);
-    goto fatal;
-  }
-  if (wl_display_read_events(display) == -1)
-    goto fatal;
-  if (wl_display_dispatch_pending(display) == -1)
-    goto fatal;
-  return;
-fatal:
-  if (wl_display_get_error(display) == EPROTO) {
+  if (libdecor_dispatch(libdecor_context, 0) >= 0) return;
+  if (wl_display_get_error(Fl_Wayland_Screen_Driver::wl_display) == EPROTO) {
     const struct wl_interface *interface;
-    int code = wl_display_get_protocol_error(display, &interface, NULL);
+    int code = wl_display_get_protocol_error(Fl_Wayland_Screen_Driver::wl_display, &interface, NULL);
     Fl::fatal("Fatal error %d in Wayland protocol: %s",
               code, (interface ? interface->name : "unknown") );
   } else {
@@ -1505,10 +1487,23 @@ static const struct wl_callback_listener sync_listener = {
 
 
 static void do_atexit() {
-  if (Fl_Wayland_Screen_Driver::wl_display) {
-    wl_display_roundtrip(Fl_Wayland_Screen_Driver::wl_display);
+  // Issue #821 no longer seems to require extra operations under gnome version < 44.
+  Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+  if (scr_driver->libdecor_context) { // libdecor recommends a call to libdecor_unref()
+    libdecor_unref(scr_driver->libdecor_context);
+    scr_driver->libdecor_context = NULL;
   }
 }
+
+
+static void handle_error(struct libdecor *libdecor_context, enum libdecor_error error, const char *message)
+{
+  Fl::fatal("Caught error (%d): %s\n", error, message);
+}
+
+static struct libdecor_interface libdecor_iface = {
+  .error = handle_error,
+};
 
 
 void Fl_Wayland_Screen_Driver::open_display_platform() {
@@ -1533,15 +1528,10 @@ void Fl_Wayland_Screen_Driver::open_display_platform() {
   struct wl_callback *registry_cb = wl_display_sync(wl_display);
   wl_callback_add_listener(registry_cb, &sync_listener, &registry_cb);
   while (registry_cb) wl_display_dispatch(wl_display);
-  Fl::add_fd(wl_display_get_fd(wl_display), FL_READ, (Fl_FD_Handler)wayland_socket_callback,
-             wl_display);
+  libdecor_context = libdecor_new(wl_display, &libdecor_iface);
+  Fl::add_fd(libdecor_get_fd(libdecor_context), FL_READ, (Fl_FD_Handler)libdecor_fd_callback,
+             libdecor_context);
   fl_create_print_window();
-  /* This is useful to avoid crash of the Wayland compositor after
-   FLTK apps terminate in certain situations:
-   - gnome-shell version < 44 (e.g. version 42.9)
-   - focus set to "follow-mouse"
-   See issue #821 for details.
-  */
   atexit(do_atexit);
 }
 
@@ -1621,10 +1611,6 @@ void Fl_Wayland_Screen_Driver::close_display() {
   wl_seat_destroy(seat->wl_seat); seat->wl_seat = NULL;
   if (seat->name) free(seat->name);
   free(seat); seat = NULL;
-  if (libdecor_context) {
-    libdecor_unref(libdecor_context);
-    libdecor_context = NULL;
-  }
   xdg_wm_base_destroy(xdg_wm_base); xdg_wm_base = NULL;
   Fl_Wayland_Plugin *plugin = Fl_Wayland_Window_Driver::gl_plugin();
   if (plugin) plugin->terminate();
@@ -1645,13 +1631,16 @@ void Fl_Wayland_Screen_Driver::close_display() {
   }
 #endif // HAVE_CURSOR_SHAPE
 
-  Fl::remove_fd(wl_display_get_fd(Fl_Wayland_Screen_Driver::wl_display));
+  if (libdecor_context) {
+    Fl::remove_fd(libdecor_get_fd(libdecor_context));
+    libdecor_unref(libdecor_context);
+    libdecor_context = NULL;
+  }
   wl_registry_destroy(wl_registry); wl_registry = NULL;
   wl_display_disconnect(Fl_Wayland_Screen_Driver::wl_display);
   Fl_Wayland_Screen_Driver::wl_display = NULL;
   delete Fl_Display_Device::display_device()->driver();
   delete Fl_Display_Device::display_device();
-  delete Fl::system_driver();
   delete this;
 }
 

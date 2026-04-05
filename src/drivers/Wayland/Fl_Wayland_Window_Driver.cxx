@@ -668,18 +668,6 @@ int Fl_Wayland_Window_Driver::scroll(int src_x, int src_y, int src_w, int src_h,
 }
 
 
-static void handle_error(struct libdecor *libdecor_context, enum libdecor_error error, const char *message)
-{
-  Fl::fatal("Caught error (%d): %s\n", error, message);
-}
-
-
-static struct libdecor_interface libdecor_iface = {
-  .error = handle_error,
-};
-
-
-
 static void delayed_rescale(Fl_Window *win) {
   Fl_Window_Driver::driver(win)->is_a_rescale(true);
   win->size(win->w(), win->h());
@@ -1063,11 +1051,12 @@ void Fl_Wayland_Window_Driver::wait_for_expose()
   Fl_Window_Driver::wait_for_expose();
   struct wld_window * xid = fl_wl_xid(pWindow);
   if (!xid) return;
+  Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
   if (pWindow->fullscreen_active()) {
     if (xid->kind == DECORATED) {
       while (!(xid->state & LIBDECOR_WINDOW_STATE_FULLSCREEN) ||
              !(xid->state & LIBDECOR_WINDOW_STATE_ACTIVE)) {
-        wl_display_dispatch(Fl_Wayland_Screen_Driver::wl_display);
+        libdecor_dispatch(scr_driver->libdecor_context, 0);
       }
     } else if (xid->kind == UNFRAMED) {
       wl_display_roundtrip(Fl_Wayland_Screen_Driver::wl_display);
@@ -1075,7 +1064,7 @@ void Fl_Wayland_Window_Driver::wait_for_expose()
   } else if (xid->kind == DECORATED) {
     // necessary for the windowfocus demo program with recent Wayland versions
     if (!(xid->state & LIBDECOR_WINDOW_STATE_ACTIVE)) {
-      wl_display_dispatch(Fl_Wayland_Screen_Driver::wl_display);
+      libdecor_dispatch(scr_driver->libdecor_context, 0);
     }
   }
 }
@@ -1535,13 +1524,11 @@ void Fl_Wayland_Window_Driver::makeWindow()
 
   } else if (pWindow->border() && !pWindow->parent() ) { // a decorated window
     new_window->kind = DECORATED;
-    if (!scr_driver->libdecor_context)
-      scr_driver->libdecor_context = libdecor_new(Fl_Wayland_Screen_Driver::wl_display,
-                                                  &libdecor_iface);
     new_window->frame = libdecor_decorate(scr_driver->libdecor_context, new_window->wl_surface,
                                           &libdecor_frame_iface, new_window);
     // appears in the Gnome desktop menu bar
-    libdecor_frame_set_app_id(new_window->frame, get_prog_name());
+    const char *appid = pWindow->xclass() ? pWindow->xclass() : get_prog_name();
+    libdecor_frame_set_app_id(new_window->frame, appid);
     libdecor_frame_set_title(new_window->frame, pWindow->label()?pWindow->label():"");
     if (!is_resizable()) {
       libdecor_frame_unset_capabilities(new_window->frame, LIBDECOR_ACTION_RESIZE);
@@ -1584,6 +1571,8 @@ void Fl_Wayland_Window_Driver::makeWindow()
     xdg_surface_add_listener(new_window->xdg_surface, &xdg_surface_listener, new_window);
     new_window->xdg_toplevel = xdg_surface_get_toplevel(new_window->xdg_surface);
     xdg_toplevel_add_listener(new_window->xdg_toplevel, &xdg_toplevel_listener, new_window);
+    xdg_toplevel_set_app_id(new_window->xdg_toplevel,
+                            pWindow->xclass() ? pWindow->xclass() : get_prog_name());
     if (pWindow->label()) xdg_toplevel_set_title(new_window->xdg_toplevel, pWindow->label());
     wl_surface_commit(new_window->wl_surface);
     pWindow->border(0);

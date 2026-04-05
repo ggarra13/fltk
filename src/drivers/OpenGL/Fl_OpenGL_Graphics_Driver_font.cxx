@@ -1,5 +1,5 @@
 //
-// Standard X11 font selection code for the Fast Light Tool Kit (FLTK).
+// Support for drawing text to Fl_Gl_Window for the Fast Light Tool Kit (FLTK).
 //
 // Copyright 1998-2016 by Bill Spitzak and others.
 //
@@ -29,7 +29,6 @@
 #include "Fl_OpenGL_Graphics_Driver.H"
 #include <FL/gl.h>
 #include <FL/Fl_Gl_Window.H>
-#include <FL/Fl_RGB_Image.H>
 #include <FL/Fl.H>
 #include <FL/fl_draw.H>
 
