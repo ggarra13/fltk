@@ -1090,11 +1090,6 @@ void Fl_Vk_Window::init_vulkan() {
         if (found_hdr)
         {
             vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
-            if (!vkSetHdrMetadataEXT)
-            {
-                fprintf(stderr, "Failed to initialize vkSetHDRMetadataEXT - no HDR extension will be used.\n");
-                found_hdr = false;
-            }
         }
     }
 
