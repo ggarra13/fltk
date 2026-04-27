@@ -3,8 +3,6 @@
 #ifndef __Fl_vk_enum_string_helper_h__
 #define __Fl_vk_enum_string_helper_h__
 
-#ifdef __linux__
-
 #include <vulkan/vulkan.h>
 #include <cstdio>
 static inline const char* string_VkResult(VkResult input) {
@@ -720,9 +718,5 @@ static inline const char* string_VkColorSpaceKHR(VkColorSpaceKHR input) {
             return "Unhandled VkColorSpaceKHR";
     }
 }
-
-#else
-   #include <vulkan/vk_enum_string_helper.h>
-#endif // __linux__
 
 #endif // __Fl_vk_enum_string_helper_h__
