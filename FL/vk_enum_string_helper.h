@@ -644,8 +644,6 @@ static inline const char* string_VkImageLayout(VkImageLayout input_value) {
             return "VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL";
         case VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL:
             return "VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL";
-        case VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ:
-            return "VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ";
         case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
             return "VK_IMAGE_LAYOUT_PRESENT_SRC_KHR";
         case VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR:
@@ -668,12 +666,6 @@ static inline const char* string_VkImageLayout(VkImageLayout input_value) {
             return "VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR";
         case VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT:
             return "VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT";
-        case VK_IMAGE_LAYOUT_TENSOR_ALIASING_ARM:
-            return "VK_IMAGE_LAYOUT_TENSOR_ALIASING_ARM";
-        case VK_IMAGE_LAYOUT_VIDEO_ENCODE_QUANTIZATION_MAP_KHR:
-            return "VK_IMAGE_LAYOUT_VIDEO_ENCODE_QUANTIZATION_MAP_KHR";
-        case VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT:
-            return "VK_IMAGE_LAYOUT_ZERO_INITIALIZED_EXT";
         default:
             return "Unhandled VkImageLayout";
     }
