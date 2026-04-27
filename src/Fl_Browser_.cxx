@@ -657,6 +657,10 @@ int Fl_Browser_::deselect(int docallbacks) {
     item_select(selection_, 0);
     redraw_line(selection_);
     selection_ = 0;
+    if (docallbacks) {
+      set_changed();
+      do_callback(FL_REASON_CHANGED);
+    }
     return 1;
   }
 }
@@ -714,13 +718,16 @@ int Fl_Browser_::handle(int event) {
         switch (Fl::event_key()) {
         case FL_Down:
           while ((l = item_next(l))) {
-            if (item_height(l)>0) {select_only(l, when()); break;}
+            if (item_height(l)>0) {
+              select_only(l, when() & ~FL_WHEN_NOT_CHANGED);
+              break;
+            }
           }
-            return 1;
+          return 1;
         case FL_Up:
           while ((l = item_prev(l))) {
             if (item_height(l)>0) {
-              select_only(l, when());
+              select_only(l, when() & ~FL_WHEN_NOT_CHANGED);
               break; // no need to test wp (return 1)
             }
           }
@@ -789,6 +796,7 @@ J1:
 // This second call of Fl_Browser_::handle() may result in a -
 // somewhat unexpected - second concurrent invocation of the callback.
 
+  static void* initsel;
   static char change;
   static char whichway;
   static int py;
@@ -800,6 +808,7 @@ J1:
       redraw();
     }
     my = py = Fl::event_y();
+    initsel = selection_;
     change = 0;
     if (type() == FL_NORMAL_BROWSER || !top_)
       ;
@@ -904,11 +913,10 @@ J1:
       }
       if (l) selection_ = l;
     } else {
-      void* l1 = selection_;
       void* l =
         (Fl::event_x()<x() || Fl::event_x()>x()+w()) ? selection_ :
         find_item(my);
-      change = (l != l1);
+      change = (l != initsel);
       select_only(l, when() & FL_WHEN_CHANGED);
       if (wp.deleted()) return 1;
     }

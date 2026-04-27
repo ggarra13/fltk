@@ -139,7 +139,7 @@ const char* Fl_Input_::expand(const char* p, char* buf) const {
   char* e = buf+(MAXBUF-4);
   const char* lastspace = p;
   char* lastspace_out = o;
-  int width_to_lastspace = 0;
+  double width_to_lastspace = 0;
   int word_count = 0;
   int word_wrap;
 //  const char *pe = p + strlen(p);
@@ -155,10 +155,10 @@ const char* Fl_Input_::expand(const char* p, char* buf) const {
 
   } else while (o<e) {
     if (wrap() && (p >= value_+size_ || isspace(*p & 255))) {
-      word_wrap = w() - Fl::box_dw(box()) - 2;
-      width_to_lastspace += (int)fl_width(lastspace_out, (int) (o-lastspace_out));
+      word_wrap = w() - Fl::box_dw(box()) - 5;  // 5 == space for cursor + gap (#1414)
+      width_to_lastspace += fl_width(lastspace_out, (int) (o-lastspace_out));
       if (p > lastspace+1) {
-        if (word_count && width_to_lastspace > word_wrap) {
+        if (word_count && ceil(width_to_lastspace) > word_wrap) {
           p = lastspace; o = lastspace_out; break;
         }
         word_count++;

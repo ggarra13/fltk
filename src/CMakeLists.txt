@@ -564,6 +564,7 @@ set(VKCPPFILES
 set(IMGCPPFILES
   fl_images_core.cxx
   fl_write_png.cxx
+  fl_write_jpeg.cxx
   Fl_BMP_Image.cxx
   Fl_File_Icon2.cxx
   Fl_GIF_Image.cxx
@@ -652,6 +653,7 @@ if(FLTK_USE_WAYLAND)
   endif(USE_SYSTEM_LIBDECOR)
   set_source_files_properties(
     ${FLTK_SOURCE_DIR}/src/drivers/Wayland/Fl_Wayland_Window_Driver.cxx
+    ${FLTK_SOURCE_DIR}/src/drivers/Wayland/Fl_Wayland_Gl_Window_Driver.cxx
     ${FLTK_SOURCE_DIR}/src/drivers/Wayland/Fl_Wayland_Screen_Driver.cxx
     PROPERTIES COMPILE_DEFINITIONS "USE_SYSTEM_LIBDECOR=${USE_SYSTEM_LIBDECOR}"
     )

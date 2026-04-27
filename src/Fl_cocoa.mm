@@ -554,10 +554,9 @@ void Fl_Cocoa_Screen_Driver::breakMacEventLoop()
 @end
 
 
-@interface FLView : NSView <NSTextInput, NSTextInputClient, NSDraggingSource> {
+@interface FLView : NSView <NSTextInputClient, NSDraggingSource> {
   BOOL in_key_event; // YES means keypress is being processed by handleEvent
   BOOL need_handle; // YES means Fl::handle(FL_KEYBOARD,) is needed after handleEvent processing
-  NSInteger identifier;
   NSRange selectedRange;
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_14
 @public
@@ -566,7 +565,6 @@ void Fl_Cocoa_Screen_Driver::breakMacEventLoop()
 }
 + (void)prepareEtext:(NSString*)aString;
 + (void)concatEtext:(NSString*)aString;
-- (BOOL)process_keydown:(NSEvent*)theEvent;
 - (id)initWithFrame:(NSRect)frameRect;
 - (void)drawRect:(NSRect)rect;
 - (BOOL)acceptsFirstResponder;
@@ -1143,40 +1141,6 @@ static void cocoaMouseHandler(NSEvent *theEvent)
 }
 
 
-@interface FLTextView : NSTextView // this subclass is only needed under OS X < 10.6
-{
-  BOOL isActive;
-}
-+ (void)initialize;
-+ (FLTextView*)singleInstance;
-- (void)insertText:(id)aString;
-- (void)doCommandBySelector:(SEL)aSelector;
-- (void)setActive:(BOOL)a;
-@end
-static FLTextView *fltextview_instance = nil;
-@implementation FLTextView
-+ (void)initialize {
-  NSRect rect={{0,0},{20,20}};
-  fltextview_instance = [[FLTextView alloc] initWithFrame:rect];
-}
-+ (FLTextView*)singleInstance {
-  return fltextview_instance;
-}
-- (void)insertText:(id)aString
-{
-  if (isActive) [[[NSApp keyWindow] contentView] insertText:aString];
-}
-- (void)doCommandBySelector:(SEL)aSelector
-{
-  [[[NSApp keyWindow] contentView] doCommandBySelector:aSelector];
-}
-- (void)setActive:(BOOL)a
-{
-  isActive = a;
-}
-@end
-
-
 @interface FLWindowDelegate : NSObject <NSWindowDelegate>
 + (void)initialize;
 + (FLWindowDelegate*)singleInstance;
@@ -1301,19 +1265,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
   Fl_Window *window = [nsw getFl_Window];
 
   int X, Y, W, H;
-  float s = Fl::screen_driver()->scale(window->screen_num());
-  if (Fl_Window::is_a_rescale()) {
-    if (window->parent()) {
-      X = window->x();
-      Y = window->y();
-    } else {
-      // Recalculate the FLTK position from the current Cocoa position applying
-      // the new scale, so the window stays at its current position after scaling.
-      CocoatoFLTK(window, X, Y);
-    }
-    W = window->w();
-    H = window->h();
-  } else if (Fl_Cocoa_Window_Driver::driver(window)->through_resize()) {
+  if (Fl_Window::is_a_rescale() || Fl_Cocoa_Window_Driver::driver(window)->through_resize()) {
     if (window->parent()) {
       X = window->x();
       Y = window->y();
@@ -1326,6 +1278,7 @@ static FLWindowDelegate *flwindowdelegate_instance = nil;
   } else {
     CocoatoFLTK(window, X, Y);
     NSRect r = [view frame];
+    float s = Fl::screen_driver()->scale(window->screen_num());
     W = (int)lround(r.size.width/s);
     H = (int)lround(r.size.height/s);
   }
@@ -2130,14 +2083,11 @@ static void  q_set_window_title(NSWindow *nsw, const char * name, const char *mi
 /**                 How FLTK handles Mac OS text input
 
  Let myview be the instance of the FLView class that has the keyboard focus. FLView is an FLTK-defined NSView subclass
- that implements the NSTextInputClient protocol to properly handle text input. It also implements the old NSTextInput
- protocol to run with OS <= 10.4. The few NSTextInput protocol methods that differ in signature from the NSTextInputClient
- protocol transmit the received message to the corresponding NSTextInputClient method.
+ that implements the NSTextInputClient protocol to properly handle text input.
 
  Keyboard input sends keyDown: and performKeyEquivalent: messages to myview. The latter occurs for keys such as
  ForwardDelete, arrows and F1, and when the Ctrl or Cmd modifiers are used. Other key presses send keyDown: messages.
- The keyDown: method calls [myview process_keydown:theEvent] that is equivalent to
- [[myview inputContext] handleEvent:theEvent], and triggers system processing of keyboard events.
+ The keyDown: method calls [[myview inputContext] handleEvent:theEvent], and triggers system processing of keyboard events.
  The performKeyEquivalent: method directly calls Fl::handle(FL_KEYBOARD, focus-window)
  when the Ctrl or Cmd modifiers are used. If not, it also calls [[myview inputContext] handleEvent:theEvent].
  The performKeyEquivalent: method returns YES when the keystroke has been handled and NO otherwise, which allows
@@ -2170,23 +2120,6 @@ static void  q_set_window_title(NSWindow *nsw, const char * name, const char *mi
  > 0 means this number of characters before the insertion point are selected. The insertText: method does
  selectedRange = NSMakeRange(100, 0); to indicate no text is selected. The setMarkedText: method does
  selectedRange = NSMakeRange(100, newSelection.length); to indicate that this length of text is selected.
-
- With OS <= 10.5, the NSView class does not implement the inputContext message. [myview process_keydown:theEvent] is
- equivalent to [[FLTextInputContext singleInstance] handleEvent:theEvent].
- Method +[FLTextInputContext singleInstance] returns an instance of class FLTextInputContext that possesses
- a handleEvent: method. The class FLTextView implements the so-called view's "field editor". This editor is an instance
- of the FLTextView class allocated by the -(id)[FLWindowDelegate windowWillReturnFieldEditor: toObject:] method.
- The -(BOOL)[FLTextInputContext handleEvent:] method emulates the missing 10.6 -(BOOL)[NSTextInputContext handleEvent:]
- by sending the interpretKeyEvents: message to the FLTextView object. The system sends back doCommandBySelector: and
- insertText: messages to the FLTextView object that are transmitted unchanged to myview to be processed as with OS >= 10.6.
- The system also sends setMarkedText: messages directly to myview.
-
- There is furthermore an oddity of dead key processing with OS <= 10.5. It occurs when a dead key followed by a non-accented
- key are pressed. Say, for example, that keys '^' followed by 'p' are pressed on a French or German keyboard. Resulting
- messages are: [myview setMarkedText:@"^"], [myview insertText:@"^"], [myview insertText:@"p"], [FLTextView insertText:@"^p"].
- The 2nd '^' replaces the marked 1st one, followed by p^p. The resulting text in the widget is "^p^p" instead of the
- desired "^p". To avoid that, the FLTextView object is deactivated by the insertText: message and reactivated after
- the handleEvent: message has been processed.
 
  NSEvent's during a character composition sequence:
  - keyDown with deadkey -> [[theEvent characters] length] is 0
@@ -2229,27 +2162,6 @@ static void cocoaKeyboardHandler(NSEvent *theEvent)
   Fl::e_text = (char*)"";
 }
 
-@interface FLTextInputContext : NSObject // "emulates" NSTextInputContext before OS 10.6
-+ (void)initialize;
-+ (FLTextInputContext*)singleInstance;
--(BOOL)handleEvent:(NSEvent*)theEvent;
-@end
-static FLTextInputContext* fltextinputcontext_instance = nil;
-@implementation FLTextInputContext
-+ (void)initialize {
-  fltextinputcontext_instance = [[FLTextInputContext alloc] init];
-}
-+ (FLTextInputContext*)singleInstance {
-  return fltextinputcontext_instance;
-}
--(BOOL)handleEvent:(NSEvent*)theEvent {
-  FLTextView *edit = [FLTextView singleInstance];
-  [edit setActive:YES];
-  [edit interpretKeyEvents:[NSArray arrayWithObject:theEvent]];
-  [edit setActive:YES];
-  return YES;
-}
-@end
 
 /* Implementation note for the support of layer-backed views.
  MacOS 10.14 Mojave changes the way all drawing to displays is performed:
@@ -2324,17 +2236,11 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   aux_bitmap = NULL;
 }
 #endif
-- (BOOL)process_keydown:(NSEvent*)theEvent
-{
-  return [[self inputContext] handleEvent:theEvent];
-}
 - (id)initWithFrame:(NSRect)frameRect
 {
-  static NSInteger counter = 0;
   self = [super initWithFrame:frameRect];
   if (self) {
     in_key_event = NO;
-    identifier = ++counter;
     }
   return self;
 }
@@ -2442,7 +2348,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   else {
     in_key_event = YES;
     need_handle = NO;
-    handled = [self process_keydown:theEvent];
+    handled = [[self inputContext] handleEvent:theEvent];
     if (need_handle) handled = Fl::handle(FL_KEYBOARD, w);
     in_key_event = NO;
     }
@@ -2550,7 +2456,7 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
     [FLView prepareEtext:[theEvent characters]];
   } else {
     need_handle = NO;
-    [self process_keydown:theEvent];
+    [[self inputContext] handleEvent:theEvent];
   }
   if (need_handle) Fl::handle(FL_KEYBOARD, window);
   in_key_event = NO;
@@ -2744,10 +2650,6 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   Fl::handle(FL_KEYBOARD, target);
 }
 
-- (void)insertText:(id)aString {
-  [self insertText:aString replacementRange:NSMakeRange(NSNotFound, 0)];
-}
-
 - (void)insertText:(id)aString replacementRange:(NSRange)replacementRange {
   NSString *received;
   if ([aString isKindOfClass:[NSAttributedString class]]) {
@@ -2796,10 +2698,6 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   // sending a 'redraw()' or 'awake()' does not solve the issue!
   if (palette) Fl::flush();
   fl_unlock_function();
-}
-
-- (void)setMarkedText:(id)aString selectedRange:(NSRange)newSelection  {
-  [self setMarkedText:aString selectedRange:newSelection replacementRange:NSMakeRange(NSNotFound, 0)];
 }
 
 - (void)setMarkedText:(id)aString selectedRange:(NSRange)newSelection replacementRange:(NSRange)replacementRange {
@@ -2858,9 +2756,6 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   return (Fl::compose_state > 0);
 }
 
-- (NSAttributedString *)attributedSubstringFromRange:(NSRange)aRange {
-  return [self attributedSubstringForProposedRange:aRange actualRange:NULL];
-}
 - (NSAttributedString *)attributedSubstringForProposedRange:(NSRange)aRange actualRange:(NSRangePointer)actualRange {
   //NSLog(@"attributedSubstringFromRange: %d %d",aRange.location,aRange.length);
   return nil;
@@ -2870,9 +2765,6 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
   return nil;
 }
 
-- (NSRect)firstRectForCharacterRange:(NSRange)aRange {
-  return [self firstRectForCharacterRange:aRange actualRange:NULL];
-}
 - (NSRect)firstRectForCharacterRange:(NSRange)aRange actualRange:(NSRangePointer)actualRange {
   //NSLog(@"firstRectForCharacterRange %d %d actualRange=%p",aRange.location, aRange.length,actualRange);
   NSRect glyphRect;
@@ -2923,10 +2815,6 @@ static FLTextInputContext* fltextinputcontext_instance = nil;
 
 - (NSInteger)windowLevel {
   return [[self window] level];
-}
-
-- (NSInteger)conversationIdentifier {
-  return identifier;
 }
 
 - (NSDragOperation)draggingSession:(NSDraggingSession *)session sourceOperationMaskForDraggingContext:(NSDraggingContext)context

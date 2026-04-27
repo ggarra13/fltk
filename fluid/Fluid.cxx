@@ -34,6 +34,7 @@
 #include "panels/codeview_panel.h"
 #include "panels/template_panel.h"
 #include "panels/about_panel.h"
+#include "fluid_icon.h"
 #include "rsrcs/pixmaps.h"
 #include "tools/autodoc.h"
 #include "widgets/App_Menu_Bar.h"
@@ -163,6 +164,7 @@ int Application::run(int argc,char **argv) {
     Fl::visual((Fl_Mode)(FL_DOUBLE|FL_INDEX));
     Fl_File_Icon::load_system_icons();
     main_window->callback(exit_cb);
+    make_fluid_icon(main_window); // assign icon to main window
     position_window(main_window,"main_window_pos", 1, 10, 30, WINWIDTH, WINHEIGHT );
     if (g_shell_config) {
       g_shell_config->read(preferences, fld::Tool_Store::USER);
@@ -172,11 +174,11 @@ int Application::run(int argc,char **argv) {
     Fluid.layout_list.read(preferences, fld::Tool_Store::USER);
     main_window->show(argc,argv);
     toggle_widget_bin();
-    toggle_codeview_cb(nullptr,nullptr);
     if (!c && openlast_button->value() && history.abspath[0][0] && args.autodoc_path.empty()) {
       // Open previous file when no file specified...
       open_project_file(history.abspath[0]);
     }
+    toggle_codeview_cb(nullptr,nullptr);
   }
   proj.undo.suspend();
   if (c && !fld::io::read_file(proj, c,0)) {

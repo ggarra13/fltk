@@ -264,6 +264,11 @@ Color values greater than 255 are treated as 24-bit RGB values. These are mapped
 to the closest color supported by the screen, either from one of the 256 colors
 in the FLTK colormap or a direct RGB value on TrueColor screens.
 
+File FL/rgb_colors.H defines 490 constants of type Fl_Color than can be used to identify
+many colors by a name. The names of these constants (example: FL_RGB_ALICE_BLUE) begin
+with the "FL_RGB_" prefix and use the English-language color names of Xorg's "share/X11/rgb.txt" file
+and their values. Include <FL/rgb_colors.H> in your program to gain access to these color names.
+
 Fl_Color fl_rgb_color(uchar r, uchar g, uchar b) <br>
 Fl_Color fl_rgb_color(uchar grayscale)
 
@@ -1104,6 +1109,19 @@ the proper size which can be freed using \p delete[].
 The \p alpha parameter controls whether an alpha
 channel is created and the value that is placed in the alpha
 channel. If 0, no alpha channel is generated.
+
+\subsection drawing_direct_image_saving Direct Image Saving
+
+FLTK allows to save an array of pixel values to a file
+either in PNG or JPEG formats, provided the app is linked to the \p fltk_images library:
+
+int fl_write_png(const char *filename, const char *pixels, int w, int h, int d, int ld)
+\par
+Saves an array of pixels to a PNG file.
+
+int fl_write_jpeg(const char *filename, const char *pixels, int w, int h, int d, int ld)
+\par
+Saves an array of pixels to a JPEG file.
 
 \subsection drawing_Fl_Image Image Classes
 
