@@ -48,8 +48,8 @@
 static const uint64_t kFenceTimeout = UINT64_MAX;
 static const uint64_t kAcquireTimeout = UINT64_MAX;
 #else
-static const uint64_t kFenceTimeout   = 10000000;
-static const uint64_t kAcquireTimeout = 10000000;
+static const uint64_t kFenceTimeout   = 1000000000;
+static const uint64_t kAcquireTimeout = 1000000000;
 #endif
 
 static int g_active_vulkan_windows = 0;
@@ -342,7 +342,10 @@ bool Fl_Vk_Window::vk_draw_begin() {
                                  kFenceTimeout);
         
         if (result == VK_TIMEOUT) {
-            fprintf(stderr, "vkWaitForFences timed out, attempting recovery\n");
+            if (m_debugSync)
+            {
+                fprintf(stderr, "vkWaitForFences timed out, attempting recovery\n");
+            }
             m_swapchain_needs_recreation = true;
             return false;
         }
