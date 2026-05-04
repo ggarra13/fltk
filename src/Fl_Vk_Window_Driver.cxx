@@ -1181,6 +1181,10 @@ void Fl_Vk_Window_Driver::init_colorspace() {
 }
 
 void Fl_Vk_Window_Driver::prepare() {
+    int W = pWindow->pixel_w();
+    int H = pWindow->pixel_h();
+    resize(true, W, H);
+    
     prepare_buffers();
     prepare_depth();
     pWindow->prepare();

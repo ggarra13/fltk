@@ -33,7 +33,6 @@
 #include "../../../libdecor/build/fl_libdecor.h"
 #include "Fl_Wayland_Window_Driver.H"
 
-
 // Describes crap needed to create a VKContext.
 class Fl_Wayland_Vk_Choice : public Fl_Vk_Choice {
   friend class Fl_Wayland_Vk_Window_Driver;
@@ -145,22 +144,15 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
 
 void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     // This is handled automatically by recreate_swapchain() in Fl_Vk_Window.
-    float f = Fl::screen_scale(pWindow->screen_num());
-    int s = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
-    W = int(W * f) * s; // W, H must be multiples of int s
-    H = int(H * f) * s;
-    int W2, H2;
-  
-    if (W2 != W || H2 != H) {
-        struct wld_window *xid = fl_wl_xid(pWindow);
-        if (!xid) return;
-        if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
-            xid->frame_cb = wl_surface_frame(xid->wl_surface);
-            wl_callback_add_listener(xid->frame_cb,
-                                     Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-        }
-        wl_surface_set_buffer_scale(xid->wl_surface, s);
+    int scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
+    struct wld_window *xid = fl_wl_xid(pWindow);
+    if (!xid) return;
+    if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
+        xid->frame_cb = wl_surface_frame(xid->wl_surface);
+        wl_callback_add_listener(xid->frame_cb,
+                                 Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
     }
+    wl_surface_set_buffer_scale(xid->wl_surface, scale);
 }
 
 
@@ -190,16 +182,6 @@ void Fl_Wayland_Vk_Window_Driver::create_surface() {
 }
 
 void Fl_Wayland_Vk_Window_Driver::make_current_before() {
-    struct wld_window *win = fl_wl_xid(pWindow);
-    if (!win) return;
-    struct wl_surface *surface = win->wl_surface;
-    if (pWindow->parent()) { // force toplevel win to enter its display before sizing GL subwin
-      win = fl_wl_xid(pWindow->top_window());
-      struct libdecor *ld = ((Fl_Wayland_Screen_Driver*)Fl::screen_driver())->libdecor_context;
-      while (wl_list_empty(&win->outputs)) libdecor_dispatch(ld, 0);
-    }
-    int scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
-    wl_surface_set_buffer_scale(surface, scale);
 }
 
 
