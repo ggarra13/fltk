@@ -30,6 +30,7 @@
 #include "../X11/Fl_X11_Vk_Window_Driver.H"
 #endif
 #include "../../Fl_Vk_Choice.H"
+#include "../../../libdecor/build/fl_libdecor.h"
 #include "Fl_Wayland_Window_Driver.H"
 
 
@@ -112,8 +113,10 @@ Fl_Vk_Choice *Fl_Wayland_Vk_Window_Driver::find(int m, const int *alistp) {
 
 
 float Fl_Wayland_Vk_Window_Driver::pixels_per_unit() {
-    //! \@note:  must NOT scale by Wayland's wld_scale here.
-    return Fl::screen_driver()->scale(pWindow->screen_num());
+    int ns = pWindow->screen_num();
+    int wld_scale = (pWindow->shown() ?
+                     Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale() : 1);
+    return wld_scale * Fl::screen_driver()->scale(ns);
 }
 
 
@@ -142,6 +145,22 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
 
 void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     // This is handled automatically by recreate_swapchain() in Fl_Vk_Window.
+    float f = Fl::screen_scale(pWindow->screen_num());
+    int s = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
+    W = int(W * f) * s; // W, H must be multiples of int s
+    H = int(H * f) * s;
+    int W2, H2;
+  
+    if (W2 != W || H2 != H) {
+        struct wld_window *xid = fl_wl_xid(pWindow);
+        if (!xid) return;
+        if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
+            xid->frame_cb = wl_surface_frame(xid->wl_surface);
+            wl_callback_add_listener(xid->frame_cb,
+                                     Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+        }
+        wl_surface_set_buffer_scale(xid->wl_surface, s);
+    }
 }
 
 
@@ -170,7 +189,18 @@ void Fl_Wayland_Vk_Window_Driver::create_surface() {
   }
 }
 
-void Fl_Wayland_Vk_Window_Driver::make_current_before() {}
+void Fl_Wayland_Vk_Window_Driver::make_current_before() {
+    struct wld_window *win = fl_wl_xid(pWindow);
+    if (!win) return;
+    struct wl_surface *surface = win->wl_surface;
+    if (pWindow->parent()) { // force toplevel win to enter its display before sizing GL subwin
+      win = fl_wl_xid(pWindow->top_window());
+      struct libdecor *ld = ((Fl_Wayland_Screen_Driver*)Fl::screen_driver())->libdecor_context;
+      while (wl_list_empty(&win->outputs)) libdecor_dispatch(ld, 0);
+    }
+    int scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
+    wl_surface_set_buffer_scale(surface, scale);
+}
 
 
 std::vector<const char*> Fl_Wayland_Vk_Window_Driver::get_instance_extensions() {
