@@ -119,14 +119,6 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                           surfCapabilities.maxImageExtent.height);
 }
 
-  
-  swapchainExtent.width = std::clamp(std::min(W, swapchainExtent.width),
-                                     surfCapabilities.minImageExtent.width,
-                                     surfCapabilities.maxImageExtent.width);
-  swapchainExtent.height = std::clamp(std::min(H, swapchainExtent.height),
-                                      surfCapabilities.minImageExtent.height,
-                                      surfCapabilities.maxImageExtent.height);
-    
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
       !pWindow->m_buffers.empty() &&
@@ -381,9 +373,8 @@ void Fl_Vk_Window_Driver::prepare_framebuffers() {
   attachments[0] = VK_NULL_HANDLE;        // Color attachment
   attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
 
-  uint32_t W = pWindow->pixel_w();
-  uint32_t H = pWindow->pixel_h();    
-
+  uint32_t W = pWindow->m_swapchainExtent.width;
+  uint32_t H = pWindow->m_swapchainExtent.height;
 
   VkFramebufferCreateInfo fb_info = {};
   fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
