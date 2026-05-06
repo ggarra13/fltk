@@ -330,6 +330,9 @@ bool Fl_Vk_Window::vk_draw_begin() {
         }
     
         m_pixels_per_unit = pixels_per_unit();
+
+        // After recreation, make sure we don't present old frames
+        m_currentFrameIndex = 0;
     }
 
     // Get current frame data
@@ -774,13 +777,14 @@ void Fl_Vk_Window::flush() {
   // Submit and present
   swap_buffers();
 
-  clear_damage();
+  if (!m_swapchain_needs_recreation)
+      clear_damage();
 }
 
 void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
-  // printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
-  // printf("orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
-  //        x(), y(), w(), h(), pixel_w(), pixel_h());
+  printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
+  printf("orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
+         x(), y(), w(), h(), pixel_w(), pixel_h());
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() ||
                      is_a_rescale() ||
                      m_pixels_per_unit <= 0.F ||
