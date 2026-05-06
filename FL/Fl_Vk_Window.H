@@ -35,6 +35,7 @@ struct Fl_Vk_SwapchainBuffer {
     VkImageView view;
     VkFramebuffer framebuffer;
     VkSemaphore semaphore;
+    VkExtent2D extent;
 
     Fl_Vk_SwapchainBuffer() :
         image(VK_NULL_HANDLE),
@@ -42,6 +43,7 @@ struct Fl_Vk_SwapchainBuffer {
         framebuffer(VK_NULL_HANDLE),
         semaphore(VK_NULL_HANDLE)
         {
+            extent = { 0, 0 };
         }
     
     void destroy(VkDevice& device)
@@ -64,6 +66,7 @@ struct Fl_Vk_SwapchainBuffer {
                 semaphore = VK_NULL_HANDLE;
             }
             
+            extent = { 0, 0 };
             // image belongs to the swapchain (must not destroy).
         }
 };
@@ -351,10 +354,12 @@ private:
           }
   };
 
+public:
+  std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
+  
 protected:
   float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
-  std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
   
   std::vector<FrameData>  m_frames;

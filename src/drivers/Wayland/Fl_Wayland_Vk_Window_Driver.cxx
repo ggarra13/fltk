@@ -59,6 +59,7 @@ int Fl_Wayland_Vk_Window_Driver::explicit_sync = -1;
 
 Fl_Wayland_Vk_Window_Driver::Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
     : Fl_Vk_Window_Driver(win)
+    , m_current_wld_scale(0)   // 0 = not yet initialised; updated on first resize()
 {
 }
 
@@ -142,17 +143,80 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// resize()
+//
+// BUG FIX: moving a window slowly between screens with different DPI scales
+// (e.g. 1× → 2×) used to produce a fatal Wayland protocol error:
+//
+//   wl_surface#N: error 2: Buffer size (WxH) must be an integer multiple
+//   of the buffer_scale (2).
+//
+// Root cause
+// ----------
+// When Wayland reports a scale change FLTK calls resize() which previously
+// called wl_surface_set_buffer_scale(newScale) immediately.  The existing
+// swapchain images (whose pixel dimensions were computed for the OLD scale)
+// are still alive at this point.  On the very next vkQueuePresentKHR the
+// compositor checks: buffer_scale × logical_size == buffer_size.  If the
+// old pixel dimensions are not exact multiples of newScale (e.g. 933×29 is
+// not a multiple of 2) it fires the fatal protocol error.
+//
+// Fix
+// ---
+// wl_surface_set_buffer_scale() must only be called when NO live swapchain
+// images exist for the current surface.  That condition holds precisely
+// inside prepare(): destroy_resources() clears pWindow->m_buffers before
+// prepare() is called, so m_buffers.empty() is a reliable, zero-overhead
+// guard.  When resize() is called from an external event (m_buffers not
+// empty) and the scale is changing we record the new desired scale and flag
+// the swapchain for recreation; the actual wl_surface_set_buffer_scale()
+// call is then made safely inside the next prepare() invocation, right
+// before fresh, correctly-aligned images are built.
+// ---------------------------------------------------------------------------
 void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
-    // This is handled automatically by recreate_swapchain() in Fl_Vk_Window.
-    int scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
+    int new_scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
     struct wld_window *xid = fl_wl_xid(pWindow);
     if (!xid) return;
+
+    // Always set up the frame callback — this is safe regardless of scale.
     if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
         xid->frame_cb = wl_surface_frame(xid->wl_surface);
         wl_callback_add_listener(xid->frame_cb,
                                  Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
     }
-    wl_surface_set_buffer_scale(xid->wl_surface, scale);
+
+    // Guard: if live swapchain images are present (m_buffers non-empty) and
+    // the buffer scale is changing, do NOT call wl_surface_set_buffer_scale()
+    // yet.  Instead, record the new desired scale (used by prepare_buffers()
+    // for alignment) and request a swapchain recreation.  The scale will be
+    // applied safely on the next prepare() call, after the old images are
+    // retired and new aligned ones are created.
+    //
+    // Note: during prepare() (called from recreate_swapchain()) m_buffers has
+    // already been cleared by destroy_resources(), so the guard below is false
+    // and we proceed to update the surface scale immediately — which is correct
+    // because prepare_buffers() follows right after and creates properly-aligned
+    // images before any present calls can happen.
+    if (!pWindow->m_buffers.empty() && new_scale != m_current_wld_scale) {
+        m_current_wld_scale = new_scale;          // remember for alignment in prepare_buffers()
+        pWindow->reinit_swapchain();
+        fprintf(stderr, "%s Saved scale to %d for next swapchain recreation.\n",
+                (pWindow->label() ? pWindow->label() : "(unlabeled window)"),
+                new_scale);
+        return;  // defer wl_surface_set_buffer_scale() to the next prepare()
+    }
+
+    // Safe to apply the scale now:
+    //  • First-time setup (m_current_wld_scale == 0): no swapchain exists yet.
+    //  • Scale unchanged: nothing to do alignment-wise.
+    //  • Called from within prepare(): old images already destroyed.
+    m_current_wld_scale = new_scale;
+    fprintf(stderr, "%s wl_surface_set_buffer_scale to %d\n",
+            (pWindow->label() ? pWindow->label() : "(unlabeled window)"),
+            new_scale);
+    pWindow->reinit_swapchain();
+    wl_surface_set_buffer_scale(xid->wl_surface, new_scale);
 }
 
 
@@ -200,6 +264,19 @@ int Fl_Wayland_Vk_Window_Driver::flush_begin() {
         return 1;  // we have a callback, skip this frame
     }
     return 0;
+}
+
+// ---------------------------------------------------------------------------
+// get_surface_buffer_scale()
+//
+// Returns the buffer scale that was most recently applied (or will be applied
+// on the next prepare() call) to the Wayland surface.  This is consumed by
+// prepare_buffers() in the common driver to align the swapchain extent, which
+// guards against the compositor-provided currentExtent being temporarily
+// unaligned while the window straddles two monitors during a slow drag.
+// ---------------------------------------------------------------------------
+int Fl_Wayland_Vk_Window_Driver::get_surface_buffer_scale() const {
+    return (m_current_wld_scale > 0) ? m_current_wld_scale : 1;
 }
 
 Fl_Wayland_Vk_Window_Driver::~Fl_Wayland_Vk_Window_Driver() {}

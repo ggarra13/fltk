@@ -25,9 +25,11 @@
 
 class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   static int explicit_sync;
+  int m_current_wld_scale;
   friend Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
   Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win);
   virtual ~Fl_Wayland_Vk_Window_Driver();
+  int get_surface_buffer_scale() const FL_OVERRIDE;
   float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
   void swap_buffers() FL_OVERRIDE;

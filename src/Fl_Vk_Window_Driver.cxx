@@ -117,7 +117,48 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       swapchainExtent.height = std::clamp(H,
                                           surfCapabilities.minImageExtent.height,
                                           surfCapabilities.maxImageExtent.height);
-}
+  }
+
+  // Guard: if the window is minimised or not yet mapped the extent can be
+  // reported as {0,0} — creating a swapchain of zero size is undefined
+  // behaviour.  Return and let the next frame retry.
+  if (swapchainExtent.width == 0 || swapchainExtent.height == 0) {
+      pWindow->m_swapchain = oldSwapchain;  // keep current swapchain alive
+      pWindow->reinit_swapchain();
+      return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Align the swapchain extent to the surface's buffer scale.
+  //
+  // On Wayland wl_surface_set_buffer_scale(N) requires every presented buffer
+  // to have dimensions that are exact integer multiples of N.  The compositor-
+  // provided currentExtent can be temporarily unaligned while a window is
+  // being dragged slowly between two monitors with different DPI scales (e.g.
+  // 1× → 2×), because the compositor may report a logical size whose physical
+  // expansion is an odd number of pixels.  Rounding DOWN to the nearest
+  // multiple is safe: it never exceeds maxImageExtent and keeps the swapchain
+  // inside the logical surface bounds.
+  // -------------------------------------------------------------------------
+  {
+      const uint32_t align = static_cast<uint32_t>(get_surface_buffer_scale());
+      if (align > 1) {
+          // Round down to the nearest multiple of align.
+          swapchainExtent.width  = (swapchainExtent.width  / align) * align;
+          swapchainExtent.height = (swapchainExtent.height / align) * align;
+
+          // Ensure we never collapse to zero after rounding (degenerate surface).
+          if (swapchainExtent.width  == 0) swapchainExtent.width  = align;
+          if (swapchainExtent.height == 0) swapchainExtent.height = align;
+
+          // Re-clamp to capabilities (the min-guard above could exceed maxImageExtent
+          // on exotic drivers, though in practice this never fires).
+          swapchainExtent.width  = std::min(swapchainExtent.width,
+                                            surfCapabilities.maxImageExtent.width);
+          swapchainExtent.height = std::min(swapchainExtent.height,
+                                            surfCapabilities.maxImageExtent.height);
+      }
+  }
 
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
@@ -164,25 +205,14 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
   {
-#ifdef DEBUG_PRESENTATION_MODE
-      std::cerr << pWindow->label() << " VK_PRESENT_MODE_MAILBOX_KHR"
-                << std::endl;
-#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount + 1);
   }
   else if (presentMode == VK_PRESENT_MODE_FIFO_KHR)
   {      
-#ifdef DEBUG_PRESENTATION_MODE
-      std::cerr << pWindow->label() << " VK_PRESENT_MODE_FIFO_KHR"
-                << std::endl;
-#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   else
   {
-#ifdef DEBUG_PRESENTATION_MODE
-      std::cerr << pWindow->label() << " VK_PRESENT_MODE_ Unknown" << std::endl;
-#endif
       swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
   }
   if (surfCapabilities.maxImageCount > 0 &&
@@ -277,6 +307,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
                                  &pWindow->m_buffers[i].view);
       VK_CHECK(result);
       pWindow->m_buffers[i].image = swapchainImages[i];
+      pWindow->m_buffers[i].extent = swapchain.imageExtent;
   }
 }
 

@@ -54,6 +54,11 @@ static const uint64_t kAcquireTimeout = 1000000000;
 
 static int g_active_vulkan_windows = 0;
 
+static const char* vulkan_window_label(Fl_Window* w)
+{
+    return (w->label() ? w->label() : "(unlabeled window)");
+}
+
 static bool all_vulkan_windows_invisible()
 {
     // The check is now based on our reliable counter.
@@ -309,7 +314,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
         if (m_debugSync)
         {
             fprintf(stderr, "%s Skipping vk_draw_begin: No swapchain\n",
-                    label() ? label() : "(unknown)");
+                    vulkan_window_label(this));
         }
         return false;
     }
@@ -335,7 +340,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     {
         if (m_debugSync) {
             fprintf(stderr, "%s Waiting for frame %u fence\n",
-                    label() ? label() : "(unknown)",
+                    vulkan_window_label(this),
                     m_currentFrameIndex);
         }
         result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
@@ -357,7 +362,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
 
     if (m_debugSync) {
         fprintf(stderr, "%s Resetting fence for frame %u\n",
-                label() ? label() : "(unknown)",
+                vulkan_window_label(this),
                 m_currentFrameIndex);
     }
 
@@ -365,7 +370,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     if (m_debugSync)
     {
         fprintf(stderr, "%s Acquiring image for frame %u\n",
-                label() ? label() : "(unknown)",
+                vulkan_window_label(this),
                 m_currentFrameIndex);
     }
     result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
@@ -376,13 +381,14 @@ bool Fl_Vk_Window::vk_draw_begin() {
         if (m_debugSync)
         {
             fprintf(stderr, "%s vkAcquireNextImageKHR timed out\n",
-                    label() ? label() : "(unknown)");
+                    vulkan_window_label(this));
         }
         return false;
     }
     else if (result == VK_ERROR_SURFACE_LOST_KHR)
     {
-        fprintf(stderr, "Surface lost, triggering recreation\n");
+        fprintf(stderr, "%s Surface lost, triggering recreation\n",
+                vulkan_window_label(this));
         m_swapchain_needs_recreation = true;
         return false; // Early return to trigger recreate_swapchain
     }
@@ -396,7 +402,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
         {
             if (m_debugSync) {
                 fprintf(stderr, "%s Skipping vk_draw_begin: Swapchain recreation failed\n",
-                    label() ? label() : "(unknown)");
+                        vulkan_window_label(this));
             }
             return false;
         }
@@ -416,9 +422,11 @@ bool Fl_Vk_Window::vk_draw_begin() {
     }
 
     if (m_debugSync) {
-        fprintf(stderr, "%s Acquired image index %u for frame %u\n",
-                label() ? label() : "(unknown)",
-                m_current_buffer, m_currentFrameIndex);
+        fprintf(stderr, "%s Acquired image index %u for frame %u %u x %u\n",
+                vulkan_window_label(this),
+                m_current_buffer, m_currentFrameIndex,
+                m_buffers[m_current_buffer].extent.width,
+                m_buffers[m_current_buffer].extent.height);
     }
 
     // Reset and begin command buffer
@@ -513,7 +521,7 @@ void Fl_Vk_Window::vk_draw_end()
     {
         if (m_debugSync) {
             fprintf(stderr, "%s Skipping vk_draw_end: Invalid state\n",
-                    label() ? label() : "(unknown)");
+                    vulkan_window_label(this));
         }
         return;
     }
@@ -568,7 +576,7 @@ void Fl_Vk_Window::swap_buffers() {
         frame.commandBuffer == VK_NULL_HANDLE) {
         if (m_debugSync) {
             fprintf(stderr, "%s Skipping swap_buffers: Invalid state\n",
-                    label() ? label() : "(unknown)");
+                    vulkan_window_label(this));
         }
         return;
     }
@@ -596,12 +604,6 @@ void Fl_Vk_Window::swap_buffers() {
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = &buffer.semaphore;
 
-    if (m_debugSync) {
-        fprintf(stderr, "%s Submitting frame %u for image index %u\n",
-                label() ? label() : "(unknown)",
-                m_currentFrameIndex, m_current_buffer);
-    }
-   
     // Reset the fence before submit.
     result = vkResetFences(device(), 1, &frame.fence);
     if (result != VK_SUCCESS)
@@ -612,6 +614,22 @@ void Fl_Vk_Window::swap_buffers() {
     
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
+
+        if (m_debugSync) {
+            fprintf(stderr, "%s Submitting frame %u for image index %u pixels_per_unit()=%f\n",
+                    vulkan_window_label(this),
+                    m_currentFrameIndex, m_current_buffer,
+                    pixels_per_unit());
+        }
+        
+        if (m_swapchain_needs_recreation)
+        {
+            if (m_debugSync) {
+                fprintf(stderr, "%s Skipping swap_buffers: Invalid state for buffer %u\n",
+                        vulkan_window_label(this), m_current_buffer);
+            }
+            return;
+        }
     
         result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
         if (result != VK_SUCCESS) {
@@ -634,9 +652,11 @@ void Fl_Vk_Window::swap_buffers() {
     present_info.pImageIndices = &m_current_buffer;
 
     if (m_debugSync) {
-        fprintf(stderr, "%s Presenting image index %u for frame %u\n",
-                label() ? label() : "(unknown)",
-                m_current_buffer, m_currentFrameIndex);
+        fprintf(stderr, "%s Presenting image index %u for frame %u %u x %u\n",
+                vulkan_window_label(this),
+                m_current_buffer, m_currentFrameIndex,
+                m_buffers[m_current_buffer].extent.width,
+                m_buffers[m_current_buffer].extent.height);
     }
         
     {
@@ -659,7 +679,7 @@ void Fl_Vk_Window::swap_buffers() {
 
     if (m_debugSync) {
         fprintf(stderr, "%s Presented image index %u for frame %u\n",
-                label() ? label() : "(unknown)",
+                vulkan_window_label(this),
                 m_current_buffer, m_currentFrameIndex);
     }
     
@@ -712,7 +732,7 @@ void Fl_Vk_Window::flush() {
 
     if (m_debugSync) {
         fprintf(stderr, "%s flush for frame %u\n",
-                label() ? label() : "(unknown)", m_currentFrameIndex);
+                vulkan_window_label(this), m_currentFrameIndex);
     }
     
   if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
@@ -722,7 +742,8 @@ void Fl_Vk_Window::flush() {
   if (m_swapchain == VK_NULL_HANDLE) {
       init_vulkan();
       if (m_swapchain == VK_NULL_HANDLE) {
-          fprintf(stderr, "Vulkan initialization failed\n");
+          fprintf(stderr, "%s Vulkan initialization failed\n",
+                  vulkan_window_label(this));
           return;
       }
   }
@@ -732,7 +753,7 @@ void Fl_Vk_Window::flush() {
       if (m_debugSync) {
           fprintf(stderr, "%s pVkWindowDriver->flush_begin failed "
                   "for frame %u\n",
-                  label() ? label() : "(unknown)", m_currentFrameIndex);
+                  vulkan_window_label(this), m_currentFrameIndex);
       }
       return;
   }
@@ -742,7 +763,7 @@ void Fl_Vk_Window::flush() {
       if (m_debugSync) {
           fprintf(stderr, "%s vk_draw_begin failed "
                   "for frame %u\n",
-                  label() ? label() : "(unknown)", m_currentFrameIndex);
+                  vulkan_window_label(this), m_currentFrameIndex);
       }
       return;
   }
