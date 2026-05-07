@@ -201,7 +201,6 @@ void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     // because prepare_buffers() follows right after and creates properly-aligned
     // images before any present calls can happen.
     if (!pWindow->m_buffers.empty() && new_scale != m_current_wld_scale) {
-        fprintf(stderr, "Buffers not empty.  Saving scale %d for future reinit_swapchain\n", new_scale);
         m_current_wld_scale = new_scale;          // remember for alignment in prepare_buffers()
         pWindow->reinit_swapchain();
         return;  // defer wl_surface_set_buffer_scale() to the next prepare()
@@ -211,8 +210,6 @@ void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     //  • First-time setup (m_current_wld_scale == 0): no swapchain exists yet.
     //  • Scale unchanged: nothing to do alignment-wise.
     //  • Called from within prepare(): old images already destroyed.
-    fprintf(stderr, "Buffers empty. Calling wl_surface_set_buffer_scale %d\n",
-            new_scale);
     m_current_wld_scale = new_scale;
     wl_surface_set_buffer_scale(xid->wl_surface, new_scale);
 }

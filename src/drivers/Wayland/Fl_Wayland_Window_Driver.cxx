@@ -2150,11 +2150,9 @@ int Fl_Wayland_Window_Driver::wld_scale() {
   if (!xid || wl_list_empty(&xid->outputs)) {
     int scale = 1;
     Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
-    if (!scr_driver)
-        return scale;
-    Fl_Wayland_Screen_Driver::output *output = NULL;
+    Fl_Wayland_Screen_Driver::output *output;
     wl_list_for_each(output, &(scr_driver->outputs), link) {
-        scale = fl_max(scale, output->wld_scale);
+      scale = fl_max(scale, output->wld_scale);
     }
     return scale;
   }
