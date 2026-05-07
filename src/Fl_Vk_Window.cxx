@@ -134,6 +134,14 @@ void Fl_Vk_Window::destroy_common_resources() {
 void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
 
+    if (m_debugSync)
+    {
+        fprintf(stderr, "%s ------------------------------------------------\n",
+                vulkan_window_label(this));
+        fprintf(stderr, "%s recreate_swapchain\n",
+                vulkan_window_label(this));
+    }
+    
     // Wait for all operations to complete on the device, not queue.
     wait_device();
 
@@ -425,7 +433,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     }
 
     if (m_debugSync) {
-        fprintf(stderr, "%s Acquired image index %u for frame %u %u x %u\n",
+        fprintf(stderr, "%s Acquired image index %u for frame %u %ux%u\n",
                 vulkan_window_label(this),
                 m_current_buffer, m_currentFrameIndex,
                 m_buffers[m_current_buffer].extent.width,
@@ -615,24 +623,15 @@ void Fl_Vk_Window::swap_buffers() {
         return;
     }
     
+    if (m_debugSync) {
+        fprintf(stderr, "%s Submitting frame %u for image index %u pixels_per_unit()=%f\n",
+                vulkan_window_label(this),
+                m_currentFrameIndex, m_current_buffer,
+                pixels_per_unit());
+    }
+        
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
-
-        if (m_debugSync) {
-            fprintf(stderr, "%s Submitting frame %u for image index %u pixels_per_unit()=%f\n",
-                    vulkan_window_label(this),
-                    m_currentFrameIndex, m_current_buffer,
-                    pixels_per_unit());
-        }
-        
-        if (m_swapchain_needs_recreation)
-        {
-            if (m_debugSync) {
-                fprintf(stderr, "%s Skipping swap_buffers: Invalid state for buffer %u\n",
-                        vulkan_window_label(this), m_current_buffer);
-            }
-            return;
-        }
     
         result = vkQueueSubmit(queue(), 1, &submit_info, frame.fence);
         if (result != VK_SUCCESS) {
@@ -654,14 +653,36 @@ void Fl_Vk_Window::swap_buffers() {
     present_info.pSwapchains = &m_swapchain;
     present_info.pImageIndices = &m_current_buffer;
 
+    const uint32_t align = static_cast<uint32_t>(
+        pVkWindowDriver->get_surface_buffer_scale());
+    if (align > 1)
+    {
+        // Round down to the nearest multiple of align.
+        uint32_t W = m_buffers[m_current_buffer].extent.width;
+        uint32_t H = m_buffers[m_current_buffer].extent.height;
+        uint32_t width  = ( W / align) * align;
+        uint32_t height = ( H / align) * align;
+        if (width != W || height != H)
+        {
+            fprintf(stderr, "%s : ***************ERROR*********** Would present wrong image size, index %u for frame %u %ux%u %f\n",
+                    vulkan_window_label(this),
+                    m_current_buffer, m_currentFrameIndex,
+                    W, H, pixels_per_unit());
+            reinit_swapchain();
+            return;
+        }
+    }
+        
+
     if (m_debugSync) {
-        fprintf(stderr, "%s Presenting image index %u for frame %u %u x %u\n",
+        fprintf(stderr, "%s Presenting image index %u for frame %u %ux%u pixels_per_unit()=%f\n",
                 vulkan_window_label(this),
                 m_current_buffer, m_currentFrameIndex,
                 m_buffers[m_current_buffer].extent.width,
-                m_buffers[m_current_buffer].extent.height);
+                m_buffers[m_current_buffer].extent.height,
+                pixels_per_unit());
     }
-        
+    
     {
         std::lock_guard<std::mutex> lock(queue_mutex());
     
@@ -762,14 +783,7 @@ void Fl_Vk_Window::flush() {
   }
   
   if (!vk_draw_begin())
-  {
-      if (m_debugSync) {
-          fprintf(stderr, "%s vk_draw_begin failed "
-                  "for frame %u\n",
-                  vulkan_window_label(this), m_currentFrameIndex);
-      }
       return;
-  }
   
   draw();  // User defined virtual draw function
   vk_draw_end();
@@ -782,9 +796,10 @@ void Fl_Vk_Window::flush() {
 }
 
 void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
-  printf("Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n", X, Y, W, H);
-  printf("orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
-         x(), y(), w(), h(), pixel_w(), pixel_h());
+  // printf("%s Fl_Vk_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n",
+  //        vulkan_window_label(this), X, Y, W, H);
+  // printf("%s orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
+  //        vulkan_window_label(this), x(), y(), w(), h(), pixel_w(), pixel_h());
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() ||
                      is_a_rescale() ||
                      m_pixels_per_unit <= 0.F ||

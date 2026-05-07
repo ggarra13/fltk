@@ -201,9 +201,6 @@ void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     if (!pWindow->m_buffers.empty() && new_scale != m_current_wld_scale) {
         m_current_wld_scale = new_scale;          // remember for alignment in prepare_buffers()
         pWindow->reinit_swapchain();
-        fprintf(stderr, "%s Saved scale to %d for next swapchain recreation.\n",
-                (pWindow->label() ? pWindow->label() : "(unlabeled window)"),
-                new_scale);
         return;  // defer wl_surface_set_buffer_scale() to the next prepare()
     }
 
@@ -212,10 +209,6 @@ void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     //  • Scale unchanged: nothing to do alignment-wise.
     //  • Called from within prepare(): old images already destroyed.
     m_current_wld_scale = new_scale;
-    fprintf(stderr, "%s wl_surface_set_buffer_scale to %d\n",
-            (pWindow->label() ? pWindow->label() : "(unlabeled window)"),
-            new_scale);
-    pWindow->reinit_swapchain();
     wl_surface_set_buffer_scale(xid->wl_surface, new_scale);
 }
 

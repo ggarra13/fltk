@@ -168,7 +168,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       pWindow->m_swapchain = oldSwapchain;
       return;
   }
-
+  
   // Store the authorative extent for this window
   pWindow->m_swapchainExtent = swapchainExtent;
 
