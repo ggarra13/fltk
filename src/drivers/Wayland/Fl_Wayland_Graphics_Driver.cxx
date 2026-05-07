@@ -178,6 +178,18 @@ static void copy_region(struct wld_window *window, cairo_region_t *r) {
 void Fl_Wayland_Graphics_Driver::buffer_commit(struct wld_window *window, cairo_region_t *r)
 {
   if (!window->buffer->wl_buffer) create_shm_buffer(window->buffer);
+
+  int cur_scale = Fl_Wayland_Window_Driver::driver(window->fl_win)->wld_scale();
+  if (window->buffer->committed_scale != cur_scale) {
+    // surface_enter has updated wld_scale() but the buffer was sized for the
+    // old scale. Committing now would violate the Wayland protocol (buffer
+    // dimensions must be multiples of buffer_scale). Let delayed_rescale
+    // rebuild the buffer at the correct size first.
+    window->buffer->draw_buffer_needs_commit = true;
+    window->fl_win->redraw();
+    return;
+  }
+  
   cairo_surface_t *surf = cairo_get_target(window->buffer->draw_buffer.cairo_);
   cairo_surface_flush(surf);
   if (r) copy_region(window, r);

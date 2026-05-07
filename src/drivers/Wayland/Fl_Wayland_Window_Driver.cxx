@@ -371,6 +371,7 @@ void Fl_Wayland_Window_Driver::make_current() {
   if (!window->buffer) {
     window->buffer = Fl_Wayland_Graphics_Driver::create_wld_buffer(
            int(pWindow->w() * f) * wld_s, int(pWindow->h() * f) * wld_s, false);
+    window->buffer->committed_scale = wld_s;
     ((Fl_Cairo_Graphics_Driver*)fl_graphics_driver)->needs_commit_tag(
                                             &window->buffer->draw_buffer_needs_commit);
   }
