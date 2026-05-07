@@ -43,6 +43,6 @@ cmake .. \
 
 ninja -v
 
-#bin/test/shape-shared
-#bin/test/cube-shared
-bin/test/fullscreen
+#bin/test/shape
+bin/test/cube
+#bin/test/fullscreen

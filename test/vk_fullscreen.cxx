@@ -527,16 +527,16 @@ void vk_shape_window::draw() {
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
     VkViewport viewport = {};
-    viewport.width = static_cast<float>(w());
-    viewport.height = static_cast<float>(h());
+    viewport.width = static_cast<float>(pixel_w());
+    viewport.height = static_cast<float>(pixel_h());
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
     vkCmdSetViewport(cmd, 0, 1, &viewport);
 
     // Set scissor
     VkRect2D scissor = {};
-    scissor.extent.width = w();
-    scissor.extent.height = h();
+    scissor.extent.width = pixel_w();
+    scissor.extent.height = pixel_h();
     vkCmdSetScissor(cmd, 0, 1, &scissor);
     
     VkDeviceSize offsets[1] = {0};
