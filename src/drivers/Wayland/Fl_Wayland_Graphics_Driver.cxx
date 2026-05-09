@@ -128,6 +128,8 @@ static void surface_frame_done(void *data, struct wl_callback *cb, uint32_t time
   }
   else
   {
+      // Surface is not a Cairo suface.  Just create a small update.
+      // Used in Vulkan refreshes.
       wl_surface_damage_buffer(window->wl_surface, 0, 0, 1, 1);
       wl_surface_commit(window->wl_surface);
   }
@@ -180,11 +182,14 @@ void Fl_Wayland_Graphics_Driver::buffer_commit(struct wld_window *window, cairo_
   if (!window->buffer->wl_buffer) create_shm_buffer(window->buffer);
 
   int cur_scale = Fl_Wayland_Window_Driver::driver(window->fl_win)->wld_scale();
+
+  // @ggarra13: ClaudeAI bug fix for race condition. FLTK bug #1428
+  //
+  // surface_enter has updated wld_scale() but the buffer was sized for the
+  // old scale. Committing now would violate the Wayland protocol (buffer
+  // dimensions must be multiples of buffer_scale). Let delayed_rescale
+  // rebuild the buffer at the correct size first.
   if (window->buffer->committed_scale != cur_scale) {
-    // surface_enter has updated wld_scale() but the buffer was sized for the
-    // old scale. Committing now would violate the Wayland protocol (buffer
-    // dimensions must be multiples of buffer_scale). Let delayed_rescale
-    // rebuild the buffer at the correct size first.
     window->buffer->draw_buffer_needs_commit = true;
     window->fl_win->redraw();
     return;
