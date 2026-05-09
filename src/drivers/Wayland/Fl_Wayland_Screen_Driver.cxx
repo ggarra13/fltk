@@ -264,7 +264,6 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   }
   if (!win) return;
   //fprintf(stderr, "pointer_enter window=%p\n", Fl_Wayland_Window_Driver::surface_to_window(surface));
-  // Caution: with an Fl_Tooltip this call can hide the window being entered (#1317)
   seat->pointer_focus = surface;
   // use custom cursor if present
   struct wl_cursor *cursor =
@@ -276,6 +275,7 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
   set_event_xy(win);
   need_leave = NULL;
   win = Fl_Wayland_Window_Driver::surface_to_window(surface);
+  // Caution: with an Fl_Tooltip this call can hide the window being entered (#1317)
   if (!win->parent()) Fl::handle(FL_ENTER, win);
 }
 
@@ -1781,7 +1781,6 @@ int Fl_Wayland_Screen_Driver::x() {
   wl_list_for_each(output, &outputs, link) {
     break;
   }
-  assert(workarea_xywh[0] >= 0);
   return workarea_xywh[0] / (output->gui_scale * output->wld_scale);
 }
 
@@ -1792,7 +1791,6 @@ int Fl_Wayland_Screen_Driver::y() {
   wl_list_for_each(output, &outputs, link) {
     break;
   }
-  assert(workarea_xywh[1] >= 0);
   return workarea_xywh[1] / (output->gui_scale * output->wld_scale);
 }
 
@@ -1803,7 +1801,6 @@ int Fl_Wayland_Screen_Driver::w() {
   wl_list_for_each(output, &outputs, link) {
     break;
   }
-  assert(workarea_xywh[2] > 0);
   return workarea_xywh[2] / (output->gui_scale * output->wld_scale);
 }
 
@@ -1814,7 +1811,6 @@ int Fl_Wayland_Screen_Driver::h() {
   wl_list_for_each(output, &outputs, link) {
     break;
   }
-  assert(workarea_xywh[3] > 0);
   return workarea_xywh[3] / (output->gui_scale * output->wld_scale);
 }
 
