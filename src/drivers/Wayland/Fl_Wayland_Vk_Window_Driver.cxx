@@ -200,7 +200,7 @@ void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
     // and we proceed to update the surface scale immediately — which is correct
     // because prepare_buffers() follows right after and creates properly-aligned
     // images before any present calls can happen.
-    if (!pWindow->m_buffers.empty() && new_scale != m_current_wld_scale) {
+    if (!pWindow->empty_buffers() && new_scale != m_current_wld_scale) {
         m_current_wld_scale = new_scale;          // remember for alignment in prepare_buffers()
         pWindow->reinit_swapchain();
         return;  // defer wl_surface_set_buffer_scale() to the next prepare()

@@ -276,6 +276,9 @@ public:
   //! Recreate swapchain on next draw
   inline void reinit_swapchain() { m_swapchain_needs_recreation = true; }
 
+  //! Returns if swapchain buffers are empty.
+  inline bool empty_buffers() const { return m_buffers.empty(); }
+  
   // Access the current back buffer (the one you're rendering to)
   VkImage get_back_buffer_image() const {
       return m_buffers[m_current_buffer].image;
@@ -354,12 +357,11 @@ private:
           }
   };
 
-public:
-  std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   
 protected:
   float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
+  std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
   
   std::vector<FrameData>  m_frames;

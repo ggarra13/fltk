@@ -162,7 +162,7 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
 
   // Skip recreation if extent matches current and old swapchain is valid
   if (oldSwapchain != VK_NULL_HANDLE && 
-      !pWindow->m_buffers.empty() &&
+      !pWindow->empty_buffers() &&
       swapchainExtent.width == pWindow->m_swapchainExtent.width &&
       swapchainExtent.height == pWindow->m_swapchainExtent.height) {
       pWindow->m_swapchain = oldSwapchain;
