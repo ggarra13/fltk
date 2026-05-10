@@ -42,6 +42,7 @@ public:
     struct wl_buffer *wl_buffer;
     void *data;
     struct wl_shm_pool *shm_pool;
+    int committed_scale; // the wld_scale active when this buffer was sized
     bool draw_buffer_needs_commit;
     bool in_use; // true while being committed
     bool released; // true after buffer_release() was called
@@ -58,7 +59,7 @@ public:
   void copy_offscreen(int x, int y, int w, int h, Fl_Offscreen osrc,
                       int srcx, int srcy) FL_OVERRIDE;
   void cache_size(Fl_Image *img, int &width, int &height) FL_OVERRIDE;
-  static struct wld_buffer *create_wld_buffer(int width, int height, bool with_shm = true);
+  static struct wld_buffer *create_wld_buffer(int width, int height, bool with_shm, int wld_s);
   static void create_shm_buffer(wld_buffer *buffer);
   static void buffer_release(struct wld_window *window);
   static void buffer_commit(struct wld_window *window, cairo_region_t *r = NULL);
@@ -67,7 +68,7 @@ public:
   // used by class Fl_Wayland_Gl_Window_Driver
   static FL_EXPORT struct draw_buffer *offscreen_buffer(Fl_Offscreen);
   static const cairo_user_data_key_t key;
-  static Fl_Image_Surface *custom_offscreen(int w, int h, struct wld_buffer **buffer);
+  static Fl_Image_Surface *custom_offscreen(int w, int h, struct wld_buffer **buffer, int scale);
 };
 
 #endif // FL_WAYLAND_GRAPHICS_DRIVER_H

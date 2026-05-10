@@ -370,8 +370,7 @@ void Fl_Wayland_Window_Driver::make_current() {
   int wld_s = wld_scale();
   if (!window->buffer) {
     window->buffer = Fl_Wayland_Graphics_Driver::create_wld_buffer(
-           int(pWindow->w() * f) * wld_s, int(pWindow->h() * f) * wld_s, false);
-    window->buffer->committed_scale = wld_s;
+           int(pWindow->w() * f) * wld_s, int(pWindow->h() * f) * wld_s, false, wld_s);
     ((Fl_Cairo_Graphics_Driver*)fl_graphics_driver)->needs_commit_tag(
                                             &window->buffer->draw_buffer_needs_commit);
   }
@@ -1882,7 +1881,7 @@ int Fl_Wayland_Window_Driver::set_cursor_4args(const Fl_RGB_Image *rgb, int hotx
   //create a Wayland buffer and have it used as an image of the new cursor
   struct Fl_Wayland_Graphics_Driver::wld_buffer *offscreen;
   Fl_Image_Surface *img_surf = Fl_Wayland_Graphics_Driver::custom_offscreen(
-      new_image->image.width, new_image->image.height, &offscreen);
+      new_image->image.width, new_image->image.height, &offscreen, scale);
   new_image->buffer = offscreen->wl_buffer;
   wl_buffer_set_user_data(new_image->buffer, offscreen);
   new_cursor->image_count = 1;
