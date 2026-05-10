@@ -46,7 +46,6 @@ public:
     bool draw_buffer_needs_commit;
     bool in_use; // true while being committed
     bool released; // true after buffer_release() was called
-    int committed_scale; // the wld_scale active when this buffer was sized
   };
   struct wld_shm_pool_data { // one record attached to each wl_shm_pool object
     char *pool_memory; // start of mmap'ed memory encapsulated by the wl_shm_pool
