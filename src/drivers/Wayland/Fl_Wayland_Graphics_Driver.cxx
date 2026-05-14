@@ -187,7 +187,11 @@ void Fl_Wayland_Graphics_Driver::buffer_commit(struct wld_window *window, cairo_
     // old scale. Committing now would violate the Wayland protocol (buffer
     // dimensions must be multiples of buffer_scale). Let delayed_rescale
     // rebuild the buffer at the correct size first. (#1428)
-    buffer_release(window);
+#if 0
+    buffer_release(window);  // MANOLO
+#else
+    window->buffer->draw_buffer_needs_commit = true;  // ClaudeAI
+#endif
     window->fl_win->redraw();
     return;
   }
