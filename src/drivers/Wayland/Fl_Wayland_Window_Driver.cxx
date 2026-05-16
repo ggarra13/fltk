@@ -660,14 +660,14 @@ int Fl_Wayland_Window_Driver::scroll(int src_x, int src_y, int src_w, int src_h,
 }
 
 
-static void delayed_rescale(Fl_Window *win) {
+/*static void delayed_rescale(Fl_Window *win) {
   Fl_Window_Driver::driver(win)->is_a_rescale(true);
   win->size(win->w(), win->h());
   Fl_Window_Driver::driver(win)->is_a_rescale(false);
-}
+}*/
 
 
-void change_scale(Fl_Wayland_Screen_Driver::output *output, struct wld_window *window,
+static void change_scale(Fl_Wayland_Screen_Driver::output *output, struct wld_window *window,
                   float pre_scale) {
   Fl_Wayland_Window_Driver *win_driver = Fl_Wayland_Window_Driver::driver(window->fl_win);
   if (!window->fl_win->parent()) {
@@ -684,14 +684,18 @@ void change_scale(Fl_Wayland_Screen_Driver::output *output, struct wld_window *w
     }
   }
   float post_scale = Fl::screen_scale(win_driver->screen_num()) * output->wld_scale;
-//printf("pre_scale=%.1f post_scale=%.1f\n", pre_scale, post_scale);
+printf("pre_scale=%.1f post_scale=%.1f\n", pre_scale, post_scale);
   if (post_scale != pre_scale) {
     if (window->kind == Fl_Wayland_Window_Driver::POPUP) {
       Fl_Wayland_Graphics_Driver::buffer_release(window);
       window->fl_win->redraw();
     } else {
       // delaying the rescaling is necessary to set first the window's size_range according to the new screen
-      Fl::add_timeout(0, (Fl_Timeout_Handler)delayed_rescale, window->fl_win);
+//      Fl::add_timeout(0, (Fl_Timeout_Handler)delayed_rescale, window->fl_win);
+      win_driver->size_range();
+      win_driver->is_a_rescale(true);
+      window->fl_win->size(window->fl_win->w(), window->fl_win->h());
+      win_driver->is_a_rescale(false);
     }
   }
 }

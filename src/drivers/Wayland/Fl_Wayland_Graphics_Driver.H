@@ -42,7 +42,7 @@ public:
     struct wl_buffer *wl_buffer;
     void *data;
     struct wl_shm_pool *shm_pool;
-    int allowed_wld_scale; // the wld_scale active when this buffer was sized
+    //int allowed_wld_scale; // the wld_scale active when this buffer was sized
     bool draw_buffer_needs_commit;
     bool in_use; // true while being committed
     bool released; // true after buffer_release() was called
