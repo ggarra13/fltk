@@ -693,7 +693,7 @@ static void change_scale(Fl_Wayland_Screen_Driver::output *output, struct wld_wi
     }
   }
   float post_scale = Fl::screen_scale(win_driver->screen_num()) * output->wld_scale;
-printf("pre_scale=%.1f post_scale=%.1f\n", pre_scale, post_scale);
+//printf("pre_scale=%.1f post_scale=%.1f\n", pre_scale, post_scale);
   if (post_scale != pre_scale) {
     if (window->kind == Fl_Wayland_Window_Driver::POPUP) {
       Fl_Wayland_Graphics_Driver::buffer_release(window);
