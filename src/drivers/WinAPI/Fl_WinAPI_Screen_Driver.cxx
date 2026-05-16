@@ -111,6 +111,7 @@ void Fl_WinAPI_Screen_Driver::init()
   // we do a run-time check for the required functions...
   HMODULE hMod = GetModuleHandle("USER32.DLL");
 
+  if (num_screens >= 0) return;
   if (hMod) {
     // check that EnumDisplayMonitors is available
     fl_edm_func fl_edm = (fl_edm_func)GetProcAddress(hMod, "EnumDisplayMonitors");
@@ -125,6 +126,9 @@ void Fl_WinAPI_Screen_Driver::init()
         //      NOTE: num_screens is incremented in screen_cb so we must first reset it here...
         num_screens = 0;
         fl_edm(0, 0, screen_cb, (LPARAM)this);
+        /*fprintf(stderr,"Screen coordinates as seen by Windows: num_screens=%d\n",num_screens);
+        for(int i=0; i<num_screens;i++)
+          fprintf(stderr,"screen_cb: n=%d left=%d right=%d top=%d bottom=%d\n",i,screens[i].left, screens[i].right,screens[i].top, screens[i].bottom);*/
         return;
       }
     }

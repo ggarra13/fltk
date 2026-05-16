@@ -2233,8 +2233,10 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
   int nscreen = 0;
   if (w->parent()) {
     nscreen = Fl_Window_Driver::driver(w->top_window())->screen_num();
-  } else if (Fl_Window_Driver::driver(w)->force_position() && Fl_WinAPI_Window_Driver::driver(w)->screen_num_ >= 0) {
-    nscreen = Fl_Window_Driver::driver(w)->screen_num();
+  } else if (Fl_Window_Driver::driver(w)->force_position()) {
+    if (Fl_WinAPI_Window_Driver::driver(w)->screen_num_ >= 0)
+      nscreen = Fl_WinAPI_Window_Driver::driver(w)->screen_num_;
+    else nscreen = Fl::screen_num(w->x(), w->y());
   } else {
     Fl_Window *hint = Fl::first_window();
     if (hint) {
