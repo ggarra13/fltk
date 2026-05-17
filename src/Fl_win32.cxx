@@ -2001,7 +2001,7 @@ int Fl_WinAPI_Window_Driver::fake_X_wm(int &X, int &Y, int &bt, int &bx, int &by
   // Find screen that contains most of the window
   // FIXME: this ought to be the "work area" instead of the entire screen !
   int scr_x = 0, scr_y = 0, scr_w = 0, scr_h = 0;
-  int ns = Fl::screen_num(int(round(X / s)), int(round(Y / s)), int(W / s), int(H / s));
+  int ns = screen_num();
   ((Fl_WinAPI_Screen_Driver*)Fl::screen_driver())->screen_xywh_unscaled(scr_x, scr_y, scr_w, scr_h, ns);
   // Make border's lower right corner visible
   if (scr_x + scr_w < X + W)
@@ -2233,8 +2233,10 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
   int nscreen = 0;
   if (w->parent()) {
     nscreen = Fl_Window_Driver::driver(w->top_window())->screen_num();
-  } else if (Fl_Window_Driver::driver(w)->force_position() && Fl_WinAPI_Window_Driver::driver(w)->screen_num_ >= 0) {
-    nscreen = Fl_Window_Driver::driver(w)->screen_num();
+  } else if (Fl_Window_Driver::driver(w)->force_position()) {
+    if (Fl_WinAPI_Window_Driver::driver(w)->screen_num_ >= 0)
+      nscreen = Fl_WinAPI_Window_Driver::driver(w)->screen_num_;
+    else nscreen = Fl::screen_num(w->x(), w->y());
   } else {
     Fl_Window *hint = Fl::first_window();
     if (hint) {
