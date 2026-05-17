@@ -114,7 +114,7 @@ struct Fl_Wayland_Graphics_Driver::wld_buffer *
   cairo_init(&buffer->draw_buffer, width, height, stride, cairo_format);
   buffer->draw_buffer_needs_commit = true;
   if (with_shm) create_shm_buffer(buffer);
-  buffer->allowed_wld_scale = wld_s;
+  //buffer->allowed_wld_scale = wld_s;
   return buffer;
 }
 
@@ -175,19 +175,16 @@ void Fl_Wayland_Graphics_Driver::buffer_commit(struct wld_window *window, cairo_
 {
   if (!window->buffer->wl_buffer) create_shm_buffer(window->buffer);
 
-  if (window->buffer->allowed_wld_scale != Fl_Wayland_Window_Driver::driver(window->fl_win)->wld_scale()) {
+  /*if (window->buffer->allowed_wld_scale != Fl_Wayland_Window_Driver::driver(window->fl_win)->wld_scale()) {
     // surface_enter has updated wld_scale() but the buffer was sized for the
     // old scale. Committing now would violate the Wayland protocol (buffer
     // dimensions must be multiples of buffer_scale). Let delayed_rescale
     // rebuild the buffer at the correct size first. (#1428)
-#if 0
-    buffer_release(window);  // MANOLO
-#else
-    window->buffer->draw_buffer_needs_commit = true;  // ClaudeAI
-#endif
+//buffer_release(window);
+window->buffer->draw_buffer_needs_commit = true;  // <-- ClaudeAI alternative
     window->fl_win->redraw();
     return;
-  }
+  }*/
 
   cairo_surface_t *surf = cairo_get_target(window->buffer->draw_buffer.cairo_);
   cairo_surface_flush(surf);
