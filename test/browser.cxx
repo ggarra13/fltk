@@ -98,7 +98,7 @@ WhenItem when_items[] = {
   { "FL_WHEN_ENTER_KEY",         FL_WHEN_ENTER_KEY },
   { "FL_WHEN_ENTER_KEY_ALWAYS",  FL_WHEN_ENTER_KEY_ALWAYS },
   { "FL_WHEN_ENTER_KEY_CHANGED", FL_WHEN_ENTER_KEY_CHANGED },
-  { "FL_WHEN_ENTER_KEY + FL_WHEN_RELEASE_ALWAYS", Fl_When(int(FL_WHEN_ENTER_KEY_CHANGED)+int(FL_WHEN_RELEASE_ALWAYS)) }
+  { "FL_WHEN_ENTER_KEY + FL_WHEN_RELEASE_ALWAYS", Fl_When(int(FL_WHEN_ENTER_KEY)+int(FL_WHEN_RELEASE_ALWAYS)) }
   // TODO: Perhaps other FL_WHEN_* combos are relevant
 };
 
@@ -144,12 +144,18 @@ void sort_cb(Fl_Widget *, void *) {
 }
 
 void btype_cb(Fl_Widget *, void *) {
-  for ( int t=1; t<=browser->size(); t++ ) browser->select(t,0);
-  browser->select(1,0);         // leave focus box on first line
+  // Switching browser type is not a typical use, so we want to make sure that
+  // everything is deselected, resetting internal variables.
+  browser->deselect(1);
        if ( strcmp(btype->text(),"Normal")==0) browser->type(FL_NORMAL_BROWSER);
   else if ( strcmp(btype->text(),"Select")==0) browser->type(FL_SELECT_BROWSER);
   else if ( strcmp(btype->text(),"Hold"  )==0) browser->type(FL_HOLD_BROWSER);
   else if ( strcmp(btype->text(),"Multi" )==0) browser->type(FL_MULTI_BROWSER);
+  // Reset the selections again, so all class member variables are matching
+  // the new browser type.
+  browser->deselect(0);
+  // Set the focus rect to the topmost item without selecting it.
+  browser->select(1, 0);
   browser->redraw();
 }
 
