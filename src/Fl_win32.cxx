@@ -1211,6 +1211,7 @@ extern HPALETTE fl_select_palette(void); // in fl_color_win32.cxx
 
 static Fl_Window *resize_bug_fix;
 static bool moving_window = false; // true when dragging a window with the mouse on the titlebar
+static bool sizing_window = false; // true when resizing a window with the mouse
 
 extern void fl_save_pen(void);
 extern void fl_restore_pen(void);
@@ -1237,6 +1238,16 @@ static BOOL CALLBACK child_window_cb(HWND child_xid, LPARAM data) {
   }
   if (child->as_gl_window()) invalidate_gl_win(child);
   return TRUE;
+}
+
+
+static struct win_w_h {
+  Fl_Window *win;
+  int W, H;
+} moved_win_data; // FLTK size of toplevel window at start of the window move operation
+
+static void delayed_size(void *) { // performed after end of win move operation or change of screen
+  moved_win_data.win->size(moved_win_data.W, moved_win_data.H);
 }
 
 
@@ -1278,7 +1289,11 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             sd->update_scaling_capability();
           } else if (ns != old_ns) {
             // jump window with Windows+Shift+L|R-arrow to other screen with other DPI
-            if (ns >= 0) Fl_Window_Driver::driver(window)->screen_num(ns);
+            if (ns >= 0) {
+              //fprintf(stderr,"WM_DPICHANGED ns %d --> %d moving_window=%d\n",old_ns,ns,moving_window);
+              Fl_Window_Driver::driver(window)->screen_num(ns);
+              if (!moving_window && !window->parent()) moved_win_data = {window, window->w(), window->h()};
+            }
             UINT flags = SWP_NOSENDCHANGING | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS;
             SetWindowPos(hWnd, NULL, lParam_rect->left, lParam_rect->top,
                          lParam_rect->right - lParam_rect->left,
@@ -1290,6 +1305,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
               }
               scale = Fl::screen_driver()->scale(ns);
               EnumChildWindows(hWnd, child_window_cb, (LPARAM)&scale);
+              if (!moving_window) Fl::add_timeout(0, (Fl_Timeout_Handler)delayed_size, NULL);
             }
           }
         }
@@ -1748,12 +1764,20 @@ content  key    keyboard layout
         Fl_WinAPI_Window_Driver::driver(window)->set_minmax((LPMINMAXINFO)lParam);
         break;
 
+      case WM_SIZING:
+        //fprintf(stderr,"WM_SIZING\n");
+        sizing_window = true;
+        return TRUE;
+
       case WM_SIZE:
         if (!window->parent()) {
           Fl_Window_Driver::driver(window)->is_maximized(wParam == SIZE_MAXIMIZED);
           if (wParam == SIZE_MINIMIZED || wParam == SIZE_MAXHIDE) {
             Fl::handle(FL_HIDE, window);
           } else {
+            /*fprintf(stderr,"WM_SIZE %dx%d moving_window=%d sizing_window=%d s=%g ns=%d\n",
+                    int(ceil(LOWORD(lParam) / scale)), int(ceil(HIWORD(lParam) / scale)),
+                    moving_window,sizing_window, scale, window->screen_num());*/
             if (!moving_window) {
               Fl::handle(FL_SHOW, window);
               resize_bug_fix = window;
@@ -1768,12 +1792,21 @@ content  key    keyboard layout
         return 0;
 
       case WM_MOVING:
+        //fprintf(stderr,"WM_MOVING\n");
         moving_window = true;
         return 1;
 
       case WM_CAPTURECHANGED:
-        moving_window = false;
+        if (window->parent()) break;
+        //fprintf(stderr,"WM_CAPTURECHANGED moving_window=%d\n",moving_window);
+        if (!moving_window) {
+          moved_win_data = {window, window->w(), window->h()};
+        } else {
+          moving_window = false;
+          Fl::add_timeout(0, (Fl_Timeout_Handler)delayed_size, NULL);
+        }
         resize_bug_fix = 0;
+        sizing_window = false;
         return 0;
 
       case WM_MOVE: {
@@ -2220,10 +2253,7 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
       nscreen = Fl_WinAPI_Window_Driver::driver(w)->screen_num_;
     else nscreen = Fl::screen_num(w->x(), w->y());
   } else {
-    Fl_Window *hint = Fl::first_window();
-    if (hint) {
-      nscreen = Fl_Window_Driver::driver(hint->top_window())->screen_num();
-    } else if (Fl::screen_driver()->screen_count() > 1 ) {
+    if (Fl::screen_driver()->screen_count() > 1 ) {
       // put the new window on same screen as mouse
       int mx, my, X, Y, W, H;
       nscreen = Fl::screen_driver()->get_mouse(mx, my);
