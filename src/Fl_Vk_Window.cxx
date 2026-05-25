@@ -515,9 +515,13 @@ bool Fl_Vk_Window::vk_draw_begin() {
         fprintf(stderr, "vkBeginCommandBuffer failed: %s\n", string_VkResult(result));
         return false;
     }
+
+    // Name the command buffer with the name of the Window too.
+    char buf[256];
+    snprintf(buf, 256,
+             "%s Main Command Buffer", (label() ? label() : "(unknown)"));
     set_object_name(VK_OBJECT_TYPE_COMMAND_BUFFER,
-                    (uint64_t)frame.commandBuffer,
-                    "Main Command Buffer");
+                    (uint64_t)frame.commandBuffer, buf);
 
     // Handle depth/stencil
     bool has_depth = mode() & FL_DEPTH;
