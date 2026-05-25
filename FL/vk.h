@@ -89,4 +89,29 @@
 FL_EXPORT void vk_check_result(VkResult err, const char* file, const int line);
 
 
+extern PFN_vkCmdBeginDebugUtilsLabelEXT fltk_vkCmdBeginDebugUtilsLabelEXT;
+extern PFN_vkCmdEndDebugUtilsLabelEXT fltk_vkCmdEndDebugUtilsLabelEXT;
+extern PFN_vkSetDebugUtilsObjectNameEXT fltk_vkSetDebugUtilsObjectNameEXT;
+extern PFN_vkCreateDebugUtilsMessengerEXT fltk_vkCreateDebugUtilsMessengerEXT;
+extern PFN_vkDestroyDebugUtilsMessengerEXT fltk_vkDestroyDebugUtilsMessengerEXT;
+extern PFN_vkCmdInsertDebugUtilsLabelEXT fltk_vkCmdInsertDebugUtilsLabelEXT;
+
+
+/** 
+ * Name a Vulkan object for debugging.
+ * 
+ * @param object_type   type of object, like:
+ *                              VK_OBJECT_TYPE_COMMAND_BUFFER,
+ *                              VK_OBJECT_TYPE_BUFFER,
+ *                              ...etc...
+ *                              (see vulkan/vulkan_core.h's VkObjectType)
+ *                              
+ * @param object_handle Vulkan Handle cast to uint64_t
+ * @param name          Debugging name.
+ */
+FL_EXPORT void vk_set_object_name(VkDevice,
+                                  VkObjectType object_type,
+                                  uint64_t object_handle,
+                                  const char* name);
+
 #endif // !FL_vk_H

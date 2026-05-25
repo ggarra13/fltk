@@ -125,9 +125,14 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
+  
+  VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
+  
   static int can_do(int, const int *);
   int mode(int, const int *);
   void destroy_common_resources();
+  void load_debug_functions();
+  void setup_debug_messenger();
   
 protected:
   void recreate_swapchain();
@@ -164,6 +169,36 @@ public:
   void resize(int,int,int,int) FL_OVERRIDE;
   int handle(int) FL_OVERRIDE;
 
+  /** 
+   * Name a Vulkan object for debugging.
+   * 
+   * @param object_type   type of object, like:
+   *                              VK_OBJECT_TYPE_COMMAND_BUFFER,
+   *                              VK_OBJECT_TYPE_BUFFER,
+   *                              ...etc...
+   *                              (see vulkan/vulkan_core.h's VkObjectType)
+   *                              
+   * @param object_handle Vulkan Handle cast to uint64_t
+   * @param name          Debugging name.
+   */
+  void set_object_name(VkObjectType object_type, uint64_t object_handle,
+                       const char* name);
+
+  /** 
+   * Begin a debug label in a command buffer with a given color
+   * 
+   * @param cmd          Vulkan Command Buffer
+   * @param label_name   Name for the label. 
+   * @param r            red color
+   * @param g            green color
+   * @param b            blue color
+   * @param a            alpha color
+   */
+  void begin_debug_label(VkCommandBuffer cmd, const char* label_name,
+                         const float r = 1.F, const float g = 0.5F,
+                         const float b = 0.F, const float a = 1.F);
+  void end_debug_label(VkCommandBuffer cmd);
+  
   /**  Returns non-zero if the hardware supports the given Vulkan mode. */
   static int can_do(int m) {return can_do(m,0);}
   /**  Returns non-zero if the hardware supports the given Vulkan mode.
@@ -311,10 +346,6 @@ public:
 
   // Declare a variable to hold the function pointer
   static PFN_vkSetHdrMetadataEXT vkSetHdrMetadataEXT;  // We handle HDR extension if available.
-  static PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelEXT;
-  static PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelEXT;
-  static PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameEXT;
-  static PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
 
   // Window's Vulkan context.
   Fl_Vk_Context ctx;

@@ -74,16 +74,29 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vulkan_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* callbackData,
     void* userData)
 {
-    fprintf(stderr, "Vulkan validation: %s\n", callbackData->pMessage);
-
-    if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-    {
-        abort();
+    // Handle different severity levels
+    const char* severity_str = "";
+    if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        severity_str = "[ERROR]";
+    } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        severity_str = "[WARNING]";
+    } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        severity_str = "[INFO]";
+    } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        severity_str = "[VERBOSE]";
     }
 
-    return VK_FALSE;
+    // Print the validation message
+    fprintf(stderr, "Vulkan validation %s: %s\n", severity_str, callbackData->pMessage);
+    
+    // Only abort on errors - don't abort on warnings
+    if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+        fprintf(stderr, "Aborting on Vulkan validation error!\n");
+        abort();
+    }
+    
+    return VK_FALSE;  // Return VK_TRUE to suppress the message, VK_FALSE to let it through
 }
-
 
 //! Per application variables (statics).
 VkInstance              Fl_Vk_Window::m_instance = VK_NULL_HANDLE;
@@ -91,10 +104,16 @@ VkDevice                Fl_Vk_Window::m_device = VK_NULL_HANDLE;
 VmaAllocator            Fl_Vk_Window::m_allocator = VK_NULL_HANDLE;
 Fl_Vk_Queue*            Fl_Vk_Window::m_queue = nullptr;
 PFN_vkSetHdrMetadataEXT Fl_Vk_Window::vkSetHdrMetadataEXT = nullptr;
-PFN_vkCmdBeginDebugUtilsLabelEXT Fl_Vk_Window::vkCmdBeginDebugUtilsLabelEXT = nullptr;
-PFN_vkCmdEndDebugUtilsLabelEXT Fl_Vk_Window::vkCmdEndDebugUtilsLabelEXT = nullptr;
-PFN_vkSetDebugUtilsObjectNameEXT Fl_Vk_Window::vkSetDebugUtilsObjectNameEXT = nullptr;
-PFN_vkCreateDebugUtilsMessengerEXT Fl_Vk_Window::vkCreateDebugUtilsMessengerEXT = nullptr;
+
+//
+// Debugging extensions.
+//
+PFN_vkCmdBeginDebugUtilsLabelEXT fltk_vkCmdBeginDebugUtilsLabelEXT = nullptr;
+PFN_vkCmdEndDebugUtilsLabelEXT fltk_vkCmdEndDebugUtilsLabelEXT = nullptr;
+PFN_vkSetDebugUtilsObjectNameEXT fltk_vkSetDebugUtilsObjectNameEXT = nullptr;
+PFN_vkCreateDebugUtilsMessengerEXT fltk_vkCreateDebugUtilsMessengerEXT = nullptr;
+PFN_vkDestroyDebugUtilsMessengerEXT fltk_vkDestroyDebugUtilsMessengerEXT = nullptr;
+PFN_vkCmdInsertDebugUtilsLabelEXT fltk_vkCmdInsertDebugUtilsLabelEXT = nullptr;
 
 bool Fl_Vk_Window::is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
                                          const VkHdrMetadataEXT& b)
@@ -129,6 +148,80 @@ void Fl_Vk_Window::destroy_common_resources() {
 
     // Reset depth layout
     m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+
+void Fl_Vk_Window::setup_debug_messenger() {
+
+    if (!fltk_vkCreateDebugUtilsMessengerEXT) {
+        throw std::runtime_error("Debug messenger creation function not loaded!");
+    }
+
+    VkDebugUtilsMessengerCreateInfoEXT create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    create_info.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    create_info.messageType =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    create_info.pfnUserCallback = vulkan_debug_callback;
+    create_info.pUserData = nullptr;
+
+    VkResult result = fltk_vkCreateDebugUtilsMessengerEXT(
+        instance(),
+        &create_info,
+        nullptr,
+        &debug_messenger);
+
+    if (result != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create debug messenger!");
+    }
+}
+
+
+/** 
+ * Insert a debug label into a command buffer.
+ * 
+ * @param cmd Vulkan Command Buffer
+ * @param label_name name for the label
+ */
+void Fl_Vk_Window::begin_debug_label(VkCommandBuffer cmd,
+                                     const char* label_name,
+                                     const float r,
+                                     const float g,
+                                     const float b,
+                                     const float a)
+{
+    if (!fltk_vkCmdBeginDebugUtilsLabelEXT) {
+        return;  // Function not available
+    }
+
+    VkDebugUtilsLabelEXT label_info{};
+    label_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    label_info.pLabelName = label_name;
+    label_info.color[0] = r;
+    label_info.color[1] = g;
+    label_info.color[2] = b;
+    label_info.color[3] = a;
+
+    fltk_vkCmdBeginDebugUtilsLabelEXT(cmd, &label_info);
+}
+
+/** 
+ * End the debug label into a command buffer.
+ * 
+ * @param cmd Vulkan Command Buffer
+ */
+void Fl_Vk_Window::end_debug_label(VkCommandBuffer cmd)
+{
+    if (!fltk_vkCmdEndDebugUtilsLabelEXT) {
+        return;  // Function not available
+    }
+    fltk_vkCmdEndDebugUtilsLabelEXT(cmd);
 }
 
 void Fl_Vk_Window::recreate_swapchain() {
@@ -995,6 +1088,13 @@ void Fl_Vk_Window::shutdown_vulkan() {
                 m_device = VK_NULL_HANDLE;
             }
 
+            if (debug_messenger != VK_NULL_HANDLE &&
+                fltk_vkDestroyDebugUtilsMessengerEXT) {
+                fltk_vkDestroyDebugUtilsMessengerEXT(m_instance,
+                                                     debug_messenger,
+                                                     nullptr);
+            }
+        
             vkDestroyInstance(m_instance, nullptr);
             m_instance = VK_NULL_HANDLE;
         }
@@ -1037,6 +1137,62 @@ void Fl_Vk_Window::init_colorspace()
     pVkWindowDriver->init_colorspace();
 }
 
+void Fl_Vk_Window::load_debug_functions()
+{
+    if (!fltk_vkCreateDebugUtilsMessengerEXT)
+    {
+        // Load all debug extension functions
+        fltk_vkCreateDebugUtilsMessengerEXT =
+            (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+                instance(), "vkCreateDebugUtilsMessengerEXT");
+        if (!fltk_vkCreateDebugUtilsMessengerEXT) {
+            throw std::runtime_error("Failed to load vkCreateDebugUtilsMessengerEXT");
+        }
+
+        fltk_vkDestroyDebugUtilsMessengerEXT =
+            (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+                instance(), "vkDestroyDebugUtilsMessengerEXT");
+        if (!fltk_vkDestroyDebugUtilsMessengerEXT) {
+            throw std::runtime_error("Failed to load vkDestroyDebugUtilsMessengerEXT");
+        }
+
+        fltk_vkCmdBeginDebugUtilsLabelEXT =
+            (PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(
+                instance(), "vkCmdBeginDebugUtilsLabelEXT");
+        if (!fltk_vkCmdBeginDebugUtilsLabelEXT) {
+            throw std::runtime_error("Failed to load vkCmdBeginDebugUtilsLabelEXT");
+        }
+
+        fltk_vkCmdEndDebugUtilsLabelEXT =
+            (PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(
+                instance(), "vkCmdEndDebugUtilsLabelEXT");
+        if (!fltk_vkCmdEndDebugUtilsLabelEXT) {
+            throw std::runtime_error("Failed to load vkCmdEndDebugUtilsLabelEXT");
+        }
+
+        fltk_vkSetDebugUtilsObjectNameEXT =
+            (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(
+                instance(), "vkSetDebugUtilsObjectNameEXT");
+        if (!fltk_vkSetDebugUtilsObjectNameEXT) {
+            throw std::runtime_error("Failed to load vkSetDebugUtilsObjectNameEXT");
+        }
+
+        fltk_vkCmdInsertDebugUtilsLabelEXT =
+            (PFN_vkCmdInsertDebugUtilsLabelEXT)vkGetInstanceProcAddr(
+                instance(), "vkCmdInsertDebugUtilsLabelEXT");
+        if (!fltk_vkCmdInsertDebugUtilsLabelEXT) {
+            throw std::runtime_error("Failed to load vkCmdInsertDebugUtilsLabelEXT");
+        }
+    }
+}
+
+void Fl_Vk_Window::set_object_name(VkObjectType object_type,
+                                   uint64_t object_handle,
+                                   const char* name)
+{
+    vk_set_object_name(device(), object_type, object_handle, name);
+}
+
 void Fl_Vk_Window::init_vulkan() {
     VkResult result;
     
@@ -1047,53 +1203,7 @@ void Fl_Vk_Window::init_vulkan() {
         {
             Fl::fatal("init_vulkan() failed to create Vulkan instance\n");
         }
-        vkCmdBeginDebugUtilsLabelEXT = 
-            (PFN_vkCmdBeginDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdBeginDebugUtilsLabelEXT");
-        if (vkCmdBeginDebugUtilsLabelEXT == nullptr)
-        {
-            throw std::runtime_error("Failed to get vkCmdBeginDebugUtilsLabelEXT function pointer!");
-        }
-
-        vkCmdEndDebugUtilsLabelEXT = 
-            (PFN_vkCmdEndDebugUtilsLabelEXT) vkGetInstanceProcAddr(instance(), "vkCmdEndDebugUtilsLabelEXT");
-        if (vkCmdEndDebugUtilsLabelEXT == nullptr)
-        {
-            throw std::runtime_error("Failed to get vkCmdEndDebugUtilsLabelEXT function pointer!");
-        }
-
-        vkSetDebugUtilsObjectNameEXT =
-            (PFN_vkSetDebugUtilsObjectNameEXT) vkGetInstanceProcAddr(instance(), "vkSetDebugUtilsObjectNameEXT");
-        if (vkSetDebugUtilsObjectNameEXT == nullptr)
-        {
-            throw std::runtime_error("Failed to get vkSetDebugUtilsObjectNameEXT function pointer!");
-        }
-        if (vkSetDebugUtilsObjectNameEXT == nullptr)
-        {
-            vkCreateDebugUtilsMessengerEXT =(PFN_vkCreateDebugUtilsMessengerEXT)
-                                            vkGetInstanceProcAddr(instance(),
-                                                                  "vkCreateDebugUtilsMessengerEXT");
-            VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {};
-            debugCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-            debugCreateInfo.messageSeverity = 
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-            debugCreateInfo.messageType =
-                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-            debugCreateInfo.pfnUserCallback = vulkan_debug_callback;
-            debugCreateInfo.pUserData = NULL;
-
-            VkDebugUtilsMessengerEXT debugMessenger;
-            vkCreateDebugUtilsMessengerEXT(
-                instance(),
-                &debugCreateInfo,
-                NULL,
-                &debugMessenger
-                );
-
-        }
+        load_debug_functions();
     }
 
     // Destroy surface
