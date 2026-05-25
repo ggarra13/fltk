@@ -39,3 +39,33 @@ void vk_set_object_name(VkDevice device,
 
     fltk_vkSetDebugUtilsObjectNameEXT(device, &name_info);
 }
+
+void vk_begin_debug_label(VkCommandBuffer cmd,
+                          const char* label_name,
+                          const float r,
+                          const float g,
+                          const float b,
+                          const float a)
+{
+    if (!fltk_vkCmdBeginDebugUtilsLabelEXT) {
+        return;  // Function not available
+    }
+
+    VkDebugUtilsLabelEXT label_info{};
+    label_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
+    label_info.pLabelName = label_name;
+    label_info.color[0] = r;
+    label_info.color[1] = g;
+    label_info.color[2] = b;
+    label_info.color[3] = a;
+
+    fltk_vkCmdBeginDebugUtilsLabelEXT(cmd, &label_info);
+}
+
+void vk_end_debug_label(VkCommandBuffer cmd)
+{
+    if (!fltk_vkCmdEndDebugUtilsLabelEXT) {
+        return;  // Function not available
+    }
+    fltk_vkCmdEndDebugUtilsLabelEXT(cmd);
+}

@@ -114,4 +114,18 @@ FL_EXPORT void vk_set_object_name(VkDevice,
                                   uint64_t object_handle,
                                   const char* name);
 
+  /** 
+   * Begin a debug label in a command buffer with a given color
+   * 
+   * @param cmd          Vulkan Command Buffer
+   * @param label_name   Name for the label. 
+   * @param r            red color
+   * @param g            green color
+   * @param b            blue color
+   * @param a            alpha color
+   */
+FL_EXPORT void vk_begin_debug_label(VkCommandBuffer cmd, const char* label_name,
+                                    const float r = 1.F, const float g = 0.5F,
+                                    const float b = 0.F, const float a = 1.F);
+FL_EXPORT void vk_end_debug_label(VkCommandBuffer cmd);
 #endif // !FL_vk_H

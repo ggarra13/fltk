@@ -183,46 +183,6 @@ void Fl_Vk_Window::setup_debug_messenger() {
 }
 
 
-/** 
- * Insert a debug label into a command buffer.
- * 
- * @param cmd Vulkan Command Buffer
- * @param label_name name for the label
- */
-void Fl_Vk_Window::begin_debug_label(VkCommandBuffer cmd,
-                                     const char* label_name,
-                                     const float r,
-                                     const float g,
-                                     const float b,
-                                     const float a)
-{
-    if (!fltk_vkCmdBeginDebugUtilsLabelEXT) {
-        return;  // Function not available
-    }
-
-    VkDebugUtilsLabelEXT label_info{};
-    label_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT;
-    label_info.pLabelName = label_name;
-    label_info.color[0] = r;
-    label_info.color[1] = g;
-    label_info.color[2] = b;
-    label_info.color[3] = a;
-
-    fltk_vkCmdBeginDebugUtilsLabelEXT(cmd, &label_info);
-}
-
-/** 
- * End the debug label into a command buffer.
- * 
- * @param cmd Vulkan Command Buffer
- */
-void Fl_Vk_Window::end_debug_label(VkCommandBuffer cmd)
-{
-    if (!fltk_vkCmdEndDebugUtilsLabelEXT) {
-        return;  // Function not available
-    }
-    fltk_vkCmdEndDebugUtilsLabelEXT(cmd);
-}
 
 void Fl_Vk_Window::recreate_swapchain() {
     VkResult result;
@@ -555,6 +515,9 @@ bool Fl_Vk_Window::vk_draw_begin() {
         fprintf(stderr, "vkBeginCommandBuffer failed: %s\n", string_VkResult(result));
         return false;
     }
+    set_object_name(VK_OBJECT_TYPE_COMMAND_BUFFER,
+                    (uint64_t)frame.commandBuffer,
+                    "Main Command Buffer");
 
     // Handle depth/stencil
     bool has_depth = mode() & FL_DEPTH;
