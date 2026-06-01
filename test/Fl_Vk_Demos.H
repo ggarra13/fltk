@@ -43,8 +43,8 @@ struct Fl_Vk_Mesh {
     Fl_Vk_Mesh() :
         buf(VK_NULL_HANDLE),
         mem(VK_NULL_HANDLE),
-        indexBuffer(VK_NULL_HANDLE),
         indexMem(VK_NULL_HANDLE),
+        indexBuffer(VK_NULL_HANDLE),
         uniformMemory(VK_NULL_HANDLE),
         uniformBuffer(VK_NULL_HANDLE)
         {
@@ -99,11 +99,12 @@ struct Fl_Vk_Texture {
     VkImage image;              // Vulkan image handle
     VkImageView view;           // View for shader access
     VkSampler sampler;          // Sampler for texture sampling
+    VkDeviceMemory mem;             // Allocated memory for texture
+
 
     uint32_t    binding;
     std::string samplerName;        // name of sampler
 
-    VkDeviceMemory mem;             // Allocated memory for texture
     uint32_t width, height, depth;  // texture width/height/depth
 
     Fl_Vk_Texture() :
@@ -112,9 +113,9 @@ struct Fl_Vk_Texture {
         image(VK_NULL_HANDLE),
         view(VK_NULL_HANDLE),
         sampler(VK_NULL_HANDLE),
+        mem(VK_NULL_HANDLE),
         binding(0),
         samplerName("sampler1"),
-        mem(VK_NULL_HANDLE),
         width(1),
         height(1),
         depth(1)
@@ -137,9 +138,9 @@ struct Fl_Vk_Texture {
         image(image),
         view(view),
         sampler(sampler),
+        mem(mem),
         binding(binding),
         samplerName(samplerName),
-        mem(mem),
         width(width),
         height(height),
         depth(depth)
