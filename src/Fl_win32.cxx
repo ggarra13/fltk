@@ -570,7 +570,7 @@ void Fl_WinAPI_Screen_Driver::desktop_scale_factor() {
     dpi[ns][0] = float(dpiX);
     dpi[ns][1] = float(dpiY);
     scale(ns, dpiX / 96.f);
-    // fprintf(LOG, "desktop_scale_factor ns=%d factor=%.2f dpi=%.1f\n", ns, scale(ns), dpi[ns][0]);
+    // fprintf(stderr, "desktop_scale_factor ns=%d factor=%.2f dpi=%.1f\n", ns, scale(ns), dpi[ns][0]);
   }
   update_scaling_capability();
 }
@@ -1211,7 +1211,6 @@ extern HPALETTE fl_select_palette(void); // in fl_color_win32.cxx
 
 static Fl_Window *resize_bug_fix;
 static bool moving_window = false; // true when dragging a window with the mouse on the titlebar
-static bool sizing_window = false; // true when resizing a window with the mouse
 
 extern void fl_save_pen(void);
 extern void fl_restore_pen(void);
@@ -1240,16 +1239,7 @@ static BOOL CALLBACK child_window_cb(HWND child_xid, LPARAM data) {
   return TRUE;
 }
 
-
-static struct win_w_h {
-  Fl_Window *win;
-  int W, H;
-} moved_win_data; // FLTK size of toplevel window at start of the window move operation
-
-static void delayed_size(void *) { // performed after end of win move operation or change of screen
-  moved_win_data.win->size(moved_win_data.W, moved_win_data.H);
-}
-
+static bool sizing_window = false;
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     
@@ -1287,19 +1277,51 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
             Fl::screen_driver()->scale(ns, f);
             Fl_Window_Driver::driver(window)->resize_after_scale_change(ns, old_f, f);
             sd->update_scaling_capability();
-          } else {
-            // jump window with Windows+Shift+L|R-arrow to other screen with other DPI
-            Fl_Window_Driver::driver(window)->screen_num(ns);
-            if (!moving_window) moved_win_data = {window, window->w(), window->h()};
-            UINT flags = SWP_NOSENDCHANGING | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOCOPYBITS;
-            SetWindowPos(hWnd, NULL, lParam_rect->left, lParam_rect->top,
-                         lParam_rect->right - lParam_rect->left,
-                         lParam_rect->bottom - lParam_rect->top, flags);
+          } else if (!sizing_window) {
+            // Move window to screen with other DPI with mouse or with Windows+Shift+L|R-arrow
+            Fl_WinAPI_Window_Driver *wd = (Fl_WinAPI_Window_Driver*)Fl_Window_Driver::driver(window);
+            int olds = window->screen_num();
+            wd->screen_num(ns); // Assign window its new new screen (ns)
+            // Compute bt, bx, by for screen ns
+            int bt, bx, by;
+            scale = Fl::screen_scale(ns);
+            if (window->border()) {
+              int X, Y, W, H, dummy_x, dummy_y;
+              sd->screen_xywh_unscaled(X, Y, W, H, ns); // Screen coordinates of screen ns
+              wd->x(X + W/2 - window->w()*scale/2); // Transiently locate win at center of screen and
+              wd->y(Y + H/2 - window->h()*scale/2); // use fake_X_WM to compute size of titlebar and borders
+              wd->fake_X_wm(dummy_x, dummy_y, bt, bx, by);
+            } else { // handle borderless window moved to new screen
+              bx = by = bt = 0;
+              float old_scale = Fl::screen_scale(olds); // scale factor before change of screen
+              if (scale != old_scale) {
+                POINT curs_pos;
+                GetCursorPos(&curs_pos); // cursor position in desktop before change of screen
+                GetWindowRect(hWnd, &r); // window position in desktop before change of screen
+                if (curs_pos.x >= r.left && curs_pos.x < r.right &&
+                    curs_pos.y >= r.top && curs_pos.y < r.bottom) { // make sure cursor is inside window
+                  // fractional horizontal and vertical position of cursor in window before change of screen
+                  float fcx = (curs_pos.x - window->x() * old_scale) / (window->w() * old_scale);
+                  float fcy = (curs_pos.y - window->y() * old_scale) / (window->h() * old_scale);
+                  // set top-left of window after change of screen to maintain relative position
+                  // of cursor within window
+                  lParam_rect->left = curs_pos.x - fcx * window->w() * scale;
+                  lParam_rect->top = curs_pos.y - fcy * window->h() * scale;
+                }
+              }
+            }
+            /*fprintf(stderr, "WM_DPICHANGED calls SetWindowPos %dx%d %gx%g\n", lParam_rect->left,
+             lParam_rect->top, window->w() * scale + 2 * bx, window->h() * scale + bt + 2 * by);*/
+            wd->is_a_rescale(1);
+            window->position((lParam_rect->left + bx) / scale, (lParam_rect->top + by + bt) / scale);
+            wd->is_a_rescale(0);
             if (Fl::modal() && Fl::modal()->menu_window()) { // is a menu window active?
               Fl::e_x_root = 1000000;
               Fl::modal()->handle(FL_PUSH); // simulate a distant click to close menus
             }
-            if (!moving_window) Fl::add_timeout(0, (Fl_Timeout_Handler)delayed_size, NULL);
+          } else { // when resizing a window with the mouse
+            Fl_Window_Driver::driver(window)->screen_num(ns); // Assign window its new new screen (ns)
+            window->redraw();
           }
         }
         return 0;
@@ -1757,10 +1779,18 @@ content  key    keyboard layout
         Fl_WinAPI_Window_Driver::driver(window)->set_minmax((LPMINMAXINFO)lParam);
         break;
 
-      case WM_SIZING:
-        //fprintf(stderr,"WM_SIZING\n");
+      case WM_SIZING: { // sent to toplevel windows when resized with the mouse
         sizing_window = true;
-        return TRUE;
+        RECT *r = (RECT*)lParam;
+        int ctrX = (r->left + r->right)/2, ctrY = (r->top + r->bottom)/2;
+        Fl_WinAPI_Screen_Driver *sd = (Fl_WinAPI_Screen_Driver *)Fl::screen_driver();
+        int ns = sd->screen_num_unscaled(ctrX, ctrY); // screen number after size change
+        int olds = window->screen_num(); // screen number before size change
+        if (ns != olds && sd->dpi[ns][0] == sd->dpi[olds][0]) { // When both screens have same DPI,
+          Fl_Window_Driver::driver(window)->screen_num(ns);     // assign window to new screen here.
+        }
+        return 1;
+      }
 
       case WM_SIZE:
         if (!window->parent()) {
@@ -1768,9 +1798,9 @@ content  key    keyboard layout
           if (wParam == SIZE_MINIMIZED || wParam == SIZE_MAXHIDE) {
             Fl::handle(FL_HIDE, window);
           } else {
-            /*fprintf(stderr,"WM_SIZE %dx%d moving_window=%d sizing_window=%d s=%g ns=%d\n",
+            /*fprintf(stderr,"WM_SIZE %dx%d moving_window=%d s=%g ns=%d\n",
                     int(ceil(LOWORD(lParam) / scale)), int(ceil(HIWORD(lParam) / scale)),
-                    moving_window,sizing_window, scale, window->screen_num());*/
+                    moving_window, scale, window->screen_num());*/
             if (!moving_window) {
               Fl::handle(FL_SHOW, window);
               resize_bug_fix = window;
@@ -1782,9 +1812,10 @@ content  key    keyboard layout
             }
           }
         }
+        sizing_window = false;
         return 0;
 
-      case WM_MOVING:
+      case WM_MOVING: // sent only to bordered toplevel windows
         //fprintf(stderr,"WM_MOVING\n");
         moving_window = true;
         return 1;
@@ -1792,14 +1823,10 @@ content  key    keyboard layout
       case WM_CAPTURECHANGED:
         if (window->parent()) break;
         //fprintf(stderr,"WM_CAPTURECHANGED moving_window=%d\n",moving_window);
-        if (!moving_window) {
-          moved_win_data = {window, window->w(), window->h()};
-        } else {
+        if (moving_window) {
           moving_window = false;
-          Fl::add_timeout(0, (Fl_Timeout_Handler)delayed_size, NULL);
         }
         resize_bug_fix = 0;
-        sizing_window = false;
         return 0;
 
       case WM_MOVE: {
@@ -1809,32 +1836,32 @@ content  key    keyboard layout
         if (moving_window) resize_bug_fix = window;
         POINTS pts = MAKEPOINTS(lParam);
         Fl_Window_Driver *wd = Fl_Window_Driver::driver(window);
-        if ( !sizing_window ) {
-          Fl_WinAPI_Screen_Driver *sd = (Fl_WinAPI_Screen_Driver *)Fl::screen_driver();
-          // detect when window centre changes screen
-          int olds = wd->screen_num();
-          // Issue #1097: when a fullscreen window is restored to its size, it receives first a WM_MOVE
-          // and then a WM_SIZE, so it still has its fullscreen size at the WM_MOVE event, which defeats
-          // using window->w()|h() to compute the center of the (small) window. We detect this situation
-          // with condition: !window->fullscreen_active() && *wd->no_fullscreen_w()
-          // and use *wd->no_fullscreen_w()|h() instead of window->w()|h().
-          int trueW = window->w(), trueH = window->h();
-          if (!window->fullscreen_active() && *wd->no_fullscreen_w()) {
-            trueW = *wd->no_fullscreen_w(); trueH = *wd->no_fullscreen_h();
-          }
-          int news = sd->screen_num_unscaled(pts.x + int(trueW * scale / 2), pts.y + int(trueH * scale / 2));
-          if (news == -1)
-            news = olds;
-          else if (news != olds) {
-            //fprintf(stderr,"WM_MOVE to %dx%d ns %d-->%d scale=%g\n",pts.x,pts.y,olds,news,sd->scale(news));
+        Fl_WinAPI_Screen_Driver *sd = (Fl_WinAPI_Screen_Driver *)Fl::screen_driver();
+        // detect when window centre changes screen
+        int olds = wd->screen_num();
+        // Issue #1097: when a fullscreen window is restored to its size, it receives first a WM_MOVE
+        // and then a WM_SIZE, so it still has its fullscreen size at the WM_MOVE event, which defeats
+        // using window->w()|h() to compute the center of the (small) window. We detect this situation
+        // with condition: !window->fullscreen_active() && *wd->no_fullscreen_w()
+        // and use *wd->no_fullscreen_w()|h() instead of window->w()|h().
+        int trueW = window->w(), trueH = window->h();
+        if (!window->fullscreen_active() && *wd->no_fullscreen_w()) {
+          trueW = *wd->no_fullscreen_w(); trueH = *wd->no_fullscreen_h();
+        }
+        int cX = pts.x + int(trueW * scale / 2), cY = pts.y + int(trueH * scale / 2);
+        int news = sd->screen_num_unscaled(cX, cY);
+        if (news == -1) {
+          news = olds;
+        } else if (news != olds) {
+          // Windows documentation of WM_DPICHANGED states:
+          // "The current DPI for a window always equals the last DPI sent by WM_DPICHANGED."
+          // Therefore processing of WM_MOVE should not change the window screen to one with
+          // a distinct DPI. A WM_DPICHANGED message will arrive and will change the screen.
+          // But, if both screens have equal DPI, the window should be assigned to the new screen.
+          if (sd->dpi[news][0] == sd->dpi[olds][0]) { // see #1371
             wd->screen_num(news);
             scale = sd->scale(news);
-            wd->is_a_rescale(1);
-            resize_bug_fix = NULL;
-            window->position(int(round(pts.x / scale)), int(round(pts.y / scale)));
-            wd->is_a_rescale(0);
             window->redraw();
-            return 0;
           }
         }
         wd->x(int(round(pts.x / scale)));
@@ -1874,7 +1901,10 @@ content  key    keyboard layout
         return 1;
 
       case WM_DISPLAYCHANGE: {// when screen configuration (number, size, position) changes
-        Fl::call_screen_init();
+        Fl_WinAPI_Screen_Driver *sd = (Fl_WinAPI_Screen_Driver*)Fl::screen_driver();
+        sd->screen_count_set(-1);
+        Fl::init_screens();
+        sd->desktop_scale_factor();
         Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
         return 0;
       }
@@ -2994,14 +3024,14 @@ void Fl_WinAPI_Window_Driver::capture_titlebar_and_borders(Fl_RGB_Image *&top, F
   int offset = r.left < 0 ? -r.left : 0;
   Fl_WinAPI_Screen_Driver *dr = (Fl_WinAPI_Screen_Driver *)Fl::screen_driver();
   if (htop && r.right - r.left > offset) {
-    top = dr->read_win_rectangle_unscaled(r.left+offset, r.top, r.right - r.left-offset, htop, 0);
+    top = dr->read_win_rectangle_unscaled(r.left+offset, r.top, r.right - r.left-offset, htop, 0, true);
     if (scaling != 1 && top)
       top->scale(ww, int(htop / scaling), 0, 1);
   }
   if (wsides) {
-    left = dr->read_win_rectangle_unscaled(r.left + offset, r.top + htop, wsides, int(h() * scaling), 0);
-    right = dr->read_win_rectangle_unscaled(r.right - wsides, r.top + htop, wsides, int(h() * scaling), 0);
-    bottom = dr->read_win_rectangle_unscaled(r.left+offset, r.bottom - hbottom, ww, hbottom, 0);
+    left = dr->read_win_rectangle_unscaled(r.left + offset, r.top + htop, wsides, int(h() * scaling), 0, true);
+    right = dr->read_win_rectangle_unscaled(r.right - wsides, r.top + htop, wsides, int(h() * scaling), 0, true);
+    bottom = dr->read_win_rectangle_unscaled(r.left+offset, r.bottom - hbottom, ww, hbottom, 0, true);
     if (scaling != 1) {
       if (left) left->scale(wsides, h(), 0, 1);
       if (right) right->scale(wsides, h(), 0, 1);
