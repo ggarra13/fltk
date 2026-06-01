@@ -45,8 +45,8 @@ struct Fl_Vk_Mesh {
         mem(VK_NULL_HANDLE),
         indexBuffer(VK_NULL_HANDLE),
         indexMem(VK_NULL_HANDLE),
-        uniformBuffer(VK_NULL_HANDLE),
-        uniformMemory(VK_NULL_HANDLE)
+        uniformMemory(VK_NULL_HANDLE),
+        uniformBuffer(VK_NULL_HANDLE)
         {
         }
 
@@ -112,9 +112,9 @@ struct Fl_Vk_Texture {
         image(VK_NULL_HANDLE),
         view(VK_NULL_HANDLE),
         sampler(VK_NULL_HANDLE),
-        mem(VK_NULL_HANDLE),
-        samplerName("sampler1"),
         binding(0),
+        samplerName("sampler1"),
+        mem(VK_NULL_HANDLE),
         width(1),
         height(1),
         depth(1)
@@ -137,9 +137,9 @@ struct Fl_Vk_Texture {
         image(image),
         view(view),
         sampler(sampler),
-        mem(mem),
-        samplerName(samplerName),
         binding(binding),
+        samplerName(samplerName),
+        mem(mem),
         width(width),
         height(height),
         depth(depth)

@@ -512,7 +512,7 @@ void vk_shape_window::prepare()
 }
 
 bool vk_shape_window::vk_draw_begin() {
-    m_clearColor = { 1.0, 0, 0, 0 };  // Red background
+    m_clearColor = { {1.0, 0, 0, 0} };  // Red background
     return Fl_Vk_Window::vk_draw_begin();
 }
 

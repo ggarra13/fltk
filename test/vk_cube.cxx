@@ -769,7 +769,7 @@ void cube_box::prepare()
 bool cube_box::vk_draw_begin()
 {
     // Background color
-    m_clearColor = { 0.4f, 0.4f, 0.4f, 0.0 };
+    m_clearColor = { {0.4f, 0.4f, 0.4f, 0.0} };
     return Fl_Vk_Window::vk_draw_begin();
 }
 
