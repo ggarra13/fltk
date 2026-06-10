@@ -11,6 +11,7 @@ cmake .. \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=$PWD/install \
       -D FLTK_BUILD_EXAMPLES=ON \
+      -D FLTK_BUILD_TESTS=ON \
       -D FLTK_BUILD_FLUID=ON \
       -D FLTK_BUILD_GL=ON \
       -D FLTK_BUILD_SHARED_LIBS=ON \
