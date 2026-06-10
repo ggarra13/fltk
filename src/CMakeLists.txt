@@ -338,6 +338,10 @@ elseif(FLTK_USE_WAYLAND)
     )
   endif(FLTK_USE_X11)
 
+  if(FLTK_USE_WAYLAND AND FLTK_HAVE_PEN_SUPPORT)
+      list(APPEND DRIVER_FILES drivers/Wayland/Fl_Wayland_Pen_Events.cxx)
+  endif()
+  
   set(DRIVER_HEADER_FILES
     drivers/Posix/Fl_Posix_System_Driver.H
     drivers/Wayland/Fl_Wayland_Screen_Driver.H
@@ -909,7 +913,7 @@ if(UNIX AND FLTK_USE_WAYLAND)
     add_custom_command(
       OUTPUT tablet-protocol.c # tablet-client-protocol.h
       COMMAND wayland-scanner private-code  ${INFILE} tablet-protocol.c
-#     COMMAND wayland-scanner client-header ${INFILE} tablet-client-protocol.h
+      COMMAND wayland-scanner client-header ${INFILE} tablet-client-protocol.h
       DEPENDS ${INFILE}
       VERBATIM
     )
