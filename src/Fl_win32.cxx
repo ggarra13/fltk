@@ -61,6 +61,7 @@ void fl_cleanup_dc_list(void);
 #include "Fl_Timeout.h"
 #include "print_button.h"
 #include <FL/Fl_Graphics_Driver.H> // for fl_graphics_driver
+#include "drivers/WinAPI/Fl_WinAPI_Pen_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_Window_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_System_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_Screen_Driver.H"
@@ -1214,7 +1215,6 @@ static bool moving_window = false; // true when dragging a window with the mouse
 
 extern void fl_save_pen(void);
 extern void fl_restore_pen(void);
-extern LRESULT fl_win32_tablet_handler(MSG& msg);
 
 
 static void invalidate_gl_win(Fl_Window *glwin) {
@@ -1242,7 +1242,10 @@ static BOOL CALLBACK child_window_cb(HWND child_xid, LPARAM data) {
 static bool sizing_window = false;
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    
+
+#ifdef FLTK_HAVE_PEN_SUPPORT
+    bool pen_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
+#endif
   // Copy the message to fl_msg so add_handler code can see it.
   // It is already there if this is called by DispatchMessage,
   // but not if Windows calls this directly.
@@ -1929,11 +1932,11 @@ content  key    keyboard layout
         return 0;
 
       default: {
-#if defined(FLTK_HAVE_PEN_SUPPORT)
-        LRESULT ret = fl_win32_tablet_handler(fl_msg);
-        if (ret != -1)
-          return ret;
-#endif
+// #if defined(FLTK_HAVE_PEN_SUPPORT)
+//         LRESULT ret = fl_win32_tablet_handler(fl_msg);
+//         if (ret != -1)
+//           return ret;
+// #endif
         if (Fl::handle(0, 0))
           return 0;
         break; }
