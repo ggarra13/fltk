@@ -163,23 +163,9 @@ static TabletTool *g_current_tool { nullptr };
 // Counter for assigning pen_ids to tools that report no hardware serial.
 static int g_next_pen_id { 1 };
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Wayland pen driver class
 // ─────────────────────────────────────────────────────────────────────────────
-// Returns the topmost open menu/popup window whose screen rectangle
-// contains (rx, ry), or nullptr if none.
-static Fl_Window *menu_window_at(double rx, double ry) {
-  for (Fl_Window *w = Fl::first_window(); w; w = Fl::next_window(w)) {
-    if (!w->menu_window() || !w->shown()) continue;
-    if (rx >= w->x() && ry >= w->y() &&
-        rx <  w->x() + w->w() && ry < w->y() + w->h()) {
-      return w;
-    }
-  }
-  return nullptr;
-}
-
 namespace Fl {
 namespace Pen {
 
@@ -355,7 +341,7 @@ static int pen_send_all(TabletTool *tool, int event, State trigger) {
  the data can be inspected before committing.
  */
 static void coords_from_surface(TabletTool *tool,
-                                 wl_fixed_t sx, wl_fixed_t sy) {
+                                wl_fixed_t sx, wl_fixed_t sy) {
   if (!tool->focus_surface) return;
 
   Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(tool->focus_surface);
@@ -649,29 +635,20 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
   Fl_Window *eventWindow = tool->focus_win;
 
-  // Defensive: if a menu/popup is open and the pen is over it, but the
-  // tablet protocol hasn't re-targeted focus_surface to the popup (some
-  // compositors only fire proximity_in/out once per tablet-range span,
-  // not per surface crossing), redirect manually.
-  if (eventWindow && !eventWindow->menu_window()) {
-    Fl_Window *popup = menu_window_at(tool->ev.rx, tool->ev.ry);
-    if (popup) {
-      tool->ev.x = tool->ev.rx - popup->x();
-      tool->ev.y = tool->ev.ry - popup->y();
-      eventWindow = popup;
-    }
-  }
-  // ── 3. Modal / grab guards ────────────────────────────────────────────────
-  // These mirror the Cocoa driver's grab/modal checks.
-  if (Fl::grab() && Fl::grab() != eventWindow) {
-    tablet_tool_reset_frame(tool);
-    tool->prev_state = tool->ev.state;
-    return;
-  }
-  if (Fl::modal() && Fl::modal() != eventWindow) {
-    tablet_tool_reset_frame(tool);
-    tool->prev_state = tool->ev.state;
-    return;
+  bool is_menu_window = eventWindow->menu_window();
+
+  if (!is_menu_window) {
+      // ── 3. Modal / grab guards ────────────────────────────────────────────────
+      if (Fl::grab() && Fl::grab() != eventWindow) {
+          tablet_tool_reset_frame(tool);
+          tool->prev_state = tool->ev.state;
+          return;
+      }
+      if (Fl::modal() && Fl::modal() != eventWindow) {
+          tablet_tool_reset_frame(tool);
+          tool->prev_state = tool->ev.state;
+          return;
+      }
   }
 
   fl_xmousewin = eventWindow;
@@ -800,6 +777,11 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   // ── 9. Reset per-frame flags ──────────────────────────────────────────────
   tablet_tool_reset_frame(tool);
   tool->prev_state = tool->ev.state;
+
+  // -- 10. Force standard mouse motion for menus (critical for highlighting)
+  if (is_menu_window && tool->frame_motion) {
+      mouse_fallback(false, false, true);   // sends FL_MOVE or FL_DRAG
+  }
 }
 
 
