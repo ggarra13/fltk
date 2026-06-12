@@ -24,6 +24,7 @@
 
 struct wl_seat;
 struct zwp_tablet_manager_v2;
+extern "C" struct wl_surface;
 
 /**
  Store the zwp_tablet_manager_v2 binding received from registry_handle_global.
@@ -46,4 +47,10 @@ void fl_wayland_tablet_init_seat(struct wl_seat *wl_seat);
  */
 void fl_wayland_tablet_cleanup();
 
+/** 
+ * Invalidate wl_surface when it is destroyed.
+ * 
+ * @param surface Wayland surface to invalidate.
+ */
+void fl_wayland_tablet_surface_destroyed(struct wl_surface *surface);
 #endif // FL_WAYLAND_PEN_EVENTS_H

@@ -300,7 +300,7 @@ void unsubscribe_cb(Fl_Widget*, void* d)
 int main(int argc, char **argv)
 {
   // Create our main app window
-  auto window = new Fl_Window(100, 100, 640, 220, "FLTK Pen/Stylus/Tablet test, Ctrl-Tap for menu");      
+  auto window = new Fl_Window(100, 100, 640, 220, "FLTK Pen/Stylus/Tablet test, Ctrl-Tap for menu");
 
   auto menu_bar = new Fl_Menu_Bar(0, 0, 640, 20);
   menu_bar->add("Middle canvas/unsubscribe", 0, unsubscribe_cb, cv1);

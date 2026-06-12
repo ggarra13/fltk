@@ -1243,7 +1243,7 @@ static bool sizing_window = false;
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
-#ifdef FLTK_HAVE_PEN_SUPPORT
+#if FLTK_HAVE_PEN_SUPPORT
     bool pen_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
 #endif
   // Copy the message to fl_msg so add_handler code can see it.

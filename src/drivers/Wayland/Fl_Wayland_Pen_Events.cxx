@@ -636,9 +636,9 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   Fl_Window *eventWindow = tool->focus_win;
 
   bool is_menu_window = eventWindow->menu_window();
-
+  
   if (!is_menu_window) {
-      // ── 3. Modal / grab guards ────────────────────────────────────────────────
+      // ── 3. Modal / grab guards ──────────────────────────────────────────
       if (Fl::grab() && Fl::grab() != eventWindow) {
           tablet_tool_reset_frame(tool);
           tool->prev_state = tool->ev.state;
@@ -937,4 +937,40 @@ void fl_wayland_tablet_cleanup() {
   g_current_tool = nullptr;
   below_pen_     = nullptr;
   pushed_        = nullptr;
+}
+
+/*
+ Called from Fl_Wayland_Window_Driver::hide() just before a wl_surface is
+ destroyed. Any tablet tool currently focused on that surface gets its
+ cached surface/window pointers cleared, and any below_pen_/pushed_
+ widget belonging to the window being closed is released, so a frame
+ event already queued by the compositor can't dereference freed memory.
+ */
+void fl_wayland_tablet_surface_destroyed(struct wl_surface *surface) {
+  if (!g_tablet_seat || !surface) return;
+
+  TabletTool *t;
+  wl_list_for_each(t, &g_tool_list, link) {
+    if (t->focus_surface != surface) continue;
+
+    Fl_Window *closing = t->focus_win;
+
+    if (below_pen_ && below_pen_->widget() &&
+        below_pen_->widget()->top_window() == closing) {
+      bool copied = false;
+      pen_send(t, below_pen_->widget(), Fl::Pen::LEAVE, (State)0, copied);
+      below_pen_ = nullptr;
+      Fl::belowmouse(nullptr);
+    }
+    if (pushed_ && pushed_->widget() &&
+        pushed_->widget()->top_window() == closing) {
+      Fl::pushed(nullptr);
+      pushed_ = nullptr;
+    }
+
+    t->focus_surface = nullptr;
+    t->focus_win     = nullptr;
+    t->in_proximity  = false;
+    tablet_tool_reset_frame(t);
+  }
 }

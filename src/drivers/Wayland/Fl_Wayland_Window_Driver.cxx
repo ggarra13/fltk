@@ -18,6 +18,7 @@
 #include "Fl_Wayland_Window_Driver.H"
 #include "Fl_Wayland_Screen_Driver.H"
 #include "Fl_Wayland_Graphics_Driver.H"
+#include "Fl_Wayland_Pen_Events.H"
 #include <FL/filename.H>
 #include <wayland-cursor.h>
 #include "../../../libdecor/build/fl_libdecor.h"
@@ -506,6 +507,9 @@ void Fl_Wayland_Window_Driver::hide() {
     if (wld_win->custom_cursor) delete_cursor(wld_win->custom_cursor);
     if (wld_win->wl_surface) {
       Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+#if FLTK_HAVE_PEN_SUPPORT
+      fl_wayland_tablet_surface_destroyed(wld_win->wl_surface);
+#endif
       destroy_surface_caution_pointer_focus(wld_win->wl_surface, scr_driver->seat);
       wld_win->wl_surface = NULL;
     }
