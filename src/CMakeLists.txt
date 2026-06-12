@@ -427,7 +427,7 @@ else()
 
   if(FLTK_HAVE_PEN_SUPPORT)
     list(APPEND DRIVER_FILES
-      drivers/WinAPI/Fl_WinAPI_Pen_Driver.cxx
+      drivers/WinAPI/Fl_WinAPI_Pen_Events.cxx
     )
   endif(FLTK_HAVE_PEN_SUPPORT)
 
