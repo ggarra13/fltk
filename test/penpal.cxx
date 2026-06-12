@@ -162,7 +162,9 @@ void CanvasInterface::cv_draw()
   int r = 10;
   if (overlay_ == PEN_DRAW)
   {
-    r = static_cast<int>(32.0 * Fl::Pen::event_pressure());
+    float pressure = Fl::Pen::event_pressure();
+    fprintf(stderr, "pressure: %f\n", pressure);
+    r = static_cast<int>(32.0 * pressure);
     if (r < 1) r = 1;
   }
   fl_color(FL_BLACK);
@@ -205,7 +207,9 @@ void CanvasInterface::cv_paint() {
 void CanvasInterface::cv_pen_paint() {
   if (!offscreen_)
     return;
-  int r = static_cast<int>(32.0 * Fl::Pen::event_pressure());
+  float pressure = Fl::Pen::event_pressure();
+  fprintf(stderr, "pressure: %f\n", pressure);
+  int r = static_cast<int>(32.0 * pressure);
   if (r < 1) r = 1;
   int dx = in_window_ ? 0 : widget_->x(), dy = in_window_ ? 0 : widget_->y();
   Fl_Color cc = Fl::Pen::event_state(Fl::Pen::State::ERASER_DOWN) ? FL_WHITE : color_;
