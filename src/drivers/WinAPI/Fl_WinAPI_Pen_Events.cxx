@@ -72,7 +72,7 @@
  Fl_Base_Pen_Events.cxx and expose via the header).
  */
 
-#include "Fl_WinAPI_Pen_Driver.H"
+#include "Fl_WinAPI_Pen_Events.H"
 #include "src/drivers/Base/Fl_Base_Pen_Events.H"
 
 #include <FL/Fl.H>
