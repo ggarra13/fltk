@@ -622,7 +622,7 @@ static void handle_update(PenDevice *dev, HWND hwnd, UINT msg,
     return;
   }
 
-  bool pen_handled = false;
+  int pen_handled = 0;
 
   // ── 3. Tip/eraser down -> TOUCH ───────────────────────────────────────────
   if (frame_down) {
