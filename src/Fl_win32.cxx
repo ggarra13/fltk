@@ -1274,12 +1274,14 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     case WM_MOUSELEAVE:
     {
       // 0xFF515700 is the WinAPI signature masking for synthesized Pen/Touch events
+#if 0
       LONG_PTR extraInfo = GetMessageExtraInfo();
       if ((extraInfo & 0xFFFFFF00) == 0xFF515700) {
           // This is a synthesized mouse event from a pen/touch action.
           // Because FLTK's Pen API handles the actual pointer event, we drop this.
           return DefWindowProcW(hWnd, uMsg, wParam, lParam);
       }
+#endif
       break;
     }
   default:
