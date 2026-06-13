@@ -699,6 +699,13 @@ FL_EXPORT bool fl_winapi_pen_handle(HWND hwnd, UINT msg, WPARAM wParam, LPARAM /
       return false;
   }
 
+  if (subscriber_list_.empty()) {
+    // No widget cares about pen events right now; let normal mouse handling
+    // take over without doing any bookkeeping that would need to be undone
+    // later if a subscription appears.
+    return false;
+  }
+
   UINT32 pointer_id = GET_POINTERID_WPARAM(wParam);
 
   POINTER_INPUT_TYPE ptype;
@@ -710,13 +717,6 @@ FL_EXPORT bool fl_winapi_pen_handle(HWND hwnd, UINT msg, WPARAM wParam, LPARAM /
     return false;
 
   PenDevice *dev = get_or_create_device(pi.pointerInfo.sourceDevice);
-
-  if (subscriber_list_.empty()) {
-    // No widget cares about pen events right now; let normal mouse handling
-    // take over without doing any bookkeeping that would need to be undone
-    // later if a subscription appears.
-    return false;
-  }
 
   switch (msg) {
     case WM_POINTERENTER:
