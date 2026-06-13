@@ -50,6 +50,7 @@ class CanvasInterface {
   Fl_Widget *widget_ { nullptr };
   bool in_window_ { false };
   bool first_draw_ { true };
+  bool pen_handle_  { false };
   Fl_Offscreen offscreen_ { 0 };
   Fl_Color color_ { 1 };
   enum { NONE, HOVER, DRAW, PEN_HOVER, PEN_DRAW } overlay_ { NONE };
@@ -82,6 +83,7 @@ int CanvasInterface::cv_handle(int event)
       if (color_ > 6) color_ = 1;
       /* fall through */
     case Fl::Pen::HOVER:
+      pen_handle_ = false;
       // Pen move over the surface without touching it.
       overlay_ = PEN_HOVER;
       ov_x_ = Fl::event_x();
@@ -99,12 +101,15 @@ int CanvasInterface::cv_handle(int event)
       ov_x_ = Fl::event_x();
       ov_y_ = Fl::event_y();
       cv_pen_paint();
+      pen_handle_ = true;
       widget_->redraw();
       return 1;
     case Fl::Pen::LIFT:
+        pen_handle_ = false;
       // Pen was just lifted from the surface and is now hovering
       return 1;
     case Fl::Pen::LEAVE:
+        pen_handle_ = false;
       // The pen left the drawing area.
       overlay_ = NONE;
       widget_->redraw();
@@ -126,6 +131,7 @@ int CanvasInterface::cv_handle(int event)
         return popup_app_menu();
       /* fall through */
     case FL_DRAG:
+        if (pen_handle_) return 1;
       overlay_ = DRAW;
       ov_x_ = Fl::event_x();
       ov_y_ = Fl::event_y();
@@ -135,6 +141,7 @@ int CanvasInterface::cv_handle(int event)
     case FL_RELEASE:
       return 1;
     case FL_LEAVE:
+        pen_handle_ = false;
       overlay_ = NONE;
       widget_->redraw();
       return 1;
