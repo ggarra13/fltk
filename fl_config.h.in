@@ -168,6 +168,6 @@
  *
  */
 
-#cmakedefine FLTK_HAVE_PEN_SUPPORT 1
+#cmakedefine01 FLTK_HAVE_PEN_SUPPORT 1
 
 #endif /* _FL_fl_config_h_ */

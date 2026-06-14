@@ -83,7 +83,7 @@ Fl_Image_Surface_Driver *Fl_Image_Surface_Driver::newImageSurfaceDriver(int w, i
   return new Fl_GDI_Image_Surface_Driver(w, h, high_res, off);
 }
 
-#if defined(FLTK_HAVE_PEN_SUPPORT)
+#if FLTK_HAVE_PEN_SUPPORT
 namespace Fl {
 namespace Private {
 // Global mouse position at mouse down event
