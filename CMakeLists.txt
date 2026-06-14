@@ -404,7 +404,7 @@ fl_summary_build("Shared libraries"    lib    FLTK_BUILD_SHARED_LIBS    FLTK_BUI
 fl_summary_build("The forms library"   lib    FLTK_BUILD_FORMS          FLTK_BUILD_FORMS)
 fl_summary_build("The OpenGL library"  lib    FLTK_USE_GL               FLTK_BUILD_GL)
 fl_summary_build("The Vulkan library"  lib    FLTK_USE_VK               FLTK_BUILD_VK)
-fl_summary_build("Pen/tablet support"  lib    FLTK_OPTION_PEN_SUPPORT   FLTK_OPTION_PEN_SUPPORT)
+fl_summary_build("Pen/tablet support"  lib    FLTK_HAVE_PEN_SUPPORT     FLTK_OPTION_PEN_SUPPORT)
 
 message(STATUS "")
 
