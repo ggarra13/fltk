@@ -50,7 +50,9 @@ class CanvasInterface {
   Fl_Widget *widget_ { nullptr };
   bool in_window_ { false };
   bool first_draw_ { true };
-  bool pen_handle_  { false };
+  bool pen_handle_  { false };  //! <-- This is a variable only needed on
+                                //!     Windows to avoid synthetized events
+                                //!     after a Pen touch/draw.
   Fl_Offscreen offscreen_ { 0 };
   Fl_Color color_ { 1 };
   enum { NONE, HOVER, DRAW, PEN_HOVER, PEN_DRAW } overlay_ { NONE };
