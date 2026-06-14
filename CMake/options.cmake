@@ -245,11 +245,11 @@ set(HAVE_LIBPNG 1)
 #######################################################################
 
 if(FLTK_USE_SYSTEM_LIBJPEG)
-    find_package(JPEG)
-    if(NOT JPEG_FOUND)
-	set(FLTK_USE_BUNDLED_JPEG TRUE)
-	message(STATUS "cannot find system jpeg library - using built-in")
-    endif()
+  find_package(JPEG)
+  if(NOT JPEG_FOUND)
+    set(FLTK_USE_BUNDLED_JPEG TRUE)
+    message(STATUS "cannot find system jpeg library - using built-in")
+  endif()
 else()
   set(FLTK_USE_BUNDLED_JPEG TRUE)
 endif()
@@ -706,8 +706,8 @@ endif()
 # enclose this in HAVE_VK like HAVE_GL
 option(FLTK_BUILD_VK "use Vulkan and build fltk_vulkan library" OFF)
 if(FLTK_BUILD_VK)
-    set(HAVE_VK TRUE)
-    set(FLTK_USE_VK TRUE)
+  set(HAVE_VK TRUE)
+  set(FLTK_USE_VK TRUE)
 endif()
 
 if(FLTK_BUILD_GL)
@@ -737,7 +737,6 @@ if(FLTK_BUILD_GL)
     endif(FLTK_BACKEND_X11)
     get_filename_component(PATH_TO_GLLIB ${OPENGL_LIB} DIRECTORY)
     find_library(GLU_LIB GLU)
-    message(STATUS "${GLU_LIB}")
     get_filename_component(PATH_TO_GLULIB ${GLU_LIB} DIRECTORY)
     set(OPENGL_LIBRARIES -L${PATH_TO_GLULIB} -L${PATH_TO_GLLIB})
     if(APPLE)
@@ -768,16 +767,16 @@ else(FLTK_BUILD_GL)
 endif(FLTK_BUILD_GL)
 
 if(FLTK_BUILD_VK)
-    # Required components
-    find_package(Vulkan REQUIRED
-	COMPONENTS
-	glslang
-	shaderc_combined
-	SPIRV-Tools)
-    set(VULKAN_FOUND TRUE)
+  # Required components
+  find_package(Vulkan REQUIRED
+      COMPONENTS
+      glslang
+      shaderc_combined
+      SPIRV-Tools)
+  set(VULKAN_FOUND TRUE)
 else(FLTK_BUILD_VK)
-    set(VULKAN_FOUND FALSE)
-    set(HAVE_VK FALSE)
+  set(VULKAN_FOUND FALSE)
+  set(HAVE_VK FALSE)
 endif(FLTK_BUILD_VK)
 
 mark_as_advanced(OPENGL_LIB) # internal cache variable, not relevant for users
@@ -830,7 +829,7 @@ endif(OPENGL_FOUND)
 set(FLTK_VULKAN_FOUND FALSE)
 if(VULKAN_FOUND)
   set(FLTK_VULKAN_FOUND TRUE)
-  
+
   if(WIN32)
     list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
   elseif(APPLE AND NOT FLTK_BACKEND_X11)
@@ -843,62 +842,61 @@ if(VULKAN_FOUND)
   endif(WIN32)
   if (Vulkan_shaderc_combined_FOUND)
 if(WIN32)
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-	set(_Vulkan_hint_executable_search_paths
-	    "$ENV{VULKAN_SDK}/bin"
-	)
-	set(_Vulkan_hint_library_search_paths
-	    "$ENV{VULKAN_SDK}/lib"
-	    "$ENV{VULKAN_SDK}/bin"
-	)
-    else()
-	set(_Vulkan_hint_executable_search_paths
-	    "$ENV{VULKAN_SDK}/bin32"
-	    "$ENV{VULKAN_SDK}/bin"
-	)
-	set(_Vulkan_hint_library_search_paths
-	    "$ENV{VULKAN_SDK}/lib32"
-	    "$ENV{VULKAN_SDK}/bin32"
-	    "$ENV{VULKAN_SDK}/lib"
-	    "$ENV{VULKAN_SDK}/bin"
-	)
-    endif()
-else()
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(_Vulkan_hint_executable_search_paths
 	"$ENV{VULKAN_SDK}/bin"
     )
     set(_Vulkan_hint_library_search_paths
 	"$ENV{VULKAN_SDK}/lib"
+	"$ENV{VULKAN_SDK}/bin"
     )
-endif()
-
-      list(APPEND VULKAN_LIBRARIES
-	  Vulkan::shaderc_combined
-	  Vulkan::glslang
+  else()
+      set(_Vulkan_hint_executable_search_paths
+	  "$ENV{VULKAN_SDK}/bin32"
+	  "$ENV{VULKAN_SDK}/bin"
       )
-      set(SPIRV-Tools-opt_LIBRARY )
-      find_library(SPIRV-Tools-opt_LIBRARY SPIRV-Tools-opt
+      set(_Vulkan_hint_library_search_paths
+	  "$ENV{VULKAN_SDK}/lib32"
+	  "$ENV{VULKAN_SDK}/bin32"
+	  "$ENV{VULKAN_SDK}/lib"
+	  "$ENV{VULKAN_SDK}/bin"
+      )
+  endif()
+else()
+  set(_Vulkan_hint_executable_search_paths
+      "$ENV{VULKAN_SDK}/bin"
+  )
+  set(_Vulkan_hint_library_search_paths
+      "$ENV{VULKAN_SDK}/lib"
+  )
+endif()
+  list(APPEND VULKAN_LIBRARIES
+      Vulkan::shaderc_combined
+      Vulkan::glslang
+  )
+  set(SPIRV-Tools-opt_LIBRARY )
+  find_library(SPIRV-Tools-opt_LIBRARY SPIRV-Tools-opt
+      HINTS
+      ${_Vulkan_hint_library_search_paths})
+  if (NOT SPIRV-Tools-opt_LIBRARY)
+      message(FATAL_ERROR "SPIRV-Tools-opt library not found!")
+  endif()
+  set(SPIRV-Tools-link_LIBRARY )
+  if (UNIX AND NOT APPLE)
+      find_library(SPIRV-Tools-link_LIBRARY SPIRV-Tools-link
 	  HINTS
 	  ${_Vulkan_hint_library_search_paths})
-      if (NOT SPIRV-Tools-opt_LIBRARY)
-	  message(FATAL_ERROR "SPIRV-Tools-opt library not found!")
+      if (NOT SPIRV-Tools-link_LIBRARY)
+	  message(FATAL_ERROR "SPIRV-Tools-link library not found!")
       endif()
-      set(SPIRV-Tools-link_LIBRARY )
-      if (UNIX AND NOT APPLE)
-	  find_library(SPIRV-Tools-link_LIBRARY SPIRV-Tools-link
-	      HINTS
-	      ${_Vulkan_hint_library_search_paths})
-	  if (NOT SPIRV-Tools-link_LIBRARY)
-	      message(FATAL_ERROR "SPIRV-Tools-link library not found!")
-	  endif()
-      endif()
-      list(APPEND VULKAN_LIBRARIES
-	  ${SPIRV-Tools-opt_LIBRARY}
-	  Vulkan::SPIRV-Tools
-	  ${SPIRV-Tools-link_LIBRARY}
-      )
+  endif()
+  list(APPEND VULKAN_LIBRARIES
+      ${SPIRV-Tools-opt_LIBRARY}
+      Vulkan::SPIRV-Tools
+      ${SPIRV-Tools-link_LIBRARY}
+  )
   else()
-      message(FATAL_ERROR "shaderc_combined not found!")
+    message(FATAL_ERROR "shaderc_combined not found!")
   endif()
 endif(VULKAN_FOUND)
 
