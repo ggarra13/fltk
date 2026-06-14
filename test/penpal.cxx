@@ -172,9 +172,10 @@ void CanvasInterface::cv_draw()
   if (overlay_ == PEN_DRAW)
   {
     float pressure = Fl::Pen::event_pressure();
+    int state = static_cast<int>(Fl::Pen::event_state());
     r = static_cast<int>(32.0 * pressure);
     if (r < 1) r = 1;
-    printf("pressure=%f radius=%d\n", pressure, r);
+    printf("pressure=%f radius=%d state=%d\n", pressure, r, state);
   }
   fl_color(FL_BLACK);
   switch (overlay_) {
@@ -217,11 +218,13 @@ void CanvasInterface::cv_pen_paint() {
   if (!offscreen_)
     return;
   float pressure = Fl::Pen::event_pressure();
+  int state = static_cast<int>(Fl::Pen::event_state());
   int r = static_cast<int>(32.0 * pressure);
   if (r < 1) r = 1;
-  printf("pressure=%f radius=%d\n", pressure, r);
+  printf("pressure=%f radius=%d state=%d\n", pressure, r, state);
   int dx = in_window_ ? 0 : widget_->x(), dy = in_window_ ? 0 : widget_->y();
-  Fl_Color cc = Fl::Pen::event_state(Fl::Pen::State::ERASER_DOWN) ? FL_WHITE : color_;
+  Fl_Color cc = Fl::Pen::event_state(Fl::Pen::State::ERASER_DOWN |
+                                     Fl::Pen::State::BUTTON0) ? FL_WHITE : color_;
   fl_begin_offscreen(offscreen_);
   fl_draw_circle(Fl::event_x()-dx-r, Fl::event_y()-dy-r, 2*r, cc);
   fl_end_offscreen();
