@@ -884,6 +884,8 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     Fl::e_is_click = 0;
     Fl::handle(event, win);
   }
+  // \@note: \bug: !(sym >= FL_F && sym <= FL_F_Last) NOT ON FLTK main branch.  Fixes repetition of keys
+  //               on mrv2
   if (event == FL_KEYDOWN && status == XKB_COMPOSE_NOTHING &&
       !(sym >= FL_Shift_L && sym <= FL_Alt_R) &&
       !(sym >= FL_F && sym <= FL_F_Last)) {
