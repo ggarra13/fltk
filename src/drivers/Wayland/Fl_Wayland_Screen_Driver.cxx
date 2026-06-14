@@ -41,6 +41,8 @@
 #endif
 #if HAVE_CURSOR_SHAPE
 #  include "cursor-shape-client-protocol.h"
+#  include "tablet-client-protocol.h"
+#  include "Fl_Wayland_Pen_Events.H"
 #endif
 #include <assert.h>
 #include <sys/mman.h>
@@ -883,7 +885,8 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     Fl::handle(event, win);
   }
   if (event == FL_KEYDOWN && status == XKB_COMPOSE_NOTHING &&
-      !(sym >= FL_Shift_L && sym <= FL_Alt_R)) {
+      !(sym >= FL_Shift_L && sym <= FL_Alt_R) &&
+      !(sym >= FL_F && sym <= FL_F_Last)) {
     // Handling of key repeats :
     // Use serial argument rather than time to detect repeated keys because
     // serial value changes at each key up or down in all tested OS and compositors,
@@ -1175,8 +1178,8 @@ static void output_done(void *data, struct wl_output *wl_output)
   while (xp) { // all mapped windows
     struct wld_window *win = (struct wld_window*)xp->xid;
     Fl_Window *W = win->fl_win;
-    if (win->buffer || W->as_gl_window()) {
-      if (W->as_gl_window()) {
+    if (win->buffer || W->as_gl_window() || W->as_vk_window()) {
+      if (W->as_gl_window() || W->as_vk_window()) {
         wl_surface_set_buffer_scale(win->wl_surface, output->wld_scale);
         Fl_Window_Driver::driver(W)->is_a_rescale(true);
         W->resize(W->x(), W->y(), W->w(), W->h());
@@ -1393,6 +1396,13 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
     scr_driver->wp_cursor_shape_manager = (struct wp_cursor_shape_manager_v1 *)
       wl_registry_bind(wl_registry, id, &wp_cursor_shape_manager_v1_interface, 1);
 #endif // HAVE_CURSOR_SHAPE
+#if defined(FLTK_HAVE_PEN_SUPPORT)
+  } else if (strcmp(interface, zwp_tablet_manager_v2_interface.name) == 0) {
+      struct zwp_tablet_manager_v2 *tm =
+          (struct zwp_tablet_manager_v2*)wl_registry_bind(
+              wl_registry, id, &zwp_tablet_manager_v2_interface, 1);
+      fl_wayland_tablet_set_manager(tm);
+#endif
   }
 }
 
@@ -1609,6 +1619,9 @@ void Fl_Wayland_Screen_Driver::close_display() {
   wl_data_device_destroy(seat->data_device); seat->data_device = NULL;
   wl_data_device_manager_destroy(seat->data_device_manager);
   seat->data_device_manager = NULL;
+#if defined(FLTK_HAVE_PEN_SUPPORT)
+  fl_wayland_tablet_cleanup();
+#endif
   wl_seat_destroy(seat->wl_seat); seat->wl_seat = NULL;
   if (seat->name) free(seat->name);
   free(seat); seat = NULL;
@@ -1667,6 +1680,7 @@ static bool compute_full_and_maximized_areas(Fl_Wayland_Screen_Driver::output *o
                                              int& Wworkarea, int& Hworkarea) {
   if (Fl_Wayland_Screen_Driver::compositor == Fl_Wayland_Screen_Driver::unspecified) {
     Wfullscreen = 0;
+    Fl::warning("Wayland compositor unknown");
     return false;
   }
   bool found_workarea = false;

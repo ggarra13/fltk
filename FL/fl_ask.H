@@ -38,7 +38,7 @@
 // undocumented feature: include fl_ask() if requested; see comment above.
 
 #ifndef FLTK_INCLUDE_FL_ASK
-#define FLTK_INCLUDE_FL_ASK 0  // set this to 1 to include fl_ask()
+#define FLTK_INCLUDE_FL_ASK 1  // set this to 1 to include fl_ask()
 #endif
 
 #endif // FL_DOXYGEN

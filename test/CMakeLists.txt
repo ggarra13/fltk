@@ -2,7 +2,7 @@
 # CMakeLists.txt used to build test and demo apps by the CMake build system
 #
 # Copyright 2004-2025 by Bill Spitzak and others.
-#
+#s
 # This library is free software. Distribution and use rights are outlined in
 # the file "COPYING" which should have been included with this file.  If this
 # file is missing or damaged, see the license at:
@@ -100,6 +100,28 @@ else()
     set(GLDEMO_SHARED "call_main;fltk::fltk-shared")
   else()
     set(GLDEMO_SHARED "fltk::fltk-shared")
+  endif()
+endif()
+
+#######################################################################
+# Define standard libraries for those OpenGL demos that can be built
+# w/o Vulkan as well. These demos show an alternate GUI or a warning
+# when built w/o Vulkan.
+#
+# Note: use "${VKDEMO_LIBS}" for their library parameter
+#        or "${VKDEMO_SHARED}" to build with shared FLTK libraries
+if(VULKAN_FOUND)
+  set(VKDEMO_LIBS fltk::vk fltk::fltk ${VULKAN_LIBRARIES})
+  if(MSVC)
+    set(VKDEMO_SHARED "call_main;fltk::fltk-shared;${VULKAN_LIBRARIES}")
+  else()
+    set(VKDEMO_SHARED fltk::vk-shared fltk::fltk-shared ${VULKAN_LIBRARIES})
+  endif()
+else()
+  if(MSVC)
+    set(VKDEMO_SHARED "call_main;fltk::fltk-shared")
+  else()
+    set(VKDEMO_SHARED "fltk::fltk-shared")
   endif()
 endif()
 
@@ -211,14 +233,14 @@ fl_create_example(subwindow subwindow.cxx fltk::fltk)
 fl_create_example(symbols symbols.cxx fltk::fltk)
 fl_create_example(tabs tabs.fl fltk::fltk)
 fl_create_example(table table.cxx fltk::fltk)
-fl_create_example(terminal terminal.fl fltk::fltk)
+#fl_create_example(terminal terminal.fl fltk::fltk)  # not building on macOS
 fl_create_example(threads threads.cxx fltk::fltk)
 fl_create_example(tile tile.cxx fltk::fltk)
 fl_create_example(tiled_image tiled_image.cxx fltk::fltk)
-fl_create_example(tree tree.fl fltk::fltk)
+# fl_create_example(tree tree.fl fltk::fltk) # not building on macOS
 fl_create_example(twowin twowin.cxx fltk::fltk)
 fl_create_example(utf8 utf8.cxx fltk::fltk)
-fl_create_example(valuators valuators.fl fltk::fltk)
+# fl_create_example(valuators valuators.fl fltk::fltk) # not building on macOS
 fl_create_example(windowfocus windowfocus.cxx fltk::fltk)
 fl_create_example(wizard wizard.cxx fltk::fltk)
 
@@ -226,7 +248,9 @@ fl_create_example(wizard wizard.cxx fltk::fltk)
 
 if(NOT FLTK_BUILD_SHARED_LIBS)
   fl_create_example(blocks "blocks.cxx;blocks.plist;blocks.icns" "fltk::fltk;${AUDIOLIBS}")
-  fl_create_example(checkers "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" fltk::images)
+  if (FLTK_BUILD_FLUID)
+      fl_create_example(checkers "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" fltk::images)
+  endif()
   fl_create_example(sudoku "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "fltk::images;${AUDIOLIBS}")
 endif()
 
@@ -278,6 +302,20 @@ if(OPENGL_FOUND)
   fl_create_example(shape shape.cxx "${GLDEMO_LIBS}")
 endif(OPENGL_FOUND)
 
+# Vulkan demos. These programs can't be built w/o Vulkan
+if(VULKAN_FOUND)
+    find_file(HAS_GLM glm/glm.hpp)
+    
+    fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
+    fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
+    fl_create_example(vk_fullscreen vk_fullscreen.cxx "${VKDEMO_LIBS}")	
+    if (HAS_GLM)
+	fl_create_example(vk_cube vk_cube.cxx "${VKDEMO_LIBS}")
+    else()
+        message(WARNING "No glm-dev package.  vk_cube will not be built!")
+    endif()
+endif(VULKAN_FOUND)
+    
 # Test FLTK headers for variable shadowing [-Wshadow] (STR 2728)
 #
 # The following test program is added only for GNU or Clang compilers which
@@ -306,7 +344,7 @@ if(CMAKE_CXX_COMPILER_ID IN_LIST _compilers)
   foreach(hd ${all_headers})
     get_filename_component(hd "${hd}" NAME)
     # skip headers that must not be included directly and fl_config.h if it exists
-    string(REGEX MATCH "^(mac|win32|x11|wayland|fl_config|gl[a-z_0-9]*)\.[hH]$" skip "${hd}")
+    string(REGEX MATCH "^(mac|win32|x11|wayland|vk|vk_enum_.*|vk_mem_.*|Fl_Vk_.*|fl_config|gl[a-z_0-9]*)\.[hH]$" skip "${hd}")
     if(skip STREQUAL "")
       file(APPEND ${include_all} "#include <FL/${hd}>\n")
     endif()
@@ -332,6 +370,7 @@ unset(_compilers)
 # Build some of the demo programs linked against the shared FLTK lib(s)
 #########################################################################
 
+
 if(FLTK_BUILD_SHARED_LIBS)
 
   fl_create_example(cairo_test-shared cairo_test.cxx "${FLTK_SHARED}")
@@ -341,15 +380,33 @@ if(FLTK_BUILD_SHARED_LIBS)
 
   # Games
   fl_create_example(blocks-shared "blocks.cxx;blocks.plist;blocks.icns" "${FLTK_SHARED};${AUDIOLIBS}")
-  fl_create_example(checkers-shared "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" "${IMAGES_SHARED}")
+  if (FLTK_BUILD_FLUID)
+      fl_create_example(checkers-shared "checkers.cxx;checkers.plist;checkers_pieces.fl;checkers.icns" "${IMAGES_SHARED}")
+  endif()
   fl_create_example(sudoku-shared "sudoku.cxx;sudoku.plist;sudoku.icns;sudoku.rc" "${IMAGES_SHARED};${AUDIOLIBS}")
 
-  # demo programs that can't be built w/o OpenGL
+  # define a list of shared targets so we can set COMPILE_DEFINITIONS in a loop
+  set(SHARED_TARGETS "")
+
+  list(APPEND SHARED_TARGETS hello pixmap_browser unittests)
+
   if(OPENGL_FOUND)
     fl_create_example(glpuzzle-shared glpuzzle.cxx "${GLDEMO_SHARED}")
     fl_create_example(shape-shared shape.cxx "${GLDEMO_SHARED}")
+    list(APPEND SHARED_TARGETS glpuzzle shape)
   endif(OPENGL_FOUND)
 
+  if(VULKAN_FOUND)
+    fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
+    fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
+    fl_create_example(vk_fullscreen-shared vk_fullscreen.cxx "${VKDEMO_SHARED}")
+      
+    if (HAS_GLM)
+      fl_create_example(vk_cube-shared vk_cube.cxx "${VKDEMO_SHARED}")
+    else()
+        message(WARNING "No glm-dev package.  vk_cube-shared will not be built!")
+    endif(HAS_GLM)
+  endif(VULKAN_FOUND)
 endif(FLTK_BUILD_SHARED_LIBS)
 
 #####################################################

@@ -21,6 +21,8 @@
 // in.  Search other files for "_WIN32" or filenames ending in _win32.cxx
 // for other system-specific code.
 
+#include <iostream>
+
 /* We require Windows 2000 features (e.g. VK definitions) */
 # if !defined(WINVER) || (WINVER < 0x0500)
 #  ifdef WINVER
@@ -59,6 +61,7 @@ void fl_cleanup_dc_list(void);
 #include "Fl_Timeout.h"
 #include "print_button.h"
 #include <FL/Fl_Graphics_Driver.H> // for fl_graphics_driver
+#include "drivers/WinAPI/Fl_WinAPI_Pen_Events.H"
 #include "drivers/WinAPI/Fl_WinAPI_Window_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_System_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_Screen_Driver.H"
@@ -1212,7 +1215,6 @@ static bool moving_window = false; // true when dragging a window with the mouse
 
 extern void fl_save_pen(void);
 extern void fl_restore_pen(void);
-extern LRESULT fl_win32_tablet_handler(MSG& msg);
 
 
 static void invalidate_gl_win(Fl_Window *glwin) {
@@ -1241,10 +1243,13 @@ static bool sizing_window = false;
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
+#if FLTK_HAVE_PEN_SUPPORT
+    bool pen_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
+#endif
+    
   // Copy the message to fl_msg so add_handler code can see it.
   // It is already there if this is called by DispatchMessage,
-  // but not if Windows calls this directly.
-
+  // but not if Windows calls this directly.          
   fl_msg.hwnd = hWnd;
   fl_msg.message = uMsg;
   fl_msg.wParam = wParam;
@@ -1252,13 +1257,44 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
   // fl_msg.time = ???
   // fl_msg.pt = ???
   // fl_msg.lPrivate = ???
+ // Early in mouse handling:
 
+  switch (uMsg) {
+    case WM_MOUSEMOVE:
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONDBLCLK:
+    case WM_LBUTTONUP:
+    case WM_MBUTTONDOWN:
+    case WM_MBUTTONDBLCLK:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONDOWN:
+    case WM_RBUTTONDBLCLK:
+    case WM_RBUTTONUP:
+    case WM_XBUTTONDOWN:
+    case WM_XBUTTONDBLCLK:
+    case WM_XBUTTONUP:
+    case WM_MOUSELEAVE:
+    {
+      // 0xFF515700 is the WinAPI signature masking for synthesized Pen/Touch events
+#if 0
+      LONG_PTR extraInfo = GetMessageExtraInfo();
+      if ((extraInfo & 0xFFFFFF00) == 0xFF515700) {
+          // This is a synthesized mouse event from a pen/touch action.
+          // Because FLTK's Pen API handles the actual pointer event, we drop this.
+          return DefWindowProcW(hWnd, uMsg, wParam, lParam);
+      }
+#endif
+      break;
+    }
+  default:
+      break;
+  }
+  
   Fl_Window *window = fl_find(hWnd);
   float scale = (window ? Fl::screen_driver()->scale(Fl_Window_Driver::driver(window)->screen_num()) : 1);
 
   if (window) {
     switch (uMsg) {
-
       case WM_DPICHANGED: { // 0x02E0, after display re-scaling and followed by WM_DISPLAYCHANGE
         if (is_dpi_aware && !window->parent()) {
           RECT r, *lParam_rect = (RECT*)lParam;
@@ -1326,14 +1362,16 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
       }
 
       case WM_QUIT: // this should not happen?
-        Fl::fatal("WM_QUIT message");
+          Fl::fatal("WM_QUIT message");
 
       case WM_CLOSE: // user clicked close box
         Fl::handle(FL_CLOSE, window);
         return 0;
 
       case WM_SYNCPAINT:
+         break;
       case WM_NCPAINT:
+         break;
       case WM_ERASEBKGND:
         // Andreas Weitl - WM_SYNCPAINT needs to be passed to DefWindowProc
         // so that Windows can generate the proper paint messages...
@@ -1925,11 +1963,11 @@ content  key    keyboard layout
         return 0;
 
       default: {
-#if defined(FLTK_HAVE_PEN_SUPPORT)
-        LRESULT ret = fl_win32_tablet_handler(fl_msg);
-        if (ret != -1)
-          return ret;
-#endif
+// #if defined(FLTK_HAVE_PEN_SUPPORT)
+//         LRESULT ret = fl_win32_tablet_handler(fl_msg);
+//         if (ret != -1)
+//           return ret;
+// #endif
         if (Fl::handle(0, 0))
           return 0;
         break; }
@@ -2417,6 +2455,7 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
     wlen = fl_utf8toUtf16(w->label(), (unsigned)l, (unsigned short *)lab, wlen);
     lab[wlen] = 0;
   }
+  
   x->xid = (fl_uintptr_t)CreateWindowExW(styleEx,
                            class_namew, lab, style,
                            xp, yp, wp, hp,

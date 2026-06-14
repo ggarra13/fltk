@@ -255,6 +255,9 @@ extern void fl_throw_focus(Fl_Widget*); // in Fl_x.cxx
    destroyed destroy all their children. This is convenient and fast.
 */
 Fl_Widget::~Fl_Widget() {
+#if FLTK_HAVE_PEN_SUPPORT
+  Fl::Pen::unsubscribe(this);
+#endif
   Fl::clear_widget_pointer(this);
   if (flags() & COPIED_LABEL) free((void *)(label_.value));
   if (flags() & COPIED_TOOLTIP) free((void *)(tooltip_));

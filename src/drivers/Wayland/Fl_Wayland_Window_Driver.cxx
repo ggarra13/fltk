@@ -18,6 +18,7 @@
 #include "Fl_Wayland_Window_Driver.H"
 #include "Fl_Wayland_Screen_Driver.H"
 #include "Fl_Wayland_Graphics_Driver.H"
+#include "Fl_Wayland_Pen_Events.H"
 #include <FL/filename.H>
 #include <wayland-cursor.h>
 #include "../../../libdecor/build/fl_libdecor.h"
@@ -412,6 +413,15 @@ void Fl_Wayland_Window_Driver::flush() {
     }
     return;
   }
+  if (pWindow->as_vk_window()) {
+    int W = pWindow->w();
+    int H = pWindow->h();
+    float scale = fl_graphics_driver->scale();
+    Fl_Wayland_Window_Driver::in_flush_ = true;
+    Fl_Window_Driver::flush();
+    Fl_Wayland_Window_Driver::in_flush_ = false;
+    return;
+  }
   struct wld_window *window = fl_wl_xid(pWindow);
   if (!window || !window->configured_width) return;
 
@@ -497,6 +507,9 @@ void Fl_Wayland_Window_Driver::hide() {
     if (wld_win->custom_cursor) delete_cursor(wld_win->custom_cursor);
     if (wld_win->wl_surface) {
       Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+#if FLTK_HAVE_PEN_SUPPORT
+      fl_wayland_tablet_surface_destroyed(wld_win->wl_surface);
+#endif
       destroy_surface_caution_pointer_focus(wld_win->wl_surface, scr_driver->seat);
       wld_win->wl_surface = NULL;
     }
@@ -658,7 +671,6 @@ int Fl_Wayland_Window_Driver::scroll(int src_x, int src_y, int src_w, int src_h,
   }
   return 0;
 }
-
 
 static void change_scale(Fl_Wayland_Screen_Driver::output *output, struct wld_window *window,
                   float pre_scale) {
@@ -1465,7 +1477,6 @@ bool Fl_Wayland_Window_Driver::process_menu_or_tooltip(struct wld_window *new_wi
   return false;
 }
 
-
 void Fl_Wayland_Window_Driver::makeWindow()
 {
   Fl_Group::current(0); // get rid of very common user bug: forgot end()
@@ -1541,14 +1552,15 @@ void Fl_Wayland_Window_Driver::makeWindow()
     // the state of the parent surface is applied."
     new_window->configured_width = pWindow->w();
     new_window->configured_height = pWindow->h();
-    if (!pWindow->as_gl_window())  {
+    if (!pWindow->as_gl_window() && !pWindow->as_vk_window())  {
       parent->fl_win->wait_for_expose();
       wl_surface_commit(parent->wl_surface);
     }
     wait_for_expose_value = 0;
     pWindow->border(0);
     checkSubwindowFrame(); // make sure subwindow doesn't leak outside parent
-
+    if (can_expand_outside_parent_) parent->covered = true; // fix for bug #1307
+    
   } else { // a window without decoration
     new_window->kind = UNFRAMED;
     new_window->xdg_surface = xdg_wm_base_get_xdg_surface(scr_driver->xdg_wm_base,
@@ -1972,11 +1984,11 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
       }
     } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
       wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
-      if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+      if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
       fl_win->configured_width = W;
       fl_win->configured_height = H;
     } else if (fl_win->xdg_surface) { // a window without border
-      if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+      if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
       fl_win->configured_width = W;
       fl_win->configured_height = H;
       W *= f; H *= f;

@@ -714,6 +714,19 @@ FL_EXPORT inline void set_atclose(Fl_Atclose_Handler f) {atclose = f;}
 /** See grab(Fl_Window*) */
 FL_EXPORT inline void grab(Fl_Window& win) {grab(&win);}
 
+  /**  sets whether Vulkan windows should be drawn at high resolution on Apple
+   computers with retina displays
+   \version 1.3.4
+   */
+FL_EXPORT extern void use_high_res_VK(int val);
+  
+  /**  returns whether Vulkan windows should be drawn at high resolution on Apple
+   computers with retina displays.
+   Default is no.
+   \version 1.3.4
+   */
+FL_EXPORT extern int use_high_res_VK();
+    
 // --- FLTK Multithreading support functions ---
 
 /** \defgroup fl_multithread Multithreading support functions

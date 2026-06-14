@@ -445,7 +445,6 @@ char Fl_Wayland_Gl_Window_Driver::swap_type() {
   return copy;
 }
 
-
 void Fl_Wayland_Gl_Window_Driver::gl_visual(Fl_Gl_Choice *c) {
   Fl_Gl_Window_Driver::gl_visual(c);
   wld_egl_conf = ((Fl_Wayland_Gl_Choice*)c)->egl_conf;

@@ -338,6 +338,10 @@ elseif(FLTK_USE_WAYLAND)
     )
   endif(FLTK_USE_X11)
 
+  if(FLTK_USE_WAYLAND AND FLTK_HAVE_PEN_SUPPORT)
+      list(APPEND DRIVER_FILES drivers/Wayland/Fl_Wayland_Pen_Events.cxx)
+  endif()
+  
   set(DRIVER_HEADER_FILES
     drivers/Posix/Fl_Posix_System_Driver.H
     drivers/Wayland/Fl_Wayland_Screen_Driver.H
@@ -423,7 +427,7 @@ else()
 
   if(FLTK_HAVE_PEN_SUPPORT)
     list(APPEND DRIVER_FILES
-      drivers/WinAPI/Fl_WinAPI_Pen_Driver.cxx
+      drivers/WinAPI/Fl_WinAPI_Pen_Events.cxx
     )
   endif(FLTK_HAVE_PEN_SUPPORT)
 
@@ -520,6 +524,46 @@ set(GLCPPFILES
   ${GLCPPFILES}
   ${GL_DRIVER_FILES}
 )
+
+set(VKCPPFILES
+  Fl_Vk_Choice.cxx
+  # Fl_Vk_Device_Plugin.cxx
+  # Fl Vk_Overlay.cxx
+  Fl_Vk_Utils.cxx
+  Fl_Vk_Window.cxx
+  vk_draw.cxx  # to remove.
+  vk.cxx
+  # vk_start.cxx
+)
+
+set(VK_DRIVER_FILES
+  Fl_Vk_Window_Driver.cxx
+)
+
+if(FLTK_BACKEND_WAYLAND)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/Wayland/Fl_Wayland_Vk_Window_Driver.H)
+  if(FLTK_USE_X11)
+    list(APPEND VK_DRIVER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
+    list(APPEND VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
+  endif(FLTK_USE_X11)
+elseif(FLTK_USE_X11)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/X11/Fl_X11_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/X11/Fl_X11_Vk_Window_Driver.H)
+elseif(APPLE)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Cocoa/Fl_Cocoa_Vk_Window_Driver.mm)
+  set(VK_DRIVER_HEADER_FILES drivers/Cocoa/Fl_Cocoa_Vk_Window_Driver.H)
+elseif(WIN32)
+  set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/WinAPI/Fl_WinAPI_Vk_Window_Driver.cxx)
+  set(VK_DRIVER_HEADER_FILES drivers/WinAPI/Fl_WinAPI_Vk_Window_Driver.H)
+endif(FLTK_BACKEND_WAYLAND)
+
+
+set(VKCPPFILES
+  ${VKCPPFILES}
+  ${VK_DRIVER_FILES}
+)
+
 
 set(IMGCPPFILES
   fl_images_core.cxx
@@ -869,7 +913,7 @@ if(UNIX AND FLTK_USE_WAYLAND)
     add_custom_command(
       OUTPUT tablet-protocol.c # tablet-client-protocol.h
       COMMAND wayland-scanner private-code  ${INFILE} tablet-protocol.c
-#     COMMAND wayland-scanner client-header ${INFILE} tablet-client-protocol.h
+      COMMAND wayland-scanner client-header ${INFILE} tablet-client-protocol.h
       DEPENDS ${INFILE}
       VERBATIM
     )
@@ -963,6 +1007,17 @@ if(FLTK_USE_GL)
 endif(FLTK_USE_GL)
 
 #######################################################################
+
+if(FLTK_USE_VK)
+  fl_add_library(fltk_vk STATIC "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
+  target_link_libraries(fltk_vk PUBLIC ${VULKAN_LIBRARIES} fltk::fltk ${CMAKE_DL_LIBS})
+  target_include_directories(fltk_vk PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+
+  # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
+  add_optional_libs(fltk_vk)
+endif(FLTK_USE_VK)
+
+#######################################################################
 # Build shared libraries (optional)
 #######################################################################
 # Shared libraries, part 1: everything except Visual Studio (MSVC)
@@ -1023,6 +1078,16 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
     endif()
   endif(FLTK_USE_GL)
 
+  if(FLTK_USE_VK)
+    fl_add_library(fltk_vk SHARED "${VKCPPFILES};${VK_HEADER_FILES};${VK_DRIVER_HEADER_FILES}")
+    target_link_libraries(fltk_vk-shared PRIVATE ${VULKAN_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
+    # target_include_directories(fltk_vk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+
+    # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
+    add_optional_libs(fltk_vk-shared)
+
+  endif(FLTK_USE_VK)
+
 endif(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
 
 #######################################################################
@@ -1043,6 +1108,10 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
     list(APPEND SOURCES ${GLCPPFILES} ${GL_HEADER_FILES} ${GL_DRIVER_HEADER_FILES})
   endif(OPENGL_FOUND)
 
+  if(VULKAN_FOUND)
+    list(APPEND SOURCES ${VKCPPFILES} ${VK_HEADER_FILES} ${VK_DRIVER_HEADER_FILES})
+  endif(VULKAN_FOUND)
+      
   fl_add_library(fltk SHARED "${SOURCES}")
   add_optional_libs(fltk-shared)
 
@@ -1065,6 +1134,11 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
       target_include_directories(fltk-shared PUBLIC ${FLTK_OPENGL_GLU_INCLUDE_DIR})
     endif()
   endif(OPENGL_FOUND)
+
+  if(VULKAN_FOUND)
+    target_link_libraries(fltk-shared PRIVATE ${VULKAN_LIBRARIES})
+    target_include_directories(fltk-shared PUBLIC ${Vulkan_INCLUDE_DIR} ${VULKAN_INCLUDE_DIRS})
+  endif(VULKAN_FOUND)
 
 endif(FLTK_BUILD_SHARED_LIBS AND MSVC)
 

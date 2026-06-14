@@ -141,6 +141,7 @@ set(FLTK_IMAGE_LIBRARIES "")
 #######################################################################
 #  Ensure that png and zlib are both system or both local for compatibility
 #######################################################################
+set(CMAKE_FIND_FRAMEWORK LAST)  # or NEVER
 
 if(FLTK_USE_SYSTEM_ZLIB)
   find_package(ZLIB)
@@ -321,10 +322,12 @@ if(UNIX)
     if(EXISTS ${PROTOCOLS}/staging/cursor-shape/cursor-shape-v1.xml AND
         EXISTS ${PROTOCOLS}/stable/tablet/tablet-v2.xml)
       set(HAVE_CURSOR_SHAPE 1)
+      set(HAVE_TABLET 1)
       message(STATUS "Found dev files for Wayland protocols 'Cursor shape' and 'Tablet'")
       message(STATUS "  ==> option FLTK_USE_DBUS can be turned OFF if 'Cursor shape'-enabled wayland compositor is used.")
     else()
       set(HAVE_CURSOR_SHAPE 0)
+      set(HAVE_TABLET 0)
     endif()
     if(FLTK_BACKEND_X11)
       include(FindX11)
@@ -501,6 +504,7 @@ endif()
 #  - FLTK_HAVE_PEN_SUPPORT  : final result for building Pen/Tablet support,
 #                             also used to set config variable in config.h
 
+set(FLTK_HAVE_PEN_SUPPORT 0)
 if(FLTK_OPTION_PEN_SUPPORT)
   if(WIN32)
     try_compile(PEN_DRIVER_SUPPORTED
@@ -686,6 +690,8 @@ endif(FLTK_OPTION_SVG)
 
 # FIXME: GLU libs have already been searched in resources.cmake
 
+set(FLTK_USE_VK FALSE)
+
 set(HAVE_GL LIB_GL OR LIB_MesaGL)
 set(FLTK_USE_GL FALSE)
 
@@ -694,6 +700,14 @@ if(HAVE_GL)
   if(FLTK_BUILD_GL)
     set(FLTK_USE_GL TRUE)
   endif()
+endif()
+
+# VK is often built from a non system directory, so we don't
+# enclose this in HAVE_VK like HAVE_GL
+option(FLTK_BUILD_VK "use Vulkan and build fltk_vulkan library" OFF)
+if(FLTK_BUILD_VK)
+  set(HAVE_VK TRUE)
+  set(FLTK_USE_VK TRUE)
 endif()
 
 if(FLTK_BUILD_GL)
@@ -752,7 +766,21 @@ else(FLTK_BUILD_GL)
   set(HAVE_GLXGETPROCADDRESSARB FALSE)
 endif(FLTK_BUILD_GL)
 
+if(FLTK_BUILD_VK)
+  # Required components
+  find_package(Vulkan REQUIRED
+      COMPONENTS
+      glslang
+      shaderc_combined
+      SPIRV-Tools)
+  set(VULKAN_FOUND TRUE)
+else(FLTK_BUILD_VK)
+  set(VULKAN_FOUND FALSE)
+  set(HAVE_VK FALSE)
+endif(FLTK_BUILD_VK)
+
 mark_as_advanced(OPENGL_LIB) # internal cache variable, not relevant for users
+mark_as_advanced(VULKAN_LIB) # internal cache variable, not relevant for users
 
 # FIXME: the following is necessary because this variable may have been removed
 # from the cache above. It has been marked "advanced" before in resources.cmake.
@@ -797,6 +825,80 @@ if(OPENGL_FOUND)
     unset(HAVE_GLXGETPROCADDRESSARB CACHE)
   endif(FLTK_BACKEND_X11)
 endif(OPENGL_FOUND)
+
+set(FLTK_VULKAN_FOUND FALSE)
+if(VULKAN_FOUND)
+  set(FLTK_VULKAN_FOUND TRUE)
+
+  if(WIN32)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
+  elseif(APPLE AND NOT FLTK_BACKEND_X11)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
+    list(APPEND FLTK_COCOA_FRAMEWORKS "-framework Metal -framework QuartzCore")
+  elseif(FLTK_BACKEND_WAYLAND)
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
+  else()
+    list(APPEND VULKAN_LIBRARIES Vulkan::Vulkan)
+  endif(WIN32)
+  if (Vulkan_shaderc_combined_FOUND)
+if(WIN32)
+  if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(_Vulkan_hint_executable_search_paths
+	"$ENV{VULKAN_SDK}/bin"
+    )
+    set(_Vulkan_hint_library_search_paths
+	"$ENV{VULKAN_SDK}/lib"
+	"$ENV{VULKAN_SDK}/bin"
+    )
+  else()
+      set(_Vulkan_hint_executable_search_paths
+	  "$ENV{VULKAN_SDK}/bin32"
+	  "$ENV{VULKAN_SDK}/bin"
+      )
+      set(_Vulkan_hint_library_search_paths
+	  "$ENV{VULKAN_SDK}/lib32"
+	  "$ENV{VULKAN_SDK}/bin32"
+	  "$ENV{VULKAN_SDK}/lib"
+	  "$ENV{VULKAN_SDK}/bin"
+      )
+  endif()
+else()
+  set(_Vulkan_hint_executable_search_paths
+      "$ENV{VULKAN_SDK}/bin"
+  )
+  set(_Vulkan_hint_library_search_paths
+      "$ENV{VULKAN_SDK}/lib"
+  )
+endif()
+  list(APPEND VULKAN_LIBRARIES
+      Vulkan::shaderc_combined
+      Vulkan::glslang
+  )
+  set(SPIRV-Tools-opt_LIBRARY )
+  find_library(SPIRV-Tools-opt_LIBRARY SPIRV-Tools-opt
+      HINTS
+      ${_Vulkan_hint_library_search_paths})
+  if (NOT SPIRV-Tools-opt_LIBRARY)
+      message(FATAL_ERROR "SPIRV-Tools-opt library not found!")
+  endif()
+  set(SPIRV-Tools-link_LIBRARY )
+  if (UNIX AND NOT APPLE)
+      find_library(SPIRV-Tools-link_LIBRARY SPIRV-Tools-link
+	  HINTS
+	  ${_Vulkan_hint_library_search_paths})
+      if (NOT SPIRV-Tools-link_LIBRARY)
+	  message(FATAL_ERROR "SPIRV-Tools-link library not found!")
+      endif()
+  endif()
+  list(APPEND VULKAN_LIBRARIES
+      ${SPIRV-Tools-opt_LIBRARY}
+      Vulkan::SPIRV-Tools
+      ${SPIRV-Tools-link_LIBRARY}
+  )
+  else()
+    message(FATAL_ERROR "shaderc_combined not found!")
+  endif()
+endif(VULKAN_FOUND)
 
 #######################################################################
 option(FLTK_OPTION_LARGE_FILE "enable large file support" ON)
@@ -857,6 +959,7 @@ else(FLTK_USE_PTHREADS)
   set(HAVE_PTHREAD_H 0)
 
 endif(FLTK_USE_PTHREADS)
+
 
 set(debug_threads 0) # set to 1 to show debug info
 if(debug_threads)
@@ -1070,6 +1173,9 @@ if(DEBUG_OPTIONS_CMAKE)
   fl_debug_var(OPENGL_FOUND)
   fl_debug_var(OPENGL_INCLUDE_DIR)
   fl_debug_var(OPENGL_LIBRARIES)
+  fl_debug_var(VULKAN_FOUND)
+  fl_debug_var(VULKAN_INCLUDE_DIRS)
+  fl_debug_var(VULKAN_LIBRARIES)
   fl_debug_var(CMAKE_MSVC_RUNTIME_LIBRARY)
   message("--- bundled libraries ---")
   fl_debug_var(FLTK_USE_SYSTEM_LIBJPEG)

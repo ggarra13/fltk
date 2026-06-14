@@ -44,6 +44,7 @@ void shape_window::draw() {
     valid(1);
     glLoadIdentity();
     glViewport(0, 0, pixel_w(), pixel_h());
+    fprintf(stderr, "%dx%d\n", pixel_w(), pixel_h());
   }
 // draw an amazing graphic:
   glClear(GL_COLOR_BUFFER_BIT);
@@ -79,6 +80,7 @@ void sides_cb(Fl_Widget *o, void *p) {
 
 int main(int argc, char **argv) {
 
+#if 0
   Fl::use_high_res_GL(1);
   Fl_Window window(300, 330);
 
@@ -98,6 +100,9 @@ int main(int argc, char **argv) {
 
   window.end();
   window.show(argc,argv);
-
+#else
+  shape_window sw(300, 20, 300, 330, "GL Window");
+  sw.show();
+#endif
   return Fl::run();
 }

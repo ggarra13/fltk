@@ -60,6 +60,15 @@
 #define BORDER_WIDTH 2
 
 /*
+ * HAVE_VK:
+ *
+ * Do you have Vulkan? Set this to 0 if you don't have or plan to use
+ * Vulkan, and FLTK will be smaller.
+ */
+
+#cmakedefine01 HAVE_VK
+ 
+/*
  * HAVE_GL:
  *
  * Do you have OpenGL? Set this to 0 if you don't have or plan to use
@@ -357,7 +366,6 @@
 
 #cmakedefine01 HAVE_CURSOR_SHAPE
 
-
 /*
  * FLTK_HAVE_PEN_SUPPORT
  *
@@ -370,4 +378,3 @@
  *
  */
 
-#cmakedefine FLTK_HAVE_PEN_SUPPORT 1
