@@ -206,7 +206,7 @@ void Wayland_Driver::subscribe(Fl_Widget* widget)
     }
     Driver::subscribe(widget);
 }
-    
+
 Trait Wayland_Driver::traits() {
   if (!g_tablet_seat) return Trait::NONE;
   // Aggregate across all known tools; a connected tablet can do at least this.
@@ -636,7 +636,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   Fl_Window *eventWindow = tool->focus_win;
 
   bool is_menu_window = eventWindow->menu_window();
-  
+
   if (!is_menu_window) {
       // ── 3. Modal / grab guards ──────────────────────────────────────────
       if (Fl::grab() && Fl::grab() != eventWindow) {
@@ -677,7 +677,6 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     }
   };
 
-  
   // ── 4. Receiver selection & below_pen ENTER/LEAVE ────────────────────────
   if (pushed_ && pushed_->widget() && Fl::pushed() == pushed_->widget()) {
     // An earlier tip-down fixed this tool's receiver until the tip lifts.

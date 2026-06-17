@@ -141,10 +141,8 @@ static int g_next_pen_id { 1 };
 namespace Fl {
 namespace Pen {
 
-// Statically allocated instance with a trivial constructor
 static WinAPI_Driver winapi_driver_instance;
-
-// Constant-initialized global reference (perfectly safe for other static initializers)
+// Define the extern Driver& declared in Fl_Base_Pen_Events.H.
 Driver& driver = winapi_driver_instance;
 
 Trait WinAPI_Driver::traits() {
@@ -153,7 +151,7 @@ Trait WinAPI_Driver::traits() {
   // driver itself is always considered available.
   Trait t = Trait::DRIVER_AVAILABLE | Trait::PEN_ID | Trait::ERASER |
             Trait::PRESSURE | Trait::TILT_X | Trait::TILT_Y | Trait::TWIST;
-  if (g_next_pen_id > 1)
+  if (!g_devices.empty())
     t |= Trait::DETECTED;
   // Note: BARREL_PRESSURE (tangential/slider pressure) and PROXIMITY (hover
   // distance) are not reported by POINTER_PEN_INFO and are therefore not
@@ -697,7 +695,7 @@ static void handle_update(PenDevice *dev, HWND hwnd, UINT msg,
 // Public entry point — called from the WinAPI WndProc
 // ─────────────────────────────────────────────────────────────────────────────
 
-bool fl_winapi_pen_handle(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
+FL_EXPORT bool fl_winapi_pen_handle(HWND hwnd, UINT msg, WPARAM wParam, LPARAM /*lParam*/) {
   switch (msg) {
     case WM_POINTERENTER:
     case WM_POINTERLEAVE:
