@@ -1242,11 +1242,6 @@ static BOOL CALLBACK child_window_cb(HWND child_xid, LPARAM data) {
 static bool sizing_window = false;
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-
-#if FLTK_HAVE_PEN_SUPPORT
-  bool pen_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
-#endif
-
   // Copy the message to fl_msg so add_handler code can see it.
   // It is already there if this is called by DispatchMessage,
   // but not if Windows calls this directly.
@@ -1258,44 +1253,6 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
   // fl_msg.pt = ???
   // fl_msg.lPrivate = ???
  // Early in mouse handling:
-
-  switch (uMsg) {
-    case WM_MOUSEMOVE:
-    case WM_LBUTTONDOWN:
-    case WM_LBUTTONDBLCLK:
-    case WM_LBUTTONUP:
-    case WM_MBUTTONDOWN:
-    case WM_MBUTTONDBLCLK:
-    case WM_MBUTTONUP:
-    case WM_RBUTTONDOWN:
-    case WM_RBUTTONDBLCLK:
-    case WM_RBUTTONUP:
-    case WM_XBUTTONDOWN:
-    case WM_XBUTTONDBLCLK:
-    case WM_XBUTTONUP:
-    case WM_MOUSELEAVE:
-    {
-#if 0
-        /* 0xFF515700 is the WinAPI signature masking for synthesized Pen/Touch events.
-           Turning this on prevents Windows from sending an additional FL_PUSH
-           when the pen is used.  However, enabling this will make the tablet
-           not work with menus, drag bar or any widgets.
-           So far the cleanest solution is to use a bool flag to handle this in
-           the user's code.
-           See test program penpal.cxx's pen_handle_ variable.
-        */
-      LONG_PTR extraInfo = GetMessageExtraInfo();
-      if ((extraInfo & 0xFFFFFF00) == 0xFF515700) {
-          // This is a synthesized mouse event from a pen/touch action.
-          // Because FLTK's Pen API handles the actual pointer event, we drop this.
-          return DefWindowProcW(hWnd, uMsg, wParam, lParam);
-      }
-#endif
-      break;
-    }
-  default:
-      break;
-  }
 
   switch (uMsg) {
     case WM_MOUSEMOVE:
@@ -2005,6 +1962,11 @@ content  key    keyboard layout
         return 0;
 
       default: {
+#if FLTK_HAVE_PEN_SUPPORT
+        bool pen_event_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
+        if (pen_event_handled)
+          return 0;
+#endif
         if (Fl::handle(0, 0))
           return 0;
         break; }
