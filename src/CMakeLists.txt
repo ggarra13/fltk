@@ -341,7 +341,7 @@ elseif(FLTK_USE_WAYLAND)
   if(FLTK_USE_WAYLAND AND FLTK_HAVE_PEN_SUPPORT)
       list(APPEND DRIVER_FILES drivers/Wayland/Fl_Wayland_Pen_Events.cxx)
   endif()
-  
+
   set(DRIVER_HEADER_FILES
     drivers/Posix/Fl_Posix_System_Driver.H
     drivers/Wayland/Fl_Wayland_Screen_Driver.H
@@ -925,7 +925,7 @@ if(UNIX AND FLTK_USE_WAYLAND)
 # but that protocol's header file is not necessary for the "cursor shape" protocol itself.
     set(INFILE ${PROTOCOLS}/stable/tablet/tablet-v2.xml)
     add_custom_command(
-      OUTPUT tablet-protocol.c # tablet-client-protocol.h
+      OUTPUT tablet-protocol.c tablet-client-protocol.h
       COMMAND wayland-scanner private-code  ${INFILE} tablet-protocol.c
       COMMAND wayland-scanner client-header ${INFILE} tablet-client-protocol.h
       DEPENDS ${INFILE}
@@ -1125,7 +1125,7 @@ if(FLTK_BUILD_SHARED_LIBS AND MSVC)
   if(VULKAN_FOUND)
     list(APPEND SOURCES ${VKCPPFILES} ${VK_HEADER_FILES} ${VK_DRIVER_HEADER_FILES})
   endif(VULKAN_FOUND)
-      
+
   fl_add_library(fltk SHARED "${SOURCES}")
   add_optional_libs(fltk-shared)
 
