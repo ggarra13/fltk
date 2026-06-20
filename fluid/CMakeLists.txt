@@ -114,7 +114,6 @@ set(CPPFILES
   fluid_icon.cxx
   app/args.cxx
   app/Snap_Action.cxx
-  app/Image_Asset.cxx
   app/history.cxx
   app/Menu.cxx
   app/shell_command.cxx
@@ -130,6 +129,7 @@ set(CPPFILES
   nodes/Group_Node.cxx
   nodes/Menu_Node.cxx
   nodes/Node.cxx
+  nodes/Widget_Image.cxx
   nodes/Widget_Node.cxx
   nodes/Window_Node.cxx
   nodes/callbacks.cxx
@@ -144,6 +144,8 @@ set(CPPFILES
   panels/widget_panel/Grid_Child_Tab.cxx
   proj/align_widget.cxx
   proj/i18n.cxx
+  proj/Image_Asset.cxx
+  proj/Image_Asset_Map.cxx
   proj/mergeback.cxx
   proj/undo.cxx
   rsrcs/pixmaps.cxx
@@ -168,7 +170,6 @@ set(HEADERFILES
   fluid_icon.h
   app/args.h
   app/Snap_Action.h
-  app/Image_Asset.h
   app/history.h
   app/Menu.h
   app/shell_command.h
@@ -184,6 +185,7 @@ set(HEADERFILES
   nodes/Group_Node.h
   nodes/Menu_Node.h
   nodes/Node.h
+  nodes/Widget_Image.h
   nodes/Widget_Node.h
   nodes/Window_Node.h
   nodes/callbacks.h
@@ -197,6 +199,8 @@ set(HEADERFILES
   panels/widget_panel/Grid_Tab.h
   panels/widget_panel/Grid_Child_Tab.h
   proj/align_widget.h
+  proj/Image_Asset.h
+  proj/Image_Asset_Map.h
   proj/mergeback.h
   proj/i18n.h
   proj/undo.h

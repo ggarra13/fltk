@@ -75,6 +75,7 @@ Fl_Image_Surface_Driver *Fl_Image_Surface_Driver::newImageSurfaceDriver(int w, i
   return new Fl_Xlib_Image_Surface_Driver(w, h, high_res, off);
 }
 
+// This defines e_x_down and e_y_down for X11 when Wayland is not being built.
 #if FLTK_HAVE_PEN_SUPPORT && !defined(FLTK_USE_WAYLAND)
 namespace Fl {
 namespace Private {

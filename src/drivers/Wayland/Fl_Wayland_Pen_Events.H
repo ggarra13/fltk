@@ -47,9 +47,9 @@ void fl_wayland_tablet_init_seat(struct wl_seat *wl_seat);
  */
 void fl_wayland_tablet_cleanup();
 
-/** 
+/**
  * Invalidate wl_surface when it is destroyed.
- * 
+ *
  * @param surface Wayland surface to invalidate.
  */
 void fl_wayland_tablet_surface_destroyed(struct wl_surface *surface);

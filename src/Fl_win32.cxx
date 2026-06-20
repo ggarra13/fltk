@@ -1242,14 +1242,9 @@ static BOOL CALLBACK child_window_cb(HWND child_xid, LPARAM data) {
 static bool sizing_window = false;
 
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-
-#if FLTK_HAVE_PEN_SUPPORT
-    bool pen_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
-#endif
-    
   // Copy the message to fl_msg so add_handler code can see it.
   // It is already there if this is called by DispatchMessage,
-  // but not if Windows calls this directly.          
+  // but not if Windows calls this directly.
   fl_msg.hwnd = hWnd;
   fl_msg.message = uMsg;
   fl_msg.wParam = wParam;
@@ -1293,7 +1288,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
   default:
       break;
   }
-  
+
   Fl_Window *window = fl_find(hWnd);
   float scale = (window ? Fl::screen_driver()->scale(Fl_Window_Driver::driver(window)->screen_num()) : 1);
 
@@ -1967,6 +1962,11 @@ content  key    keyboard layout
         return 0;
 
       default: {
+#if FLTK_HAVE_PEN_SUPPORT
+        bool pen_event_handled = fl_winapi_pen_handle(hWnd, uMsg, wParam, lParam);
+        if (pen_event_handled)
+          return 0;
+#endif
         if (Fl::handle(0, 0))
           return 0;
         break; }
@@ -2454,7 +2454,7 @@ void Fl_WinAPI_Window_Driver::makeWindow() {
     wlen = fl_utf8toUtf16(w->label(), (unsigned)l, (unsigned short *)lab, wlen);
     lab[wlen] = 0;
   }
-  
+
   x->xid = (fl_uintptr_t)CreateWindowExW(styleEx,
                            class_namew, lab, style,
                            xp, yp, wp, hp,
