@@ -552,13 +552,8 @@ static void tool_cb_button(void *data, struct zwp_tablet_tool_v2 *,
   // Map physical button codes to State bits.
   State bit = (State)0;
   switch (button) {
-<<<<<<< HEAD
-    case BTN_STYLUS:  bit = State::BUTTON0; break;
-    case BTN_STYLUS2: bit = State::BUTTON1; break;
-=======
     case BTN_STYLUS:  bit = State::BUTTON1; break; // upper barell button
     case BTN_STYLUS2: bit = State::BUTTON0; break; // lower barrel button, closer to the pen tip
->>>>>>> original
     case BTN_STYLUS3: bit = State::BUTTON2; break;
     default: break;
   }
@@ -641,11 +636,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   Fl_Window *eventWindow = tool->focus_win;
 
   bool is_menu_window = eventWindow->menu_window();
-<<<<<<< HEAD
 
-=======
-
->>>>>>> original
   if (!is_menu_window) {
       // ── 3. Modal / grab guards ──────────────────────────────────────────
       if (Fl::grab() && Fl::grab() != eventWindow) {
@@ -686,10 +677,6 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     }
   };
 
-<<<<<<< HEAD
-
-=======
->>>>>>> original
   // ── 4. Receiver selection & below_pen ENTER/LEAVE ────────────────────────
   if (pushed_ && pushed_->widget() && Fl::pushed() == pushed_->widget()) {
     // An earlier tip-down fixed this tool's receiver until the tip lifts.
