@@ -1244,7 +1244,6 @@ int Fl_Menu_Item::size() const {
     }
     m++;
   }
-  return nest;
 }
 
 /* Advance a pointer to next visible or invisible item of a menu array.
