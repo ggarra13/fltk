@@ -1244,6 +1244,7 @@ int Fl_Menu_Item::size() const {
     }
     m++;
   }
+  return nest;
 }
 
 /* Advance a pointer to next visible or invisible item of a menu array.
@@ -1737,4 +1738,3 @@ void Fl_Window_Driver::scroll_to_selected_item(Fl_Window *win) {
 static bool is_special_labeltype(uchar t) {
   return t == _FL_MULTI_LABEL || t == _FL_ICON_LABEL || t == _FL_IMAGE_LABEL;
 }
-
