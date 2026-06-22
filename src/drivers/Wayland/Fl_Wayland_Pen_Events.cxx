@@ -103,6 +103,8 @@ extern "C" {
                                          struct libdecor_frame *frame,
                                          bool *using_CAIRO);
 }
+extern struct wl_surface *gtk_shell_surface;
+extern Fl_Window *gtk_shell_window;
 
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
@@ -546,6 +548,7 @@ static void tool_cb_proximity_out(void *data, struct zwp_tablet_tool_v2 *) {
   TabletTool *tool           = static_cast<TabletTool *>(data);
   tool->in_proximity         = false;
   tool->frame_proximity_out  = true;
+  gtk_shell_window           = nullptr;
 }
 
 static void tool_cb_down(void *data, struct zwp_tablet_tool_v2 *,
