@@ -135,7 +135,6 @@ struct TabletTool {
   double         decor_sx { 0 };      // surface-local x when over a decoration surface
   double         decor_sy { 0 };      // surface-local y when over a decoration surface
   struct libdecor_frame *focus_frame { nullptr }; // owning frame when over a decoration
-  bool           over_decoration { false };
 
   uint64_t                        hardware_serial;
   int                             pen_id;       // int-sized pen identity
@@ -521,7 +520,6 @@ static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
   TabletTool *tool = static_cast<TabletTool *>(data);
   tool->focus_surface      = surface;
   tool->focus_frame        = nullptr;
-  tool->over_decoration    = false;
   tool->focus_win          = Fl_Wayland_Window_Driver::surface_to_window(surface);
   tool->in_proximity       = true;
   tool->frame_proximity_in = true;
@@ -534,7 +532,6 @@ static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
   if (!tool->focus_win)
   {
     // check whether surface is the headerbar of a GTK-decorated window
-    tool->over_decoration = true;
     bool found = false;
 
     auto drvr = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
@@ -888,12 +885,8 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   // Check if over decoration and if so, do an action if needed.
   if (!tool->focus_win || subscriber_list_.empty()) {
 
-      // ── Decoration bridge ─────────────────────────────────────────────────
-      if (tool->over_decoration && tool->focus_frame && tool->frame_down) {
-
-          // ── Determine total decoration surface width ─────────────────────
-          // libdecor_frame_translate_coordinate(frame, 0, 0, &left, &top) gives the
-          // content origin within the decoration frame.  top == titlebar height.
+      // ── frame down on decoration ───────────────────────────────────────
+      if (tool->focus_frame && tool->frame_down) {
 
           // Find the Fl_Window that owns this frame.
           Fl_Window* win = nullptr;
@@ -927,7 +920,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
                   break;
               }
           } // if (win)
-      } // over_decoration
+      } // focus_frame && frame_down
 
       tablet_tool_reset_frame(tool);
       tool->prev_state = tool->ev.state;
