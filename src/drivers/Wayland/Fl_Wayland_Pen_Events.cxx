@@ -292,16 +292,53 @@ static bool event_inside(Fl_Widget *w, double x, double y) {
 }
 
 /*
- Search the subscriber list for the topmost subscribed widget inside (x, y)
- that belongs to top-window win.
- */
-static Fl_Widget *find_below_pen(Fl_Window *win, double x, double y) {
-  for (auto &sub : subscriber_list_) {
-    Fl_Widget *w = sub.second->widget();
-    if (w && w->top_window() == win && w->visible() && event_inside(w, x, y))
-      return w;
-  }
-  return nullptr;
+  Find the topmost subscribed widget under (x, y) in top-window coordinates.
+  Handles:
+   - Normal widgets
+   - Widgets inside groups
+   - Subwindows (Fl_Window as child)
+   - Separate top-level windows that are themselves subscribers
+*/
+static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
+{
+  if (!topwin) return nullptr;
+
+  struct Finder {
+      static Fl_Widget* find_in_group(Fl_Window *win, Fl_Group* g, double gx, double gy)
+    {
+      if (!g) return nullptr;
+
+      // 1. Check children back-to-front (topmost first)
+      for (int i = g->children() - 1; i >= 0; --i) {
+        Fl_Widget* w = g->child(i);
+        if (!w || !w->visible()) continue;
+
+        if (!event_inside(w, gx, gy))
+            continue;
+
+        if (subscriber_list_.count(w))
+            return w;
+
+        double wx = gx - w->x();
+        double wy = gy - w->y();
+
+        if (wx >= 0.0 && wy >= 0.0 && wx < w->w() && wy < w->h()) {
+          if (Fl_Group* sg = w->as_group()) {
+              if (Fl_Widget* found = find_in_group(win, sg, gx, gy))
+                  return found;
+          }
+        }
+      }
+
+      // 2. Check if THIS window/group is a pen subscriber
+      if (subscriber_list_.count(g))
+        return g;
+
+      return nullptr;
+    }
+  };
+
+  return Finder::find_in_group(topwin, topwin, x, y);
 }
 
 /*
