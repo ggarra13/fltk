@@ -303,7 +303,7 @@ static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
   if (!topwin) return nullptr;
 
   struct Finder {
-      static Fl_Widget* find_in_group(Fl_Window *win, Fl_Group* g, double gx, double gy)
+      static Fl_Widget* find_in_group(Fl_Group* g, double gx, double gy)
     {
       if (!g) return nullptr;
 
@@ -318,26 +318,21 @@ static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
         if (subscriber_list_.count(w))
             return w;
 
-        double wx = gx - w->x();
-        double wy = gy - w->y();
-
-        if (wx >= 0.0 && wy >= 0.0 && wx < w->w() && wy < w->h()) {
-          if (Fl_Group* sg = w->as_group()) {
-              if (Fl_Widget* found = find_in_group(win, sg, gx, gy))
-                  return found;
-          }
+        if (Fl_Group* sg = w->as_group()) {
+            if (Fl_Widget* found = find_in_group(sg, gx, gy))
+                return found;
         }
       }
 
       // 2. Check if THIS window/group is a pen subscriber
       if (subscriber_list_.count(g))
-        return g;
+          return g;
 
       return nullptr;
     }
   };
 
-  return Finder::find_in_group(topwin, topwin, x, y);
+  return Finder::find_in_group(topwin, x, y);
 }
 
 /*
