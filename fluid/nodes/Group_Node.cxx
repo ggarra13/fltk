@@ -194,19 +194,19 @@ void Group_Node::ideal_size(int &w, int &h) {
     w = 140;
     h = 140;
   }
-  fld::app::Snap_Action::better_size(w, h);
+  fluid::app::Snap_Action::better_size(w, h);
 }
 
-void Group_Node::write_code1(fld::io::Code_Writer& f) {
+void Group_Node::write_code1(fluid::io::Code_Writer& f) {
   Widget_Node::write_code1(f);
 }
 
-void Group_Node::write_code2(fld::io::Code_Writer& f) {
+void Group_Node::write_code2(fluid::io::Code_Writer& f) {
   const char *var = name() ? name() : "o";
   write_extra_code(f);
-  f.write_c("%s%s->end();\n", f.indent(), var);
+  f.write_c(f.indent() + var + "->end();\n");
   if (resizable()) {
-    f.write_c("%sFl_Group::current()->resizable(%s);\n", f.indent(), var);
+    f.write_c(f.indent() + "Fl_Group::current()->resizable(" + var + ");\n");
   }
   write_block_close(f);
 }
@@ -352,7 +352,7 @@ void Flex_Node::copy_properties_for_children() {
   d->layout();
 }
 
-void Flex_Node::write_properties(fld::io::Project_Writer &f)
+void Flex_Node::write_properties(fluid::io::Project_Writer &f)
 {
   Group_Node::write_properties(f);
   Fl_Flex* flex = (Fl_Flex*)o;
@@ -377,7 +377,7 @@ void Flex_Node::write_properties(fld::io::Project_Writer &f)
   }
 }
 
-void Flex_Node::read_property(fld::io::Project_Reader &f, const char *c)
+void Flex_Node::read_property(fluid::io::Project_Reader &f, const char *c)
 {
   Fl_Flex* flex = (Fl_Flex*)o;
   suspend_auto_layout = 1;
@@ -425,20 +425,19 @@ void Flex_Node::postprocess_read()
   suspend_auto_layout = 0;
 }
 
-void Flex_Node::write_code2(fld::io::Code_Writer& f) {
+void Flex_Node::write_code2(fluid::io::Code_Writer& f) {
   const char *var = name() ? name() : "o";
   Fl_Flex* flex = (Fl_Flex*)o;
   int lm, tm, rm, bm;
   flex->margin(&lm, &tm, &rm, &bm);
   if (lm!=0 || tm!=0 || rm!=0 || bm!=0)
-    f.write_c("%s%s->margin(%d, %d, %d, %d);\n", f.indent(), var, lm, tm, rm, bm);
+    f.write_c(f.indent() + var + "->margin(" + std::to_string(lm) + ", " + std::to_string(tm) + ", " + std::to_string(rm) + ", " + std::to_string(bm) + ");\n");
   if (flex->gap())
-    f.write_c("%s%s->gap(%d);\n", f.indent(), var, flex->gap());
+    f.write_c(f.indent() + var + "->gap(" + std::to_string(flex->gap()) + ");\n");
   for (int i=0; i<flex->children(); ++i) {
     Fl_Widget *ci = flex->child(i);
     if (flex->fixed(ci))
-      f.write_c("%s%s->fixed(%s->child(%d), %d);\n", f.indent(), var, var, i,
-                flex->horizontal() ? ci->w() : ci->h());
+      f.write_c(f.indent() + var + "->fixed(" + var + "->child(" + std::to_string(i) + "), " + std::to_string(flex->horizontal() ? ci->w() : ci->h()) + ");\n");
   }
   Group_Node::write_code2(f);
 }
@@ -714,7 +713,7 @@ Fl_Widget *Table_Node::enter_live_mode(int) {
 void Table_Node::ideal_size(int &w, int &h) {
   w = 160;
   h = 120;
-  fld::app::Snap_Action::better_size(w, h);
+  fluid::app::Snap_Action::better_size(w, h);
 }
 
 // ---- Tabs_Node --------------------------------------------------- MARK: -

@@ -37,9 +37,9 @@
 
 extern void open_panel();
 
-using namespace fld;
-using namespace fld::io;
-using namespace fld::proj;
+using namespace fluid;
+using namespace fluid::io;
+using namespace fluid::proj;
 
 /// Set a current class, so that the code of the children is generated correctly.
 Class_Node *current_class = nullptr;
@@ -79,10 +79,10 @@ static char buffer[128]; // for error messages
  \return nullptr if the character was found, else a pointer to a static string
     with an error message
  */
-const char *_q_check(const char * & c, int type) {
+static const char *q_check(const char * & c, int type) {
   for (;;) switch (*c++) {
     case '\0':
-      sprintf(buffer,"missing %c",type);
+      sprintf(buffer,"missing %c", type);
       return buffer;
     case '\\':
       if (*c) c++;
@@ -101,7 +101,7 @@ const char *_q_check(const char * & c, int type) {
  \return nullptr if the character was found, else a pointer to a static string
     with an error message
  */
-const char *_c_check(const char * & c, int type) {
+const char *c_check_recursion(const char * & c, int type) {
   const char *d;
   for (;;) switch (*c++) {
     case 0:
@@ -130,23 +130,23 @@ const char *_c_check(const char * & c, int type) {
     case '{':
 //      // Matt: C++ does allow {} inside () now
 //      if (type==')') goto UNEXPECTED;
-      d = _c_check(c,'}');
+      d = c_check_recursion(c,'}');
       if (d) return d;
       break;
     case '(':
-      d = _c_check(c,')');
+      d = c_check_recursion(c,')');
       if (d) return d;
       break;
     case '[':
-      d = _c_check(c,']');
+      d = c_check_recursion(c,']');
       if (d) return d;
       break;
     case '\"':
-      d = _q_check(c,'\"');
+      d = q_check(c,'\"');
       if (d) return d;
       break;
     case '\'':
-      d = _q_check(c,'\'');
+      d = q_check(c,'\'');
       if (d) return d;
       break;
     case '}':
@@ -172,7 +172,7 @@ const char *_c_check(const char * & c, int type) {
     (i.e. namespace { ... } ). We should make this option user selectable.
  */
 const char *c_check(const char *c, int type) {
-  return _c_check(c,type);
+  return c_check_recursion(c,type);
 }
 
 // ---- Function_Node implementation
@@ -218,7 +218,7 @@ Node *Function_Node::make(Strategy strategy) {
   - "C" is written if we want a C signature instead of C++
   - "return_type" is followed by the return type of the function
  */
-void Function_Node::write_properties(fld::io::Project_Writer &f) {
+void Function_Node::write_properties(fluid::io::Project_Writer &f) {
   Node::write_properties(f);
   switch (public_) {
     case 0: f.write_string("private"); break;
@@ -235,7 +235,7 @@ void Function_Node::write_properties(fld::io::Project_Writer &f) {
  Read function specific properties fron an .fl file.
  \param[in] c read from this string
  */
-void Function_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void Function_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"private")) {
     public_ = 0;
   } else if (!strcmp(c,"protected")) {
@@ -312,9 +312,9 @@ static void clean_function_for_implementation(char *out, const char *function_na
 /**
  Write the code for the source and the header file.
  This writes the code that goes \b before all children of this class.
- \see write_code2(fld::io::Code_Writer& f)
+ \see write_code2(fluid::io::Code_Writer& f)
  */
-void Function_Node::write_code1(fld::io::Code_Writer& f) {
+void Function_Node::write_code1(fluid::io::Code_Writer& f) {
   constructor=0;
   havewidgets = 0;
   Node *child;
@@ -379,13 +379,13 @@ void Function_Node::write_code1(fld::io::Code_Writer& f) {
         size_t n = strlen(k);
         if (!strncmp(name(), k, n) && name()[n] == '(') constructor = 1;
       }
-      f.write_h("%s", f.indent(1));
+      f.write_h(f.indent(1));
       if (is_static) f.write_h("static ");
       if (is_virtual) f.write_h("virtual ");
       if (!constructor) {
-        f.write_h("%s%s ", rtype.c_str(), star.c_str());
+        f.write_h(rtype + star + " ");
         if (havechildren)
-          f.write_c("%s%s ", rtype.c_str(), star.c_str());
+          f.write_c(rtype + star + " ");
       }
 
       // if this is a subclass, only f.write_h() the part before the ':'
@@ -403,22 +403,22 @@ void Function_Node::write_code1(fld::io::Code_Writer& f) {
       *sptr = '\0';
 
       if (s[strlen(s)-1] == '}') {  // special case for inlined functions
-        f.write_h("%s\n", s);
+        f.write_h(std::string(s) + "\n");
       } else {
-        f.write_h("%s;\n", s);
+        f.write_h(std::string(s) + ";\n");
       }
       if (havechildren) {
         clean_function_for_implementation(s, name());
-        f.write_c("%s::%s {\n", k, s);
+        f.write_c(std::string(k) + "::" + std::string(s) + " {\n");
       }
     } else {
       if (havechildren)
         write_comment_c(f);
       if (public_==1) {
         if (declare_c_)
-          f.write_h("extern \"C\" { %s%s %s; }\n", rtype.c_str(), star.c_str(), name());
+          f.write_h("extern \"C\" { " + rtype + star+ " " + name() + "; }\n");
         else
-          f.write_h("%s%s %s;\n", rtype.c_str(), star.c_str(), name());
+          f.write_h(rtype + star + " " + name() + ";\n");
       } else if (public_==2) {
         // write neither the prototype nor static, the function may be declared elsewhere
       } else {
@@ -430,22 +430,22 @@ void Function_Node::write_code1(fld::io::Code_Writer& f) {
       char s[1024];
       if (havechildren) {
         clean_function_for_implementation(s, name());
-        f.write_c("%s%s %s {\n", rtype.c_str(), star.c_str(), s);
+        f.write_c(rtype + star + " " + s + " {\n");
       }
     }
   }
 
   if (havewidgets && child && !child->name())
-    f.write_c("%s%s* w;\n", f.indent(1), subclassname(child).c_str());
-  f.indentation++;
+    f.write_c(f.indent(1) + subclassname(child) + "* w;\n");
+  f.indent_more();
 }
 
 /**
  Write the code for the source and the header file.
  This writes the code that goes \b after all children of this class.
- \see write_code1(fld::io::Code_Writer& f)
+ \see write_code1(fluid::io::Code_Writer& f)
  */
-void Function_Node::write_code2(fld::io::Code_Writer& f) {
+void Function_Node::write_code2(fluid::io::Code_Writer& f) {
   Node *child;
   const char *var = "w";
   char havechildren = 0;
@@ -456,15 +456,15 @@ void Function_Node::write_code2(fld::io::Code_Writer& f) {
 
   if (ismain()) {
     if (havewidgets)
-      f.write_c("%s%s->show(argc, argv);\n", f.indent(1), var);
+      f.write_c(f.indent(1) + var + "->show(argc, argv);\n");
     if (havechildren)
-      f.write_c("%sreturn Fl::run();\n", f.indent(1));
+      f.write_c(f.indent(1) + "return Fl::run();\n");
   } else if (havewidgets && !constructor && return_type().empty()) {
-    f.write_c("%sreturn %s;\n", f.indent(1), var);
+    f.write_c(f.indent(1) + "return " + var + ";\n");
   }
   if (havechildren)
     f.write_c("}\n");
-  f.indentation = 0;
+  f.indent_reset();
 }
 
 /**
@@ -542,7 +542,7 @@ void Code_Node::open() {
 /**
  Grab changes from an external editor and write this node.
  */
-void Code_Node::write(fld::io::Project_Writer &f) {
+void Code_Node::write(fluid::io::Project_Writer &f) {
   // External editor changes? If so, load changes into ram, update mtime/size
   if ( handle_editor_changes() == 1 ) {
     Fluid.main_window->redraw();    // tell fluid to redraw; edits may affect tree's contents
@@ -553,7 +553,7 @@ void Code_Node::write(fld::io::Project_Writer &f) {
 /**
  Write the code block with the correct indentation.
  */
-void Code_Node::write_code1(fld::io::Code_Writer& f) {
+void Code_Node::write_code1(fluid::io::Code_Writer& f) {
   // External editor changes? If so, load changes into ram, update mtime/size
   if ( handle_editor_changes() == 1 ) {
     Fluid.main_window->redraw();    // tell fluid to redraw; edits may affect tree's contents
@@ -651,7 +651,7 @@ Node *CodeBlock_Node::make(Strategy strategy) {
   - "after" is followed by the code that comes after the children
  The "before" code is stored in the name() field.
  */
-void CodeBlock_Node::write_properties(fld::io::Project_Writer &f) {
+void CodeBlock_Node::write_properties(fluid::io::Project_Writer &f) {
   Node::write_properties(f);
   if (!end_code().empty()) {
     f.write_string("after");
@@ -662,7 +662,7 @@ void CodeBlock_Node::write_properties(fld::io::Project_Writer &f) {
 /**
  Read the node specific properties.
  */
-void CodeBlock_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void CodeBlock_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"after")) {
     end_code(f.read_word());
   } else {
@@ -680,21 +680,21 @@ void CodeBlock_Node::open() {
 /**
  Write the "before" code.
  */
-void CodeBlock_Node::write_code1(fld::io::Code_Writer& f) {
+void CodeBlock_Node::write_code1(fluid::io::Code_Writer& f) {
   const char* c = name();
-  f.write_c("%s%s {\n", f.indent(), c ? c : "");
-  f.indentation++;
+  f.write_c(f.indent() + (c ? c : "") + " {\n");
+  f.indent_more();
 }
 
 /**
  Write the "after" code.
  */
-void CodeBlock_Node::write_code2(fld::io::Code_Writer& f) {
-  f.indentation--;
+void CodeBlock_Node::write_code2(fluid::io::Code_Writer& f) {
+  f.indent_less();
   if (!end_code().empty())
-    f.write_c("%s} %s\n", f.indent(), end_code().c_str());
+    f.write_c(f.indent() + "} " + end_code() + "\n");
   else
-    f.write_c("%s}\n", f.indent());
+    f.write_c(f.indent() + "}\n");
 }
 
 // ---- Decl_Node declaration
@@ -753,7 +753,7 @@ Node *Decl_Node::make(Strategy strategy) {
   - "private"/"public"/"protected"
   - "local"/"global" if this is static or not
  */
-void Decl_Node::write_properties(fld::io::Project_Writer &f) {
+void Decl_Node::write_properties(fluid::io::Project_Writer &f) {
   Node::write_properties(f);
   switch (public_) {
     case 0: f.write_string("private"); break;
@@ -769,7 +769,7 @@ void Decl_Node::write_properties(fld::io::Project_Writer &f) {
 /**
  Read the specific properties.
  */
-void Decl_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void Decl_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"public")) {
     public_ = 1;
   } else if (!strcmp(c,"private")) {
@@ -797,7 +797,7 @@ void Decl_Node::open() {
  \todo There are a lot of side effect in this node depending on the given text
     and the parent node. They need to be understood and documented.
  */
-void Decl_Node::write_code1(fld::io::Code_Writer& f) {
+void Decl_Node::write_code1(fluid::io::Code_Writer& f) {
   const char* c = name();
   if (!c) return;
   // handle a few keywords differently if inside a class
@@ -808,8 +808,8 @@ void Decl_Node::write_code1(fld::io::Code_Writer& f) {
                         || (!strncmp(c,"enum",4) && isspace(c[4]))
                         ) ) {
     f.write_public(public_);
-    write_comment_h(f, f.indent(1));
-    f.write_h("%s%s\n", f.indent(1), c);
+    write_comment_h(f, f.indent(1).c_str());
+    f.write_h(f.indent(1) + c + "\n");
     return;
   }
   // handle putting #include, extern, using or typedef into decl:
@@ -823,10 +823,10 @@ void Decl_Node::write_code1(fld::io::Code_Writer& f) {
       ) {
     if (public_) {
       write_comment_h(f);
-      f.write_h("%s\n", c);
+      f.write_h(std::string(c) + "\n");
     } else {
       write_comment_c(f);
-      f.write_c("%s\n", c);
+      f.write_c(std::string(c) + "\n");
     }
     return;
   }
@@ -838,25 +838,25 @@ void Decl_Node::write_code1(fld::io::Code_Writer& f) {
   while (e>c && e[-1]==' ') e--;
   if (class_name(1)) {
     f.write_public(public_);
-    write_comment_h(f, f.indent(1));
-    f.write_hc(f.indent(1), int(e-c), c, csc);
+    write_comment_h(f, f.indent(1).c_str());
+    f.write_hc(f.indent(1), std::string(c, e-c), std::string(csc));
   } else {
     if (public_) {
       if (static_)
         f.write_h("extern ");
       else
         write_comment_h(f);
-      f.write_hc("", int(e-c), c, csc);
+      f.write_hc("", std::string(c, e-c), std::string(csc));
 
       if (static_) {
         write_comment_c(f);
-        f.write_cc("", int(e-c), c, csc);
+        f.write_cc("", std::string(c, e-c), std::string(csc));
       }
     } else {
       write_comment_c(f);
       if (static_)
         f.write_c("static ");
-      f.write_cc("", int(e-c), c, csc);
+      f.write_cc("", std::string(c, e-c), std::string(csc));
     }
   }
 }
@@ -903,7 +903,7 @@ Node *Data_Node::make(Strategy strategy) {
   - "filename" followed by the filename of the file to inline
   - "textmode" if data is written in ASCII vs. binary
  */
-void Data_Node::write_properties(fld::io::Project_Writer &f) {
+void Data_Node::write_properties(fluid::io::Project_Writer &f) {
   Decl_Node::write_properties(f);
   if (!filename().empty()) {
     f.write_string("filename");
@@ -921,7 +921,7 @@ void Data_Node::write_properties(fld::io::Project_Writer &f) {
 /**
  Read specific properties.
  */
-void Data_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void Data_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"filename")) {
     storestring(f.read_word(), filename_, 1);
   } else if (!strcmp(c,"textmode")) {
@@ -949,13 +949,13 @@ void Data_Node::open() {
 /**
  Write the content of the external file inline into the source code.
  */
-void Data_Node::write_code1(fld::io::Code_Writer& f) {
+void Data_Node::write_code1(fluid::io::Code_Writer& f) {
   const char *message = nullptr;
   const char *c = name();
   if (!c) return;
   std::string fn = filename();
   char *data = nullptr;
-  int nData = -1;
+  int nData = 0;
   int uncompressedDataSize = 0;
   // path should be set correctly already
   if (!filename().empty() && !f.write_codeview) {
@@ -993,45 +993,45 @@ void Data_Node::write_code1(fld::io::Code_Writer& f) {
       f.write_c("\n");
       write_comment_c(f);
       if (output_format_ == 1) {
-        f.write_h("%sstatic const char* %s;\n", f.indent(1), c);
-        f.write_c("const char* %s::%s = /* text inlined from %s */\n", class_name(1), c, fn.c_str());
+        f.write_h(f.indent(1) + "static const char* " + c + ";\n");
+        f.write_c("const char* " + std::string(class_name(1)) + "::" + c + " = /* text inlined from " + fn + " */\n");
       } else {
         f.write_h_once("#include <string>");
-        f.write_h("%sstatic const std::string %s;\n", f.indent(1), c);
-        f.write_c("const std::string %s::%s = /* text inlined from %s */\n", class_name(1), c, fn.c_str());
+        f.write_h(f.indent(1) + "static const std::string " + c + ";\n");
+        f.write_c("const std::string " + std::string(class_name(1)) + "::" + c + " = /* text inlined from " + fn + " */\n");
       }
-      if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-      f.write_cstring(data, nData);
+      if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+      f.write_cstring(fluid::string_view(data, nData));
     } else if ((output_format_ == 2) || (output_format_ == 5)) {
-      f.write_h("%sstatic int %s_size;\n", f.indent(1), c);
+      f.write_h(f.indent(1) + "static int " + c + "_size;\n");
       f.write_c("\n");
       write_comment_c(f);
-      f.write_c("int %s::%s_size = %d;\n", class_name(1), c, uncompressedDataSize);
+      f.write_c("int " + std::string(class_name(1)) + "::" + c + "_size = " + std::to_string(uncompressedDataSize) + ";\n");
       if (output_format_ == 2) {
-        f.write_h("%sstatic unsigned char %s[%d];\n", f.indent(1), c, nData);
-        f.write_c("unsigned char %s::%s[%d] = /* data compressed and inlined from %s */\n", class_name(1), c, nData, fn.c_str());
+        f.write_h(f.indent(1) + "static unsigned char " + c + "[" + std::to_string(nData) + "];\n");
+        f.write_c("unsigned char " + std::string(class_name(1)) + "::" + c + "[" + std::to_string(nData) + "] = /* data compressed and inlined from " + fn + " */\n");
       } else {
         f.write_h_once("#include <stdint.h>");
         f.write_h_once("#include <vector>");
-        f.write_h("%sstatic std::vector<uint8_t> %s;\n", f.indent(1), c);
-        f.write_c("std::vector<uint8_t> %s::%s = /* data compressed and inlined from %s */\n", class_name(1), c, fn.c_str());
+        f.write_h(f.indent(1) + "static std::vector<uint8_t> " + c + ";\n");
+        f.write_c("std::vector<uint8_t> " + std::string(class_name(1)) + "::" + c + " = /* data compressed and inlined from " + fn + " */\n");
       }
-      if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-      f.write_cdata(data, nData);
+      if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+      f.write_cdata(fluid::string_view(data, nData));
     } else {
       f.write_c("\n");
       write_comment_c(f);
       if (output_format_ == 0) {
-        f.write_h("%sstatic unsigned char %s[%d];\n", f.indent(1), c, nData);
-        f.write_c("unsigned char %s::%s[%d] = /* data inlined from %s */\n", class_name(1), c, nData, fn.c_str());
+        f.write_h(f.indent(1) + "static unsigned char " + c + "[" + std::to_string(nData) + "];\n");
+        f.write_c("unsigned char " + std::string(class_name(1)) + "::" + c + "[" + std::to_string(nData) + "] = /* data inlined from " + fn + " */\n");
       } else {
         f.write_h_once("#include <stdint.h>");
         f.write_h_once("#include <vector>");
-        f.write_h("%sstatic std::vector<uint8_t> %s;\n", f.indent(1), c);
-        f.write_c("std::vector<uint8_t> %s::%s = /* data inlined from %s */\n", class_name(1), c, fn.c_str());
+        f.write_h(f.indent(1) + "static std::vector<uint8_t> " + c + ";\n");
+        f.write_c("std::vector<uint8_t> " + std::string(class_name(1)) + "::" + c + " = /* data inlined from " + fn + " */\n");
       }
-      if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-      f.write_cdata(data, nData);
+      if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+      f.write_cdata(fluid::string_view(data, nData));
     }
     f.write_c(";\n");
   } else {
@@ -1042,54 +1042,54 @@ void Data_Node::write_code1(fld::io::Code_Writer& f) {
           f.write_c("\n");
           write_comment_c(f);
           if (output_format_ == 1) {
-            f.write_h("extern const char* %s;\n", c);
-            f.write_c("const char* %s = /* text inlined from %s */\n", c, fn.c_str());
+            f.write_h("extern const char* " + std::string(c) + ";\n");
+            f.write_c("const char* " + std::string(c) + " = /* text inlined from " + fn + " */\n");
           } else {
             f.write_h_once("#include <string>");
-            f.write_h("extern const std::string %s;\n", c);
-            f.write_c("const std::string %s = /* text inlined from %s */\n", c, fn.c_str());
+            f.write_h("extern const std::string " + std::string(c) + ";\n");
+            f.write_c("const std::string " + std::string(c) + " = /* text inlined from " + fn + " */\n");
           }
-          if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-          f.write_cstring(data, nData);
+          if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+          f.write_cstring(fluid::string_view(data, nData));
         } else if ((output_format_ == 2) || (output_format_ == 5)) {
-          f.write_h("extern int %s_size;\n", c);
+          f.write_h("extern int " + std::string(c) + "_size;\n");
           f.write_c("\n");
           write_comment_c(f);
-          f.write_c("int %s_size = %d;\n", c, uncompressedDataSize);
+          f.write_c("int " + std::string(c) + "_size = " + std::to_string(uncompressedDataSize) + ";\n");
           if (output_format_ == 2) {
-            f.write_h("extern unsigned char %s[%d];\n", c, nData);
-            f.write_c("unsigned char %s[%d] = /* data compressed and inlined from %s */\n", c, nData, fn.c_str());
+            f.write_h("extern unsigned char " + std::string(c) + "[" + std::to_string(nData) + "];\n");
+            f.write_c("unsigned char " + std::string(c) + "[" + std::to_string(nData) + "] = /* data compressed and inlined from " + fn + " */\n");
           } else {
             f.write_h_once("#include <stdint.h>");
             f.write_h_once("#include <vector>");
-            f.write_h("extern std::vector<uint8_t> %s;\n", c);
-            f.write_c("std::vector<uint8_t> %s = /* data compressed and inlined from %s */\n", c, fn.c_str());
+            f.write_h("extern std::vector<uint8_t> " + std::string(c) + ";\n");
+            f.write_c("std::vector<uint8_t> " + std::string(c) + " = /* data compressed and inlined from " + fn + " */\n");
           }
-          if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-          f.write_cdata(data, nData);
+          if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+          f.write_cdata(fluid::string_view(data, nData));
         } else {
           f.write_c("\n");
           write_comment_c(f);
           if (output_format_ == 0) {
-            f.write_h("extern unsigned char %s[%d];\n", c, nData);
-            f.write_c("unsigned char %s[%d] = /* data inlined from %s */\n", c, nData, fn.c_str());
+            f.write_h("extern unsigned char " + std::string(c) + "[" + std::to_string(nData) + "];\n");
+            f.write_c("unsigned char " + std::string(c) + "[" + std::to_string(nData) + "] = /* data inlined from " + fn + " */\n");
           } else {
             f.write_h_once("#include <stdint.h>");
             f.write_h_once("#include <vector>");
-            f.write_h("extern std::vector<uint8_t> %s;\n", c);
-            f.write_c("std::vector<uint8_t> %s = /* data inlined from %s */\n", c, fn.c_str());
+            f.write_h("extern std::vector<uint8_t> " + std::string(c) + ";\n");
+            f.write_c("std::vector<uint8_t> " + std::string(c) + " = /* data inlined from " + fn + " */\n");
           }
-          if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-          f.write_cdata(data, nData);
+          if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+          f.write_cdata(fluid::string_view(data, nData));
         }
         f.write_c(";\n");
       } else {
         write_comment_h(f);
-        f.write_h("#error Unsupported declaration loading inline data %s\n", fn.c_str());
+        f.write_h("#error Unsupported declaration loading inline data " + fn + "\n");
         if (output_format_ == 1)
-          f.write_h("const char* %s = \"abc...\";\n", c);
+          f.write_h("const char* " + std::string(c) + " = \"abc...\";\n");
         else
-          f.write_h("unsigned char %s[3] = { 1, 2, 3 };\n", c);
+          f.write_h("unsigned char " + std::string(c) + "[3] = { 1, 2, 3 };\n");
       }
     } else {
       f.write_c("\n");
@@ -1097,40 +1097,40 @@ void Data_Node::write_code1(fld::io::Code_Writer& f) {
       if ((output_format_ == 1) || (output_format_ == 4)) {
         if (output_format_ == 1) {
           if (static_) f.write_c("static ");
-          f.write_c("const char* %s = /* text inlined from %s */\n", c, fn.c_str());
+          f.write_c("const char* " + std::string(c) + " = /* text inlined from " + fn + " */\n");
         } else {
           f.write_c_once("#include <string>");
           if (static_) f.write_c("static ");
-          f.write_c("const std::string %s = /* text inlined from %s */\n", c, fn.c_str());
+          f.write_c("const std::string " + std::string(c) + " = /* text inlined from " + fn + " */\n");
         }
-        if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-        f.write_cstring(data, nData);
+        if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+        f.write_cstring(fluid::string_view(data, nData));
       } else if ((output_format_ == 2) || (output_format_ == 5)) {
         if (static_) f.write_c("static ");
-        f.write_c("int %s_size = %d;\n", c, uncompressedDataSize);
+        f.write_c("int " + std::string(c) + "_size = " + std::to_string(uncompressedDataSize) + ";\n");
         if (output_format_ == 2) {
           if (static_) f.write_c("static ");
-          f.write_c("unsigned char %s[%d] = /* data compressed and inlined from %s */\n", c, nData, fn.c_str());
+          f.write_c("unsigned char " + std::string(c) + "[" + std::to_string(nData) + "] = /* data compressed and inlined from " + fn + " */\n");
         } else {
           f.write_c_once("#include <stdint.h>");
           f.write_c_once("#include <vector>");
           if (static_) f.write_c("static ");
-          f.write_c("std::vector<uint8_t> %s = /* data compressed and inlined from %s */\n", c, fn.c_str());
+          f.write_c("std::vector<uint8_t> " + std::string(c) + " = /* data compressed and inlined from " + fn + " */\n");
         }
-        if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-        f.write_cdata(data, nData);
+        if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+        f.write_cdata(fluid::string_view(data, nData));
       } else {
         if (output_format_ == 0) {
           if (static_) f.write_c("static ");
-          f.write_c("unsigned char %s[%d] = /* data inlined from %s */\n", c, nData, fn.c_str());
+          f.write_c("unsigned char " + std::string(c) + "[" + std::to_string(nData) + "] = /* data inlined from " + fn + " */\n");
         } else {
           f.write_c_once("#include <stdint.h>");
           f.write_c_once("#include <vector>");
           if (static_) f.write_c("static ");
-          f.write_c("std::vector<uint8_t> %s = /* data inlined from %s */\n", c, fn.c_str());
+          f.write_c("std::vector<uint8_t> " + std::string(c) + " = /* data inlined from " + fn + " */\n");
         }
-        if (message) f.write_c("#error %s %s\n", message, fn.c_str());
-        f.write_cdata(data, nData);
+        if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
+        f.write_cdata(fluid::string_view(data, nData));
       }
       f.write_c(";\n");
     }
@@ -1194,7 +1194,7 @@ Node *DeclBlock_Node::make(Strategy strategy) {
   - "public"/"protected"
   - "after" followed by the second code block.
  */
-void DeclBlock_Node::write_properties(fld::io::Project_Writer &f) {
+void DeclBlock_Node::write_properties(fluid::io::Project_Writer &f) {
   Node::write_properties(f);
   // deprecated
   if (is_public()) f.write_string("public");
@@ -1208,7 +1208,7 @@ void DeclBlock_Node::write_properties(fld::io::Project_Writer &f) {
 /**
  Read the specific properties.
  */
-void DeclBlock_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void DeclBlock_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if(!strcmp(c,"public")) {
     write_map_ |= CODE_IN_HEADER;
   } else if(!strcmp(c,"protected")) {
@@ -1233,25 +1233,25 @@ void DeclBlock_Node::open() {
  Write the \b before static code to the source file, and to the header file if declared public.
  The before code is stored in the name() field.
  */
-void DeclBlock_Node::write_static(fld::io::Code_Writer& f) {
+void DeclBlock_Node::write_static(fluid::io::Code_Writer& f) {
   const char* c = name();
   if (c && *c) {
     if (write_map_ & STATIC_IN_HEADER)
-      f.write_h("%s\n", c);
+      f.write_h(std::string(c) + "\n");
     if (write_map_ & STATIC_IN_SOURCE)
-      f.write_c("%s\n", c);
+      f.write_c(std::string(c) + "\n");
   }
 }
 
 /**
  Write the \b after static code to the source file, and to the header file if declared public.
  */
-void DeclBlock_Node::write_static_after(fld::io::Code_Writer& f) {
+void DeclBlock_Node::write_static_after(fluid::io::Code_Writer& f) {
   if (!end_code().empty()) {
     if (write_map_ & STATIC_IN_HEADER)
-      f.write_h("%s\n", end_code().c_str());
+      f.write_h(end_code() + "\n");
     if (write_map_ & STATIC_IN_SOURCE)
-      f.write_c("%s\n", end_code().c_str());
+      f.write_c(end_code() + "\n");
   }
 }
 
@@ -1259,25 +1259,25 @@ void DeclBlock_Node::write_static_after(fld::io::Code_Writer& f) {
  Write the \b before code to the source file, and to the header file if declared public.
  The before code is stored in the name() field.
  */
-void DeclBlock_Node::write_code1(fld::io::Code_Writer& f) {
+void DeclBlock_Node::write_code1(fluid::io::Code_Writer& f) {
   const char* c = name();
   if (c && *c) {
     if (write_map_ & CODE_IN_HEADER)
-      f.write_h("%s\n", c);
+      f.write_h(std::string(c) + "\n");
     if (write_map_ & CODE_IN_SOURCE)
-      f.write_c("%s\n", c);
+      f.write_c(std::string(c) + "\n");
   }
 }
 
 /**
  Write the \b after code to the source file, and to the header file if declared public.
  */
-void DeclBlock_Node::write_code2(fld::io::Code_Writer& f) {
+void DeclBlock_Node::write_code2(fluid::io::Code_Writer& f) {
   if (!end_code().empty()) {
     if (write_map_ & CODE_IN_HEADER)
-      f.write_h("%s\n", end_code().c_str());
+      f.write_h(end_code() + "\n");
     if (write_map_ & CODE_IN_SOURCE)
-      f.write_c("%s\n", end_code().c_str());
+      f.write_c(end_code() + "\n");
   }
 }
 
@@ -1323,7 +1323,7 @@ Node *Comment_Node::make(Strategy strategy) {
   - "in_source"/"not_in_source" if the comment will be written to the source code
   - "in_header"/"not_in_header" if the comment will be written to the header file
  */
-void Comment_Node::write_properties(fld::io::Project_Writer &f) {
+void Comment_Node::write_properties(fluid::io::Project_Writer &f) {
   Node::write_properties(f);
   if (in_c_) f.write_string("in_source"); else f.write_string("not_in_source");
   if (in_h_) f.write_string("in_header"); else f.write_string("not_in_header");
@@ -1332,7 +1332,7 @@ void Comment_Node::write_properties(fld::io::Project_Writer &f) {
 /**
  Read extra properties.
  */
-void Comment_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void Comment_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"in_source")) {
     in_c_ = 1;
   } else if (!strcmp(c,"not_in_source")) {
@@ -1378,7 +1378,7 @@ void Comment_Node::open() {
 /**
  Write the comment to the files.
  */
-void Comment_Node::write_code1(fld::io::Code_Writer& f) {
+void Comment_Node::write_code1(fluid::io::Code_Writer& f) {
   const char* c = name();
   if (!c) return;
   if (!in_c_ && !in_h_) return;
@@ -1388,8 +1388,8 @@ void Comment_Node::write_code1(fld::io::Code_Writer& f) {
   // if this seems to be a C style comment, copy the block as is
   // (it's up to the user to correctly close the comment)
   if (s[0]=='/' && s[1]=='*') {
-    if (in_h_) f.write_h("%s\n", c);
-    if (in_c_) f.write_c("%s\n", c);
+    if (in_h_) f.write_h(std::string(c) + "\n");
+    if (in_c_) f.write_c(std::string(c) + "\n");
     return;
   }
   // copy the comment line by line, add the double slash if needed
@@ -1409,8 +1409,8 @@ void Comment_Node::write_code1(fld::io::Code_Writer& f) {
       if (in_c_) f.write_c("// ");
     }
     // now copy the rest of the line
-    if (in_h_) f.write_h("%s\n", b);
-    if (in_c_) f.write_c("%s\n", b);
+    if (in_h_) f.write_h(std::string(b) + "\n");
+    if (in_c_) f.write_c(std::string(b) + "\n");
     if (eol==0) break;
     *e++ = eol;
     b = e;
@@ -1463,7 +1463,7 @@ Node *Class_Node::make(Strategy strategy) {
   - ":" followed by the super class
   - "private"/"protected"
  */
-void Class_Node::write_properties(fld::io::Project_Writer &f) {
+void Class_Node::write_properties(fluid::io::Project_Writer &f) {
   Node::write_properties(f);
   if (!base_class().empty()) {
     f.write_string(":");
@@ -1478,7 +1478,7 @@ void Class_Node::write_properties(fld::io::Project_Writer &f) {
 /**
  Read additional properties.
  */
-void Class_Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void Class_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"private")) {
     public_ = 0;
   } else if (!strcmp(c,"protected")) {
@@ -1500,18 +1500,18 @@ void Class_Node::open() {
 /**
  Write the header code that declares this class.
  */
-void Class_Node::write_code1(fld::io::Code_Writer& f) {
+void Class_Node::write_code1(fluid::io::Code_Writer& f) {
   parent_class = current_class;
   current_class = this;
   write_public_state = 0;
   f.write_h("\n");
   write_comment_h(f);
   if (!prefix().empty())
-    f.write_h("class %s %s ", prefix().c_str(), name());
+    f.write_h("class " + std::string(prefix()) + " " + std::string(name()) + " ");
   else
-    f.write_h("class %s ", name());
+    f.write_h("class " + std::string(name()) + " ");
   if (!base_class().empty()) {
-    f.write_h(": %s ", base_class().c_str());
+    f.write_h(": " + std::string(base_class()) + " ");
   }
   f.write_h("{\n");
 }
@@ -1519,7 +1519,7 @@ void Class_Node::write_code1(fld::io::Code_Writer& f) {
 /**
  Write the header code that ends the declaration of this class.
  */
-void Class_Node::write_code2(fld::io::Code_Writer& f) {
+void Class_Node::write_code2(fluid::io::Code_Writer& f) {
   f.write_h("};\n");
   current_class = parent_class;
 }

@@ -23,6 +23,7 @@
 #include "proj/undo.h"
 #include "nodes/Window_Node.h"
 #include "nodes/Grid_Node.h"
+#include "io/file_chooser.h"
 #include "nodes/Menu_Node.h"
 #include "nodes/Function_Node.h"
 #include <FL/Fl_Spinner.H>
@@ -44,7 +45,7 @@ extern void color_common(Fl_Color c);
 extern void color2_common(Fl_Color c);
 extern void textcolor_common(Fl_Color c);
 extern int widget_i;
-extern fld::widget::Formula_Input_Vars widget_vars[];
+extern fluid::widget::Formula_Input_Vars widget_vars[];
 extern int numselected;
 extern Fl_Menu_Item boxmenu[];
 extern int haderror;
@@ -53,7 +54,7 @@ extern int haderror;
  Allow widget navigation on text fields with Tab.
 */
 static int use_tab_navigation(int, Fl_Text_Editor*) {
-//ﬂ ▼ ------------------------ code --~-~~~=-=~~~==-=~---=-- ▼ ﬂ//
+//ﬂ ▼ ------------------------ code ---~=~=-----=-=~-~=~--~- ▼ ﬂ//
   return 0;
 //ﬂ ▲ ----------~~-~=---~-------------~-=--~~-=~=-~~--~-~=-- ▲ ﬂ//
 }
@@ -123,10 +124,10 @@ static void cb_image_panel_data(Fl_Box* o, void* v) {
 //ﬂ ▲ ----------=~-=-~-~---~-----------~=--~~~-~~=--~-=--=-= ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* image_panel_imagew = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* image_panel_imagew = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_image_panel_imagew(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---==-=~~~~~-~-=~=-~~- ▼ ﬂ//
+static void cb_image_panel_imagew(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback -~~~=~~--~~-=------~~~ ▼ ﬂ//
   if (v == LOAD) {
       if (current_widget->is_widget() && !current_widget->is_a(Type::Window)) {
         o->value(current_widget->active_image.scale_w);
@@ -155,10 +156,10 @@ static void cb_image_panel_imagew(fld::widget::Formula_Input* o, void* v) {
 //ﬂ ▲ ----------~==~=~-~~=~~------------=-~-=-=~~-~==-=~~-~= ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* image_panel_imageh = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* image_panel_imageh = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_image_panel_imageh(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~~~=----~=~-~=~~--=~~- ▼ ﬂ//
+static void cb_image_panel_imageh(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~~=--=-~~~=~~~=-=~=~=~ ▼ ﬂ//
   if (v == LOAD) {
       if (current_widget->is_widget() && !current_widget->is_a(Type::Window)) {
         o->value(current_widget->active_image.scale_h);
@@ -263,10 +264,10 @@ static void cb_image_panel_dedata(Fl_Box* o, void* v) {
 //ﬂ ▲ ----------~=~=-~~---=~------------~~=-~~=-=-=~=~--=--~ ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* image_panel_deimagew = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* image_panel_deimagew = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_image_panel_deimagew(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---=~~~~~=-=-~=~~=--=~ ▼ ﬂ//
+static void cb_image_panel_deimagew(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~~~~~==~~=--~~=~~=~-~~ ▼ ﬂ//
   if (v == LOAD) {
       if (current_widget->is_widget() && !current_widget->is_a(Type::Window)) {
         o->value(current_widget->inactive_image.scale_w);
@@ -295,10 +296,10 @@ static void cb_image_panel_deimagew(fld::widget::Formula_Input* o, void* v) {
 //ﬂ ▲ ----------~=-~--=-=~=~----------~-=-~=--=-~-~---~-~=~- ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* image_panel_deimageh = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* image_panel_deimageh = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_image_panel_deimageh(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback -----==-~==~=-=~=--~-= ▼ ﬂ//
+static void cb_image_panel_deimageh(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback ---~=~--~=~-----~~~--~ ▼ ﬂ//
   if (v == LOAD) {
       if (current_widget->is_widget() && !current_widget->is_a(Type::Window)) {
         o->value(current_widget->inactive_image.scale_h);
@@ -407,7 +408,7 @@ Fl_Double_Window* make_image_panel() {
       } // Fl_Box* image_panel_data
       { Fl_Group* o = new Fl_Group(75, 75, 170, 20);
         o->callback((Fl_Callback*)propagate_load);
-        { image_panel_imagew = new fld::widget::Formula_Input(75, 75, 55, 20, "Width:");
+        { image_panel_imagew = new fluid::widget::Formula_Input(75, 75, 55, 20, "Width:");
           image_panel_imagew->tooltip("Scale image to this width in pixel units");
           image_panel_imagew->box(FL_DOWN_BOX);
           image_panel_imagew->color(FL_BACKGROUND2_COLOR);
@@ -420,8 +421,8 @@ Fl_Double_Window* make_image_panel() {
           image_panel_imagew->callback((Fl_Callback*)cb_image_panel_imagew);
           image_panel_imagew->align(Fl_Align(FL_ALIGN_TOP_LEFT));
           image_panel_imagew->when(FL_WHEN_RELEASE);
-        } // fld::widget::Formula_Input* image_panel_imagew
-        { image_panel_imageh = new fld::widget::Formula_Input(135, 75, 55, 20, "Height:");
+        } // fluid::widget::Formula_Input* image_panel_imagew
+        { image_panel_imageh = new fluid::widget::Formula_Input(135, 75, 55, 20, "Height:");
           image_panel_imageh->tooltip("Scale image to this height in pixel units");
           image_panel_imageh->box(FL_DOWN_BOX);
           image_panel_imageh->color(FL_BACKGROUND2_COLOR);
@@ -434,7 +435,7 @@ Fl_Double_Window* make_image_panel() {
           image_panel_imageh->callback((Fl_Callback*)cb_image_panel_imageh);
           image_panel_imageh->align(Fl_Align(FL_ALIGN_TOP_LEFT));
           image_panel_imageh->when(FL_WHEN_RELEASE);
-        } // fld::widget::Formula_Input* image_panel_imageh
+        } // fluid::widget::Formula_Input* image_panel_imageh
         { Fl_Button* o = new Fl_Button(195, 75, 50, 20, "Reset");
           o->tooltip("Reset scale to original size");
           o->labelsize(11);
@@ -483,7 +484,7 @@ Fl_Double_Window* make_image_panel() {
       } // Fl_Box* image_panel_dedata
       { Fl_Group* o = new Fl_Group(75, 215, 170, 20);
         o->callback((Fl_Callback*)propagate_load);
-        { image_panel_deimagew = new fld::widget::Formula_Input(75, 215, 55, 20, "Width:");
+        { image_panel_deimagew = new fluid::widget::Formula_Input(75, 215, 55, 20, "Width:");
           image_panel_deimagew->tooltip("Scale image to this width in pixel units");
           image_panel_deimagew->box(FL_DOWN_BOX);
           image_panel_deimagew->color(FL_BACKGROUND2_COLOR);
@@ -496,8 +497,8 @@ Fl_Double_Window* make_image_panel() {
           image_panel_deimagew->callback((Fl_Callback*)cb_image_panel_deimagew);
           image_panel_deimagew->align(Fl_Align(FL_ALIGN_TOP_LEFT));
           image_panel_deimagew->when(FL_WHEN_RELEASE);
-        } // fld::widget::Formula_Input* image_panel_deimagew
-        { image_panel_deimageh = new fld::widget::Formula_Input(135, 215, 55, 20, "Height:");
+        } // fluid::widget::Formula_Input* image_panel_deimagew
+        { image_panel_deimageh = new fluid::widget::Formula_Input(135, 215, 55, 20, "Height:");
           image_panel_deimageh->tooltip("Scale image to this height in pixel units");
           image_panel_deimageh->box(FL_DOWN_BOX);
           image_panel_deimageh->color(FL_BACKGROUND2_COLOR);
@@ -510,7 +511,7 @@ Fl_Double_Window* make_image_panel() {
           image_panel_deimageh->callback((Fl_Callback*)cb_image_panel_deimageh);
           image_panel_deimageh->align(Fl_Align(FL_ALIGN_TOP_LEFT));
           image_panel_deimageh->when(FL_WHEN_RELEASE);
-        } // fld::widget::Formula_Input* image_panel_deimageh
+        } // fluid::widget::Formula_Input* image_panel_deimageh
         { Fl_Button* o = new Fl_Button(195, 215, 50, 20, "Reset");
           o->tooltip("Reset scale to original size");
           o->labelsize(11);
@@ -555,7 +556,7 @@ Fl_Double_Window* make_image_panel() {
 }
 
 void run_image_panel() {
-//ﬂ ▼ ------------------------ code --~~~~--~==--~=---=-=~~~ ▼ ﬂ//
+//ﬂ ▼ ------------------------ code --~-~-~~---==~~-~=~-~~~- ▼ ﬂ//
   if (!image_panel_window)
     make_image_panel();
 
@@ -750,10 +751,10 @@ Fl_Menu_Item menu_1[] = {
  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
-fld::widget::Formula_Input* widget_x_input = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* widget_x_input = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_widget_x_input(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~~~--=~-~=-~~--~~=~~~= ▼ ﬂ//
+static void cb_widget_x_input(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~~-~~~=~=~=~~-~==-=~=~ ▼ ﬂ//
   if (v == LOAD) {
     if (current_widget->is_true_widget()) {
       o->value(((Widget_Node *)current_widget)->o->x());
@@ -784,10 +785,10 @@ static void cb_widget_x_input(fld::widget::Formula_Input* o, void* v) {
 //ﬂ ▲ ----------=~=~--~~-=-~----------~~=~=--~~~-=~=~-=~~==- ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* widget_y_input = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* widget_y_input = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_widget_y_input(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---==~=~~~~=-=---=--~= ▼ ﬂ//
+static void cb_widget_y_input(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback ---~~==~~=---~-~-~~--- ▼ ﬂ//
   if (v == LOAD) {
     if (current_widget->is_true_widget()) {
       o->value(((Widget_Node *)current_widget)->o->y());
@@ -817,10 +818,10 @@ static void cb_widget_y_input(fld::widget::Formula_Input* o, void* v) {
 //ﬂ ▲ ----------~==--=~=--=-----------~~=~--~~=~-~---=~-=-~= ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* widget_w_input = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* widget_w_input = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_widget_w_input(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~~~=---=-=-~-==----=~= ▼ ﬂ//
+static void cb_widget_w_input(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~-=--=--=---~~--=~---- ▼ ﬂ//
   if (v == LOAD) {
     if (current_widget->is_true_widget()) {
       o->value(((Widget_Node *)current_widget)->o->w());
@@ -850,10 +851,10 @@ static void cb_widget_w_input(fld::widget::Formula_Input* o, void* v) {
 //ﬂ ▲ ----------~=~-=~~--~------------~--~-==-~~~~~==-=--=-= ▲ ﬂ//
 }
 
-fld::widget::Formula_Input* widget_h_input = (fld::widget::Formula_Input*)nullptr;
+fluid::widget::Formula_Input* widget_h_input = (fluid::widget::Formula_Input*)nullptr;
 
-static void cb_widget_h_input(fld::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-=~~-~-=~=--=-~=-~==~ ▼ ﬂ//
+static void cb_widget_h_input(fluid::widget::Formula_Input* o, void* v) {
+//ﬂ ▼ ---------------------- callback --~--==~--~==~=--=-~-~ ▼ ﬂ//
   if (v == LOAD) {
     if (current_widget->is_true_widget()) {
       o->value(((Widget_Node *)current_widget)->o->h());
@@ -2372,10 +2373,10 @@ static void cb_wComment(Fl_Text_Editor* o, void* v) {
 //ﬂ ▲ ----------=~---~~-=--~----------~~-~--=~~~-~~==~~=~~~- ▲ ﬂ//
 }
 
-fld::widget::Code_Editor* wCallback = (fld::widget::Code_Editor*)nullptr;
+fluid::widget::Code_Editor* wCallback = (fluid::widget::Code_Editor*)nullptr;
 
-static void cb_wCallback(fld::widget::Code_Editor* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~=-==-~==~-=~~-=--=~ ▼ ﬂ//
+static void cb_wCallback(fluid::widget::Code_Editor* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~-=-~~--=-=~=~~-=~=-~= ▼ ﬂ//
   if (v == LOAD) {
       const char *cbtext = current_widget->callback();
       o->buffer()->text( cbtext ? cbtext : "" );
@@ -2651,19 +2652,26 @@ static void cb_wp_data_filename(Fl_Input* o, void* v) {
 static void cb_fileopen(Fl_Button*, void* v) {
 //ﬂ ▼ ---------------------- callback ~--=-~~~=~~--~=-=~-=~- ▼ ﬂ//
   if (v != LOAD) {
-    Fluid.proj.enter_project_dir();
-    const char *fn = fl_file_chooser("Load Inline Data",
-      nullptr, wp_data_filename->value(), 1);
+     Fluid.proj.enter_project_dir();
+    std::string fn = fluid::io::filechooser(
+      fluid::io::FileChooserType::LOAD_FILE,
+      fluid::io::FileChooserPath::RELATIVE_PATH,
+      "Load Inline Data File",
+      "Can't open inline data file:\n%s.",
+      wp_data_filename->value(),
+      Fluid.proj.projectfile_path(),
+      ""
+    );
     Fluid.proj.leave_project_dir();
-    if (fn) {
-      if (strcmp(fn, wp_data_filename->value())) {
+     if (!fn.empty()) {
+      if (strcmp(fn.c_str(), wp_data_filename->value())) {
         Fluid.proj.set_modflag(1);
-        wp_data_filename->value(fn);
+        wp_data_filename->value(fn.c_str());
         wp_data_filename->do_callback();
       }
     }
   }
-//ﬂ ▲ ----------=~~---~~=~~=----------~--~-~=~=-~=--~=-~~=-- ▲ ﬂ//
+//ﬂ ▲ ----------=~~---~~=~~=-------------=-~~-=~-~~-------~- ▲ ﬂ//
 }
 
 static void cb_Comment(Fl_Text_Editor* o, void* v) {
@@ -2814,17 +2822,23 @@ static void cb_comment_load_2(Fl_Button*, void* v) {
 //ﬂ ▼ ---------------------- callback ~~~~~=~-=~~-=-=-~=-=~= ▼ ﬂ//
   // load a comment from disk
   if (v != LOAD) {
-    fl_file_chooser_ok_label("Load");
-    const char *fname = fl_file_chooser("Pick a comment", nullptr, nullptr);
-    fl_file_chooser_ok_label(nullptr);
-    if (fname) {
-      if (comment_tabs_name->buffer()->loadfile(fname)) {
-        fl_alert("Error loading file\n%s", fname);
+    std::string fname  = fluid::io::filechooser(
+      fluid::io::FileChooserType::LOAD_FILE,
+      fluid::io::FileChooserPath::ABSOLUTE_PATH,
+      "Load Comment From File",
+      "Can't open text file:\n%s.",
+      "",
+      Fluid.proj.projectfile_path(),
+      ""
+    );
+    if (!fname.empty()) {
+      if (comment_tabs_name->buffer()->loadfile(fname.c_str())) {
+        fl_alert("Error loading file\n%s", fname.c_str());
       }
       comment_tabs_name->do_callback();
     }
   }
-//ﬂ ▲ ----------=~--=--=~=~=----------~~-~~----=--~~-~~~=~=- ▲ ﬂ//
+//ﬂ ▲ ----------=~--=--=~=~=-----------~--~=~==-=~~=~-~=-=-- ▲ ﬂ//
 }
 
 static void cb_output(Fl_Check_Button* o, void* v) {
@@ -3234,8 +3248,8 @@ static void cb_1b(Fl_Tile* o, void* v) {
 //ﬂ ▲ ----------=~-=~--~~=~=-----------~~----=--~=~~-~-----= ▲ ﬂ//
 }
 
-static void cb_Declaration(fld::widget::Code_Editor* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---==--~~-=-=-~=----=- ▼ ﬂ//
+static void cb_Declaration(fluid::widget::Code_Editor* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~~-=~~~-~==--=~-~~-~=- ▼ ﬂ//
   if (!current_node || !current_node->is_a(Type::Decl)) return;
   Decl_Node* nd = (Decl_Node*)current_node;
 
@@ -3358,8 +3372,8 @@ static void cb_code_tabs(Fl_Tabs* o, void* v) {
 
 Fl_Group* code_tabs_main = (Fl_Group*)nullptr;
 
-static void cb_1c(fld::widget::Code_Editor* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~~-==-=~~--~=~=~-~~-~- ▼ ﬂ//
+static void cb_1c(fluid::widget::Code_Editor* o, void* v) {
+//ﬂ ▼ ---------------------- callback ~~--~~~=---~--=~-~=~-- ▼ ﬂ//
   if (!current_node || !current_node->is_a(Type::Code)) return;
   Code_Node* nd = (Code_Node*)current_node;
    if (v == LOAD) {
@@ -3481,8 +3495,8 @@ static void cb_1f(Fl_Tile* o, void* v) {
 //ﬂ ▲ ----------=~~=~~-~---~-----------~~----=--~=~~-~-----= ▲ ﬂ//
 }
 
-static void cb_Function(fld::widget::Code_Editor* o, void* v) {
-//ﬂ ▼ ---------------------- callback --=~=----~=~~-=~-==--~ ▼ ﬂ//
+static void cb_Function(fluid::widget::Code_Editor* o, void* v) {
+//ﬂ ▼ ---------------------- callback --~-~~~~-~=~-~~~=~-~-- ▼ ﬂ//
   if (!current_node || !current_node->is_a(Type::Function)) return;
   Function_Node* nd = (Function_Node*)current_node;
 
@@ -3505,8 +3519,8 @@ static void cb_Function(fld::widget::Code_Editor* o, void* v) {
 //ﬂ ▲ ----------=~=~=-=--~=~-----------~=-=~~~~~-=~~~=-=-~-- ▲ ﬂ//
 }
 
-static void cb_Return(fld::widget::Code_Editor* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~=--~-~=~=~~~---=~~=~ ▼ ﬂ//
+static void cb_Return(fluid::widget::Code_Editor* o, void* v) {
+//ﬂ ▼ ---------------------- callback -~-=--~~=---~==~=~-=~= ▼ ﬂ//
   if (!current_node || !current_node->is_a(Type::Function)) return;
   Function_Node* nd = (Function_Node*)current_node;
   update_current(o, v,
@@ -3730,7 +3744,7 @@ Fl_Double_Window* make_widget_panel() {
             o->labelsize(11);
             o->callback((Fl_Callback*)position_group_cb);
             o->align(Fl_Align(FL_ALIGN_LEFT));
-            { widget_x_input = new fld::widget::Formula_Input(95, 150, 55, 20, "X:");
+            { widget_x_input = new fluid::widget::Formula_Input(95, 150, 55, 20, "X:");
               widget_x_input->tooltip("The X position of the widget as a number or formula.\nFormulas can be simple "
 "math, including the variables\nx, px, sx, cx, and i");
               widget_x_input->box(FL_DOWN_BOX);
@@ -3744,8 +3758,8 @@ Fl_Double_Window* make_widget_panel() {
               widget_x_input->callback((Fl_Callback*)cb_widget_x_input);
               widget_x_input->align(Fl_Align(FL_ALIGN_TOP_LEFT));
               widget_x_input->when(FL_WHEN_RELEASE);
-            } // fld::widget::Formula_Input* widget_x_input
-            { widget_y_input = new fld::widget::Formula_Input(155, 150, 55, 20, "Y:");
+            } // fluid::widget::Formula_Input* widget_x_input
+            { widget_y_input = new fluid::widget::Formula_Input(155, 150, 55, 20, "Y:");
               widget_y_input->tooltip("The Y position of the widget as a number or formula.\nFormulas can be simple "
 "math, including the variables\ny, py, sy, cy, and i");
               widget_y_input->box(FL_DOWN_BOX);
@@ -3759,8 +3773,8 @@ Fl_Double_Window* make_widget_panel() {
               widget_y_input->callback((Fl_Callback*)cb_widget_y_input);
               widget_y_input->align(Fl_Align(FL_ALIGN_TOP_LEFT));
               widget_y_input->when(FL_WHEN_RELEASE);
-            } // fld::widget::Formula_Input* widget_y_input
-            { widget_w_input = new fld::widget::Formula_Input(215, 150, 55, 20, "Width:");
+            } // fluid::widget::Formula_Input* widget_y_input
+            { widget_w_input = new fluid::widget::Formula_Input(215, 150, 55, 20, "Width:");
               widget_w_input->tooltip("The width of the widget as a number or formula.\nFormulas can be simple math,"
 " including the variables\nw, pw, sw, cw, and i");
               widget_w_input->box(FL_DOWN_BOX);
@@ -3774,8 +3788,8 @@ Fl_Double_Window* make_widget_panel() {
               widget_w_input->callback((Fl_Callback*)cb_widget_w_input);
               widget_w_input->align(Fl_Align(FL_ALIGN_TOP_LEFT));
               widget_w_input->when(FL_WHEN_RELEASE);
-            } // fld::widget::Formula_Input* widget_w_input
-            { widget_h_input = new fld::widget::Formula_Input(275, 150, 55, 20, "Height:");
+            } // fluid::widget::Formula_Input* widget_w_input
+            { widget_h_input = new fluid::widget::Formula_Input(275, 150, 55, 20, "Height:");
               widget_h_input->tooltip("The height of the widget as a number or formula.\nFormulas can be simple math"
 ", including the variables\nh, ph, sh, ch, and i");
               widget_h_input->box(FL_DOWN_BOX);
@@ -3789,7 +3803,7 @@ Fl_Double_Window* make_widget_panel() {
               widget_h_input->callback((Fl_Callback*)cb_widget_h_input);
               widget_h_input->align(Fl_Align(FL_ALIGN_TOP_LEFT));
               widget_h_input->when(FL_WHEN_RELEASE);
-            } // fld::widget::Formula_Input* widget_h_input
+            } // fluid::widget::Formula_Input* widget_h_input
             { Fl_Choice* o = new Fl_Choice(335, 150, 64, 20, "Children:");
               o->tooltip("When instantiating a widget class, the children can either be fixed in their "
 "original position, automatically be repositioned, or both repsositioned and re"
@@ -4393,7 +4407,7 @@ Fl_Double_Window* make_widget_panel() {
             } // Fl_Group* o
             { Fl_Group* o = new Fl_Group(95, 223, 310, 82);
               o->box(FL_FLAT_BOX);
-              { wCallback = new fld::widget::Code_Editor(95, 225, 310, 80, "Callback:");
+              { wCallback = new fluid::widget::Code_Editor(95, 225, 310, 80, "Callback:");
                 wCallback->tooltip("The callback function or code for the widget. Use the variable name \'o\' to "
 "access the Widget pointer and \'v\' to access the user value.");
                 wCallback->box(FL_DOWN_BOX);
@@ -4409,7 +4423,7 @@ Fl_Double_Window* make_widget_panel() {
                 wCallback->align(Fl_Align(FL_ALIGN_LEFT));
                 wCallback->when(FL_WHEN_RELEASE);
                 Fl_Group::current()->resizable(wCallback);
-              } // fld::widget::Code_Editor* wCallback
+              } // fluid::widget::Code_Editor* wCallback
               o->end();
             } // Fl_Group* o
             o->end();
@@ -4560,20 +4574,24 @@ Fl_Double_Window* make_widget_panel() {
             o->callback((Fl_Callback*)cb_Name);
             o->align(Fl_Align(132));
           } // Fl_Input* o
-          { wp_data_filename = new Fl_Input(95, 125, 270, 20, "Filename:");
-            wp_data_filename->tooltip("name and path of file that will be inlined");
-            wp_data_filename->labelfont(1);
-            wp_data_filename->labelsize(11);
-            wp_data_filename->textfont(4);
-            wp_data_filename->textsize(11);
-            wp_data_filename->callback((Fl_Callback*)cb_wp_data_filename);
-            wp_data_filename->align(Fl_Align(132));
-            Fl_Group::current()->resizable(wp_data_filename);
-          } // Fl_Input* wp_data_filename
-          { Fl_Button* o = new Fl_Button(365, 125, 40, 20, "@fileopen");
-            o->labelcolor((Fl_Color)134);
-            o->callback((Fl_Callback*)cb_fileopen);
-          } // Fl_Button* o
+          { Fl_Group* o = new Fl_Group(95, 125, 310, 20);
+            o->callback((Fl_Callback*)propagate_load);
+            { wp_data_filename = new Fl_Input(95, 125, 270, 20, "Filename:");
+              wp_data_filename->tooltip("name and path of file that will be inlined");
+              wp_data_filename->labelfont(1);
+              wp_data_filename->labelsize(11);
+              wp_data_filename->textfont(4);
+              wp_data_filename->textsize(11);
+              wp_data_filename->callback((Fl_Callback*)cb_wp_data_filename);
+              wp_data_filename->align(Fl_Align(132));
+              Fl_Group::current()->resizable(wp_data_filename);
+            } // Fl_Input* wp_data_filename
+            { Fl_Button* o = new Fl_Button(365, 125, 40, 20, "@fileopen");
+              o->labelcolor((Fl_Color)134);
+              o->callback((Fl_Callback*)cb_fileopen);
+            } // Fl_Button* o
+            o->end();
+          } // Fl_Group* o
           { Fl_Text_Editor* o = new Fl_Text_Editor(95, 150, 310, 105, "Comment:");
             o->box(FL_DOWN_BOX);
             o->labelfont(1);
@@ -4582,6 +4600,7 @@ Fl_Double_Window* make_widget_panel() {
             o->textsize(11);
             o->callback((Fl_Callback*)cb_Comment);
             o->align(Fl_Align(FL_ALIGN_LEFT));
+            Fl_Group::current()->resizable(o);
             o->buffer(new Fl_Text_Buffer());
             o->add_key_binding(FL_Tab, 0, use_tab_navigation);
           } // Fl_Text_Editor* o
@@ -4847,7 +4866,7 @@ Fl_Double_Window* make_widget_panel() {
               o->labelsize(11);
               o->callback((Fl_Callback*)propagate_load);
               o->align(Fl_Align(FL_ALIGN_LEFT));
-              { fld::widget::Code_Editor* o = new fld::widget::Code_Editor(95, 75, 310, 100, "Declaration:");
+              { fluid::widget::Code_Editor* o = new fluid::widget::Code_Editor(95, 75, 310, 100, "Declaration:");
                 o->tooltip("a declaration: `int x;`, an external symbol: `extern int foo();`,\na `#` dire"
 "ctive: `#include <foo.h>`, a typedef `typedef char byte;`,\n or a `using` stat"
 "ement, etc.");
@@ -4864,7 +4883,7 @@ Fl_Double_Window* make_widget_panel() {
                 o->when(FL_WHEN_RELEASE);
                 Fl_Group::current()->resizable(o);
                 o->add_key_binding(FL_Tab, 0, use_tab_navigation);
-              } // fld::widget::Code_Editor* o
+              } // fluid::widget::Code_Editor* o
               o->end();
             } // Fl_Group* o
             { Fl_Group* o = new Fl_Group(15, 180, 390, 105);
@@ -4946,7 +4965,7 @@ Fl_Double_Window* make_widget_panel() {
         { code_tabs_main = new Fl_Group(10, 30, 400, 330, "Code");
           code_tabs_main->labelsize(11);
           code_tabs_main->callback((Fl_Callback*)propagate_load);
-          { fld::widget::Code_Editor* o = new fld::widget::Code_Editor(15, 40, 390, 315);
+          { fluid::widget::Code_Editor* o = new fluid::widget::Code_Editor(15, 40, 390, 315);
             o->box(FL_DOWN_BOX);
             o->color(FL_BACKGROUND2_COLOR);
             o->selection_color(FL_SELECTION_COLOR);
@@ -4962,7 +4981,7 @@ Fl_Double_Window* make_widget_panel() {
             Fl_Group::current()->resizable(o);
             o->linenumber_width(60);
 o->linenumber_size(o->Fl_Text_Display::textsize());
-          } // fld::widget::Code_Editor* o
+          } // fluid::widget::Code_Editor* o
           code_tabs_main->end();
           Fl_Group::current()->resizable(code_tabs_main);
         } // Fl_Group* code_tabs_main
@@ -5020,7 +5039,7 @@ o->linenumber_size(o->Fl_Text_Display::textsize());
               o->labelsize(11);
               o->callback((Fl_Callback*)propagate_load);
               o->align(Fl_Align(FL_ALIGN_LEFT));
-              { fld::widget::Code_Editor* o = new fld::widget::Code_Editor(95, 100, 310, 50, "Function\nName and\nArgs:");
+              { fluid::widget::Code_Editor* o = new fluid::widget::Code_Editor(95, 100, 310, 50, "Function\nName and\nArgs:");
                 o->tooltip("function name and args, or blank for `main(..)`");
                 o->box(FL_DOWN_FRAME);
                 o->color(FL_BACKGROUND2_COLOR);
@@ -5035,7 +5054,7 @@ o->linenumber_size(o->Fl_Text_Display::textsize());
                 o->when(FL_WHEN_RELEASE);
                 Fl_Group::current()->resizable(o);
                 o->add_key_binding(FL_Tab, 0, use_tab_navigation);
-              } // fld::widget::Code_Editor* o
+              } // fluid::widget::Code_Editor* o
               o->end();
             } // Fl_Group* o
             { Fl_Group* o = new Fl_Group(15, 155, 390, 60);
@@ -5044,7 +5063,7 @@ o->linenumber_size(o->Fl_Text_Display::textsize());
               o->labelsize(11);
               o->callback((Fl_Callback*)propagate_load);
               o->align(Fl_Align(FL_ALIGN_LEFT));
-              { fld::widget::Code_Editor* o = new fld::widget::Code_Editor(95, 160, 310, 50, "Return Type:");
+              { fluid::widget::Code_Editor* o = new fluid::widget::Code_Editor(95, 160, 310, 50, "Return Type:");
                 o->tooltip("return type, or blank to return outermost widget");
                 o->box(FL_DOWN_FRAME);
                 o->color(FL_BACKGROUND2_COLOR);
@@ -5059,7 +5078,7 @@ o->linenumber_size(o->Fl_Text_Display::textsize());
                 o->when(FL_WHEN_RELEASE);
                 Fl_Group::current()->resizable(o);
                 o->add_key_binding(FL_Tab, 0, use_tab_navigation);
-              } // fld::widget::Code_Editor* o
+              } // fluid::widget::Code_Editor* o
               o->end();
             } // Fl_Group* o
             { Fl_Group* o = new Fl_Group(15, 215, 390, 105);

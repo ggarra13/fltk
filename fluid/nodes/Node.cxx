@@ -401,7 +401,7 @@ void delete_all(int selected_only) {
   if(!selected_only) {
     // reset the setting for the external shell command
     if (g_shell_config) {
-      g_shell_config->clear(fld::Tool_Store::PROJECT);
+      g_shell_config->clear(fluid::Tool_Store::PROJECT);
       g_shell_config->rebuild_shell_menu();
       g_shell_config->update_settings_dialog();
     }
@@ -409,7 +409,7 @@ void delete_all(int selected_only) {
       widget_browser->hposition(0);
       widget_browser->vposition(0);
     }
-    Fluid.layout_list.remove_all(fld::Tool_Store::PROJECT);
+    Fluid.layout_list.remove_all(fluid::Tool_Store::PROJECT);
     Fluid.layout_list.current_suite(0);
     Fluid.layout_list.current_preset(0);
     Fluid.layout_list.update_dialogs();
@@ -891,7 +891,7 @@ void Node::move_before(Node* g) {
 
 
 // write a widget and all its children:
-void Node::write(fld::io::Project_Writer &f) {
+void Node::write(fluid::io::Project_Writer &f) {
   if (f.write_codeview()) proj1_start = (int)ftell(f.file()) + 1;
   if (f.write_codeview()) proj2_start = (int)ftell(f.file()) + 1;
   f.write_indent(level);
@@ -923,7 +923,7 @@ void Node::write(fld::io::Project_Writer &f) {
   if (f.write_codeview()) proj2_end = (int)ftell(f.file());
 }
 
-void Node::write_properties(fld::io::Project_Writer &f) {
+void Node::write_properties(fluid::io::Project_Writer &f) {
   // repeat this for each attribute:
   if (Fluid.proj.write_mergeback_data && uid_) {
     f.write_word("uid");
@@ -957,7 +957,7 @@ void Node::write_properties(fld::io::Project_Writer &f) {
   if (selected) f.write_word("selected");
 }
 
-void Node::read_property(fld::io::Project_Reader &f, const char *c) {
+void Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   if (!strcmp(c,"uid")) {
     const char *hex = f.read_word();
     int x = 0;
@@ -1022,13 +1022,13 @@ void Node::read_property(fld::io::Project_Reader &f, const char *c) {
  Lastly, this method should call the super class to give it a chance to append
  its own properties.
 
- \see Grid_Node::write_parent_properties(fld::io::Project_Writer &f, Node *child, bool encapsulate)
+ \see Grid_Node::write_parent_properties(fluid::io::Project_Writer &f, Node *child, bool encapsulate)
 
  \param[in] f the project file writer
  \param[in] child write properties for this child, make sure it has the correct type
  \param[in] encapsulate write the `parent_properties {}` block if true before writing any properties
  */
-void Node::write_parent_properties(fld::io::Project_Writer &f, Node *child, bool encapsulate) {
+void Node::write_parent_properties(fluid::io::Project_Writer &f, Node *child, bool encapsulate) {
   (void)f; (void)child; (void)encapsulate;
   // nothing to do here
   // put the following code into your implementation of write_parent_properties
@@ -1055,14 +1055,14 @@ void Node::write_parent_properties(fld::io::Project_Writer &f, Node *child, bool
  method reads back those properties. This function is virtual, so if a Type
  does not support a property, it will propagate to its super class.
 
- \see Node::write_parent_properties(fld::io::Project_Writer &f, Node *child, bool encapsulate)
- \see Grid_Node::read_parent_property(fld::io::Project_Reader &f, Node *child, const char *property)
+ \see Node::write_parent_properties(fluid::io::Project_Writer &f, Node *child, bool encapsulate)
+ \see Grid_Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const char *property)
 
  \param[in] f the project file writer
  \param[in] child read properties for this child
  \param[in] property the name of a property, or "}" when we reach the end of the list
  */
-void Node::read_parent_property(fld::io::Project_Reader &f, Node *child, const char *property) {
+void Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const char *property) {
   (void)child;
   f.read_error("Unknown parent property \"%s\"", property);
 }
@@ -1074,91 +1074,94 @@ int Node::read_fdesign(const char*, const char*) {return 0;}
  Write a comment into the header file.
  \param[in] pre indent the comment by this string
 */
-void Node::write_comment_h(fld::io::Code_Writer& f, const char *pre)
+void Node::write_comment_h(fluid::io::Code_Writer& f, const char *pre)
 {
   if (comment() && *comment()) {
-    f.write_h("%s/**\n", pre);
+    f.write_h(std::string(pre) + "/**\n");
     const char *s = comment();
-    f.write_h("%s ", pre);
+    f.write_h(std::string(pre) + " ");
     while(*s) {
       if (*s=='\n') {
         if (s[1]) {
-          f.write_h("\n%s ", pre);
+          f.write_h("\n" + std::string(pre) + " ");
         }
       } else {
-        f.write_h("%c", *s); // FIXME this is much too slow!
+        f.write_h(std::string(1, *s)); // FIXME this is much too slow!
       }
       s++;
     }
-    f.write_h("\n%s*/\n", pre);
+    f.write_h("\n" + std::string(pre) + "*/\n");
   }
 }
 
 /**
   Write a comment into the source file.
 */
-void Node::write_comment_c(fld::io::Code_Writer& f, const char *pre)
+void Node::write_comment_c(fluid::io::Code_Writer& f, const char *pre)
 {
   if (comment() && *comment()) {
-    f.write_c("%s/**\n", pre);
+    f.write_c(std::string(pre) + "/**\n");
     const char *s = comment();
     if (*s && *s!='\n')
-      f.write_c("%s ", pre);
+      f.write_c(std::string(pre) + " ");
     while(*s) {
       if (*s=='\n') {
         f.write_c("\n");
         if (s[1] && s[1]!='\n') {
-          f.write_c("%s ", pre);
+          f.write_c(std::string(pre) + " ");
         }
       } else {
-        f.write_c("%c", *s); // FIXME this is much too slow!
+        f.write_c(std::string(1, *s)); // FIXME this is much too slow!
       }
       s++;
     }
-    f.write_c("\n%s*/\n", pre);
+    f.write_c("\n" + std::string(pre) + "*/\n");
   }
 }
 
 /**
   Write a comment into the source file.
 */
-void Node::write_comment_inline_c(fld::io::Code_Writer& f, const char *pre)
+void Node::write_comment_inline_c(fluid::io::Code_Writer& f, const char *pre)
 {
   if (comment() && *comment()) {
     const char *s = comment();
     if (strchr(s, '\n')==nullptr) {
       // single line comment
-      if (pre) f.write_c("%s", pre);
-      f.write_c("// %s\n", s);
-      if (!pre) f.write_c("%s", f.indent_plus(1));
+      if (pre) f.write_c(std::string(pre));
+      f.write_c("// " + std::string(s) + "\n");
+      if (!pre) f.write_c(f.indent_plus(1));
     } else {
-      f.write_c("%s/*\n", pre?pre:"");
+      if (pre)
+        f.write_c(std::string(pre) + "/*\n");
+      else
+        f.write_c("/*\n");
       if (*s && *s!='\n') {
         if (pre)
-          f.write_c("%s ", pre);
+          f.write_c(std::string(pre) + " ");
         else
-          f.write_c("%s ", f.indent_plus(1));
+          f.write_c(f.indent_plus(1) + " ");
       }
       while(*s) {
         if (*s=='\n') {
           f.write_c("\n");
           if (s[1] && s[1]!='\n') {
             if (pre)
-              f.write_c("%s ", pre);
+              f.write_c(std::string(pre) + " ");
             else
-              f.write_c("%s ", f.indent_plus(1));
+              f.write_c(f.indent_plus(1) + " ");
           }
         } else {
-          f.write_c("%c", *s); // FIXME this is much too slow!
+          f.write_c(std::string(1, *s)); // FIXME this is much too slow!
         }
         s++;
       }
       if (pre)
-        f.write_c("\n%s */\n", pre);
+        f.write_c("\n" + std::string(pre) + " */\n");
       else
-        f.write_c("\n%s */\n", f.indent_plus(1));
+        f.write_c("\n" + f.indent_plus(1) + " */\n");
       if (!pre)
-        f.write_c("%s", f.indent_plus(1));
+        f.write_c(f.indent_plus(1));
     }
   }
 }
@@ -1202,9 +1205,9 @@ int Node::user_defined(const char* cbname) const {
   return 0;
 }
 
-const char *Node::callback_name(fld::io::Code_Writer& f) {
+std::string Node::callback_name(fluid::io::Code_Writer& f) {
   if (is_name(callback())) return callback();
-  return f.unique_id(this, "cb", name(), label());
+  return f.unique_id(this, "cb", (name()?name():""), (label()?label():""));
 }
 
 /**
@@ -1255,18 +1258,18 @@ bool Node::is_in_class() const {
   return false;
 }
 
-void Node::write_static(fld::io::Code_Writer&) {
+void Node::write_static(fluid::io::Code_Writer&) {
 }
 
-void Node::write_static_after(fld::io::Code_Writer&) {
+void Node::write_static_after(fluid::io::Code_Writer&) {
 }
 
-void Node::write_code1(fld::io::Code_Writer& f) {
-  f.write_h("// Header for %s\n", title());
-  f.write_c("// Code for %s\n", title());
+void Node::write_code1(fluid::io::Code_Writer& f) {
+  f.write_h("// Header for " + std::string(title()) + "\n");
+  f.write_c("// Code for " + std::string(title()) + "\n");
 }
 
-void Node::write_code2(fld::io::Code_Writer&) {
+void Node::write_code2(fluid::io::Code_Writer&) {
 }
 
 /** Set a uid that is unique within the project.

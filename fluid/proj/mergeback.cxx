@@ -35,8 +35,8 @@ extern void propagate_load(Fl_Group*, void*);
 extern void load_panel();
 extern void redraw_browser();
 
-using namespace fld;
-using namespace fld::proj;
+using namespace fluid;
+using namespace fluid::proj;
 
 // TODO: add application user setting to control mergeback
 //        [] new projects default to mergeback
@@ -92,7 +92,7 @@ using namespace fld::proj;
  Returns 0 if nothing changed, and 1 if it merged any changes back, and -1 if
  there were conflicts.
 
- \note this function is currently part of fld::io::Code_Writer to get easy access
+ \note this function is currently part of fluid::io::Code_Writer to get easy access
  to our crc32 code that also wrote the code file originally.
 
  \param[in] s path and filename of the source code file
@@ -243,7 +243,7 @@ void Mergeback::analyse_callback(unsigned long code_crc, unsigned long tag_crc, 
   Node *tp = proj_.tree.find_by_uid(uid);
   if (tp && tp->is_true_widget()) {
     std::string cb = tp->callback(); cb += "\n";
-    unsigned long project_crc = fld::io::Code_Writer::block_crc(cb.c_str());
+    unsigned long project_crc = fluid::io::Code_Writer::block_crc(cb);
     // check if the code and project crc are the same, so this modification was already applied
     if (project_crc!=code_crc) {
       num_changed_code++;
@@ -265,7 +265,7 @@ void Mergeback::analyse_code(unsigned long code_crc, unsigned long tag_crc, int 
   Node *tp = proj_.tree.find_by_uid(uid);
   if (tp && tp->is_a(Type::Code)) {
     std::string code = tp->name(); code += "\n";
-    unsigned long project_crc = fld::io::Code_Writer::block_crc(code.c_str());
+    unsigned long project_crc = fluid::io::Code_Writer::block_crc(code);
     // check if the code and project crc are the same, so this modification was already applied
     if (project_crc!=code_crc) {
       num_changed_code++;
@@ -384,16 +384,23 @@ std::string Mergeback::format_tag(Tag prev_type, Tag next_type, uint16_t uid, ui
   // Write the first 32 bit word as an encoded divider line
   uint32_t pt = static_cast<uint32_t>(prev_type);
   uint32_t nt = static_cast<uint32_t>(next_type);
-  uint32_t word = (0<<24) | (pt<<16) | (uid); // top 8 bit available for encoding type
+  uint32_t word = ((0<<24)&0xff000000) | ((pt<<16)&0x00ff0000) | ((uid)&0x0000ffff); // top 8 bit available for encoding type
   for (int i=30; i>=0; i-=3) result += lut[(word>>i)&7];
   // Write a string indicating the type of editable text
+  #if 0
   if ( next_type != Tag::GENERIC) {
-    result += tag_lut[nt];
+    result += tag_lut[(nt%4)];
   } else if (prev_type != Tag::GENERIC) {
-    result += tag_lut[nt];
+    result += tag_lut[(pt%4)];
+  } else {
+    result += tag_lut[0];
   }
+  #else
+  result += tag_lut[(nt%4)];
+  #endif
   // Write the second 32 bit word as an encoded divider line
   for (int i=30; i>=0; i-=3) result += lut[(crc>>i)&7];
+  // printf("  uid=%d, prev_type=%d, next_type=%d, crc=%u\n", uid, pt, nt, crc);
   // Repeat the intro pattern
   result += ' ';
   if (prev_type != Tag::GENERIC) result += "▲";
@@ -444,7 +451,7 @@ int Mergeback::analyse() {
     const char *tag = find_mergeback_tag(line);
     if (!tag) {
       // if this line has no tag, add the contents to the CRC and continue
-      code_crc = fld::io::Code_Writer::block_crc(line, -1, code_crc, &line_start);
+      code_crc = fluid::io::Code_Writer::block_crc(line, code_crc, &line_start);
     } else {
       // if this line has a tag, read all tag data
       Tag tag_type = Tag::UNUSED_;
@@ -485,7 +492,7 @@ int Mergeback::apply_callback(long block_end, long block_start, unsigned long co
   Node *tp = proj_.tree.find_by_uid(uid);
   if (tp && tp->is_true_widget()) {
     std::string cb = tp->callback(); cb += "\n";
-    unsigned long project_crc = fld::io::Code_Writer::block_crc(cb.c_str());
+    unsigned long project_crc = fluid::io::Code_Writer::block_crc(cb);
     if (project_crc!=code_crc) {
       tp->callback(read_and_unindent_block(block_start, block_end).c_str());
       return 1;
@@ -501,7 +508,7 @@ int Mergeback::apply_code(long block_end, long block_start, unsigned long code_c
   Node *tp = proj_.tree.find_by_uid(uid);
   if (tp && tp->is_a(Type::Code)) {
     std::string cb = tp->name(); cb += "\n";
-    unsigned long project_crc = fld::io::Code_Writer::block_crc(cb.c_str());
+    unsigned long project_crc = fluid::io::Code_Writer::block_crc(cb);
     if (project_crc!=code_crc) {
       tp->name(read_and_unindent_block(block_start, block_end).c_str());
       return 1;
@@ -537,7 +544,7 @@ int Mergeback::apply() {
     const char *tag = find_mergeback_tag(line);
     if (!tag) {
       // if this line has no tag, add the contents to the CRC and continue
-      code_crc = fld::io::Code_Writer::block_crc(line, -1, code_crc, &line_start);
+      code_crc = fluid::io::Code_Writer::block_crc(line, code_crc, &line_start);
       block_end = ::ftell(code);
     } else {
       // if this line has a tag, read all tag data

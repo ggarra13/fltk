@@ -46,7 +46,7 @@ class Fl_Button;
 class Fl_Check_Button;
 class Fl_Help_Dialog;
 
-namespace fld {
+namespace fluid {
 namespace app {
 class Layout_List;
 }
@@ -120,7 +120,7 @@ public: // Member Variables
   // TODO: make this into a class: app::GUI
   Fl_Window *main_window { nullptr };
   static Fl_Menu_Item main_menu[];
-  fld::widget::App_Menu_Bar *main_menubar { nullptr };
+  fluid::widget::App_Menu_Bar *main_menubar { nullptr };
   Fl_Menu_Item *save_item { nullptr };
   Fl_Menu_Item *history_item { nullptr };
   Fl_Menu_Item *widgetbin_item { nullptr };
@@ -193,8 +193,6 @@ public: // Methods
 
   // Build the main app window and create a few other dialogs.
   void make_main_window();
-  // Open a native file chooser to allow choosing a project file for reading.
-  std::string open_project_filechooser(const std::string &title);
   // Give the user the opportunity to save a project before clearing it.
   bool confirm_project_clear();
   // Ensure that text widgets in the widget panel propagates apply current changes.
@@ -213,9 +211,9 @@ public: // Methods
 #endif // __APPLE__
 };
 
-} // namespace fld
+} // namespace fluid
 
-extern fld::Application Fluid;
+extern fluid::Application Fluid;
 
 
 #endif // FLUID_FLUID_H
