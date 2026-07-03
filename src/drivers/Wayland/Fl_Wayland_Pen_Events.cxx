@@ -201,9 +201,6 @@ public:
   Trait pen_traits(int id)  override;
 };
 
-static Wayland_Driver wayland_driver_instance;
-// Define the extern Driver& declared in Fl_Base_Pen_Events.H.
-Driver& driver = wayland_driver_instance;
 
 void Wayland_Driver::subscribe(Fl_Widget* widget)
 {
@@ -257,6 +254,10 @@ Trait Wayland_Driver::pen_traits(int pen_id) {
 } // namespace Pen
 } // namespace Fl
 
+Fl::Pen::Driver& newWaylandPenDriver() {
+  Fl::Pen::Wayland_Driver *wayland_driver_instance = new Fl::Pen::Wayland_Driver();
+  return *wayland_driver_instance;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Platform-independent helper functions
