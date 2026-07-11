@@ -74,6 +74,10 @@ Fl_Callback_Reason Fl::callback_reason_ = FL_REASON_UNKNOWN;
 unsigned char   Fl::Private::options_[] = { 0, 0 };
 unsigned char   Fl::Private::options_read_ = 0;
 
+// Global pen position at pen down event
+int             Fl::Private::e_x_down { 0 };
+int             Fl::Private::e_y_down { 0 };
+
 int             Fl::Private::selection_to_clipboard_ = 0;
 
 Fl_Window       *fl_xfocus = NULL; // which window X thinks has focus

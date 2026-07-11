@@ -142,12 +142,10 @@ static int g_next_pen_id { 1 };
 namespace Fl {
 namespace Pen {
 
-static WinAPI_Driver winapi_driver_instance;
-
-Driver& newPenDriver() {
-  return winapi_driver_instance;
+Fl::Pen::Driver& newPenDriver() {
+    Fl::Pen::Driver *winapi_driver_instance = new WinAPI_Driver();
+    return *winapi_driver_instance;
 }
-
 
 Trait WinAPI_Driver::traits() {
   // The Pointer Input API used by this driver is available on Windows 8 and

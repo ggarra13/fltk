@@ -111,14 +111,6 @@ static Fl_Window *gtk_shell_window = nullptr;
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
 
-// Click detection needs the mouse-down position stored by Fl internals.
-namespace Fl {
-namespace Private {
-extern int e_x_down;
-extern int e_y_down;
-} // namespace Private
-} // namespace Fl
-
 using namespace Fl::Pen;
 
 // C+11 Safe defined
@@ -253,13 +245,14 @@ Trait Wayland_Driver::pen_traits(int pen_id) {
   return match ? match->capabilities : Trait::NONE;
 }
 
+    Fl::Pen::Driver& newWaylandPenDriver() {
+        Fl::Pen::Wayland_Driver *wayland_driver_instance = new Fl::Pen::Wayland_Driver();
+        return *wayland_driver_instance;
+    }
+
 } // namespace Pen
 } // namespace Fl
 
-Fl::Pen::Driver& newWaylandPenDriver() {
-  Fl::Pen::Wayland_Driver *wayland_driver_instance = new Fl::Pen::Wayland_Driver();
-  return *wayland_driver_instance;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Platform-independent helper functions
