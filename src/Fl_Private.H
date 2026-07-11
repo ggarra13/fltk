@@ -73,6 +73,10 @@ FL_EXPORT extern Fl_Cairo_State cairo_state_;
 
 #endif // FLTK_HAVE_CAIRO
 
+    // Global pen position at pen down event
+    extern int e_x_down;
+    extern int e_y_down;
+
 } // namespace Private
 } // namespace Fl
 

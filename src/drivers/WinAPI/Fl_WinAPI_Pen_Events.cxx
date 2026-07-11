@@ -142,10 +142,9 @@ static int g_next_pen_id { 1 };
 namespace Fl {
 namespace Pen {
 
-static WinAPI_Driver winapi_driver_instance;
-
 Driver& newPenDriver() {
-  return winapi_driver_instance;
+    Fl::Pen::Driver *winapi_driver_instance = new WinAPI_Driver();
+    return *winapi_driver_instance;
 }
 
 
