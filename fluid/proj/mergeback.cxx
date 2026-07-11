@@ -1,7 +1,7 @@
 //
 // MergeBack code for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 2023-2025 by Bill Spitzak and others.
+// Copyright 2023-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -24,6 +24,7 @@
 
 #include <FL/Fl_Window.H>
 #include <FL/fl_ask.H>
+#include "../../src/flstring.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -138,8 +139,8 @@ void Mergeback::unindent(char *s) {
   bool line_start = true;
   while (*s) {
     if (line_start) {
-      if (*s>0 && isspace(*s)) s++;
-      if (*s>0 && isspace(*s)) s++;
+      if (*s>0 && fl_ascii_isspace(*s)) s++;
+      if (*s>0 && fl_ascii_isspace(*s)) s++;
       line_start = false;
     }
     if (*s=='\r') s++;
@@ -263,7 +264,7 @@ void Mergeback::analyse_callback(unsigned long code_crc, unsigned long tag_crc, 
  */
 void Mergeback::analyse_code(unsigned long code_crc, unsigned long tag_crc, int uid) {
   Node *tp = proj_.tree.find_by_uid(uid);
-  if (tp && tp->is_a(Type::Code)) {
+  if (tp && dynamic_cast<Code_Node*>(tp)) {
     std::string code = tp->name(); code += "\n";
     unsigned long project_crc = fluid::io::Code_Writer::block_crc(code);
     // check if the code and project crc are the same, so this modification was already applied
@@ -506,7 +507,7 @@ int Mergeback::apply_callback(long block_end, long block_start, unsigned long co
  */
 int Mergeback::apply_code(long block_end, long block_start, unsigned long code_crc, int uid) {
   Node *tp = proj_.tree.find_by_uid(uid);
-  if (tp && tp->is_a(Type::Code)) {
+  if (tp && dynamic_cast<Code_Node*>(tp)) {
     std::string cb = tp->name(); cb += "\n";
     unsigned long project_crc = fluid::io::Code_Writer::block_crc(cb);
     if (project_crc!=code_crc) {

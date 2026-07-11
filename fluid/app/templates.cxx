@@ -1,7 +1,7 @@
 //
 // Fluid Project Templates code for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2025 by Bill Spitzak and others.
+// Copyright 1998-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -26,7 +26,7 @@
 #include <FL/filename.H>
 #include <FL/fl_ask.H>
 #include <FL/Fl_PNG_Image.H>
-#include "../src/flstring.h"
+#include "../../src/flstring.h"
 
 using namespace fluid;
 using namespace fluid::app;
@@ -68,7 +68,7 @@ void fluid::app::save_template() {
   char savename[FL_PATH_MAX], *saveptr;
   strlcpy(savename, c, sizeof(savename));
   for (saveptr = savename; *saveptr; saveptr ++) {
-    if (isspace(*saveptr)) *saveptr = '_';
+    if (fl_ascii_isspace(*saveptr)) *saveptr = '_';
   }
 
   // Find the templates directory...
@@ -107,7 +107,7 @@ void fluid::app::save_template() {
 
   for (t = Fluid.proj.tree.first; t; t = t->next) {
     // Find the first window...
-    if (t->is_a(Type::Window)) break;
+    if (dynamic_cast<Window_Node*>(t)) break;
   }
 
   if (!t) return;

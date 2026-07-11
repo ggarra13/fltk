@@ -1,7 +1,7 @@
 //
 // Fluid Project File Reader code for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2025 by Bill Spitzak and others.
+// Copyright 1998-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -31,7 +31,9 @@
 #include "nodes/Widget_Node.h"
 #include "nodes/Grid_Node.h"
 #include "nodes/Window_Node.h"
+#include "nodes/Menu_Node.h"
 #include "widgets/Node_Browser.h"
+#include "../../src/flstring.h"
 
 #include <FL/Fl_Window.H>
 #include <FL/fl_message.H>
@@ -350,7 +352,7 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
       // FIXME: this has no business in the file reader!
       // TODO: this is called whenever something is pasted from the top level into a grid
       //    It makes sense to make this more universal for other widget types too.
-      if (merge && t && t->parent && t->parent->is_a(Type::Grid)) {
+      if (merge && t && t->parent && dynamic_cast<Grid_Node*>(t->parent)) {
         if (Window_Node::popupx != 0x7FFFFFFF) {
           ((Grid_Node*)t->parent)->insert_child_at(((Widget_Node*)t)->o, Window_Node::popupx, Window_Node::popupy);
         } else {
@@ -403,7 +405,7 @@ int Project_Reader::read_project(const char *filename, int merge, Strategy strat
   Fluid.proj.tree.current = nullptr;
   // Force menu items to be rebuilt...
   for (o = Fluid.proj.tree.first; o; o = o->next) {
-    if (o->is_a(Type::Menu_Manager_)) {
+    if (dynamic_cast<Menu_Manager_Node*>(o)) {
       o->add_child(nullptr,nullptr);
     }
   }
@@ -483,7 +485,7 @@ const char *Project_Reader::read_word(int wantbrace) {
       continue;
     } else if (x == '\n') {
       lineno++;
-    } else if (!isspace(x & 255)) {
+    } else if (!fl_ascii_isspace(x)) {
       break;
     }
   }
@@ -524,7 +526,7 @@ const char *Project_Reader::read_word(int wantbrace) {
     int length = 0;
     for (;;) {
       if (x == '\\') {x = read_quoted(); if (x<0) continue;}
-      else if (x<0 || isspace(x & 255) || x=='{' || x=='}' || x=='#') break;
+      else if (x<0 || fl_ascii_isspace(x) || x=='{' || x=='}' || x=='#') break;
       buffer[length++] = x;
       expand_buffer(length);
       x = nextchar();
@@ -563,7 +565,7 @@ int Project_Reader::read_fdesign_line(const char*& name, const char*& value) {
     x = nextchar();
     if (x < 0 && feof(fin)) return 0;
     if (x == '\n') {length = 0; continue;} // no colon this line...
-    if (!isspace(x & 255)) {
+    if (!fl_ascii_isspace(x)) {
       buffer[length++] = x;
       expand_buffer(length);
     }
@@ -575,7 +577,7 @@ int Project_Reader::read_fdesign_line(const char*& name, const char*& value) {
   // skip to start of value:
   for (;;) {
     x = nextchar();
-    if ((x < 0 && feof(fin)) || x == '\n' || !isspace(x & 255)) break;
+    if ((x < 0 && feof(fin)) || x == '\n' || !fl_ascii_isspace(x)) break;
   }
 
   // read the value:

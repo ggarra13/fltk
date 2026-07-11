@@ -97,9 +97,7 @@ struct pointer_output {
 
 
 static std::vector<int> key_vector; // used by Fl_Wayland_Screen_Driver::event_key()
-/*static*/ struct wl_surface *gtk_shell_surface = NULL;
-/*static*/ libdecor_frame *gtk_shell_frame = NULL;
-/*static*/ Fl_Window *gtk_shell_window = nullptr;
+static struct wl_surface *gtk_shell_surface = NULL;
 
 Fl_Wayland_Screen_Driver::compositor_name Fl_Wayland_Screen_Driver::compositor =
   Fl_Wayland_Screen_Driver::unspecified;
@@ -651,14 +649,14 @@ struct key_repeat_data_t {
   Fl_Window *window;
 };
 
-#define KEY_REPEAT_DELAY 0.5 // sec
-#define KEY_REPEAT_INTERVAL 0.05 // sec
+static double key_repeat_delay = 0.5; // sec
+static double key_repeat_interval = 0.05;  // sec
 
 
 static void key_repeat_timer_cb(key_repeat_data_t *key_repeat_data) {
-  if (last_keydown_serial == key_repeat_data->serial) {
+  if (last_keydown_serial == key_repeat_data->serial && key_repeat_interval > 0) {
     Fl::handle(FL_KEYDOWN, key_repeat_data->window);
-    Fl::add_timeout(KEY_REPEAT_INTERVAL, (Fl_Timeout_Handler)key_repeat_timer_cb, key_repeat_data);
+    Fl::add_timeout(key_repeat_interval, (Fl_Timeout_Handler)key_repeat_timer_cb, key_repeat_data);
   }
   else delete key_repeat_data;
 }
@@ -905,7 +903,7 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     key_repeat_data->serial = serial;
     key_repeat_data->window = win;
     last_keydown_serial = serial;
-    Fl::add_timeout(KEY_REPEAT_DELAY, (Fl_Timeout_Handler)key_repeat_timer_cb,
+    Fl::add_timeout(key_repeat_delay, (Fl_Timeout_Handler)key_repeat_timer_cb,
                     key_repeat_data);
   }
 }
@@ -951,7 +949,9 @@ static void wl_keyboard_modifiers(void *data, struct wl_keyboard *wl_keyboard,
 
 static void wl_keyboard_repeat_info(void *data, struct wl_keyboard *wl_keyboard, int32_t rate, int32_t delay)
 {
-  // wl_keyboard is version 3 under Debian, but that event isn't sent until version 4
+  key_repeat_delay = delay / 1000.;
+  key_repeat_interval = (rate > 0 ? 1. / rate : 0);
+  //printf("wl_keyboard_repeat_info: rate=%d delay=%d\n",rate,delay);
 }
 
 
@@ -1277,7 +1277,7 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
 //fprintf(stderr, "registry_handle_global: seat=%p\n", scr_driver->seat);
     wl_list_init(&scr_driver->seat->pointer_outputs);
     scr_driver->seat->wl_seat = (wl_seat*)wl_registry_bind(wl_registry, id,
-                                                           &wl_seat_interface, 3);
+                                                      &wl_seat_interface, fl_min(version, 4));
     scr_driver->seat->xkb_context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (scr_driver->seat->xkb_context) {
       const char *locale = getenv("LC_ALL");
@@ -1439,7 +1439,7 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 
-static void libdecor_fd_callback(int fd, struct libdecor *libdecor_context)
+static void wld_socket_callback(int fd, struct libdecor *libdecor_context)
 {
   if (libdecor_dispatch(libdecor_context, 0) >= 0) return;
   if (wl_display_get_error(Fl_Wayland_Screen_Driver::wl_display) == EPROTO) {
@@ -1545,7 +1545,7 @@ void Fl_Wayland_Screen_Driver::open_display_platform() {
   wl_callback_add_listener(registry_cb, &sync_listener, &registry_cb);
   while (registry_cb) wl_display_dispatch(wl_display);
   libdecor_context = libdecor_new(wl_display, &libdecor_iface);
-  Fl::add_fd(libdecor_get_fd(libdecor_context), FL_READ, (Fl_FD_Handler)libdecor_fd_callback,
+  Fl::add_fd(libdecor_get_fd(libdecor_context), FL_READ, (Fl_FD_Handler)wld_socket_callback,
              libdecor_context);
   fl_create_print_window();
   atexit(do_atexit);

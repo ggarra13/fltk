@@ -103,8 +103,10 @@ extern "C" {
                                          struct libdecor_frame *frame,
                                          bool *using_CAIRO);
 }
-extern struct wl_surface *gtk_shell_surface;
-extern Fl_Window *gtk_shell_window;
+
+static struct wl_surface *gtk_shell_surface;
+static libdecor_frame *gtk_shell_frame = nullptr;
+static Fl_Window *gtk_shell_window = nullptr;
 
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
@@ -772,7 +774,7 @@ static int handle_cairo_events(Fl_Window* win, TabletTool* tool)
     return 0;
 }
 /*
-  Convert pen evenets over the titlebar or resize area into libdecor actions.
+  Convert pen events over the titlebar or resize area into libdecor actions.
 
   \return a value that indicate how the caller shall continue processing the event.
   The return values are yet to be defined.
