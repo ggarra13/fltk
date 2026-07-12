@@ -78,12 +78,12 @@ Fl_Image_Surface_Driver *Fl_Image_Surface_Driver::newImageSurfaceDriver(int w, i
 // This defines X11 dummy driver when Wayland is not being built.
 #if FLTK_HAVE_PEN_SUPPORT && !defined(FLTK_USE_WAYLAND)
 namespace Fl {
-    namespace Pen
-    {
-        Fl::Pen::Driver& newPenDriver() {
-            static Driver default_driver;
-            return default_driver;
-        }
+  namespace Pen
+  {
+    Fl::Pen::Driver& newPenDriver() {
+      static Driver default_driver;
+      return default_driver;
     }
+  }
 }
 #endif

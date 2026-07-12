@@ -150,23 +150,23 @@ Fl_Image_Surface_Driver *Fl_Image_Surface_Driver::newImageSurfaceDriver(int w, i
 // This defines Pen Driver for both for Wayland and, optionally, X11.
 #if FLTK_HAVE_PEN_SUPPORT
 namespace Fl {
-    namespace Pen
-    {
-        extern Fl::Pen::Driver& newWaylandPenDriver();
+  namespace Pen
+  {
+    extern Fl::Pen::Driver& newWaylandPenDriver();
 
 #ifdef FLTK_USE_X11
-        Fl::Pen::Driver &newX11PenDriver() {
-            Fl::Pen::Driver *x11_driver_instance = new Fl::Pen::Driver();
-            return *x11_driver_instance;
-        }
-#endif
-
-        Fl::Pen::Driver& newPenDriver() {
-#ifdef FLTK_USE_X11
-            if (!attempt_wayland()) return newX11PenDriver();
-#endif
-            return newWaylandPenDriver();
-        }
+    Fl::Pen::Driver &newX11PenDriver() {
+      Fl::Pen::Driver *x11_driver_instance = new Fl::Pen::Driver();
+      return *x11_driver_instance;
     }
+#endif
+
+    Fl::Pen::Driver& newPenDriver() {
+#ifdef FLTK_USE_X11
+      if (!attempt_wayland()) return newX11PenDriver();
+#endif
+      return newWaylandPenDriver();
+    }
+  }
 }
 #endif
