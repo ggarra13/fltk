@@ -230,10 +230,10 @@ Trait Wayland_Driver::pen_traits(int pen_id) {
   return match ? match->capabilities : Trait::NONE;
 }
 
-    Fl::Pen::Driver& newWaylandPenDriver() {
-        Fl::Pen::Wayland_Driver *wayland_driver_instance = new Fl::Pen::Wayland_Driver();
-        return *wayland_driver_instance;
-    }
+Fl::Pen::Driver& newWaylandPenDriver() {
+  Fl::Pen::Wayland_Driver *wayland_driver_instance = new Fl::Pen::Wayland_Driver();
+  return *wayland_driver_instance;
+}
 
 } // namespace Pen
 } // namespace Fl

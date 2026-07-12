@@ -143,8 +143,8 @@ namespace Fl {
 namespace Pen {
 
 Fl::Pen::Driver& newPenDriver() {
-    Fl::Pen::Driver *winapi_driver_instance = new WinAPI_Driver();
-    return *winapi_driver_instance;
+  Fl::Pen::Driver *winapi_driver_instance = new WinAPI_Driver();
+  return *winapi_driver_instance;
 }
 
 Trait WinAPI_Driver::traits() {
