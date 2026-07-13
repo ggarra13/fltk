@@ -36,6 +36,8 @@ struct Fd_Pointer_Tree;
 
 int is_id(char c);
 
+struct TextSpan2;
+
 namespace fluid {
 
 class Project;
@@ -63,6 +65,18 @@ struct string_view {
     }
 };
 
+class CRC32 {
+  uint32_t crc_ { 0 };
+  bool multi_space_ { false };
+  bool line_start_ { true };
+public:
+  CRC32() = default;
+  void update(fluid::string_view block);
+  uint32_t value() const { return crc_; }
+  void reset() { crc_ = 0; multi_space_ = false; line_start_ = true; }
+  static uint32_t block(fluid::string_view block);
+};
+
 namespace io {
 
 extern std::string to_string_8x(uint32_t value);
@@ -75,9 +89,13 @@ private:
   Project &proj_;
 
   /// string stream buffer for generating C++ code file content
-  std::ostringstream code_buffer;
+  std::ostringstream code_buffer { };
   /// string stream buffer for generating C++ header file content
-  std::ostringstream header_buffer;
+  std::ostringstream header_buffer { };
+
+  std::string header_filename { };
+  std::string code_filename { };
+  std::string header_guard_macro_ { };
 
   /// tree of unique but human-readable identifiers
   std::map<std::string, void*> unique_id_list { };
@@ -89,15 +107,14 @@ private:
   std::set<void*> ptr_in_code { };
 
   /// crc32 for blocks of text written to the code file
-  unsigned long block_crc_ = 0;
-  /// if set, we are at the start of a line and can ignore leading spaces in crc
-  bool block_line_start_ = true;
+  fluid::CRC32 crc_ { };
 
   /// current level of source code indentation
-  int indentation = 0;
+  int indentation { 0 };
 
   bool file_content_matches(const std::string& filename, const std::string& content);
   bool write_file_if_changed(const std::string& filename, const std::string& content);
+  int flush();
 
   /// Return the current write position in the code output stream.
   int code_pos() { return (int)code_buffer.tellp(); }
@@ -105,20 +122,19 @@ private:
   int header_pos() { return (int)header_buffer.tellp(); }
 
 protected:
-  void crc_add(fluid::string_view block);
   int crc_puts(const std::string& text);
   int crc_putc(int c);
 
 public:
   /// set if we write abbreviated file for the source code previewer
   /// (disables binary data blocks, for example)
-  bool write_codeview = false;
+  bool write_codeview { false };
   /// silly thing to prevent declaring unused variables:
   /// When this symbol is on, all attempts to write code don't write
   /// anything, but set a variable if it looks like the variable "o" is used:
-  int varused_test = 0;
+  int varused_test { 0 };
   /// set to 1 if varused_test found that a variable is actually used
-  int varused = 0;
+  int varused { 0 };
 
 public:
   Code_Writer(Project &proj);
@@ -156,15 +172,26 @@ public:
   Node* write_code(Node* p);
 
   int write_code(const std::string& code_arg, const std::string& header_arg, bool to_codeview=false);
+  Node* write_prologue_comment();
+  void write_prologue();
+  void write_i18n_prologue();
+  void write_epilogue();
+  void write_epilogue_comment();
 
   /// Return the generated source code as a string (valid after write_code() with to_codeview=true).
   std::string code_string() const { return code_buffer.str(); }
   /// Return the generated header code as a string (valid after write_code() with to_codeview=true).
   std::string header_string() const { return header_buffer.str(); }
 
+  /// Return the predefined header guard, or generate one based on the header filename if not set.
+  std::string header_guard_macro();
+  /// Remember the last destination for later MergeBack calls.
+  void remember_mergeback_paths();
+
   void tag(proj::Mergeback::Tag prev_type, proj::Mergeback::Tag next_type, unsigned short uid);
 
-  static unsigned long block_crc(fluid::string_view block, unsigned long in_crc=0, bool *inout_line_start=nullptr);
+  void mark_start(TextSpan2& span);
+  void mark_end(TextSpan2& span);
 };
 
 } // namespace io

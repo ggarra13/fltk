@@ -128,11 +128,13 @@ set(CPPFILES
   nodes/Function_Node.cxx
   nodes/Grid_Node.cxx
   nodes/Group_Node.cxx
+  nodes/iterators.cxx
   nodes/Menu_Node.cxx
   nodes/Node.cxx
   nodes/Widget_Image.cxx
   nodes/Widget_Node.cxx
   nodes/Window_Node.cxx
+  nodes/attributes.cxx
   nodes/callbacks.cxx
   nodes/factory.cxx
   panels/about_panel.cxx
@@ -186,11 +188,13 @@ set(HEADERFILES
   nodes/Function_Node.h
   nodes/Grid_Node.h
   nodes/Group_Node.h
+  nodes/iterators.h
   nodes/Menu_Node.h
   nodes/Node.h
   nodes/Widget_Image.h
   nodes/Widget_Node.h
   nodes/Window_Node.h
+  nodes/attributes.h
   nodes/callbacks.h
   nodes/factory.h
   panels/about_panel.h

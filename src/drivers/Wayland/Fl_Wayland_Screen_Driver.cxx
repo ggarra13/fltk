@@ -880,13 +880,6 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
   // otherwise send it to Wayland-defined focus window
   Fl_Window *win = ( Fl::focus() ? Fl::focus()->top_window() :
                     Fl_Wayland_Window_Driver::surface_to_window(seat->keyboard_surface) );
-  if (win) {
-    set_event_xy(win);
-    Fl::e_is_click = 0;
-    Fl::handle(event, win);
-  }
-  // \@note: \bug: !(sym >= FL_F && sym <= FL_F_Last) NOT ON FLTK main branch.  Fixes repetition of keys
-  //               on mrv2
   if (event == FL_KEYDOWN && status == XKB_COMPOSE_NOTHING &&
       !(sym >= FL_Shift_L && sym <= FL_Alt_R) &&
       !(sym >= FL_F && sym <= FL_F_Last)) {
@@ -905,6 +898,11 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     last_keydown_serial = serial;
     Fl::add_timeout(key_repeat_delay, (Fl_Timeout_Handler)key_repeat_timer_cb,
                     key_repeat_data);
+  }
+  if (win) {
+    set_event_xy(win);
+    Fl::e_is_click = 0;
+    Fl::handle(event, win);
   }
 }
 
@@ -1032,8 +1030,8 @@ void text_input_commit_string(void *data, struct zwp_text_input_v3 *zwp_text_inp
 void text_input_delete_surrounding_text(void *data,
                                         struct zwp_text_input_v3 *zwp_text_input_v3,
                                         uint32_t before_length, uint32_t after_length) {
-  fprintf(stderr, "delete_surrounding_text before=%d adfter=%d\n",
-          before_length,after_length);
+  fprintf(stderr, "delete_surrounding_text before=%u after=%u\n",
+          before_length, after_length);
 }
 
 
@@ -1365,7 +1363,7 @@ static void registry_handle_global(void *user_data, struct wl_registry *wl_regis
     ((pair_bool*)user_data)->found_gtk_shell = true;
     //fprintf(stderr, "Running the Mutter compositor\n");
     scr_driver->seat->gtk_shell = (struct gtk_shell1*)wl_registry_bind(wl_registry, id,
-                                  &gtk_shell1_interface, version);
+                                  &gtk_shell1_interface, fl_min(version, 5));
   } else if (strcmp(interface, "weston_desktop_shell") == 0) {
     Fl_Wayland_Screen_Driver::compositor = Fl_Wayland_Screen_Driver::WESTON;
     //fprintf(stderr, "Running the Weston compositor\n");
@@ -2173,8 +2171,7 @@ void *Fl_Wayland_Screen_Driver::control_maximize_button(void *data) {
 
 
 int Fl_Wayland_Screen_Driver::poll_or_select_with_delay(double time_to_wait) {
-  if (wl_display_dispatch_pending(wl_display) > 0) return 1;
-  return Fl_Unix_Screen_Driver::poll_or_select_with_delay(time_to_wait);
+  return libdecor_dispatch(libdecor_context, time_to_wait);
 }
 
 
