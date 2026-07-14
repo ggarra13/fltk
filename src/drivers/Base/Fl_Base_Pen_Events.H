@@ -21,6 +21,7 @@
 #include <config.h>
 #include <FL/core/pen_events.H>
 #include <FL/Fl.H>
+#include <src/Fl_Private.H>
 
 #include <map>
 #include <memory>
