@@ -766,6 +766,7 @@ static int handle_cairo_events(Fl_Window* win, TabletTool* tool)
 
     return 0;
 }
+
 /*
   Convert pen events over the titlebar or resize area into libdecor actions.
 
