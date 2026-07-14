@@ -87,14 +87,6 @@
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
 
-// Click detection needs the mouse-down position stored by Fl internals.
-namespace Fl {
-namespace Private {
-extern int e_x_down;
-extern int e_y_down;
-} // namespace Private
-} // namespace Fl
-
 using namespace Fl::Pen;
 
 static const State kButtonBits[] = {
