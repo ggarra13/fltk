@@ -2170,9 +2170,11 @@ void *Fl_Wayland_Screen_Driver::control_maximize_button(void *data) {
 
 
 int Fl_Wayland_Screen_Driver::poll_or_select_with_delay(double time_to_wait) {
-  return libdecor_dispatch(libdecor_context, time_to_wait);
+  Fl::unlock();
+  int ret = libdecor_dispatch(libdecor_context, time_to_wait);
+  Fl::lock();
+  return ret;
 }
-
 
 // like Fl_Wayland_Screen_Driver::poll_or_select_with_delay(0.0) except no callbacks are done:
 int Fl_Wayland_Screen_Driver::poll_or_select() {
