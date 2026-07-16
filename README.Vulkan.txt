@@ -128,3 +128,11 @@ If you installed the version from LunarG, by default it will get installed in yo
 -----------
 
 You need to download the Vulkan SDK from LunarG.   Once installed, the normal location will be C:\VulkanSDK.  You should set the environment variable VULKAN_SDK to that directory.
+
+For projects using this Vulkan fork of FLTK, please take a look at:
+
+https://github.com/ggarra13/mrv2
+HDR video player (vmrv2) - Relative mature.
+
+https://github.com/ggarra13/usdviewer
+OpenUSD Scanline Renderer (Early WIP)
