@@ -18,6 +18,11 @@ Contents
    3.3    macOS
    3.4    Windows
 
+4   API
+
+5   Demos
+
+6   Projects
 
 1 Introduction
 ==============
@@ -128,6 +133,47 @@ If you installed the version from LunarG, by default it will get installed in yo
 -----------
 
 You need to download the Vulkan SDK from LunarG.   Once installed, the normal location will be C:\VulkanSDK.  You should set the environment variable VULKAN_SDK to that directory.
+
+4.0 API
+
+The API of Vulkan relies on two new classes: Fl_Vk_Window (which you must derive from) and Fl_Vk_Window_Driver (which you should not change).
+All Vulkan primitives are kept in FL/Fl_Vk_Context.H and can be accessed by Fl_Vk_Windows' accessors.  This allows us to change the implementation of them as the API evolves, without breaking backwards compatibility.
+Also, passing a reference or pointer of Fl_Vk_Context is simpler and more efficient than passing each Vulkan handle individually.
+
+These are responsible for setting up a Vulkan Window.  There's no Fl_Vk_Instance like other APIs like Qt.  Instead a number of functions should be overriden and return std::vectors.
+All extensions (VkInstance and VkDevice ones) are added to the functions provided in Fl_Vk_Window.
+
+   4.1 Extensions
+
+   Instance extensions must be listed in:
+
+       - Fl_Vk_Window's instance extensions are listed and returned in a vector as get_instance_extensions and get_optional_extensions.
+
+       - Device extensions:
+       Fl_Vk_Window's device extensions are similarly listed in get_device_extensions.
+
+       Besides the extensions, for drawing to the OpenGL window, Fl_Vk_Window should create a renderPass and pipeline and store them in m_renderPass and m_pipeline, albeit these are entirely optional.
+
+   4.2 Flow of the Window creation and drawing:
+
+       Fl_Vk_Window calls the overloaded extensions files.
+       The protected init_vk function is called to intialize the Fl_Vk_Context.
+       The potentially overloaded init_colorspace can be used to select a color space and swapchain format.  By default, init_colorspace will try to use the best format.
+       Fl_Vk_Window will call prepare() which you must overload to create the minimal primitives for your window (render pass, pipeline, shaders, etc).
+       Fl_Vk_Window will call vk_draw_begin() where you can set the background and stencil/depth values.
+       Fl_Vk_Window will "finally" call draw(), where you will draw all your drawing.  It is suggested that draw() use getCurrentCommandBuffer() to get a command buffer for a Vulkan MAX_FRAMES_IN_FLIGHT structure.
+       Fl_Vk_Window will then finally call vk_draw_end().  You usually don't need to change it.
+       On resizes or hiding of the window, Fl_Vk_Window will tear down all of its internal Vulkan primitives and call Fl_Vk_Window's overloaded destroy() function so you can do the same for primitives you created in prepare().
+       
+5  Demos
+--------
+
+vk_shape   - similar to FLTK's OpenGL shape.  Draws a triangle/circle.
+vk_texture - Like vk_shape but with a simple texture.  It also tests depth/stencil.
+vk_cube    - similar to FLTK's OpenGL cube.  Requires the glm math library.
+
+6 Projects
+----------
 
 For projects using this Vulkan fork of FLTK, please take a look at:
 
