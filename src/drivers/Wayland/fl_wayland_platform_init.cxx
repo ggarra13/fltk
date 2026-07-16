@@ -1,7 +1,7 @@
 //
 // Wayland-specific code to initialize wayland support.
 //
-// Copyright 2022-2023 by Bill Spitzak and others.
+// Copyright 2022-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -147,7 +147,7 @@ Fl_Image_Surface_Driver *Fl_Image_Surface_Driver::newImageSurfaceDriver(int w, i
   return new Fl_Wayland_Image_Surface_Driver(w, h, high_res, off);
 }
 
-// This defines Pen Driver for both for Wayland and, optionally, X11.
+// This defines Pen Driver both for Wayland and, optionally, X11.
 #if FLTK_HAVE_PEN_SUPPORT
 namespace Fl {
   namespace Pen
