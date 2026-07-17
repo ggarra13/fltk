@@ -48,6 +48,18 @@
 
 #include <gtk/gtk.h>
 
+#ifndef G_GNUC_FALLTHROUGH
+# if defined(__has_attribute)
+#  if __has_attribute(fallthrough)
+#   define G_GNUC_FALLTHROUGH __attribute__((fallthrough))
+#  else
+#   define G_GNUC_FALLTHROUGH ((void)0)
+#  endif
+# else
+#  define G_GNUC_FALLTHROUGH ((void)0)
+# endif
+#endif
+
 static const size_t SHADOW_MARGIN = 24;	/* grabbable part of the border */
 
 static const char *cursor_names[] = {
