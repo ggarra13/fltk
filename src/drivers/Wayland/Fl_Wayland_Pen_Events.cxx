@@ -69,6 +69,7 @@
 #include "../../../libdecor/build/fl_libdecor.h"
 
 #include <FL/Fl.H>
+#include <FL/Fl_Tooltip.H>
 #include <FL/Fl_Window.H>
 #include <FL/platform.H>
 
@@ -848,6 +849,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
                Fl::Pen::LEAVE, (State)0, copied);
     }
     below_pen_ = nullptr;
+
+    Fl::belowmouse(nullptr);
+    Fl_Tooltip::enter(nullptr);
+
     if (pushed_) {
       Fl::pushed(nullptr);
       pushed_ = nullptr;
@@ -984,10 +989,20 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     auto bpen_old    = (Fl::belowmouse() == bpen_widget) ? bpen_widget : nullptr;
     auto bpen_now    = find_below_pen(eventWindow, tool->ev.x, tool->ev.y);
 
+    // Prevent flickering by ignoring the tooltip window entirely ──
+    if (bpen_now) {
+      Fl_Window *win = bpen_now->as_window() ? bpen_now->as_window() : bpen_now->window();
+      if (win && win->tooltip_window()) {
+        bpen_now = bpen_old; // Pretend the pen never left the underlying widget
+      }
+    }
+
+    // ── Widget Transition Logic ────────────────────────────────────────────
     if (bpen_now != bpen_old) {
-      if (bpen_old)
+      if (bpen_old) {
         pen_send(tool, bpen_old, Fl::Pen::LEAVE, (State)0,
                  event_data_copied);
+      }
       below_pen_ = nullptr;
       if (bpen_now) {
         State hover_state = (tool->type == ZWP_TABLET_TOOL_V2_TYPE_ERASER)
@@ -995,8 +1010,16 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
         if (pen_send(tool, bpen_now, Fl::Pen::ENTER, hover_state,
                      event_data_copied)) {
           below_pen_ = subscriber_list_[bpen_now];
-          Fl::belowmouse(bpen_now);
         }
+
+        // Update standard FLTK hover state regardless of pen_send success.
+        // This ensures passive widgets (like Fl_Box) still show their standard tooltips!
+        Fl::belowmouse(bpen_now);
+        Fl_Tooltip::enter(bpen_now);
+      } else {
+        // Moving into empty space
+        Fl::belowmouse(nullptr);
+        Fl_Tooltip::enter(nullptr);
       }
     }
     receiver = below_pen_ ? below_pen_->widget() : nullptr;
