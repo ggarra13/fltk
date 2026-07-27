@@ -57,8 +57,8 @@
  offset_subwindow_event(), event_inside(), find_below_pen(), copy_state(),
  pen_send(), and pen_send_all() are identical in the Cocoa and Wayland
  drivers.  They are duplicated here intentionally rather than elevated to
- Fl_Base_Pen_Events to avoid touching the shared API in this patch.
- TODO: move them to Fl_Base_Pen_Events.cxx and expose via the header.
+ Fl_Base_Pen_Driver to avoid touching the shared API in this patch.
+ TODO: move them to Fl_Base_Pen_Driver.cxx and expose via the header.
  */
 
 #include "Fl_Wayland_Pen_Events.H"
