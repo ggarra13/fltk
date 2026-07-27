@@ -116,6 +116,77 @@ FL_EXPORT extern int fl_ascii_strcasecmp(const char *s, const char *t);
 // AlbrechtS, June 2026
 
 /*
+  This function can be used to replace isalnum(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note isalnum() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_isalnum(int ch) {
+  return (ch >= 'a' && ch <= 'z') ||
+         (ch >= 'A' && ch <= 'Z') ||
+         (ch >= '0' && ch <= '9');
+}
+
+/*
+  This function can be used to replace isalpha(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note isalpha() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_isalpha(int ch) {
+  return (ch >= 'a' && ch <= 'z') ||
+         (ch >= 'A' && ch <= 'Z');
+}
+
+/*
+  This function can be used to replace isprint(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note isprint() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_isprint(int ch) {
+  if (ch < 0 || ch > 0x7f) return 0;
+  return isprint(ch);
+}
+
+/*
+  This function can be used to replace ispunct(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note ispunct() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_ispunct(int ch) {
+  return (ch >= 33 && ch <= 47) ||
+         (ch >= 58 && ch <= 64) ||
+         (ch >= 91 && ch <= 96) ||
+         (ch >= 123 && ch <= 126);
+}
+
+/*
   This function can be used to replace isspace(int) in FLTK.
 
   This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
@@ -130,6 +201,107 @@ FL_EXPORT extern int fl_ascii_strcasecmp(const char *s, const char *t);
 inline int fl_ascii_isspace(int ch) {
   if (ch < 0 || ch > 0x7f) return 0;
   return isspace(ch);
+}
+
+/*
+  This function can be used to replace toupper(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note toupper() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_toupper(int ch) {
+  if (ch >= 'a' && ch <= 'z') return ch - ('a' - 'A');
+  return ch;
+}
+
+/*
+  This function can be used to replace tolower(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note tolower() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_tolower(int ch) {
+  if (ch >= 'A' && ch <= 'Z') return ch + ('a' - 'A');
+  return ch;
+}
+
+/*
+  This function can be used to replace isxdigit(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note isxdigit() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_isxdigit(int ch) {
+  return (ch >= '0' && ch <= '9') ||
+         (ch >= 'a' && ch <= 'f') ||
+         (ch >= 'A' && ch <= 'F');
+}
+
+/*
+  This function can be used to replace isdigit(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note isdigit() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_isdigit(int ch) {
+  return (ch >= '0' && ch <= '9');
+}
+
+
+/*
+  This function can be used to replace isupper(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note isupper() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_isupper(int ch) {
+  return (ch >= 'A' && ch <= 'Z');
+}
+
+/*
+  This function can be used to replace islower(int) in FLTK.
+
+  This function is \b NOT UTF-8 aware and \b should only be used where only ASCII
+  checks are needed.
+
+  \note islower() can only be used correctly on ASCII characters (bytes) in the
+    range 0 .. 127. Everything else is locale dependent or results in undefined
+    behavior.
+
+  \param[in]  ch  input character
+*/
+inline int fl_ascii_islower(int ch) {
+  return (ch >= 'a' && ch <= 'z');
 }
 #  ifdef __cplusplus
 }
