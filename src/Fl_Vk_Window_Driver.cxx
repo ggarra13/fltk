@@ -712,7 +712,8 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 
         for (i = 0; i < device_extension_count; i++)
         {
-            if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            if (!is_headless() &&
+                !strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                         device_extensions[i].extensionName))
             {
                 swapchainExtFound = 1;
