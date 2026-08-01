@@ -26,7 +26,7 @@
 #include "Fl_Vk_Context.H"
 #include "Fl_Window.H"
 
-    
+
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
@@ -45,7 +45,7 @@ struct Fl_Vk_SwapchainBuffer {
         {
             extent = { 0, 0 };
         }
-    
+
     void destroy(VkDevice& device)
         {
             if (framebuffer != VK_NULL_HANDLE)
@@ -65,16 +65,16 @@ struct Fl_Vk_SwapchainBuffer {
                 vkDestroySemaphore(device, semaphore, NULL);
                 semaphore = VK_NULL_HANDLE;
             }
-            
+
             extent = { 0, 0 };
             // image belongs to the swapchain (must not destroy).
         }
 };
 
-  
+
 struct Fl_Vk_Depth {
     VkFormat format;
-    
+
     VkImage image;
     VkImageView view;
     VmaAllocation allocation;  // use this instead
@@ -125,15 +125,15 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
-  
+
   VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
-  
+
   static int can_do(int, const int *);
   int mode(int, const int *);
   void destroy_common_resources();
   void load_debug_functions();
   void setup_debug_messenger();
-  
+
 protected:
   void recreate_swapchain();
 
@@ -154,12 +154,12 @@ protected:
   //! Called after draw()
   virtual void vk_draw_end();
 
-  //! Called in case 
+  //! Called in case
   void set_hdr_metadata();
 
   //! Called to clean up resources when shutting down vulkan.
   void shutdown_vulkan();
-  
+
 public:
   void show() FL_OVERRIDE;
   /** Same as Fl_Window::show(int a, char **b) */
@@ -169,26 +169,26 @@ public:
   void resize(int,int,int,int) FL_OVERRIDE;
   int handle(int) FL_OVERRIDE;
 
-  /** 
+  /**
    * Name a Vulkan object for debugging.
-   * 
+   *
    * @param object_type   type of object, like:
    *                              VK_OBJECT_TYPE_COMMAND_BUFFER,
    *                              VK_OBJECT_TYPE_BUFFER,
    *                              ...etc...
    *                              (see vulkan/vulkan_core.h's VkObjectType)
-   *                              
+   *
    * @param object_handle Vulkan Handle cast to uint64_t
    * @param name          Debugging name.
    */
   void set_object_name(VkObjectType object_type, uint64_t object_handle,
                        const char* name);
 
-  /** 
+  /**
    * Begin a debug label in a command buffer with a given color
-   * 
+   *
    * @param cmd          Vulkan Command Buffer
-   * @param label_name   Name for the label. 
+   * @param label_name   Name for the label.
    * @param r            red color
    * @param g            green color
    * @param b            blue color
@@ -198,7 +198,7 @@ public:
                          const float r = 1.F, const float g = 0.5F,
                          const float b = 0.F, const float a = 1.F);
   void end_debug_label(VkCommandBuffer cmd);
-  
+
   /**  Returns non-zero if the hardware supports the given Vulkan mode. */
   static int can_do(int m) {return can_do(m,0);}
   /**  Returns non-zero if the hardware supports the given Vulkan mode.
@@ -242,7 +242,7 @@ public:
 
    mode() must not be called within draw() since it
    changes the current context.
-   
+
    */
   int mode(int a) {return mode(a,0);}
   /** Set the Vulkan capabilities of the window using platform-specific data.
@@ -253,10 +253,10 @@ public:
   //! Application and engine name.
   virtual const char* application_name() { return "FLTK"; }
   virtual const char* engine_name() { return "FLTK"; }
-  
+
   //! Main entry point for Vulkan elements creation and destruction.
   virtual void prepare() = 0;
-  virtual void destroy() {};  
+  virtual void destroy() {};
 
   //! Required and optional instance extensions used on creation (overload it)
   virtual std::vector<const char*> get_instance_extensions();
@@ -284,7 +284,7 @@ public:
   //! Required device extensions
   inline VkRenderPass&         renderPass() { return m_renderPass; }
   inline VkPipeline&             pipeline() { return m_pipeline; }
-      
+
   inline const VkInstance&             instance() const { return m_instance; }
   inline const VkPhysicalDevice&            gpu() const { return ctx.gpu; }
   inline const VkPhysicalDevice& physicalDevice() const { return ctx.gpu; }
@@ -313,7 +313,7 @@ public:
 
   //! Returns if swapchain buffers are empty.
   inline bool empty_buffers() const { return m_buffers.empty(); }
-  
+
   // Access the current back buffer (the one you're rendering to)
   VkImage get_back_buffer_image() const {
       return m_buffers[m_current_buffer].image;
@@ -328,7 +328,7 @@ public:
   }
 
   //! @}
-  
+
   // Application
 
   // if true, turns on validation layers.  Default is to have it on on Debug
@@ -337,9 +337,9 @@ public:
 
   // Traces the use of the swapchain.  You probably don't need use it.
   bool m_debugSync;
-  
+
   // These get copied into ctx for every window
-  static VkInstance   m_instance; 
+  static VkInstance   m_instance;
   static VkDevice     m_device;
   static Fl_Vk_Queue* m_queue;
   static VmaAllocator m_allocator;
@@ -388,13 +388,13 @@ private:
           }
   };
 
-  
+
 protected:
   float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
-  
+
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;
   VkImageLayout           m_currentDepthLayout;
@@ -402,7 +402,7 @@ protected:
   //! Flag used to handle resizes (swapchain and other resources recreation)
   bool                   m_swapchain_needs_recreation;
   VkSwapchainKHR         m_swapchain;
-  
+
   // HDR metadata information (passed during swap_buffers)
   bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
                              const VkHdrMetadataEXT& b);
@@ -416,7 +416,7 @@ protected:
   // This will problably be removed or moved into Fl_Vk_Context.
   VkPhysicalDeviceMemoryProperties m_memory_properties;
 
-  
+
   void init_vulkan();
 
   // Auxiliary functions to begin and end the main render pass.
@@ -427,11 +427,11 @@ protected:
   void begin_render_pass();
   void end_render_pass(VkCommandBuffer);
   void end_render_pass();
-  
+
   void swap_buffers();
 
 public:
-  
+
   void swap_interval(int);
   int swap_interval() const;
 
@@ -443,7 +443,7 @@ public:
   //! Call this to wait on the Vulkan device.  This will wait for all GPUs
   //! operations to finish.
   void wait_device();
-  
+
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
       return m_frames[m_currentFrameIndex].commandBuffer;
@@ -451,7 +451,7 @@ public:
   uint32_t getCurrentBufferIndex() const {
       return m_current_buffer;
   }
-  
+
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
   Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }
@@ -467,11 +467,11 @@ public:
    \version 1.3.4
    */
   int pixel_w() {
-      if (m_swapchain != VK_NULL_HANDLE && m_swapchainExtent.width  > 0)
+      if (m_swapchainExtent.width  > 0)
           return (int)m_swapchainExtent.width;
       return int(pixels_per_unit() * w() + 0.5f);
   }
-  
+
   /** Gives the window height in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
    which is expressed in FLTK units, may differ from the window height in pixels.
@@ -482,18 +482,18 @@ public:
    \version 1.3.4
    */
   int pixel_h() {
-    if (m_swapchain != VK_NULL_HANDLE && m_swapchainExtent.height > 0)
+    if (m_swapchainExtent.height > 0)
         return (int)m_swapchainExtent.height;
     return int(pixels_per_unit() * h() + 0.5f);  // pre-swapchain estimate only
   }
-  
+
   virtual ~Fl_Vk_Window();
   /**
     Creates a new Fl_Vk_Window widget using the given size, and label string.
     The default boxtype is FL_NO_BOX. The default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
   */
   Fl_Vk_Window(int W, int H, const char *l=0) : Fl_Window(W,H,l) {init();}
-  
+
   /**
     Creates a new Fl_Vk_Window widget using the given position,
     size, and label string. The default boxtype is FL_NO_BOX. The
