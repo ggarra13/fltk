@@ -17,8 +17,10 @@
 
 #include <FL/Fl_Vk_Headless_Window.H>
 #include "Fl_Vk_Headless_Window_Driver.H"
+#include <iostream>
 
 Fl_Vk_Window_Driver *Fl_Vk_Headless_Window::create_driver() {
+    std::cerr << "create headless window driver" << std::endl;
   return new Fl_Vk_Headless_Window_Driver(this);
 }
 

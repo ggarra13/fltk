@@ -29,6 +29,10 @@
 
 #if HAVE_VK
 
+#include <iostream>
+
+#define DBG std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -110,6 +114,8 @@ Fl_Vk_Headless_Window(w, h, l) {
 
 void vk_offscreen_window::prepare_mesh()
 {
+    DBG;
+
     // clang-format off
     struct Vertex
     {
@@ -144,6 +150,7 @@ void vk_offscreen_window::prepare_mesh()
     }
 
 
+    DBG;
     VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
 
     // clang-format on
@@ -168,6 +175,7 @@ void vk_offscreen_window::prepare_mesh()
     result = vkCreateBuffer(device(), &buf_info, NULL, &m_mesh.buf);
     VK_CHECK(result);
 
+    DBG;
     VkMemoryRequirements mem_reqs;
     vkGetBufferMemoryRequirements(device(), m_mesh.buf, &mem_reqs);
     VK_CHECK(result);
@@ -200,6 +208,7 @@ void vk_offscreen_window::prepare_mesh()
     m_mesh.vi_attrs[0].location = 0;
     m_mesh.vi_attrs[0].format = VK_FORMAT_R32G32B32_SFLOAT;
     m_mesh.vi_attrs[0].offset = 0;
+    DBG;
 }
 
 void vk_offscreen_window::prepare_render_pass()
@@ -207,6 +216,7 @@ void vk_offscreen_window::prepare_render_pass()
     bool has_depth = mode() & FL_DEPTH;
     bool has_stencil = mode() & FL_STENCIL;
 
+    DBG;
     VkAttachmentDescription attachments[2];
     attachments[0] = VkAttachmentDescription();
     attachments[0].format = format();
@@ -217,6 +227,7 @@ void vk_offscreen_window::prepare_render_pass()
     attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Start undefined
 
+    DBG;
     // *** The one line that actually differs from vk_shape.cxx ***
     // vk_shape.cxx uses VK_IMAGE_LAYOUT_PRESENT_SRC_KHR here, because its
     // color image is a swapchain image headed for a presentation engine.
@@ -228,6 +239,7 @@ void vk_offscreen_window::prepare_render_pass()
 
     attachments[1] = VkAttachmentDescription();
 
+    DBG;
     VkAttachmentReference color_reference = {};
     color_reference.attachment = 0;
     color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -236,6 +248,7 @@ void vk_offscreen_window::prepare_render_pass()
     depth_reference.attachment = 1;
     depth_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    DBG;
     VkSubpassDescription subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.flags = 0;
@@ -247,6 +260,7 @@ void vk_offscreen_window::prepare_render_pass()
 
     if (has_depth || has_stencil)
     {
+    DBG;
         attachments[1].format = m_depth.format;
         attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
         attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -270,6 +284,7 @@ void vk_offscreen_window::prepare_render_pass()
         subpass.pPreserveAttachments = NULL;
     }
 
+    DBG;
     VkRenderPassCreateInfo rp_info = {};
     rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     rp_info.pNext = NULL;
@@ -280,6 +295,7 @@ void vk_offscreen_window::prepare_render_pass()
     rp_info.dependencyCount = 0;
     rp_info.pDependencies = NULL;
 
+    DBG;
     VkResult result;
     result = vkCreateRenderPass(device(), &rp_info, NULL, &m_renderPass);
     VK_CHECK(result);
@@ -289,6 +305,7 @@ VkShaderModule vk_offscreen_window::prepare_vs() {
     if (m_vert_shader_module != VK_NULL_HANDLE)
         return m_vert_shader_module;
 
+    DBG;
     std::string vertex_shader_glsl = R"(
         #version 450
         layout(location = 0) in vec3 inPos;
@@ -313,6 +330,7 @@ VkShaderModule vk_offscreen_window::prepare_vs() {
 }
 
 VkShaderModule vk_offscreen_window::prepare_fs() {
+    DBG;
     if (m_frag_shader_module != VK_NULL_HANDLE)
         return m_frag_shader_module;
 
@@ -340,6 +358,7 @@ VkShaderModule vk_offscreen_window::prepare_fs() {
 }
 
 void vk_offscreen_window::prepare_pipeline() {
+    DBG;
     VkGraphicsPipelineCreateInfo pipeline;
     VkPipelineCacheCreateInfo pipelineCacheCreateInfo;
 
@@ -404,6 +423,7 @@ void vk_offscreen_window::prepare_pipeline() {
     dynamicStateEnables[dynamicState.dynamicStateCount++] =
         VK_DYNAMIC_STATE_SCISSOR;
 
+    DBG;
     bool has_depth = mode() & FL_DEPTH;
     bool has_stencil = mode() & FL_STENCIL;
 
@@ -452,6 +472,7 @@ void vk_offscreen_window::prepare_pipeline() {
     memset(&pipelineCacheCreateInfo, 0, sizeof(pipelineCacheCreateInfo));
     pipelineCacheCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
 
+    DBG;
     result = vkCreatePipelineCache(device(), &pipelineCacheCreateInfo, NULL,
                                    &pipelineCache());
     VK_CHECK(result);
@@ -459,6 +480,7 @@ void vk_offscreen_window::prepare_pipeline() {
                                        &pipeline, NULL, &m_pipeline);
     VK_CHECK(result);
 
+    DBG;
     vkDestroyPipelineCache(device(), pipelineCache(), NULL);
     pipelineCache() = VK_NULL_HANDLE;
 }
@@ -466,6 +488,7 @@ void vk_offscreen_window::prepare_pipeline() {
 void vk_offscreen_window::prepare_descriptor_layout() {
     VkResult result;
 
+    DBG;
     VkPipelineLayoutCreateInfo pPipelineLayoutCreateInfo = {};
     pPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pPipelineLayoutCreateInfo.pNext = NULL;
@@ -479,10 +502,12 @@ void vk_offscreen_window::prepare_descriptor_layout() {
 
 void vk_offscreen_window::prepare()
 {
+    DBG;
     prepare_mesh();
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
+    DBG;
 }
 
 bool vk_offscreen_window::vk_draw_begin() {
@@ -498,6 +523,7 @@ void vk_offscreen_window::draw() {
     if (pixel_w() <= 0 || pixel_h() <= 0)
         return;
 
+    DBG;
     VkCommandBuffer cmd = getCurrentCommandBuffer();
 
     begin_render_pass(cmd);
@@ -521,19 +547,26 @@ void vk_offscreen_window::draw() {
     vkCmdDraw(cmd, 3 * sides, 1, 0, 0); // Draw shape
 
     end_render_pass(cmd);
+    DBG;
 }
 
 Fl_RGB_Image *vk_offscreen_window::capture_shape() {
     render_offscreen();  // renders exactly one frame: vk_draw_begin()/draw()/vk_draw_end()/swap_buffers()
 
+    DBG;
     Fl_Vk_Window_Driver *drv = Fl_Vk_Window_Driver::driver(this);
     if (!drv) return NULL;
 
-    return drv->capture_vk_rectangle(0, 0, pixel_w(), pixel_h());
+    std::cerr << "is headless=" << drv->is_headless() << std::endl;
+
+    DBG;
+    Fl_RGB_Image* image = drv->capture_vk_rectangle(0, 0, pixel_w(), pixel_h());
+    return image;
 }
 
 void vk_offscreen_window::destroy_mesh()
 {
+    DBG;
     m_mesh.destroy(device());
 }
 
@@ -542,6 +575,7 @@ void vk_offscreen_window::destroy()
     if (device() == VK_NULL_HANDLE)
         return;
 
+    DBG;
     destroy_mesh();
 
     if (m_pipeline_layout != VK_NULL_HANDLE) {
@@ -556,6 +590,7 @@ void vk_offscreen_window::destroy()
         vkDestroyShaderModule(device(), m_frag_shader_module, nullptr);
         m_frag_shader_module = VK_NULL_HANDLE;
     }
+    DBG;
 }
 
 // Minimal, dependency-free PPM writer, purely so this test leaves behind
@@ -563,22 +598,26 @@ void vk_offscreen_window::destroy()
 // image *writer* -- if you'd rather have PNG, encode img->data()[0]
 // yourself with libpng/stb_image_write/etc.
 static bool write_ppm(const char *path, Fl_RGB_Image *img) {
+    DBG;
     if (!img || img->d() < 3) return false;
     std::ofstream f(path, std::ios::binary);
     if (!f) return false;
 
+    DBG;
     f << "P6\n" << img->w() << " " << img->h() << "\n255\n";
 
     const int d = img->d();
     const int ld = img->ld() ? img->ld() : img->w() * d;
     const uchar *data = (const uchar *)img->data()[0];
 
+    DBG;
     for (int y = 0; y < img->h(); ++y) {
         const uchar *row = data + (size_t)y * ld;
         for (int x = 0; x < img->w(); ++x) {
             f.write((const char *)(row + (size_t)x * d), 3); // R,G,B
         }
     }
+    DBG;
     return true;
 }
 
@@ -586,6 +625,7 @@ int main(int argc, char **argv) {
     int sides = (argc > 1) ? atoi(argv[1]) : 6;
     if (sides < 3) sides = 3;
 
+    DBG;
     vk_offscreen_window win(280, 280);
     win.sides = sides;
 
@@ -600,6 +640,7 @@ int main(int argc, char **argv) {
     printf("vk_offscreen: captured %dx%d image, %d channel(s)\n",
           img->w(), img->h(), img->d());
 
+    DBG;
     const char *out_path = "vk_offscreen_out.ppm";
     if (write_ppm(out_path, img)) {
         printf("vk_offscreen: wrote %s (view with e.g. `convert %s out.png`)\n",
@@ -608,9 +649,11 @@ int main(int argc, char **argv) {
         fprintf(stderr, "vk_offscreen: failed to write %s\n", out_path);
     }
 
+    DBG;
     delete img; // alloc_array was set in capture_vk_rectangle(), so this
                 // also frees the pixel buffer
 
+    DBG;
     // win (and its Vulkan resources) tear down normally when it goes out
     // of scope here -- no Fl::run(), no shown() window, no display
     // connection was ever needed.

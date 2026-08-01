@@ -26,6 +26,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include <FL/Fl_Vk_Window.H>
 #include <FL/vk.h>
@@ -124,7 +125,7 @@ public:
   VkDevice device() { return m_device; }
   VkQueue queue() { return m_queue; }
   uint32_t queueFamily() { return m_queueFamilyIndex; }
-  
+
 protected:
   void create_device();
   void init_instance();
