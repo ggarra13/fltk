@@ -18,6 +18,7 @@
 
 #include "Fluid.h"
 #include "Project.h"
+#include "message.h"
 #include "proj/Image_Asset.h"
 #include "proj/mergeback.h"
 #include "proj/undo.h"
@@ -115,7 +116,7 @@ Node* Widget_Node::make(Strategy strategy) {
     pp = pp->parent;
   }
   if (!pp || !pp->is_true_widget() || !anchor->is_true_widget()) {
-    fl_message("Please select a group widget or window");
+    fluid_message("Please select a group widget or window");
     return nullptr;
   }
 
@@ -748,7 +749,7 @@ void Widget_Node::write_code1(fluid::io::Code_Writer& f) {
           if (instring) {
             if (*ptr == '\\') ptr++;
             else if (*ptr == '\"') instring = 0;
-          } else if (inname && !fl_ascii_isalnum(*ptr & 255)) {
+          } else if (inname && !fl_ascii_isalnum(*ptr)) {
             inname = 0;
           } else if (*ptr == '/' && ptr[1]=='*') {
             incomment = 1; ptr++;
@@ -763,7 +764,7 @@ void Widget_Node::write_code1(fluid::io::Code_Writer& f) {
               incppcomment = 0;
           } else if (*ptr == '\"') {
             instring = 1;
-          } else if (fl_ascii_isalnum(*ptr & 255) || *ptr == '_') {
+          } else if (fl_ascii_isalnum(*ptr) || *ptr == '_') {
             size_t len = strspn(ptr, "0123456789_"
                                      "abcdefghijklmnopqrstuvwxyz"
                                      "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
