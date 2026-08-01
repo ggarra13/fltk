@@ -58,8 +58,8 @@ Fl_Vk_Window_Driver *Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *w) {
 int Fl_Wayland_Vk_Window_Driver::explicit_sync = -1;
 
 Fl_Wayland_Vk_Window_Driver::Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win)
-    : Fl_Vk_Window_Driver(win)
-    , m_current_wld_scale(0)   // 0 = not yet initialised; updated on first resize()
+  : Fl_Vk_Window_Driver(win)
+  , m_current_wld_scale(0)   // 0 = not yet initialised; updated on first resize()
 {
 }
 
@@ -113,10 +113,10 @@ Fl_Vk_Choice *Fl_Wayland_Vk_Window_Driver::find(int m, const int *alistp) {
 
 
 float Fl_Wayland_Vk_Window_Driver::pixels_per_unit() {
-    int ns = pWindow->screen_num();
-    int wld_scale = (pWindow->shown() ?
-                     Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale() : 1);
-    return wld_scale * Fl::screen_driver()->scale(ns);
+  int ns = pWindow->screen_num();
+  int wld_scale = (pWindow->shown() ?
+                   Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale() : 1);
+  return wld_scale * Fl::screen_driver()->scale(ns);
 }
 
 
@@ -129,15 +129,15 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
   // like issue #967, but on Vulkan see #1292  -- this solves it
   if (pWindow->m_surface != VK_NULL_HANDLE)
   {
-    if (pWindow->parent()) { 
+    if (pWindow->parent()) {
       struct wld_window* window = fl_wl_xid(pWindow);
       if (window->frame_cb || !window->wl_surface) return;
 
       // Force only if totally off-screen
       if (wl_list_empty(&window->outputs)) {
-          window->frame_cb = wl_surface_frame(window->wl_surface);
-          wl_callback_add_listener(window->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
-          wl_display_flush(fl_wl_display());
+        window->frame_cb = wl_surface_frame(window->wl_surface);
+        wl_callback_add_listener(window->frame_cb, Fl_Wayland_Graphics_Driver::p_surface_frame_listener, window);
+        wl_display_flush(fl_wl_display());
       }
     }
   }
@@ -175,43 +175,43 @@ void Fl_Wayland_Vk_Window_Driver::swap_buffers() {
 // before fresh, correctly-aligned images are built.
 // ---------------------------------------------------------------------------
 void Fl_Wayland_Vk_Window_Driver::resize(int is_a_resize, int W, int H) {
-    if (!pWindow->m_surface)
-        return;
-    int new_scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
-    struct wld_window *xid = fl_wl_xid(pWindow);
-    if (!xid) return;
+  if (!pWindow->m_surface)
+    return;
+  int new_scale = Fl_Wayland_Window_Driver::driver(pWindow)->wld_scale();
+  struct wld_window *xid = fl_wl_xid(pWindow);
+  if (!xid) return;
 
-    // Always set up the frame callback — this is safe regardless of scale.
-    if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
-        xid->frame_cb = wl_surface_frame(xid->wl_surface);
-        wl_callback_add_listener(xid->frame_cb,
-                                 Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
-    }
+  // Always set up the frame callback — this is safe regardless of scale.
+  if (xid->kind == Fl_Wayland_Window_Driver::DECORATED && !xid->frame_cb) {
+    xid->frame_cb = wl_surface_frame(xid->wl_surface);
+    wl_callback_add_listener(xid->frame_cb,
+                             Fl_Wayland_Graphics_Driver::p_surface_frame_listener, xid);
+  }
 
-    // Guard: if live swapchain images are present (m_buffers non-empty) and
-    // the buffer scale is changing, do NOT call wl_surface_set_buffer_scale()
-    // yet.  Instead, record the new desired scale (used by prepare_buffers()
-    // for alignment) and request a swapchain recreation.  The scale will be
-    // applied safely on the next prepare() call, after the old images are
-    // retired and new aligned ones are created.
-    //
-    // Note: during prepare() (called from recreate_swapchain()) m_buffers has
-    // already been cleared by destroy_resources(), so the guard below is false
-    // and we proceed to update the surface scale immediately — which is correct
-    // because prepare_buffers() follows right after and creates properly-aligned
-    // images before any present calls can happen.
-    if (!pWindow->empty_buffers() && new_scale != m_current_wld_scale) {
-        m_current_wld_scale = new_scale;          // remember for alignment in prepare_buffers()
-        pWindow->reinit_swapchain();
-        return;  // defer wl_surface_set_buffer_scale() to the next prepare()
-    }
+  // Guard: if live swapchain images are present (m_buffers non-empty) and
+  // the buffer scale is changing, do NOT call wl_surface_set_buffer_scale()
+  // yet.  Instead, record the new desired scale (used by prepare_buffers()
+  // for alignment) and request a swapchain recreation.  The scale will be
+  // applied safely on the next prepare() call, after the old images are
+  // retired and new aligned ones are created.
+  //
+  // Note: during prepare() (called from recreate_swapchain()) m_buffers has
+  // already been cleared by destroy_resources(), so the guard below is false
+  // and we proceed to update the surface scale immediately — which is correct
+  // because prepare_buffers() follows right after and creates properly-aligned
+  // images before any present calls can happen.
+  if (!pWindow->empty_buffers() && new_scale != m_current_wld_scale) {
+    m_current_wld_scale = new_scale;          // remember for alignment in prepare_buffers()
+    pWindow->reinit_swapchain();
+    return;  // defer wl_surface_set_buffer_scale() to the next prepare()
+  }
 
-    // Safe to apply the scale now:
-    //  • First-time setup (m_current_wld_scale == 0): no swapchain exists yet.
-    //  • Scale unchanged: nothing to do alignment-wise.
-    //  • Called from within prepare(): old images already destroyed.
-    m_current_wld_scale = new_scale;
-    wl_surface_set_buffer_scale(xid->wl_surface, new_scale);
+  // Safe to apply the scale now:
+  //  • First-time setup (m_current_wld_scale == 0): no swapchain exists yet.
+  //  • Scale unchanged: nothing to do alignment-wise.
+  //  • Called from within prepare(): old images already destroyed.
+  m_current_wld_scale = new_scale;
+  wl_surface_set_buffer_scale(xid->wl_surface, new_scale);
 }
 
 
@@ -232,7 +232,7 @@ void Fl_Wayland_Vk_Window_Driver::create_surface() {
   if (!surface) Fl::fatal("Wayland surface is nullptr!");
 
   createInfo.surface = surface;
-  
+
   if (vkCreateWaylandSurfaceKHR(pWindow->ctx.instance, &createInfo, nullptr,
                                 &pWindow->m_surface) !=
       VK_SUCCESS) {
@@ -253,12 +253,12 @@ std::vector<const char*> Fl_Wayland_Vk_Window_Driver::get_instance_extensions() 
 
 
 int Fl_Wayland_Vk_Window_Driver::flush_begin() {
-    struct wld_window* window = fl_wl_xid(pWindow);
-    if (window && window->frame_cb && window->fl_win)
-    {
-        return 1;  // we have a callback, skip this frame
-    }
-    return 0;
+  struct wld_window* window = fl_wl_xid(pWindow);
+  if (window && window->frame_cb && window->fl_win)
+  {
+    return 1;  // we have a callback, skip this frame
+  }
+  return 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ int Fl_Wayland_Vk_Window_Driver::flush_begin() {
 // unaligned while the window straddles two monitors during a slow drag.
 // ---------------------------------------------------------------------------
 int Fl_Wayland_Vk_Window_Driver::get_surface_buffer_scale() const {
-    return (m_current_wld_scale > 0) ? m_current_wld_scale : 1;
+  return (m_current_wld_scale > 0) ? m_current_wld_scale : 1;
 }
 
 Fl_Wayland_Vk_Window_Driver::~Fl_Wayland_Vk_Window_Driver() {}

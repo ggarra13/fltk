@@ -80,7 +80,7 @@ Fl_Vk_Choice *Fl_Cocoa_Vk_Window_Driver::find(int m, const int *alistp)
 float Fl_Cocoa_Vk_Window_Driver::pixels_per_unit()
 {
   int retina = (fl_mac_os_version >= 100700 && Fl::use_high_res_GL() && Fl_X::flx(pWindow) &&
-          Fl_Cocoa_Window_Driver::driver(pWindow)->mapped_to_retina()) ? 2 : 1;
+                Fl_Cocoa_Window_Driver::driver(pWindow)->mapped_to_retina()) ? 2 : 1;
   return retina * Fl_Graphics_Driver::default_driver().scale();
 }
 
@@ -91,7 +91,7 @@ int Fl_Cocoa_Vk_Window_Driver::mode_(int m, const int *a) {
     while (*aa) {
       if (*(aa++) ==
           kCGLPFADoubleBuffer
-          ) { m |= FL_DOUBLE; break; }
+        ) { m |= FL_DOUBLE; break; }
     }
   }
   mode( m); alist(a);
@@ -189,67 +189,67 @@ static Fl_RGB_Image *cgimage_to_rgb4(CGImageRef img) {
 
 std::vector<const char*> Fl_Cocoa_Vk_Window_Driver::get_instance_extensions()
 {
-    std::vector<const char*> out;
-    out.push_back("VK_KHR_surface");
-    out.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
-    return out;
+  std::vector<const char*> out;
+  out.push_back("VK_KHR_surface");
+  out.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
+  return out;
 }
 
 
 bool Fl_Cocoa_Vk_Window_Driver::has_hdr_monitor()
 {
-    bool out = false;
-    NSScreen *mainScreen = [NSScreen mainScreen];
+  bool out = false;
+  NSScreen *mainScreen = [NSScreen mainScreen];
 
-    // Check if the OS version supports EDR queries
-    if ([mainScreen respondsToSelector:@selector(maximumExtendedDynamicRangeColorComponentValue)]) {
-        CGFloat maxEDR = [mainScreen maximumExtendedDynamicRangeColorComponentValue];
-        
-        // If maxEDR is exactly or very close to 2.0, the monitor is in SDR mode (0-200 nits).
-        // If it's > 2.0, you have HDR headroom available.
-        out = maxEDR > 2.01; 
-    }
-    return out;
+  // Check if the OS version supports EDR queries
+  if ([mainScreen respondsToSelector:@selector(maximumExtendedDynamicRangeColorComponentValue)]) {
+    CGFloat maxEDR = [mainScreen maximumExtendedDynamicRangeColorComponentValue];
+
+    // If maxEDR is exactly or very close to 2.0, the monitor is in SDR mode (0-200 nits).
+    // If it's > 2.0, you have HDR headroom available.
+    out = maxEDR > 2.01;
+  }
+  return out;
 }
 
 void Fl_Cocoa_Vk_Window_Driver::create_surface()
 {
-    FLWindow* window = fl_xid(pWindow);
-    
-    // Get the NSView from the window                   
-    NSView* view = [window contentView];
-    
-    // Ensure the view has a CAMetalLayer (required by MoltenVK)
-    CAMetalLayer* metalLayer = [CAMetalLayer layer];
-    [view setLayer:metalLayer];
-    [view setWantsLayer:YES]; // Enable layer-backing for the NSView
-    
-    // Get the scale factor from the window or screen
-    CGFloat scale = [[view window] backingScaleFactor];
+  FLWindow* window = fl_xid(pWindow);
 
-    // Apply the scale to the layer
-    if (Fl::use_high_res_VK())
-    {
-        metalLayer.contentsScale = scale;
-        metalLayer.drawableSize = CGSizeMake(view.bounds.size.width * scale,
-                                             view.bounds.size.height * scale);
-    }
-    
-    VkMetalSurfaceCreateInfoEXT surfaceInfo = {};
-    surfaceInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
-    surfaceInfo.pNext = nullptr;
-    surfaceInfo.flags = 0;
-    surfaceInfo.pLayer = (__bridge CAMetalLayer*)metalLayer; // Use the layer instead of the view
+  // Get the NSView from the window
+  NSView* view = [window contentView];
 
-    // Use vkCreateMetalSurfaceEXT instead of vkCreateMacOSSurfaceMVK
-    VkResult result = vkCreateMetalSurfaceEXT(pWindow->ctx.instance,
-                                              &surfaceInfo,
-                                              nullptr,
-                                              &pWindow->m_surface);
-    if (result != VK_SUCCESS)
-    {
-        Fl::fatal("Failed to create macOS Vulkan surface");
-    }
+  // Ensure the view has a CAMetalLayer (required by MoltenVK)
+  CAMetalLayer* metalLayer = [CAMetalLayer layer];
+  [view setLayer:metalLayer];
+  [view setWantsLayer:YES]; // Enable layer-backing for the NSView
+
+  // Get the scale factor from the window or screen
+  CGFloat scale = [[view window] backingScaleFactor];
+
+  // Apply the scale to the layer
+  if (Fl::use_high_res_VK())
+  {
+    metalLayer.contentsScale = scale;
+    metalLayer.drawableSize = CGSizeMake(view.bounds.size.width * scale,
+                                         view.bounds.size.height * scale);
+  }
+
+  VkMetalSurfaceCreateInfoEXT surfaceInfo = {};
+  surfaceInfo.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
+  surfaceInfo.pNext = nullptr;
+  surfaceInfo.flags = 0;
+  surfaceInfo.pLayer = (__bridge CAMetalLayer*)metalLayer; // Use the layer instead of the view
+
+  // Use vkCreateMetalSurfaceEXT instead of vkCreateMacOSSurfaceMVK
+  VkResult result = vkCreateMetalSurfaceEXT(pWindow->ctx.instance,
+                                            &surfaceInfo,
+                                            nullptr,
+                                            &pWindow->m_surface);
+  if (result != VK_SUCCESS)
+  {
+    Fl::fatal("Failed to create macOS Vulkan surface");
+  }
 }
 
 

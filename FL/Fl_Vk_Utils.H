@@ -15,10 +15,10 @@
 //! Function used to compile a glsl shader to SPRIV (needs shaderc_combined)
 FL_EXPORT
 std::vector<uint32_t> compile_glsl_to_spirv(
-    const std::string& source_code,
-    shaderc_shader_kind shader_kind,
-    const std::string& filename = "shader.glsl",
-    bool optimize = false);
+  const std::string& source_code,
+  shaderc_shader_kind shader_kind,
+  const std::string& filename = "shader.glsl",
+  bool optimize = false);
 
 //! Function to create a shader module from SPIRV byte code
 FL_EXPORT
