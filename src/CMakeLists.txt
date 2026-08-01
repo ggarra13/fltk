@@ -541,6 +541,7 @@ set(VKCPPFILES
   # Fl Vk_Overlay.cxx
   Fl_Vk_Utils.cxx
   Fl_Vk_Window.cxx
+  Fl_Vk_Headless_Window.cxx
   vk_draw.cxx  # to remove.
   vk.cxx
   # vk_start.cxx
@@ -548,6 +549,7 @@ set(VKCPPFILES
 
 set(VK_DRIVER_FILES
   Fl_Vk_Window_Driver.cxx
+  Fl_Vk_Headless_Window_Driver.cxx
 )
 
 if(FLTK_BACKEND_WAYLAND)
