@@ -99,7 +99,9 @@ private:
 
 vk_offscreen_window::vk_offscreen_window(int w, int h, const char *l) :
 Fl_Vk_Headless_Window(w, h, l) {
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     mode(FL_RGB | FL_DOUBLE | FL_ALPHA);
+    std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
     sides = 6;
     // Turn on validation, same as vk_shape.cxx
     m_validate = true;

@@ -37,6 +37,7 @@ protected:
   // never mapped on screen.
   Fl_Vk_Window_Driver *create_driver() FL_OVERRIDE;
 
+  std::vector<const char*> get_optional_extensions() { return {}; };
 public:
   Fl_Vk_Headless_Window(int W, int H, const char *l = 0) : Fl_Vk_Window(W, H, l) {}
 };
