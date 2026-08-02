@@ -59,6 +59,7 @@ ninja -v
 
 bin/test/vk_shape-shared
 bin/test/vk_shape_textured-shared
+bin/test/vk_offscreen
 bin/test/vk_fullscreen
 
 
