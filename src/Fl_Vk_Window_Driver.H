@@ -26,6 +26,7 @@
 
 #include <string>
 #include <vector>
+#include <iostream>
 
 #include <FL/Fl_Vk_Window.H>
 #include <FL/vk.h>
@@ -70,6 +71,25 @@ public:
   virtual void swap_buffers() {};
   virtual void resize(int is_a_resize, int w, int h) {};
   virtual void prepare();
+
+  //! Returns true for a driver that renders off-screen, without a native
+  //! window, a VkSurfaceKHR, or a swapchain (see Fl_Vk_Headless_Window_Driver).
+  //! Used throughout Fl_Vk_Window/Fl_Vk_Window_Driver to select the
+  //! surface-less code paths needed for CLI/headless rendering.
+  virtual bool is_headless() const { return false; }
+
+  //! True once color buffers usable for rendering exist, regardless of
+  //! whether they came from a VkSwapchainKHR (interactive) or from
+  //! prepare_offscreen_buffers() (headless). Replaces raw
+  //! `m_swapchain != VK_NULL_HANDLE` checks, which are meaningless when
+  //! headless since no swapchain is ever created.
+  bool buffers_ready() const;
+
+  //! Headless equivalent of prepare_buffers(): builds pWindow->m_buffers
+  //! (and sets pWindow->m_swapchainExtent) from plain VkImages instead of
+  //! a VkSwapchainKHR. Default implementation used by
+  //! Fl_Vk_Headless_Window_Driver; the interactive drivers never call this.
+  virtual void prepare_offscreen_buffers();
   virtual void vk_hide_before(void *&) {} // the default implementation may be enough
   static Fl_Vk_Choice *find_begin(int m, const int *alistp);
   // Return one of these structures for a given vk mode.
@@ -105,7 +125,7 @@ public:
   VkDevice device() { return m_device; }
   VkQueue queue() { return m_queue; }
   uint32_t queueFamily() { return m_queueFamilyIndex; }
-  
+
 protected:
   void create_device();
   void init_instance();

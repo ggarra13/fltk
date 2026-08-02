@@ -36,17 +36,23 @@ struct Fl_Vk_SwapchainBuffer {
   VkFramebuffer framebuffer;
   VkSemaphore semaphore;
   VkExtent2D extent;
+  // Non-null only for offscreen/headless buffers, which are allocated via
+  // VMA in Fl_Vk_Window_Driver::prepare_offscreen_buffers(). Swapchain
+  // images (the interactive path) leave this VK_NULL_HANDLE, since those
+  // images belong to the swapchain and must not be freed here.
+  VmaAllocation allocation;
 
   Fl_Vk_SwapchainBuffer() :
     image(VK_NULL_HANDLE),
     view(VK_NULL_HANDLE),
     framebuffer(VK_NULL_HANDLE),
-    semaphore(VK_NULL_HANDLE)
+    semaphore(VK_NULL_HANDLE),
+    allocation(VK_NULL_HANDLE)
     {
       extent = { 0, 0 };
     }
 
-  void destroy(VkDevice& device)
+  void destroy(VkDevice& device, VmaAllocator allocator = VK_NULL_HANDLE)
     {
       if (framebuffer != VK_NULL_HANDLE)
       {
@@ -66,8 +72,17 @@ struct Fl_Vk_SwapchainBuffer {
         semaphore = VK_NULL_HANDLE;
       }
 
+      if (allocation != VK_NULL_HANDLE)
+      {
+        // Offscreen/headless buffer: we own this image, unlike a
+        // swapchain image, which belongs to the swapchain and must
+        // not be destroyed here.
+        vmaDestroyImage(allocator, image, allocation);
+        allocation = VK_NULL_HANDLE;
+      }
+      image = VK_NULL_HANDLE;
+
       extent = { 0, 0 };
-      // image belongs to the swapchain (must not destroy).
     }
 };
 
@@ -135,6 +150,14 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   void setup_debug_messenger();
 
 protected:
+  //! Creates the platform-specific driver object for this window. The
+  //! default forwards to Fl_Vk_Window_Driver::newVkWindowDriver(), which
+  //! picks X11/Wayland/Win32/Cocoa at compile+run time. A headless
+  //! subclass (see Fl_Vk_Headless_Window) overrides this to install
+  //! Fl_Vk_Headless_Window_Driver instead, without touching any of the
+  //! per-platform driver files.
+  virtual Fl_Vk_Window_Driver *create_driver();
+
   void recreate_swapchain();
 
   //! Called on initialization of the swapchain to set up the swapchain
@@ -437,6 +460,16 @@ public:
 
   int can_do_overlay() { return false; }
 
+  //! Renders a single frame (vk_draw_begin()/draw()/vk_draw_end()/
+  //! swap_buffers()) without requiring the window to be shown() -- for use
+  //! with a headless window (see Fl_Vk_Headless_Window), which is never
+  //! mapped on screen and so never receives FLTK damage/flush() calls.
+  //! Lazily performs Vulkan/offscreen-buffer initialization on first call,
+  //! exactly as flush() does for interactive windows. Calling this on a
+  //! non-headless window is a no-op (use show() + the normal event loop
+  //! instead).
+  void render_offscreen();
+
   //! Call this to wait on the Window's queue.
   void wait_queue();
 
@@ -467,7 +500,11 @@ public:
       \version 1.3.4
   */
   int pixel_w() {
-    if (m_swapchainExtent.width  > 0)
+    // m_swapchainExtent is authoritative once prepare() has run, whether
+    // it was populated by prepare_buffers() (interactive, has a real
+    // VkSwapchainKHR) or prepare_offscreen_buffers() (headless, never
+    // has one) -- so this no longer requires m_swapchain != VK_NULL_HANDLE.
+    if (m_swapchainExtent.width > 0)
       return (int)m_swapchainExtent.width;
     return int(pixels_per_unit() * w() + 0.5f);
   }
@@ -482,6 +519,7 @@ public:
       \version 1.3.4
   */
   int pixel_h() {
+    // See pixel_w() above for why this no longer checks m_swapchain.
     if (m_swapchainExtent.height > 0)
       return (int)m_swapchainExtent.height;
     return int(pixels_per_unit() * h() + 0.5f);  // pre-swapchain estimate only

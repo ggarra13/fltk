@@ -357,7 +357,7 @@ void Fl_Vk_Window::end_render_pass(VkCommandBuffer cmd)
 void Fl_Vk_Window::end_render_pass()
 {
   FrameData& frame = m_frames[m_currentFrameIndex];
-  if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE)
+  if (!pVkWindowDriver->buffers_ready() || frame.commandBuffer == VK_NULL_HANDLE)
   {
     fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
     return;
@@ -369,19 +369,24 @@ bool Fl_Vk_Window::vk_draw_begin() {
 
   VkResult result;
 
-  // Check if Vulkan is initialized
-  if (m_swapchain == VK_NULL_HANDLE)
+  // Check if Vulkan is initialized. buffers_ready() covers both the
+  // interactive (real VkSwapchainKHR) and headless (offscreen buffers,
+  // never has a swapchain) cases -- a raw m_swapchain check here always
+  // fails for a headless window and silently skips every frame.
+  if (!pVkWindowDriver->buffers_ready())
   {
     if (m_debugSync)
     {
-      fprintf(stderr, "%s Skipping vk_draw_begin: No swapchain\n",
+      fprintf(stderr, "%s Skipping vk_draw_begin: No buffers\n",
               vulkan_window_label(this));
     }
     return false;
   }
 
-  // Recreate swapchain if needed
-  if (m_swapchain_needs_recreation)
+  // Recreate swapchain if needed (headless has no swapchain to recreate;
+  // resizing an offscreen window isn't wired up yet, so this is skipped
+  // entirely rather than silently doing nothing useful).
+  if (!pVkWindowDriver->is_headless() && m_swapchain_needs_recreation)
   {
     recreate_swapchain();
     if (m_swapchain == VK_NULL_HANDLE)
@@ -430,59 +435,66 @@ bool Fl_Vk_Window::vk_draw_begin() {
             m_currentFrameIndex);
   }
 
-  // Acquire next swapchain image
-  if (m_debugSync)
-  {
-    fprintf(stderr, "%s Acquiring image for frame %u\n",
-            vulkan_window_label(this),
-            m_currentFrameIndex);
-  }
-  result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
-                                 frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
-                                 &m_current_buffer);
-  if (result == VK_TIMEOUT)
-  {
-    if (m_debugSync)
-    {
-      fprintf(stderr, "%s vkAcquireNextImageKHR timed out\n",
-              vulkan_window_label(this));
-    }
-    return false;
-  }
-  else if (result == VK_ERROR_SURFACE_LOST_KHR)
-  {
-    fprintf(stderr, "%s Surface lost, triggering recreation\n",
-            vulkan_window_label(this));
-    m_swapchain_needs_recreation = true;
-    return false; // Early return to trigger recreate_swapchain
-  }
-  else if (result == VK_ERROR_OUT_OF_DATE_KHR ||
-           result == VK_SUBOPTIMAL_KHR ||
-           result == VK_NOT_READY)
-  {
-    m_swapchain_needs_recreation = true;
-    recreate_swapchain();
-    if (m_swapchain == VK_NULL_HANDLE)
-    {
-      if (m_debugSync) {
-        fprintf(stderr, "%s Skipping vk_draw_begin: Swapchain recreation failed\n",
-                vulkan_window_label(this));
+  if (pVkWindowDriver->is_headless()) {
+      // No VkSwapchainKHR, so nothing to acquire from -- offscreen
+      // rendering targets a single buffer (see
+      // prepare_offscreen_buffers()), so there's exactly one index to use.
+      m_current_buffer = 0;
+  } else {
+      // Acquire next swapchain image
+      if (m_debugSync)
+      {
+        fprintf(stderr, "%s Acquiring image for frame %u\n",
+                vulkan_window_label(this),
+                m_currentFrameIndex);
       }
-      return false;
-    }
-    result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
-                                   frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
-                                   &m_current_buffer);
-    if (result != VK_SUCCESS)
-    {
-      fprintf(stderr, "vkAcquireNextImageKHR retry failed: %s\n", string_VkResult(result));
-      return false;
-    }
-  }
-  else if (result != VK_SUCCESS)
-  {
-    fprintf(stderr, "vkAcquireNextImageKHR failed: %s\n", string_VkResult(result));
-    return false;
+      result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
+                                     frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
+                                     &m_current_buffer);
+      if (result == VK_TIMEOUT)
+      {
+        if (m_debugSync)
+        {
+          fprintf(stderr, "%s vkAcquireNextImageKHR timed out\n",
+                  vulkan_window_label(this));
+        }
+        return false;
+      }
+      else if (result == VK_ERROR_SURFACE_LOST_KHR)
+      {
+        fprintf(stderr, "%s Surface lost, triggering recreation\n",
+                vulkan_window_label(this));
+        m_swapchain_needs_recreation = true;
+        return false; // Early return to trigger recreate_swapchain
+      }
+      else if (result == VK_ERROR_OUT_OF_DATE_KHR ||
+               result == VK_SUBOPTIMAL_KHR ||
+               result == VK_NOT_READY)
+      {
+        m_swapchain_needs_recreation = true;
+        recreate_swapchain();
+        if (m_swapchain == VK_NULL_HANDLE)
+        {
+          if (m_debugSync) {
+            fprintf(stderr, "%s Skipping vk_draw_begin: Swapchain recreation failed\n",
+                    vulkan_window_label(this));
+          }
+          return false;
+        }
+        result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
+                                       frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
+                                       &m_current_buffer);
+        if (result != VK_SUCCESS)
+        {
+          fprintf(stderr, "vkAcquireNextImageKHR retry failed: %s\n", string_VkResult(result));
+          return false;
+        }
+      }
+      else if (result != VK_SUCCESS)
+      {
+        fprintf(stderr, "vkAcquireNextImageKHR failed: %s\n", string_VkResult(result));
+        return false;
+      }
   }
 
   if (m_debugSync) {
@@ -588,7 +600,7 @@ void Fl_Vk_Window::vk_draw_end()
   end_render_pass();
 
   FrameData& frame = m_frames[m_currentFrameIndex];
-  if (m_swapchain == VK_NULL_HANDLE || frame.commandBuffer == VK_NULL_HANDLE)
+  if (!pVkWindowDriver->buffers_ready() || frame.commandBuffer == VK_NULL_HANDLE)
   {
     if (m_debugSync) {
       fprintf(stderr, "%s Skipping vk_draw_end: Invalid state\n",
@@ -612,6 +624,8 @@ int Fl_Vk_Window::can_do(int a, const int *b) {
 
 void Fl_Vk_Window::show() {
   int need_after = 0;
+  if (!pVkWindowDriver)
+    pVkWindowDriver = create_driver();
   if (!shown()) {
     Fl_Window::default_size_range();
     pVkWindowDriver->before_show(need_after);
@@ -625,6 +639,8 @@ void Fl_Vk_Window::show() {
 int Fl_Vk_Window::mode(int m, const int *a) {
   if (m == mode_ && a == alist)
     return 0;
+  if (!pVkWindowDriver)
+    pVkWindowDriver = create_driver();
   return pVkWindowDriver->mode_(m, a);
 }
 
@@ -643,7 +659,7 @@ void Fl_Vk_Window::swap_buffers() {
 
   // Check state
   FrameData& frame = m_frames[m_currentFrameIndex];
-  if (m_swapchain == VK_NULL_HANDLE ||
+  if (!pVkWindowDriver->buffers_ready() ||
       frame.commandBuffer == VK_NULL_HANDLE) {
     if (m_debugSync) {
       fprintf(stderr, "%s Skipping swap_buffers: Invalid state\n",
@@ -654,8 +670,9 @@ void Fl_Vk_Window::swap_buffers() {
 
   Fl_Vk_SwapchainBuffer& buffer = m_buffers[m_current_buffer];
 
-  // Update HDR metadata if changed
-  if (m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
+  // Update HDR metadata if changed (meaningless without a real swapchain)
+  if (m_surface != VK_NULL_HANDLE &&
+      m_hdr_metadata_changed && vkSetHdrMetadataEXT &&
       m_hdr_metadata.sType == VK_STRUCTURE_TYPE_HDR_METADATA_EXT)
   {
     vkSetHdrMetadataEXT(device(), 1, &m_swapchain, &m_hdr_metadata);
@@ -667,13 +684,20 @@ void Fl_Vk_Window::swap_buffers() {
   VkPipelineStageFlags pipe_stage_flags = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = &frame.imageAcquiredSemaphore;
-  submit_info.pWaitDstStageMask = &pipe_stage_flags;
+  if (!pVkWindowDriver->is_headless()) {
+      // frame.imageAcquiredSemaphore is only ever signaled by
+      // vkAcquireNextImageKHR (interactive path); a headless window never
+      // calls it, so waiting on it here would block forever. Likewise,
+      // nothing waits on buffer.semaphore without a vkQueuePresentKHR to
+      // consume it, so there's no reason to signal it either.
+      submit_info.waitSemaphoreCount = 1;
+      submit_info.pWaitSemaphores = &frame.imageAcquiredSemaphore;
+      submit_info.pWaitDstStageMask = &pipe_stage_flags;
+      submit_info.signalSemaphoreCount = 1;
+      submit_info.pSignalSemaphores = &buffer.semaphore;
+  }
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &frame.commandBuffer;
-  submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = &buffer.semaphore;
 
   // Reset the fence before submit.
   result = vkResetFences(device(), 1, &frame.fence);
@@ -702,69 +726,79 @@ void Fl_Vk_Window::swap_buffers() {
   }
 
 
-  pVkWindowDriver->swap_buffers();
+  if (m_surface != VK_NULL_HANDLE) {
+    pVkWindowDriver->swap_buffers();
 
-  // Present swapchain image
-  VkPresentInfoKHR present_info = {};
-  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-  present_info.waitSemaphoreCount = 1;
-  present_info.pWaitSemaphores = &buffer.semaphore;
-  present_info.swapchainCount = 1;
-  present_info.pSwapchains = &m_swapchain;
-  present_info.pImageIndices = &m_current_buffer;
+    // Present swapchain image
+    VkPresentInfoKHR present_info = {};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = &buffer.semaphore;
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = &m_swapchain;
+    present_info.pImageIndices = &m_current_buffer;
 
-  const uint32_t align = static_cast<uint32_t>(
-    pVkWindowDriver->get_surface_buffer_scale());
-  if (align > 1)
-  {
-    // Round down to the nearest multiple of align.
-    uint32_t W = m_buffers[m_current_buffer].extent.width;
-    uint32_t H = m_buffers[m_current_buffer].extent.height;
-    uint32_t width  = ( W / align) * align;
-    uint32_t height = ( H / align) * align;
-    if (width != W || height != H)
+    const uint32_t align = static_cast<uint32_t>(
+      pVkWindowDriver->get_surface_buffer_scale());
+    if (align > 1)
     {
-      fprintf(stderr, "%s : ***************ERROR*********** Would present wrong image size, index %u for frame %u %ux%u %f\n",
+      // Round down to the nearest multiple of align.
+      uint32_t W = m_buffers[m_current_buffer].extent.width;
+      uint32_t H = m_buffers[m_current_buffer].extent.height;
+      uint32_t width  = ( W / align) * align;
+      uint32_t height = ( H / align) * align;
+      if (width != W || height != H)
+      {
+        fprintf(stderr, "%s : ***************ERROR*********** Would present wrong image size, index %u for frame %u %ux%u %f\n",
+                vulkan_window_label(this),
+                m_current_buffer, m_currentFrameIndex,
+                W, H, pixels_per_unit());
+        reinit_swapchain();
+        return;
+      }
+    }
+
+
+    if (m_debugSync) {
+      fprintf(stderr, "%s Presenting image index %u for frame %u %ux%u pixels_per_unit()=%f\n",
               vulkan_window_label(this),
               m_current_buffer, m_currentFrameIndex,
-              W, H, pixels_per_unit());
-      reinit_swapchain();
+              m_buffers[m_current_buffer].extent.width,
+              m_buffers[m_current_buffer].extent.height,
+              pixels_per_unit());
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex());
+
+      result = vkQueuePresentKHR(queue(), &present_info);
+    }
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
+        result == VK_NOT_READY) {
+      m_swapchain_needs_recreation = true;
       return;
     }
-  }
+    else if (result != VK_SUCCESS)
+    {
+      fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
+              string_VkResult(result));
+      return;
+    }
 
-
-  if (m_debugSync) {
-    fprintf(stderr, "%s Presenting image index %u for frame %u %ux%u pixels_per_unit()=%f\n",
-            vulkan_window_label(this),
-            m_current_buffer, m_currentFrameIndex,
-            m_buffers[m_current_buffer].extent.width,
-            m_buffers[m_current_buffer].extent.height,
-            pixels_per_unit());
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(queue_mutex());
-
-    result = vkQueuePresentKHR(queue(), &present_info);
-  }
-
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
-      result == VK_NOT_READY) {
-    m_swapchain_needs_recreation = true;
-    return;
-  }
-  else if (result != VK_SUCCESS)
-  {
-    fprintf(stderr, "vkQueuePresentKHR failed: %s\n",
-            string_VkResult(result));
-    return;
-  }
-
-  if (m_debugSync) {
-    fprintf(stderr, "%s Presented image index %u for frame %u\n",
-            vulkan_window_label(this),
-            m_current_buffer, m_currentFrameIndex);
+    if (m_debugSync) {
+      fprintf(stderr, "%s Presented image index %u for frame %u\n",
+              vulkan_window_label(this),
+              m_current_buffer, m_currentFrameIndex);
+    }
+  } else {
+    // Headless: nothing to present. The fence signaled by vkQueueSubmit
+    // above (waited on next frame, or explicitly by the caller/
+    // capture_vk_rectangle()) is the only synchronization needed.
+    if (m_debugSync) {
+      fprintf(stderr, "%s Headless: skipping present for frame %u\n",
+              vulkan_window_label(this), m_currentFrameIndex);
+    }
   }
 
   // Advance to next frame
@@ -823,9 +857,9 @@ void Fl_Vk_Window::flush() {
     return;
 
   // Initialize Vulkan (must be in flush, not show for macOS)
-  if (m_swapchain == VK_NULL_HANDLE) {
+  if (!pVkWindowDriver->buffers_ready()) {
     init_vulkan();
-    if (m_swapchain == VK_NULL_HANDLE) {
+    if (!pVkWindowDriver->buffers_ready()) {
       fprintf(stderr, "%s Vulkan initialization failed\n",
               vulkan_window_label(this));
       return;
@@ -850,6 +884,52 @@ void Fl_Vk_Window::flush() {
 
   // Submit and present
   swap_buffers();
+
+  if (!m_swapchain_needs_recreation)
+    clear_damage();
+}
+
+void Fl_Vk_Window::render_offscreen() {
+  if (!pVkWindowDriver)
+    pVkWindowDriver = create_driver();
+
+  if (!pVkWindowDriver->is_headless())
+    return; // use show() + the normal event loop for interactive windows
+
+  if (pixel_w() <= 0 || pixel_h() <= 0)
+    return;
+
+  // Lazily initialize Vulkan + offscreen buffers on first call, exactly as
+  // flush() does for interactive windows (there is no show()/first-expose
+  // event to hang this off of for a window that's never mapped on screen).
+  if (!pVkWindowDriver->buffers_ready()) {
+    init_vulkan();
+    if (!pVkWindowDriver->buffers_ready()) {
+      fprintf(stderr, "%s Headless Vulkan initialization failed\n",
+              vulkan_window_label(this));
+      return;
+    }
+  }
+
+  if (!vk_draw_begin())
+    return;
+
+  draw();  // User defined virtual draw function
+  vk_draw_end();
+
+  // Submit (swap_buffers() skips presentation entirely when m_surface ==
+  // VK_NULL_HANDLE, which is always true for a headless window).
+  swap_buffers();
+
+  // Block until the GPU has actually finished this frame. There's no
+  // presentation engine here to hand synchronization off to, and the
+  // caller (typically capture_vk_rectangle(), via a *separate*
+  // vkQueueSubmit) needs the render pass's writes -- and its transition to
+  // the layout capture_vk_rectangle() expects -- to be complete and
+  // visible before it touches the image. Same-queue submission order alone
+  // only guarantees start order, not that this submission has finished
+  // before the next one begins.
+  wait_queue();
 
   if (!m_swapchain_needs_recreation)
     clear_damage();
@@ -949,6 +1029,7 @@ int Fl_Vk_Window::handle(int event) {
     \version 1.3.4
 */
 float Fl_Vk_Window::pixels_per_unit() {
+  if (!pVkWindowDriver) create_driver();
   return pVkWindowDriver->pixels_per_unit();
 }
 
@@ -1079,6 +1160,7 @@ Fl_Vk_Window::~Fl_Vk_Window()
   g_active_vulkan_windows--;
   shutdown_vulkan();
   delete pVkWindowDriver;
+  pVkWindowDriver = nullptr;
 }
 
 void Fl_Vk_Window::wait_queue()
@@ -1177,9 +1259,10 @@ void Fl_Vk_Window::init_vulkan() {
   if (m_surface != VK_NULL_HANDLE)
     pVkWindowDriver->destroy_surface();
 
-  // Create surface
+  // Create surface (headless driver's create_surface() intentionally
+  // leaves m_surface == VK_NULL_HANDLE -- that is not a failure for it).
   pVkWindowDriver->create_surface();
-  if (m_surface == VK_NULL_HANDLE) {
+  if (m_surface == VK_NULL_HANDLE && !pVkWindowDriver->is_headless()) {
     fprintf(stderr, "Failed to create Vulkan's Window surface\n");
     return;
   }
@@ -1235,9 +1318,10 @@ void Fl_Vk_Window::init_vulkan() {
     return;
   }
 
-  // Initialize swapchain, views, depth/stencil and buffers
+  // Initialize swapchain (or, headless, offscreen buffers), views,
+  // depth/stencil and framebuffers
   pVkWindowDriver->prepare();
-  if (m_swapchain == VK_NULL_HANDLE) {
+  if (!pVkWindowDriver->buffers_ready()) {
     fprintf(stderr, "prepare() failed\n");
     wait_device();
     pVkWindowDriver->destroy_resources();
@@ -1246,15 +1330,21 @@ void Fl_Vk_Window::init_vulkan() {
     return;
   }
 
-  // Get swapchain image count
-  result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
-  if (result != VK_SUCCESS || m_swapchainImageCount == 0) {
-    fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
-    wait_device();
-    pVkWindowDriver->destroy_resources();
-    pVkWindowDriver->destroy_surface();
-    m_swapchain = VK_NULL_HANDLE;
-    return;
+  // Get buffer count: from the swapchain when interactive, or directly
+  // from the offscreen buffer vector prepare_offscreen_buffers() already
+  // populated when headless (there is no VkSwapchainKHR to query).
+  if (pVkWindowDriver->is_headless()) {
+    m_swapchainImageCount = (uint32_t)m_buffers.size();
+  } else {
+    result = vkGetSwapchainImagesKHR(device(), m_swapchain, &m_swapchainImageCount, nullptr);
+    if (result != VK_SUCCESS || m_swapchainImageCount == 0) {
+      fprintf(stderr, "vkGetSwapchainImagesKHR failed: %s\n", string_VkResult(result));
+      wait_device();
+      pVkWindowDriver->destroy_resources();
+      pVkWindowDriver->destroy_surface();
+      m_swapchain = VK_NULL_HANDLE;
+      return;
+    }
   }
 
   // Initialize frame data
@@ -1327,11 +1417,15 @@ std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
   return out;
 }
 
+Fl_Vk_Window_Driver *Fl_Vk_Window::create_driver() {
+  return Fl_Vk_Window_Driver::newVkWindowDriver(this);
+}
+
 void Fl_Vk_Window::init() {
-  pVkWindowDriver = Fl_Vk_Window_Driver::newVkWindowDriver(this);
   end(); // we probably don't want any children
   box(FL_NO_BOX);
 
+  pVkWindowDriver = nullptr;
   mode_ = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist = 0;
   g = 0;

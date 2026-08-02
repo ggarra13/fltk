@@ -476,16 +476,6 @@ void Fl_Vk_Window_Driver::init_instance()
   {
     const std::vector<const char*>& instance_extensions =
       Fl_Vk_Window_Driver::driver(pWindow)->get_instance_extensions();
-    if (instance_extensions.empty())
-    {
-      Fl::fatal("FLTK get_instance_extensions failed to find the "
-                "platform surface extensions.\n\nDo you have a compatible "
-                "Vulkan installable client driver (ICD) installed?\nPlease "
-                "look at the Getting Started guide for additional "
-                "information.\n",
-                "vkCreateInstance Failure");
-    }
-
 
     for (const auto& extension : instance_extensions)
     {
@@ -722,7 +712,8 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 
     for (i = 0; i < device_extension_count; i++)
     {
-      if (!strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      if (!is_headless() &&
+          !strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                   device_extensions[i].extensionName))
       {
         swapchainExtFound = 1;
@@ -753,7 +744,7 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
     VK_FREE(device_extensions);
   }
 
-  if (!swapchainExtFound) {
+  if (!swapchainExtFound && !is_headless()) {
     Fl::fatal("vkEnumerateDeviceExtensionProperties failed to find "
               "the " VK_KHR_SWAPCHAIN_EXTENSION_NAME " extension.\n\nDo you have a compatible "
               "Vulkan installable client driver (ICD) installed?\nPlease "
@@ -846,57 +837,73 @@ void Fl_Vk_Window_Driver::init_colorspace() {
   vkGetPhysicalDeviceMemoryProperties(pWindow->gpu(),
                                       &pWindow->m_memory_properties);
 
-  // Iterate over each queue to learn whether it supports presenting:
-  VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
-                                                   sizeof(VkBool32));
-  for (i = 0; i < numQueues; i++)
-  {
-    vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
-                                         pWindow->m_surface,
-                                         &supportsPresent[i]);
-  }
-
-  // Search for a graphics and a present queue in the array of queue
-  // families, try to find one that supports both
   uint32_t graphicsQueueNodeIndex = UINT32_MAX;
-  uint32_t presentQueueNodeIndex = UINT32_MAX;
-  for (i = 0; i < numQueues; i++) {
-    if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
-      if (graphicsQueueNodeIndex == UINT32_MAX) {
-        graphicsQueueNodeIndex = i;
-      }
 
-      if (supportsPresent[i] == VK_TRUE) {
+  if (is_headless()) {
+    // No VkSurfaceKHR exists, so there is no "present support" to query:
+    // any graphics-capable queue family will do for offscreen rendering.
+    for (i = 0; i < numQueues; i++) {
+      if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
         graphicsQueueNodeIndex = i;
-        presentQueueNodeIndex = i;
         break;
       }
     }
-  }
-  if (presentQueueNodeIndex == UINT32_MAX) {
-    // If didn't find a queue that supports both graphics and present, then
-    // find a separate present queue.
-    for (i = 0; i < numQueues; ++i) {
-      if (supportsPresent[i] == VK_TRUE) {
-        presentQueueNodeIndex = i;
-        break;
+    if (graphicsQueueNodeIndex == UINT32_MAX) {
+      Fl::fatal("Could not find a graphics queue\n",
+                "Headless Initialization Failure");
+    }
+  } else {
+    // Iterate over each queue to learn whether it supports presenting:
+    VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
+                                                     sizeof(VkBool32));
+    for (i = 0; i < numQueues; i++)
+    {
+      vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
+                                           pWindow->m_surface,
+                                           &supportsPresent[i]);
+    }
+
+    // Search for a graphics and a present queue in the array of queue
+    // families, try to find one that supports both
+    uint32_t presentQueueNodeIndex = UINT32_MAX;
+    for (i = 0; i < numQueues; i++) {
+      if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+        if (graphicsQueueNodeIndex == UINT32_MAX) {
+          graphicsQueueNodeIndex = i;
+        }
+
+        if (supportsPresent[i] == VK_TRUE) {
+          graphicsQueueNodeIndex = i;
+          presentQueueNodeIndex = i;
+          break;
+        }
       }
     }
-  }
-  free(supportsPresent);
+    if (presentQueueNodeIndex == UINT32_MAX) {
+      // If didn't find a queue that supports both graphics and present, then
+      // find a separate present queue.
+      for (i = 0; i < numQueues; ++i) {
+        if (supportsPresent[i] == VK_TRUE) {
+          presentQueueNodeIndex = i;
+          break;
+        }
+      }
+    }
+    free(supportsPresent);
 
-  // Generate result or if could not find both a graphics and a present queue
-  if (graphicsQueueNodeIndex == UINT32_MAX ||
-      presentQueueNodeIndex == UINT32_MAX) {
-    Fl::fatal("Could not find a graphics and a present queue\n",
-              "Swapchain Initialization Failure");
-  }
+    // Generate result or if could not find both a graphics and a present queue
+    if (graphicsQueueNodeIndex == UINT32_MAX ||
+        presentQueueNodeIndex == UINT32_MAX) {
+      Fl::fatal("Could not find a graphics and a present queue\n",
+                "Swapchain Initialization Failure");
+    }
 
-  // \@note: It is possible for an application to use a separate graphics
-  //         and a present queues.  Here we assume not.
-  if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
-    Fl::fatal("Could not find a common graphics and a present queue\n",
-              "Swapchain Initialization Failure");
+    // \@note: It is possible for an application to use a separate graphics
+    //         and a present queues.  Here we assume not.
+    if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
+      Fl::fatal("Could not find a common graphics and a present queue\n",
+                "Swapchain Initialization Failure");
+    }
   }
 
   pWindow->ctx.queueFamilyIndex = m_queueFamilyIndex = graphicsQueueNodeIndex;
@@ -925,10 +932,32 @@ void Fl_Vk_Window_Driver::init_colorspace() {
   pWindow->ctx.safe_thread_queue = pWindow->m_queue;
   pWindow->ctx.allocator = pWindow->m_allocator;
 
-  bool hasHDRMonitor = has_hdr_monitor();
-  bool hdrMonitorFound = false;
   VkColorSpaceKHR color_space;
   VkFormat view_format;
+
+  if (is_headless()) {
+    // No VkSurfaceKHR exists, so vkGetPhysicalDeviceSurfaceFormatsKHR()
+    // (and the HDR-scoring logic below, which only matters for a real
+    // presentation engine) do not apply. Offscreen buffers use a fixed,
+    // widely-supported format; override via a driver subclass if a
+    // different one is needed (e.g. to match a downstream encoder).
+    view_format = VK_FORMAT_R8G8B8A8_UNORM;
+    color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    pWindow->ctx.format = view_format;
+    pWindow->ctx.colorSpace = color_space;
+
+    if (pWindow->log_level() > 2)
+    {
+      printf("\tSelected offscreen format = %s\n"
+             "\tSelected offscreen color space = %s\n",
+             string_VkFormat(view_format),
+             string_VkColorSpaceKHR(color_space));
+    }
+    return;
+  }
+
+  bool hasHDRMonitor = has_hdr_monitor();
+  bool hdrMonitorFound = false;
 
   // 1. Get the function pointer
   auto fpGetPhysicalDeviceSurfaceFormats2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormats2KHR>(
@@ -1216,14 +1245,102 @@ void Fl_Vk_Window_Driver::prepare() {
   int H = pWindow->pixel_h();
   resize(true, W, H);
 
-  prepare_buffers();
+  if (is_headless())
+    prepare_offscreen_buffers();
+  else
+    prepare_buffers();
   prepare_depth();
   pWindow->prepare();
   prepare_framebuffers(); // can be kept in driver
 }
 
+bool Fl_Vk_Window_Driver::buffers_ready() const {
+  // A real swapchain is the readiness signal for interactive windows;
+  // headless windows never create one, so the offscreen buffer vector
+  // itself is the signal instead.
+  return is_headless() ? !pWindow->m_buffers.empty()
+    : pWindow->m_swapchain != VK_NULL_HANDLE;
+}
+
+// Headless equivalent of prepare_buffers(): builds plain VkImages (via VMA)
+// instead of a VkSwapchainKHR, then populates pWindow->m_buffers exactly the
+// way prepare_buffers() does, so prepare_depth()/prepare_framebuffers() (and
+// anything downstream that reads m_buffers/m_swapchainExtent) need no
+// changes at all to work for offscreen rendering.
+void Fl_Vk_Window_Driver::prepare_offscreen_buffers() {
+  // Destroy any previously-allocated offscreen images/views/semaphores.
+  for (auto& buffer : pWindow->m_buffers) {
+    buffer.destroy(pWindow->device(), pWindow->m_allocator);
+  }
+  pWindow->m_buffers.clear();
+
+  uint32_t W = pWindow->pixel_w();
+  uint32_t H = pWindow->pixel_h();
+  if (W == 0 || H == 0) {
+    // Nothing to allocate yet; caller may retry once a real size is known.
+    return;
+  }
+  pWindow->m_swapchainExtent = { W, H };
+
+  // Single buffer: there is no acquire/present cycle to rotate through
+  // multiple images the way the interactive swapchain path has --
+  // vk_draw_begin() always targets m_current_buffer == 0 for a headless
+  // window (see its is_headless() branch). Each render_offscreen() call
+  // fully waits for GPU completion (see Fl_Vk_Window::render_offscreen())
+  // before the caller reads the image back, so there's no pipelining to
+  // gain from a second buffer here.
+  const uint32_t kOffscreenImageCount = 1;
+
+  VkImageCreateInfo image_info = {};
+  image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  image_info.imageType     = VK_IMAGE_TYPE_2D;
+  image_info.format        = pWindow->format();
+  image_info.extent        = { W, H, 1 };
+  image_info.mipLevels     = 1;
+  image_info.arrayLayers   = 1;
+  image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+  image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+  image_info.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+  VmaAllocationCreateInfo alloc_info = {};
+  alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+  pWindow->m_buffers.resize(kOffscreenImageCount);
+  VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+
+  for (auto& buffer : pWindow->m_buffers) {
+    VkResult result = vmaCreateImage(pWindow->m_allocator, &image_info, &alloc_info,
+                                     &buffer.image, &buffer.allocation, nullptr);
+    if (result != VK_SUCCESS) {
+      fprintf(stderr, "vmaCreateImage (offscreen buffer) failed: %s\n",
+              string_VkResult(result));
+      pWindow->m_buffers.clear();
+      return;
+    }
+
+    VkImageViewCreateInfo view_info = {};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image = buffer.image;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = pWindow->format();
+    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.layerCount = 1;
+    result = vkCreateImageView(pWindow->device(), &view_info, NULL, &buffer.view);
+    VK_CHECK(result);
+
+    result = vkCreateSemaphore(pWindow->device(), &semaphoreInfo, nullptr,
+                               &buffer.semaphore);
+    VK_CHECK(result);
+
+    buffer.extent = pWindow->m_swapchainExtent;
+  }
+}
+
 void Fl_Vk_Window_Driver::destroy_surface() {
-  if (!pWindow || !pWindow->instance())
+  if (!pWindow || !pWindow->instance() ||
+      pWindow->m_surface == VK_NULL_HANDLE)
     return;
 
   vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
@@ -1245,10 +1362,12 @@ void Fl_Vk_Window_Driver::destroy_resources()
   // Destroy resources in reverse creation order (first, those of window)
   pWindow->destroy_common_resources();
 
-  // Destroy the buffers
+  // Destroy the buffers (pass the allocator: a no-op for swapchain images,
+  // which leave buffer.allocation == VK_NULL_HANDLE, but required to
+  // actually free offscreen/headless buffers, which are VMA-owned).
   for (auto& buffer : pWindow->m_buffers)
   {
-    buffer.destroy(pWindow->device());
+    buffer.destroy(pWindow->device(), pWindow->m_allocator);
   }
   pWindow->m_buffers.clear();
 
