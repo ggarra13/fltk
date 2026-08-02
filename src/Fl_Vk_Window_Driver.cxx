@@ -1282,10 +1282,14 @@ void Fl_Vk_Window_Driver::prepare_offscreen_buffers() {
     }
     pWindow->m_swapchainExtent = { W, H };
 
-    // Two buffers, matching the double-buffering the interactive path
-    // typically ends up with (FIFO/MAILBOX swapchains normally return >= 2
-    // images); keeps m_frames / m_currentFrameIndex bookkeeping consistent.
-    const uint32_t kOffscreenImageCount = 2;
+    // Single buffer: there is no acquire/present cycle to rotate through
+    // multiple images the way the interactive swapchain path has --
+    // vk_draw_begin() always targets m_current_buffer == 0 for a headless
+    // window (see its is_headless() branch). Each render_offscreen() call
+    // fully waits for GPU completion (see Fl_Vk_Window::render_offscreen())
+    // before the caller reads the image back, so there's no pipelining to
+    // gain from a second buffer here.
+    const uint32_t kOffscreenImageCount = 1;
 
     VkImageCreateInfo image_info = {};
     image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
