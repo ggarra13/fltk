@@ -1335,7 +1335,8 @@ void Fl_Vk_Window_Driver::prepare_offscreen_buffers() {
 }
 
 void Fl_Vk_Window_Driver::destroy_surface() {
-    if (!pWindow || !pWindow->instance())
+    if (!pWindow || !pWindow->instance() ||
+        pWindow->m_surface == VK_NULL_HANDLE)
         return;
 
     vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);

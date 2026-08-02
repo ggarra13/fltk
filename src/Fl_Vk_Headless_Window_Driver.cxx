@@ -36,13 +36,11 @@
 // the image to. See vk_shape.cxx-style demos for the render-pass side of
 // this contract.
 Fl_RGB_Image *Fl_Vk_Headless_Window_Driver::capture_vk_rectangle(int x, int y, int w, int h) {
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   if (w <= 0 || h <= 0 || pWindow->empty_buffers())
     return NULL;
 
   const VkDeviceSize bufSize = (VkDeviceSize)w * h * 4; // 4 bytes/pixel source format
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   VkBuffer stagingBuf;
   VkDeviceMemory stagingMem;
   createBuffer(device(), gpu(), bufSize,
@@ -50,13 +48,10 @@ Fl_RGB_Image *Fl_Vk_Headless_Window_Driver::capture_vk_rectangle(int x, int y, i
               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
               stagingBuf, stagingMem);
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   VkCommandBuffer cmd = beginSingleTimeCommands(device(), pWindow->commandPool());
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   VkImage src = pWindow->get_back_buffer_image(); // public accessor -- see note above
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   VkBufferImageCopy region = {};
   region.bufferOffset = 0;
   region.bufferRowLength = 0;   // tightly packed
@@ -68,15 +63,11 @@ Fl_RGB_Image *Fl_Vk_Headless_Window_Driver::capture_vk_rectangle(int x, int y, i
   region.imageOffset = { x, y, 0 };
   region.imageExtent = { (uint32_t)w, (uint32_t)h, 1 };
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   vkCmdCopyImageToBuffer(cmd, src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                          stagingBuf, 1, &region);
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   // Waits on the queue internally -- no extra synchronization needed here.
   endSingleTimeCommands(cmd, device(), pWindow->commandPool(), queue());
-
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
 
   void *mapped = nullptr;
   VkResult result = vkMapMemory(device(), stagingMem, 0, bufSize, 0, &mapped);
@@ -86,7 +77,6 @@ Fl_RGB_Image *Fl_Vk_Headless_Window_Driver::capture_vk_rectangle(int x, int y, i
     vkFreeMemory(device(), stagingMem, nullptr);
     return NULL;
   }
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
 
   // Convert tightly-packed 4-byte source pixels to the 3-byte RGB buffer
   // Fl_RGB_Image expects. pWindow->format() is chosen in
@@ -101,16 +91,13 @@ Fl_RGB_Image *Fl_Vk_Headless_Window_Driver::capture_vk_rectangle(int x, int y, i
     pixels[i * 3 + 1] = s[1]; // G
     pixels[i * 3 + 2] = s[2]; // B
   }
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
 
   vkUnmapMemory(device(), stagingMem);
   vkDestroyBuffer(device(), stagingBuf, nullptr);
   vkFreeMemory(device(), stagingMem, nullptr);
 
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   Fl_RGB_Image *img = new Fl_RGB_Image(pixels, w, h, 3);
   img->alloc_array = 1;
-  std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
   return img;
 }
 
