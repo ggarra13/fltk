@@ -774,7 +774,6 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 
 void Fl_Vk_Window_Driver::create_device()
 {
-    std::cerr << __FUNCTION__ << " " << __FILE__ << std::endl;
     VkResult result;
 
     VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynState3Features{
