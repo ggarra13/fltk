@@ -26,109 +26,109 @@
 #include "Fl_Vk_Context.H"
 #include "Fl_Window.H"
 
-
+    
 class Fl_Vk_Choice; // structure to hold result of glXChooseVisual (unused)
 class Fl_Vk_Window_Driver;
 
 struct Fl_Vk_SwapchainBuffer {
-  VkImage image;
-  VkImageView view;
-  VkFramebuffer framebuffer;
-  VkSemaphore semaphore;
-  VkExtent2D extent;
-  // Non-null only for offscreen/headless buffers, which are allocated via
-  // VMA in Fl_Vk_Window_Driver::prepare_offscreen_buffers(). Swapchain
-  // images (the interactive path) leave this VK_NULL_HANDLE, since those
-  // images belong to the swapchain and must not be freed here.
-  VmaAllocation allocation;
+    VkImage image;
+    VkImageView view;
+    VkFramebuffer framebuffer;
+    VkSemaphore semaphore;
+    VkExtent2D extent;
+    // Non-null only for offscreen/headless buffers, which are allocated via
+    // VMA in Fl_Vk_Window_Driver::prepare_offscreen_buffers(). Swapchain
+    // images (the interactive path) leave this VK_NULL_HANDLE, since those
+    // images belong to the swapchain and must not be freed here.
+    VmaAllocation allocation;
 
-  Fl_Vk_SwapchainBuffer() :
-    image(VK_NULL_HANDLE),
-    view(VK_NULL_HANDLE),
-    framebuffer(VK_NULL_HANDLE),
-    semaphore(VK_NULL_HANDLE),
-    allocation(VK_NULL_HANDLE)
-    {
-      extent = { 0, 0 };
-    }
+    Fl_Vk_SwapchainBuffer() :
+        image(VK_NULL_HANDLE),
+        view(VK_NULL_HANDLE),
+        framebuffer(VK_NULL_HANDLE),
+        semaphore(VK_NULL_HANDLE),
+        allocation(VK_NULL_HANDLE)
+        {
+            extent = { 0, 0 };
+        }
+    
+    void destroy(VkDevice& device, VmaAllocator allocator = VK_NULL_HANDLE)
+        {
+            if (framebuffer != VK_NULL_HANDLE)
+            {
+                vkDestroyFramebuffer(device, framebuffer, NULL);
+                framebuffer = VK_NULL_HANDLE;
+            }
 
-  void destroy(VkDevice& device, VmaAllocator allocator = VK_NULL_HANDLE)
-    {
-      if (framebuffer != VK_NULL_HANDLE)
-      {
-        vkDestroyFramebuffer(device, framebuffer, NULL);
-        framebuffer = VK_NULL_HANDLE;
-      }
+            if (view != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(device, view, NULL);
+                view = VK_NULL_HANDLE;
+            }
 
-      if (view != VK_NULL_HANDLE)
-      {
-        vkDestroyImageView(device, view, NULL);
-        view = VK_NULL_HANDLE;
-      }
+            if (semaphore != VK_NULL_HANDLE)
+            {
+                vkDestroySemaphore(device, semaphore, NULL);
+                semaphore = VK_NULL_HANDLE;
+            }
 
-      if (semaphore != VK_NULL_HANDLE)
-      {
-        vkDestroySemaphore(device, semaphore, NULL);
-        semaphore = VK_NULL_HANDLE;
-      }
+            if (allocation != VK_NULL_HANDLE)
+            {
+                // Offscreen/headless buffer: we own this image, unlike a
+                // swapchain image, which belongs to the swapchain and must
+                // not be destroyed here.
+                vmaDestroyImage(allocator, image, allocation);
+                allocation = VK_NULL_HANDLE;
+            }
+            image = VK_NULL_HANDLE;
 
-      if (allocation != VK_NULL_HANDLE)
-      {
-        // Offscreen/headless buffer: we own this image, unlike a
-        // swapchain image, which belongs to the swapchain and must
-        // not be destroyed here.
-        vmaDestroyImage(allocator, image, allocation);
-        allocation = VK_NULL_HANDLE;
-      }
-      image = VK_NULL_HANDLE;
-
-      extent = { 0, 0 };
-    }
+            extent = { 0, 0 };
+        }
 };
 
-
+  
 struct Fl_Vk_Depth {
-  VkFormat format;
+    VkFormat format;
+    
+    VkImage image;
+    VkImageView view;
+    VmaAllocation allocation;  // use this instead
 
-  VkImage image;
-  VkImageView view;
-  VmaAllocation allocation;  // use this instead
+    Fl_Vk_Depth() :
+        format(VK_FORMAT_UNDEFINED),
+        image(VK_NULL_HANDLE),
+        view(VK_NULL_HANDLE),
+        allocation(VK_NULL_HANDLE)
+        {
+        };
 
-  Fl_Vk_Depth() :
-    format(VK_FORMAT_UNDEFINED),
-    image(VK_NULL_HANDLE),
-    view(VK_NULL_HANDLE),
-    allocation(VK_NULL_HANDLE)
-    {
-    };
+    void destroy(VkDevice& device, VmaAllocator allocator)
+        {
+            if (view != VK_NULL_HANDLE)
+            {
+                vkDestroyImageView(device, view, NULL);
+                view = VK_NULL_HANDLE;
+            }
 
-  void destroy(VkDevice& device, VmaAllocator allocator)
-    {
-      if (view != VK_NULL_HANDLE)
-      {
-        vkDestroyImageView(device, view, NULL);
-        view = VK_NULL_HANDLE;
-      }
-
-      // vmaDestroyImage replaces both vkDestroyImage AND vkFreeMemory.
-      // It is safe to call with VK_NULL_HANDLE for both fields.
-      if (image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)
-      {
-        vmaDestroyImage(allocator, image, allocation);
-        image      = VK_NULL_HANDLE;
-        allocation = VK_NULL_HANDLE;
-      }
-    }
+            // vmaDestroyImage replaces both vkDestroyImage AND vkFreeMemory.
+            // It is safe to call with VK_NULL_HANDLE for both fields.
+            if (image != VK_NULL_HANDLE || allocation != VK_NULL_HANDLE)
+            {
+                vmaDestroyImage(allocator, image, allocation);
+                image      = VK_NULL_HANDLE;
+                allocation = VK_NULL_HANDLE;
+            }
+        }
 };
 
 /**
-   The Fl_Vk_Window widget sets things up so Vulkan works.
+  The Fl_Vk_Window widget sets things up so Vulkan works.
 
-   It also keeps an Vulkan "context" for that window.
+  It also keeps an Vulkan "context" for that window.
 
-   Please note that the FLTK drawing and clipping functions
-   will not work inside an Fl_Vk_Window. All drawing
-   should be done using Vulkan calls exclusively.
+  Please note that the FLTK drawing and clipping functions
+  will not work inside an Fl_Vk_Window. All drawing
+  should be done using Vulkan calls exclusively.
 
 */
 class FL_EXPORT Fl_Vk_Window : public Fl_Window {
@@ -140,22 +140,26 @@ class FL_EXPORT Fl_Vk_Window : public Fl_Window {
   char damage1_; // damage() of back buffer (we might use this in the future)
   void init();
 
-
+  
   VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
-
+  
   static int can_do(int, const int *);
   int mode(int, const int *);
   void destroy_common_resources();
   void load_debug_functions();
   void setup_debug_messenger();
-
+  
 protected:
-  //! Creates the platform-specific driver object for this window. The
-  //! default forwards to Fl_Vk_Window_Driver::newVkWindowDriver(), which
-  //! picks X11/Wayland/Win32/Cocoa at compile+run time. A headless
-  //! subclass (see Fl_Vk_Headless_Window) overrides this to install
-  //! Fl_Vk_Headless_Window_Driver instead, without touching any of the
-  //! per-platform driver files.
+  //! Selects headless (offscreen, no native window/VkSurfaceKHR/swapchain)
+  //! rendering for this window instead of the normal interactive path.
+  //! See the public headless()/headless(bool) accessors below for the
+  //! usage contract; m_headless is the storage they read/write.
+  bool m_headless;
+
+  //! Creates the platform-specific driver object for this window: the
+  //! headless driver if headless() is true, otherwise
+  //! Fl_Vk_Window_Driver::newVkWindowDriver()'s usual X11/Wayland/Win32/
+  //! Cocoa dispatch.
   virtual Fl_Vk_Window_Driver *create_driver();
 
   void recreate_swapchain();
@@ -177,13 +181,30 @@ protected:
   //! Called after draw()
   virtual void vk_draw_end();
 
-  //! Called in case
+  //! Called in case 
   void set_hdr_metadata();
 
   //! Called to clean up resources when shutting down vulkan.
   void shutdown_vulkan();
-
+  
 public:
+  //! Selects headless (offscreen, no native window/VkSurfaceKHR/swapchain)
+  //! rendering for this window instead of the normal interactive path.
+  //!
+  //! Must be set before the first show() or render_offscreen() call --
+  //! whichever runs first is what lazily creates the driver (via the
+  //! protected create_driver() seam), and with it decides which Vulkan
+  //! instance/device extensions and code paths get used. Calling this
+  //! afterward has no effect on an already-created driver.
+  //!
+  //! This is what lets a single Fl_Vk_Window subclass -- one prepare(),
+  //! one draw(), one everything -- serve both an interactive UI and a
+  //! CLI/offscreen workflow: construct it, optionally call headless(true),
+  //! then either show()+Fl::run() or render_offscreen(), with no
+  //! duplicated rendering code between the two.
+  void headless(bool val) { m_headless = val; }
+  bool headless() const { return m_headless; }
+
   void show() FL_OVERRIDE;
   /** Same as Fl_Window::show(int a, char **b) */
   void show(int a, char **b) {Fl_Window::show(a,b);}
@@ -192,26 +213,26 @@ public:
   void resize(int,int,int,int) FL_OVERRIDE;
   int handle(int) FL_OVERRIDE;
 
-  /**
+  /** 
    * Name a Vulkan object for debugging.
-   *
+   * 
    * @param object_type   type of object, like:
    *                              VK_OBJECT_TYPE_COMMAND_BUFFER,
    *                              VK_OBJECT_TYPE_BUFFER,
    *                              ...etc...
    *                              (see vulkan/vulkan_core.h's VkObjectType)
-   *
+   *                              
    * @param object_handle Vulkan Handle cast to uint64_t
    * @param name          Debugging name.
    */
   void set_object_name(VkObjectType object_type, uint64_t object_handle,
                        const char* name);
 
-  /**
+  /** 
    * Begin a debug label in a command buffer with a given color
-   *
+   * 
    * @param cmd          Vulkan Command Buffer
-   * @param label_name   Name for the label.
+   * @param label_name   Name for the label. 
    * @param r            red color
    * @param g            green color
    * @param b            blue color
@@ -221,52 +242,52 @@ public:
                          const float r = 1.F, const float g = 0.5F,
                          const float b = 0.F, const float a = 1.F);
   void end_debug_label(VkCommandBuffer cmd);
-
+  
   /**  Returns non-zero if the hardware supports the given Vulkan mode. */
   static int can_do(int m) {return can_do(m,0);}
   /**  Returns non-zero if the hardware supports the given Vulkan mode.
-       \see Fl_Vk_Window::mode(const int *a) */
+   \see Fl_Vk_Window::mode(const int *a) */
   static int can_do(const int *m) {return can_do(0, m);}
   /**  Returns non-zero if the hardware supports the current Vulkan mode. */
   int can_do() {return can_do(mode_,alist);}
   /** Returns the current Vulkan capabilities of the window.
-      Don't use this if capabilities were set through Fl_Vk_Window::mode(const int *a).
-  */
+   Don't use this if capabilities were set through Fl_Vk_Window::mode(const int *a).
+   */
   Fl_Mode mode() const {return (Fl_Mode)mode_;}
   /**
-     Set or change the Vulkan capabilities of the window.  The value can be
-     any of the following OR'd together:
+   Set or change the Vulkan capabilities of the window.  The value can be
+   any of the following OR'd together:
 
-     - \c FL_RGB - RGB color (not indexed)
-     - \c FL_RGB8 - RGB color with at least 8 bits of each color
-     - \c FL_INDEX - Indexed mode
-     - \c FL_SINGLE - not double buffered
-     - \c FL_DOUBLE - double buffered
-     - \c FL_ACCUM - accumulation buffer
-     - \c FL_ALPHA - alpha channel in color
-     - \c FL_DEPTH - depth buffer
-     - \c FL_STENCIL - stencil buffer
-     - \c FL_MULTISAMPLE - multisample antialiasing
+   - \c FL_RGB - RGB color (not indexed)
+   - \c FL_RGB8 - RGB color with at least 8 bits of each color
+   - \c FL_INDEX - Indexed mode
+   - \c FL_SINGLE - not double buffered
+   - \c FL_DOUBLE - double buffered
+   - \c FL_ACCUM - accumulation buffer
+   - \c FL_ALPHA - alpha channel in color
+   - \c FL_DEPTH - depth buffer
+   - \c FL_STENCIL - stencil buffer
+   - \c FL_MULTISAMPLE - multisample antialiasing
 
-     FL_RGB and FL_SINGLE have a value of zero, so they
-     are "on" unless you give FL_INDEX or FL_DOUBLE.
+   FL_RGB and FL_SINGLE have a value of zero, so they
+   are "on" unless you give FL_INDEX or FL_DOUBLE.
 
-     If the desired combination cannot be done, FLTK will try turning off
-     FL_MULTISAMPLE.  If this also fails the show() will call
-     Fl::error() and not show the window.
+   If the desired combination cannot be done, FLTK will try turning off
+   FL_MULTISAMPLE.  If this also fails the show() will call
+   Fl::error() and not show the window.
 
-     You can change the mode while the window is displayed.  This is most
-     useful for turning double-buffering on and off.  Under X this will
-     cause the old X window to be destroyed and a new one to be created.  If
-     this is a top-level window this will unfortunately also cause the
-     window to blink, raise to the top, and be de-iconized, and the xid()
-     will change, possibly breaking other code.  It is best to make the GL
-     window a child of another window if you wish to do this!
+   You can change the mode while the window is displayed.  This is most
+   useful for turning double-buffering on and off.  Under X this will
+   cause the old X window to be destroyed and a new one to be created.  If
+   this is a top-level window this will unfortunately also cause the
+   window to blink, raise to the top, and be de-iconized, and the xid()
+   will change, possibly breaking other code.  It is best to make the GL
+   window a child of another window if you wish to do this!
 
-     mode() must not be called within draw() since it
-     changes the current context.
-
-  */
+   mode() must not be called within draw() since it
+   changes the current context.
+   
+   */
   int mode(int a) {return mode(a,0);}
   /** Set the Vulkan capabilities of the window using platform-specific data.
       \param a zero-ending array of platform-specific attributes and attribute values
@@ -276,10 +297,10 @@ public:
   //! Application and engine name.
   virtual const char* application_name() { return "FLTK"; }
   virtual const char* engine_name() { return "FLTK"; }
-
+  
   //! Main entry point for Vulkan elements creation and destruction.
   virtual void prepare() = 0;
-  virtual void destroy() {};
+  virtual void destroy() {};  
 
   //! Required and optional instance extensions used on creation (overload it)
   virtual std::vector<const char*> get_instance_extensions();
@@ -307,7 +328,7 @@ public:
   //! Required device extensions
   inline VkRenderPass&         renderPass() { return m_renderPass; }
   inline VkPipeline&             pipeline() { return m_pipeline; }
-
+      
   inline const VkInstance&             instance() const { return m_instance; }
   inline const VkPhysicalDevice&            gpu() const { return ctx.gpu; }
   inline const VkPhysicalDevice& physicalDevice() const { return ctx.gpu; }
@@ -323,11 +344,11 @@ public:
 
   //! Returns a vector with currently used instance extensions
   inline const std::vector<const char*>
-    getCurrentInstanceExtensions() const { return ctx.instance_extensions; }
+      getCurrentInstanceExtensions() const { return ctx.instance_extensions; }
 
   //! Returns a vector with currently used device extensions
   inline const std::vector<const char*>
-    getCurrentDeviceExtensions() const { return ctx.device_extensions; }
+      getCurrentDeviceExtensions() const { return ctx.device_extensions; }
 
   inline void setValidationLayers(bool v) { v = m_validate; }
 
@@ -336,22 +357,22 @@ public:
 
   //! Returns if swapchain buffers are empty.
   inline bool empty_buffers() const { return m_buffers.empty(); }
-
+  
   // Access the current back buffer (the one you're rendering to)
   VkImage get_back_buffer_image() const {
-    return m_buffers[m_current_buffer].image;
+      return m_buffers[m_current_buffer].image;
   }
 
   VkImageView get_back_buffer_view() const {
-    return m_buffers[m_current_buffer].view;
+      return m_buffers[m_current_buffer].view;
   }
 
   VkFramebuffer get_back_buffer_framebuffer() const {
-    return m_buffers[m_current_buffer].framebuffer;
+      return m_buffers[m_current_buffer].framebuffer;
   }
 
   //! @}
-
+  
   // Application
 
   // if true, turns on validation layers.  Default is to have it on on Debug
@@ -360,9 +381,9 @@ public:
 
   // Traces the use of the swapchain.  You probably don't need use it.
   bool m_debugSync;
-
+  
   // These get copied into ctx for every window
-  static VkInstance   m_instance;
+  static VkInstance   m_instance; 
   static VkDevice     m_device;
   static Fl_Vk_Queue* m_queue;
   static VmaAllocator m_allocator;
@@ -397,27 +418,27 @@ public:
 private:
   // Per frame data used internally.
   struct FrameData {
-    VkSemaphore imageAcquiredSemaphore;
-    VkSemaphore drawCompleteSemaphore;
-    VkFence fence;
-    VkCommandBuffer commandBuffer;
+      VkSemaphore imageAcquiredSemaphore;
+      VkSemaphore drawCompleteSemaphore;
+      VkFence fence;
+      VkCommandBuffer commandBuffer;
 
-    FrameData() :
-      imageAcquiredSemaphore(VK_NULL_HANDLE),
-      drawCompleteSemaphore(VK_NULL_HANDLE),
-      fence(VK_NULL_HANDLE),
-      commandBuffer(VK_NULL_HANDLE)
-      {
-      }
+      FrameData() :
+          imageAcquiredSemaphore(VK_NULL_HANDLE),
+          drawCompleteSemaphore(VK_NULL_HANDLE),
+          fence(VK_NULL_HANDLE),
+          commandBuffer(VK_NULL_HANDLE)
+          {
+          }
   };
 
-
+  
 protected:
   float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
   uint32_t                m_current_buffer;
-
+  
   std::vector<FrameData>  m_frames;
   uint32_t                m_currentFrameIndex;
   VkImageLayout           m_currentDepthLayout;
@@ -425,7 +446,7 @@ protected:
   //! Flag used to handle resizes (swapchain and other resources recreation)
   bool                   m_swapchain_needs_recreation;
   VkSwapchainKHR         m_swapchain;
-
+  
   // HDR metadata information (passed during swap_buffers)
   bool is_equal_hdr_metadata(const VkHdrMetadataEXT& a,
                              const VkHdrMetadataEXT& b);
@@ -439,7 +460,7 @@ protected:
   // This will problably be removed or moved into Fl_Vk_Context.
   VkPhysicalDeviceMemoryProperties m_memory_properties;
 
-
+  
   void init_vulkan();
 
   // Auxiliary functions to begin and end the main render pass.
@@ -450,11 +471,11 @@ protected:
   void begin_render_pass();
   void end_render_pass(VkCommandBuffer);
   void end_render_pass();
-
+  
   void swap_buffers();
 
 public:
-
+  
   void swap_interval(int);
   int swap_interval() const;
 
@@ -476,66 +497,66 @@ public:
   //! Call this to wait on the Vulkan device.  This will wait for all GPUs
   //! operations to finish.
   void wait_device();
-
+  
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
-    return m_frames[m_currentFrameIndex].commandBuffer;
+      return m_frames[m_currentFrameIndex].commandBuffer;
   }
   uint32_t getCurrentBufferIndex() const {
-    return m_current_buffer;
+      return m_current_buffer;
   }
-
+  
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
   Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }
 
   float pixels_per_unit();
   /** Gives the window width in Vulkan pixels.
-      When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::w()
-      which is expressed in FLTK units, may differ from the window width in pixels.
-      Calls to Vulkan functions expecting pixel values (\em e.g., \c vkScissor
-      use pixel_w() rather than w().
-      Method pixel_w() detects when the GUI is rescaled or when the window has been moved
-      between low and high resolution displays and automatically adjusts the returned value.
-      \version 1.3.4
-  */
+   When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::w()
+   which is expressed in FLTK units, may differ from the window width in pixels.
+   Calls to Vulkan functions expecting pixel values (\em e.g., \c vkScissor
+   use pixel_w() rather than w().
+   Method pixel_w() detects when the GUI is rescaled or when the window has been moved
+   between low and high resolution displays and automatically adjusts the returned value.
+   \version 1.3.4
+   */
   int pixel_w() {
-    // m_swapchainExtent is authoritative once prepare() has run, whether
-    // it was populated by prepare_buffers() (interactive, has a real
-    // VkSwapchainKHR) or prepare_offscreen_buffers() (headless, never
-    // has one) -- so this no longer requires m_swapchain != VK_NULL_HANDLE.
-    if (m_swapchainExtent.width > 0)
-      return (int)m_swapchainExtent.width;
-    return int(pixels_per_unit() * w() + 0.5f);
+      // m_swapchainExtent is authoritative once prepare() has run, whether
+      // it was populated by prepare_buffers() (interactive, has a real
+      // VkSwapchainKHR) or prepare_offscreen_buffers() (headless, never
+      // has one) -- so this no longer requires m_swapchain != VK_NULL_HANDLE.
+      if (m_swapchainExtent.width  > 0)
+          return (int)m_swapchainExtent.width;
+      return int(pixels_per_unit() * w() + 0.5f);
   }
-
+  
   /** Gives the window height in Vulkan pixels.
-      When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
-      which is expressed in FLTK units, may differ from the window height in pixels.
-      Calls to Vulkan functions expecting pixel values (\em e.g., \c glViewport) should therefore
-      use pixel_h() rather than h().
-      Method pixel_h() detects when the GUI is rescaled or when the window has been moved
-      between low and high resolution displays and automatically adjusts the returned value.
-      \version 1.3.4
-  */
+   When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::h()
+   which is expressed in FLTK units, may differ from the window height in pixels.
+   Calls to Vulkan functions expecting pixel values (\em e.g., \c glViewport) should therefore
+   use pixel_h() rather than h().
+   Method pixel_h() detects when the GUI is rescaled or when the window has been moved
+   between low and high resolution displays and automatically adjusts the returned value.
+   \version 1.3.4
+   */
   int pixel_h() {
     // See pixel_w() above for why this no longer checks m_swapchain.
     if (m_swapchainExtent.height > 0)
-      return (int)m_swapchainExtent.height;
+        return (int)m_swapchainExtent.height;
     return int(pixels_per_unit() * h() + 0.5f);  // pre-swapchain estimate only
   }
-
+  
   virtual ~Fl_Vk_Window();
   /**
-     Creates a new Fl_Vk_Window widget using the given size, and label string.
-     The default boxtype is FL_NO_BOX. The default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
+    Creates a new Fl_Vk_Window widget using the given size, and label string.
+    The default boxtype is FL_NO_BOX. The default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
   */
   Fl_Vk_Window(int W, int H, const char *l=0) : Fl_Window(W,H,l) {init();}
-
+  
   /**
-     Creates a new Fl_Vk_Window widget using the given position,
-     size, and label string. The default boxtype is FL_NO_BOX. The
-     default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
+    Creates a new Fl_Vk_Window widget using the given position,
+    size, and label string. The default boxtype is FL_NO_BOX. The
+    default mode is FL_RGB|FL_DOUBLE|FL_DEPTH.
   */
 
   Fl_Vk_Window(int X, int Y, int W, int H, const char *l=0)

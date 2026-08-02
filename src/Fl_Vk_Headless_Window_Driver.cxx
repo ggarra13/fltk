@@ -15,14 +15,12 @@
 #include <config.h>
 #if HAVE_VK
 
-#include <FL/vk_enum_string_helper.h>
 #include "Fl_Vk_Headless_Window_Driver.H"
+#include <FL/vk_enum_string_helper.h>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
 #include <FL/Fl_RGB_Image.H>
 #include <FL/Fl.H>
-
-#include <iostream>
 
 // Reads pixels directly out of the current offscreen VkImage via a
 // host-visible staging buffer. There is no OS window to screenshot (that's

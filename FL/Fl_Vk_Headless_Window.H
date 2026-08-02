@@ -27,19 +27,22 @@
 
 #include <FL/Fl_Vk_Window.H>
 
-class Fl_Vk_Window_Driver;
-
+//! Pure convenience: equivalent to `Fl_Vk_Window win(W, H, l); win.headless(true);`
+//! Fl_Vk_Window itself now understands headless() as a runtime flag (see
+//! its create_driver()/get_optional_extensions()), so this class exists
+//! only for code that prefers a distinct, compile-time-enforced type.
+//! Prefer calling headless(true) directly on your own Fl_Vk_Window
+//! subclass if you want the *same* class to serve both an interactive UI
+//! and a CLI/offscreen workflow, chosen at runtime -- that's the whole
+//! point of the flag living on the base class.
 class FL_EXPORT Fl_Vk_Headless_Window : public Fl_Vk_Window {
-protected:
-  // Installs Fl_Vk_Headless_Window_Driver instead of going through
-  // Fl_Vk_Window_Driver::newVkWindowDriver()'s per-platform (X11/Wayland/
-  // Win32/Cocoa) dispatch -- none of those apply here, since this window is
-  // never mapped on screen.
-  Fl_Vk_Window_Driver *create_driver() FL_OVERRIDE;
-
-  std::vector<const char*> get_optional_extensions() { return {}; };
 public:
-  Fl_Vk_Headless_Window(int W, int H, const char *l = 0) : Fl_Vk_Window(W, H, l) {}
+  Fl_Vk_Headless_Window(int W, int H, const char *l = 0) : Fl_Vk_Window(W, H, l) {
+    headless(true);
+  }
+  Fl_Vk_Headless_Window(int X, int Y, int W, int H, const char *l = 0) : Fl_Vk_Window(X, Y, W, H, l) {
+    headless(true);
+  }
 };
 
 #endif // Fl_Vk_Headless_Window_H

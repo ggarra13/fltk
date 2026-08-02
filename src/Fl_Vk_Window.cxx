@@ -23,6 +23,7 @@
 #include <FL/Fl_Vk_Utils.H>
 #include <FL/Fl_Vk_Window.H>
 #include "Fl_Vk_Window_Driver.H"
+#include "Fl_Vk_Headless_Window_Driver.H"
 #include "Fl_Window_Driver.H"
 #include "Fl_Scalable_Graphics_Driver.H" // Fl_Fontdesc
 #include <FL/Fl_Graphics_Driver.H>
@@ -1408,16 +1409,27 @@ std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
   std::vector<const char*> out;
-  out.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
   out.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
-  // For HDR support
-  out.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+  if (!m_headless) {
+    // Both of these exist purely to query/select surface presentation
+    // formats and HDR support -- neither applies without a VkSurfaceKHR,
+    // and the first has a hard spec dependency on VK_KHR_surface
+    // (VUID-vkCreateInstance-ppEnabledExtensionNames-01388), which a
+    // headless instance never enables (see
+    // Fl_Vk_Headless_Window_Driver::get_instance_extensions()).
+    out.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+
+    // For HDR support
+    out.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+  }
 
   return out;
 }
 
 Fl_Vk_Window_Driver *Fl_Vk_Window::create_driver() {
+  if (m_headless)
+    return new Fl_Vk_Headless_Window_Driver(this);
   return Fl_Vk_Window_Driver::newVkWindowDriver(this);
 }
 
@@ -1426,6 +1438,7 @@ void Fl_Vk_Window::init() {
   box(FL_NO_BOX);
 
   pVkWindowDriver = nullptr;
+  m_headless = false;
   mode_ = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist = 0;
   g = 0;
