@@ -818,6 +818,8 @@ void Fl_Vk_Window::swap_buffers() {
    buffer swaps
 */
 void Fl_Vk_Window::swap_interval(int value) {
+  if (m_headless) return;
+
   if (pVkWindowDriver->swap_interval() != value)
   {
     pVkWindowDriver->swap_interval(value);
@@ -947,7 +949,8 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
                      m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
-  pVkWindowDriver->resize(is_a_resize, W, H);
+  if (!m_headless)
+    pVkWindowDriver->resize(is_a_resize, W, H);
 
   if (is_a_resize) {
     m_swapchainExtent = {0, 0};
@@ -1030,7 +1033,7 @@ int Fl_Vk_Window::handle(int event) {
     \version 1.3.4
 */
 float Fl_Vk_Window::pixels_per_unit() {
-  if (!pVkWindowDriver) create_driver();
+  if (!pVkWindowDriver) return 1.0;
   return pVkWindowDriver->pixels_per_unit();
 }
 
@@ -1280,20 +1283,23 @@ void Fl_Vk_Window::init_vulkan() {
   FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilCompareMask);
 
 
-  if (!vkSetHdrMetadataEXT)
+  if (!headless())
   {
-    bool found_hdr = false;
-    for (auto extension : ctx.device_extensions)
+    if (!vkSetHdrMetadataEXT)
     {
-      if (strcmp(extension, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0)
+      bool found_hdr = false;
+      for (auto extension : ctx.device_extensions)
       {
-        found_hdr = true;
+        if (strcmp(extension, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0)
+        {
+          found_hdr = true;
+        }
       }
-    }
 
-    if (found_hdr)
-    {
-      vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+      if (found_hdr)
+      {
+        vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+      }
     }
   }
 
