@@ -641,7 +641,10 @@ int Fl_Vk_Window::mode(int m, const int *a) {
   if (m == mode_ && a == alist)
     return 0;
   if (!pVkWindowDriver)
-    pVkWindowDriver = create_driver();
+  {
+      mode_ = m;
+      return m;
+  }
   return pVkWindowDriver->mode_(m, a);
 }
 
@@ -949,8 +952,7 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
                      m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
-  if (!m_headless)
-    pVkWindowDriver->resize(is_a_resize, W, H);
+  pVkWindowDriver->resize(is_a_resize, W, H);
 
   if (is_a_resize) {
     m_swapchainExtent = {0, 0};
