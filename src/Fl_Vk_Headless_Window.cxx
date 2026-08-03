@@ -19,8 +19,4 @@
 #include "Fl_Vk_Headless_Window_Driver.H"
 #include <iostream>
 
-Fl_Vk_Window_Driver *Fl_Vk_Headless_Window::create_driver() {
-  return new Fl_Vk_Headless_Window_Driver(this);
-}
-
 #endif // HAVE_VK

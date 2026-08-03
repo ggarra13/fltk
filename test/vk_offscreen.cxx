@@ -29,10 +29,6 @@
 
 #if HAVE_VK
 
-#include <iostream>
-
-#define DBG std::cerr << __FUNCTION__ << " " << __LINE__ << std::endl;
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

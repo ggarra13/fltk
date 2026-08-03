@@ -541,7 +541,7 @@ set(VKCPPFILES
   # Fl Vk_Overlay.cxx
   Fl_Vk_Utils.cxx
   Fl_Vk_Window.cxx
-  Fl_Vk_Headless_Window.cxx
+  # Fl_Vk_Headless_Window.cxx
   vk_draw.cxx  # to remove.
   vk.cxx
   # vk_start.cxx

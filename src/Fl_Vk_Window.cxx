@@ -23,6 +23,7 @@
 #include <FL/Fl_Vk_Utils.H>
 #include <FL/Fl_Vk_Window.H>
 #include "Fl_Vk_Window_Driver.H"
+#include "Fl_Vk_Headless_Window_Driver.H"
 #include "Fl_Window_Driver.H"
 #include "Fl_Scalable_Graphics_Driver.H" // Fl_Fontdesc
 #include <FL/Fl_Graphics_Driver.H>
@@ -640,7 +641,10 @@ int Fl_Vk_Window::mode(int m, const int *a) {
   if (m == mode_ && a == alist)
     return 0;
   if (!pVkWindowDriver)
-    pVkWindowDriver = create_driver();
+  {
+      mode_ = m;
+      return m;
+  }
   return pVkWindowDriver->mode_(m, a);
 }
 
@@ -817,6 +821,8 @@ void Fl_Vk_Window::swap_buffers() {
    buffer swaps
 */
 void Fl_Vk_Window::swap_interval(int value) {
+  if (m_headless) return;
+
   if (pVkWindowDriver->swap_interval() != value)
   {
     pVkWindowDriver->swap_interval(value);
@@ -946,6 +952,8 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
                      m_pixels_per_unit != pixels_per_unit());
 
   Fl_Window::resize(X, Y, W, H);
+
+  if (!pVkWindowDriver) pVkWindowDriver = create_driver();
   pVkWindowDriver->resize(is_a_resize, W, H);
 
   if (is_a_resize) {
@@ -1029,7 +1037,7 @@ int Fl_Vk_Window::handle(int event) {
     \version 1.3.4
 */
 float Fl_Vk_Window::pixels_per_unit() {
-  if (!pVkWindowDriver) create_driver();
+  if (!pVkWindowDriver) return 1.0;
   return pVkWindowDriver->pixels_per_unit();
 }
 
@@ -1279,20 +1287,23 @@ void Fl_Vk_Window::init_vulkan() {
   FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilCompareMask);
 
 
-  if (!vkSetHdrMetadataEXT)
+  if (!headless())
   {
-    bool found_hdr = false;
-    for (auto extension : ctx.device_extensions)
+    if (!vkSetHdrMetadataEXT)
     {
-      if (strcmp(extension, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0)
+      bool found_hdr = false;
+      for (auto extension : ctx.device_extensions)
       {
-        found_hdr = true;
+        if (strcmp(extension, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0)
+        {
+          found_hdr = true;
+        }
       }
-    }
 
-    if (found_hdr)
-    {
-      vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+      if (found_hdr)
+      {
+        vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
+      }
     }
   }
 
@@ -1408,16 +1419,27 @@ std::vector<const char*> Fl_Vk_Window::get_instance_extensions()
 std::vector<const char*> Fl_Vk_Window::get_optional_extensions()
 {
   std::vector<const char*> out;
-  out.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
   out.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
-  // For HDR support
-  out.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+  if (!m_headless) {
+    // Both of these exist purely to query/select surface presentation
+    // formats and HDR support -- neither applies without a VkSurfaceKHR,
+    // and the first has a hard spec dependency on VK_KHR_surface
+    // (VUID-vkCreateInstance-ppEnabledExtensionNames-01388), which a
+    // headless instance never enables (see
+    // Fl_Vk_Headless_Window_Driver::get_instance_extensions()).
+    out.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
+
+    // For HDR support
+    out.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+  }
 
   return out;
 }
 
 Fl_Vk_Window_Driver *Fl_Vk_Window::create_driver() {
+  if (m_headless)
+    return new Fl_Vk_Headless_Window_Driver(this);
   return Fl_Vk_Window_Driver::newVkWindowDriver(this);
 }
 
@@ -1426,6 +1448,7 @@ void Fl_Vk_Window::init() {
   box(FL_NO_BOX);
 
   pVkWindowDriver = nullptr;
+  m_headless = false;
   mode_ = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist = 0;
   g = 0;
