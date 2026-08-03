@@ -953,7 +953,7 @@ void Fl_Vk_Window::resize(int X, int Y, int W, int H) {
 
   Fl_Window::resize(X, Y, W, H);
 
-  if (!pVkWindowDriver) create_driver();
+  if (!pVkWindowDriver) pVkWindowDriver = create_driver();
   pVkWindowDriver->resize(is_a_resize, W, H);
 
   if (is_a_resize) {
