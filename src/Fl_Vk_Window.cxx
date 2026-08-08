@@ -31,6 +31,7 @@
 #include <FL/platform.H>
 
 #include <algorithm>
+#include <fstream>
 #include <iostream>
 
 #define FLTK_ADD_DEVICE_EXTENSION(name)                         \
@@ -1134,6 +1135,22 @@ void Fl_Vk_Window::shutdown_vulkan() {
 
       if (m_allocator != VK_NULL_HANDLE)
       {
+#ifndef NDEBUG
+        char* statsString;
+
+        // VK_TRUE gives you the detailed breakdown of every single allocation
+        vmaBuildStatsString(m_allocator, &statsString, VK_TRUE);
+
+        // Write the dump to a file (it can be very large)
+        std::ofstream out("/tmp/vma_dump.json");
+        if (out.is_open()) {
+          out << statsString;
+          out.close();
+        }
+
+        vmaFreeStatsString(m_allocator, statsString);
+#endif
+
         vmaDestroyAllocator(m_allocator);
         m_allocator = VK_NULL_HANDLE;
       }
