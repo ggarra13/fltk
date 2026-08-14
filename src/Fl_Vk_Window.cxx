@@ -1202,8 +1202,13 @@ void Fl_Vk_Window::wait_device()
 {
   if (device() == VK_NULL_HANDLE)
     return;
-  VkResult result = vkDeviceWaitIdle(device());
-  VK_CHECK(result);
+
+  {
+      std::lock_guard lock(queue_mutex());
+
+      VkResult result = vkDeviceWaitIdle(device());
+      VK_CHECK(result);
+  }
 }
 
 void Fl_Vk_Window::init_colorspace()
