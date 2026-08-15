@@ -213,7 +213,7 @@ static char *copy_trunc(char *p, const char *str, int maxl, int quote, int trunc
  \param[in] X, Y, W, H position and size of widget
  \param[in] l optional label
  \todo It would be nice to be able to grab one or more nodes and move them
-    within the hierarchy.
+    within the hierarchy via drag'n'drop.
  */
 Node_Browser::Node_Browser(int X,int Y,int W,int H,const char*l) :
   Fl_Browser_(X,Y,W,H,l)
@@ -253,10 +253,9 @@ void *Node_Browser::item_prev(void *l) const {
  Override the method to check if an item was selected.
  \param l this item
  \return 1 if selected, 0 if not
- \todo what is the difference between selected and new_selected, and why do we do this?
  */
 int Node_Browser::item_selected(void *l) const {
-  return ((Node*)l)->new_selected;
+  return ((Node*)l)->selected;
 }
 
 /**
@@ -265,7 +264,7 @@ int Node_Browser::item_selected(void *l) const {
  \param[in] v 1 if selecting, 0 if not
  */
 void Node_Browser::item_select(void *l,int v) {
-  ((Node*)l)->new_selected = v;
+  ((Node*)l)->selected = v;
 }
 
 /**
@@ -337,7 +336,7 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
     // -- comment
     copy_trunc(buf, l->comment(), 80, 0, 1);
     comment_incr = textsize()-1;
-    if (l->new_selected) fl_color(fl_contrast(comment_color, FL_SELECTION_COLOR));
+    if (l->selected) fl_color(fl_contrast(comment_color, FL_SELECTION_COLOR));
     else fl_color(comment_color);
     fl_font(comment_font, textsize()-2);
     fl_draw(buf, X, Y+12);
@@ -345,7 +344,7 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
     comment_incr -= comment_incr/2;
   }
 
-  if (l->new_selected) fl_color(fl_contrast(FL_FOREGROUND_COLOR,FL_SELECTION_COLOR));
+  if (l->selected) fl_color(fl_contrast(FL_FOREGROUND_COLOR,FL_SELECTION_COLOR));
   else fl_color(FL_FOREGROUND_COLOR);
 
   // Width=10: Draw the triangle that indicates possible children
@@ -399,7 +398,7 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
     if (c.compare(0, 3, "Fl_")==0) c.erase(0, 3);
     // -- class
     fl_font(class_font, textsize());
-    if (l->new_selected) fl_color(fl_contrast(class_color, FL_SELECTION_COLOR));
+    if (l->selected) fl_color(fl_contrast(class_color, FL_SELECTION_COLOR));
     else fl_color(class_color);
     fl_draw(c.c_str(), X, Y+13);
     X += int(fl_width(c.c_str())+fl_width('n'));
@@ -407,14 +406,14 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
     if (!c.empty()) {
       // -- name
       fl_font(name_font, textsize());
-      if (l->new_selected) fl_color(fl_contrast(name_color, FL_SELECTION_COLOR));
+      if (l->selected) fl_color(fl_contrast(name_color, FL_SELECTION_COLOR));
       else fl_color(name_color);
       fl_draw(c.c_str(), X, Y+13);
     } else if (l->label()) {
       // -- label
       c = l->label();
       fl_font(label_font, textsize());
-      if (l->new_selected) fl_color(fl_contrast(label_color, FL_SELECTION_COLOR));
+      if (l->selected) fl_color(fl_contrast(label_color, FL_SELECTION_COLOR));
       else fl_color(label_color);
       copy_trunc(buf, c.c_str(), 32, 1, 0); // quoted string
       fl_draw(buf, X, Y+13);
@@ -423,20 +422,20 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
     if (l->is_code_block() && (l->level==0 || l->parent->is_class())) {
       // -- function names
       fl_font(func_font, textsize());
-      if (l->new_selected) fl_color(fl_contrast(func_color, FL_SELECTION_COLOR));
+      if (l->selected) fl_color(fl_contrast(func_color, FL_SELECTION_COLOR));
       else fl_color(func_color);
       copy_trunc(buf, l->title(), 55, 0, 0);
     } else {
       if (dynamic_cast<Comment_Node*>(l)) {
         // -- comment (in main line, not above entry)
         fl_font(comment_font, textsize());
-        if (l->new_selected) fl_color(fl_contrast(comment_color, FL_SELECTION_COLOR));
+        if (l->selected) fl_color(fl_contrast(comment_color, FL_SELECTION_COLOR));
         else fl_color(comment_color);
         copy_trunc(buf, l->title(), 55, 0, 0);
       } else {
         // -- code
         fl_font(code_font, textsize());
-        if (l->new_selected) fl_color(fl_contrast(code_color, FL_SELECTION_COLOR));
+        if (l->selected) fl_color(fl_contrast(code_color, FL_SELECTION_COLOR));
         else fl_color(code_color);
         copy_trunc(buf, l->title(), 55, 0, 1);
       }
@@ -446,7 +445,7 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
 
   // draw a thin line below the item if this item is not selected
   // (if it is selected this additional line would look bad)
-  if (!l->new_selected) {
+  if (!l->selected) {
     fl_color(fl_lighter(FL_GRAY));
     fl_line(x1,Y+16,x1+w1,Y+16);
   }
@@ -544,7 +543,7 @@ int Node_Browser::handle(int e) {
   case FL_RELEASE:
     if (!title) {
       l = (Node*)find_item(Fl::event_y());
-      if (l && l->new_selected && (Fl::event_clicks() || Fl::event_state(FL_CTRL)))
+      if (l && l->selected && (Fl::event_clicks() || Fl::event_state(FL_CTRL)))
         l->open();
       break;
     }
@@ -645,17 +644,29 @@ void Node_Browser::load_prefs() {
   int c;
   Fl_Preferences p(Fluid.preferences, "widget_browser");
   p.get("label_color",  c, 72); label_color = c;
-  p.get("label_font",   c, FL_HELVETICA); label_font = c;
+  p.get("label_font",   c, FL_HELVETICA);
+  if (c<FL_HELVETICA || c>FL_ZAPF_DINGBATS) c = FL_HELVETICA;
+  label_font = c;
   p.get("class_color",  c, FL_FOREGROUND_COLOR); class_color = c;
-  p.get("class_font",   c, FL_HELVETICA_BOLD); class_font = c;
+  p.get("class_font",   c, FL_HELVETICA_BOLD);
+  if (c<FL_HELVETICA || c>FL_ZAPF_DINGBATS) c = FL_HELVETICA;
+  class_font = c;
   p.get("func_color",   c, FL_FOREGROUND_COLOR); func_color = c;
-  p.get("func_font",    c, FL_HELVETICA); func_font = c;
+  p.get("func_font",    c, FL_HELVETICA);
+  if (c<FL_HELVETICA || c>FL_ZAPF_DINGBATS) c = FL_HELVETICA;
+  func_font = c;
   p.get("name_color",   c, FL_FOREGROUND_COLOR); name_color = c;
-  p.get("name_font",    c, FL_HELVETICA); name_font = c;
+  p.get("name_font",    c, FL_HELVETICA);
+  if (c<FL_HELVETICA || c>FL_ZAPF_DINGBATS) c = FL_HELVETICA;
+  name_font = c;
   p.get("code_color",   c, FL_FOREGROUND_COLOR); code_color = c;
-  p.get("code_font",    c, FL_HELVETICA); code_font = c;
+  p.get("code_font",    c, FL_HELVETICA);
+  if (c<FL_HELVETICA || c>FL_ZAPF_DINGBATS) c = FL_HELVETICA;
+  code_font = c;
   p.get("comment_color",c, FL_DARK_GREEN); comment_color = c;
-  p.get("comment_font", c, FL_HELVETICA); comment_font = c;
+  p.get("comment_font", c, FL_HELVETICA);
+  if (c<FL_HELVETICA || c>FL_ZAPF_DINGBATS) c = FL_HELVETICA;
+  comment_font = c;
 }
 
 void Node_Browser::save_prefs() {

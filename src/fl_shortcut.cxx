@@ -38,7 +38,6 @@
 #include "Fl_Screen_Driver.H"
 #include <FL/fl_draw.H>
 #include <stdlib.h>
-#include <ctype.h>
 #include "flstring.h"
 
 /**
@@ -347,7 +346,7 @@ int Fl_Widget::test_shortcut(const char *t, const bool require_alt) {
   if (c == ls)
     return 1;
   // On macOS, we need to simulate the upper case keystroke as well
-  if (extra_test && Fl::event_state(FL_ALT) && fl_ascii_isalpha(c) && (unsigned)toupper(c)==ls)
+  if (extra_test && Fl::event_state(FL_ALT) && fl_ascii_isalpha(c) && (unsigned)fl_ascii_toupper(c) == ls)
     return 1;
   return 0;
 }

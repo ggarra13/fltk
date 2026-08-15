@@ -60,7 +60,6 @@
  Fl_Base_Pen_Driver to avoid touching the shared API in this patch.
  TODO: move them to Fl_Base_Pen_Driver.cxx and expose via the header.
  */
-
 #include "Fl_Wayland_Pen_Driver.H"
 #include "src/drivers/Base/Fl_Base_Pen_Driver.H"
 #include "Fl_Wayland_Screen_Driver.H"
@@ -290,17 +289,17 @@ static bool event_inside(Fl_Widget *w, double x, double y) {
 /*
   Find the topmost subscribed widget under (x, y) in top-window coordinates.
   Handles:
-   - Normal widgets
-   - Widgets inside groups
-   - Subwindows (Fl_Window as child)
-   - Separate top-level windows that are themselves subscribers
-*/
+  - Normal widgets
+  - Widgets inside groups
+  - Subwindows (Fl_Window as child with can_expand_outside_parent_)
+  - Separate top-level windows that are themselves subscribers
+ */
 static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
 {
   if (!topwin) return nullptr;
 
   struct Finder {
-      static Fl_Widget* find_in_group(Fl_Group* g, double gx, double gy)
+    static Fl_Widget* find_in_group(Fl_Group* g, double gx, double gy)
     {
       if (!g) return nullptr;
 
@@ -935,7 +934,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
   // Safe-guard
   if (!eventWindow)
-      return;
+    return;
 
   bool is_menu_window = eventWindow->menu_window();
 

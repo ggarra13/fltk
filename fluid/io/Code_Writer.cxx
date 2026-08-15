@@ -230,27 +230,31 @@ bool Code_Writer::c_contains(void *pp) {
 
  \param[in] text write this string
  */
-void Code_Writer::write_cstring(fluid::string_view text) {
+void Code_Writer::write_cstring(fluid::string_view text)
+{
   const char *next_line = "\"\n\"";
-  if (varused_test) {
-    varused = 1;
-    return;
-  }
-  // if we are rendering to the source code preview window, and the text is
-  // longer than four lines, we only render a placeholder.
-  if (write_codeview && (text.empty() || (text.size()>300))) {
-    if (text.size()>=0)
-      crc_puts("\" ... " + std::to_string(text.size()) + " bytes of text... \"");
-    else
+
+  // Handle sourcecode preview
+  if (write_codeview) {
+    if (text.data() == nullptr) {
+      // In code-view mode, the text is not always available, so just print a placeholder.
       crc_puts("\" ... text... \"");
-    return;
+      return;
+    } else if (text.size() > 300) {
+      // If the text is too long, just print a placeholder with the size of the text.
+      crc_puts("\" ... " + std::to_string(text.size()) + " bytes of text... \"");
+      return;
+    } // else fall through and render the text
   }
+
+  // If there is no input data, write an error statement.
   if (text.data() == nullptr) {
     crc_puts("\n#error  string not found\n");
-    crc_puts("\" ... undefined size text... \"");
+    crc_puts("nullptr");
     return;
   }
 
+  // Write the escaped text at 78 characters per line.
   const char *p = text.data();
   const char *e = text.data()+text.size();
   int linelength = 1;
@@ -321,11 +325,8 @@ void Code_Writer::write_cstring(fluid::string_view text) {
 
  \param[in] block pointer to a block of binary data, interpreted as unsigned bytes
  */
-void Code_Writer::write_cdata(fluid::string_view block) {
-  if (varused_test) {
-    varused = 1;
-    return;
-  }
+void Code_Writer::write_cdata(fluid::string_view block)
+{
   if (write_codeview) {
     if (!block.empty())
       crc_puts("{ /* ... " + std::to_string(block.size()) + "  bytes of binary data... */ }");
@@ -362,10 +363,6 @@ void Code_Writer::write_cdata(fluid::string_view block) {
  \param[in] code string containing the code to write
  */
 void Code_Writer::write_c(const std::string& code) {
-  if (varused_test) {
-    varused = 1;
-    return;
-  }
   crc_puts(code);
 }
 
@@ -391,7 +388,6 @@ void Code_Writer::write_cc(const std::string& indent, const std::string& code, c
  \param[in] code string containing the code to write
  */
 void Code_Writer::write_h(const std::string& code) {
-  if (varused_test) return;
   header_buffer << code;
 }
 
@@ -475,13 +471,14 @@ void Code_Writer::write_c_indented(const std::string& codeblock, int additional_
  constructor whereas functions, declarations, and inline data are seen as
  members of the class itself.
  */
-bool is_class_member(Node *t) {
+bool is_direct_class_member(Node *t) {
   return    dynamic_cast<Function_Node*>(t)
          || dynamic_cast<Decl_Node*>(t)
-         || dynamic_cast<Data_Node*>(t);
-//         || dynamic_cast<Class_Node*>(t)          // FLUID can't handle a class inside a class
-//         || dynamic_cast<Widget_Class_Node*>(t)   // ???
-//         || dynamic_cast<DeclBlock_Node*>(t)      // Declaration blocks are generally not handled well
+         || dynamic_cast<Data_Node*>(t)
+         || dynamic_cast<Class_Node*>(t)        // Caution, class in a class mostly untested
+         || dynamic_cast<Widget_Class_Node*>(t) // Caution, class in a class mostly untested
+//         || dynamic_cast<DeclBlock_Node*>(t)  // Declaration blocks are generally not handled well
+          ;
 }
 
 /**
@@ -494,13 +491,13 @@ bool is_class_member(Node *t) {
  \param[in] q should be a comment type
  \return true if this comment is followed by a class member
  \return false if it is followed by a widget or code
- \see is_class_member(Node *t)
+ \see is_direct_class_member(Node *t)
  */
 static bool is_comment_before_class_member(Node *q) {
   if (dynamic_cast<Comment_Node*>(q) && q->next && q->next->level==q->level) {
     if (dynamic_cast<Comment_Node*>(q->next))
       return is_comment_before_class_member(q->next);
-    if (is_class_member(q->next))
+    if (is_direct_class_member(q->next))
       return true;
   }
   return false;
@@ -541,11 +538,20 @@ Node* Code_Writer::write_code(Node* p) {
   }
   // recursively write the code of all children
   Node* q;
-  if (p->is_widget() && p->is_class()) {
-    // Handle widget classes specially
+  if (dynamic_cast<Widget_Class_Node*>(p)) {
+    // Legacy handling for Widget_Class_Node:
+    // As the name suggests, these are widgets and classes at the same time.
+    // The implementation is a class that generates a collection of widgets
+    // in a Fl_Group of Fl_Window (or derived).
+    // Problem is, widgets are created directly as children of Widget_Class_Node
+    // instead of inside a constructor. So below we have to treat all children
+    // that  are widgets in write_code1(), and all children that are regular
+    // class members (Methods, Variables) *after* write_code2().
+    // \todo Improve the concept of Widget_Class_Node to be more like a regular
+    //       class, with a constructor
     for (q = p->next; q && q->level > p->level;) {
       // note: maybe declaration blocks should be handled like comments in the context
-      if (!is_class_member(q) && !is_comment_before_class_member(q)) {
+      if (!is_direct_class_member(q) && !is_comment_before_class_member(q)) {
         q = write_code(q);
       } else {
         int level = q->level;
@@ -561,7 +567,7 @@ Node* Code_Writer::write_code(Node* p) {
     mark_end(p->finalize_node);
 
     for (q = p->next; q && q->level > p->level;) {
-      if (is_class_member(q) || is_comment_before_class_member(q)) {
+      if (is_direct_class_member(q) || is_comment_before_class_member(q)) {
         q = write_code(q);
       } else {
         int level = q->level;
@@ -572,7 +578,7 @@ Node* Code_Writer::write_code(Node* p) {
     }
 
     write_h("};\n");
-    current_widget_class = nullptr;
+    class_stack.pop_back();
   } else {
     for (q = p->next; q && q->level > p->level;) q = write_code(q);
     // write all code that come after the children
@@ -792,12 +798,26 @@ int Code_Writer::flush()
  This avoids repeating these words if the mode is already set.
  \param[in] state 0 for private, 1 for public, 2 for protected
  */
-void Code_Writer::write_public(int state) {
-  if (!current_class && !current_widget_class) return;
-  if (current_class && current_class->write_public_state == state) return;
-  if (current_widget_class && current_widget_class->write_public_state == state) return;
-  if (current_class) current_class->write_public_state = state;
-  if (current_widget_class) current_widget_class->write_public_state = state;
+void Code_Writer::write_public(int state)
+{
+  if (class_stack.empty()) {
+    return;
+  }
+  auto* top = class_stack.back();
+  auto* current_class = dynamic_cast<Class_Node*>(top);
+  auto* current_widget_class = dynamic_cast<Widget_Class_Node*>(top);
+  if (current_class) {
+    if (current_class->write_public_state == state)
+      return;
+    current_class->write_public_state = state;
+  } else if (current_widget_class) {
+    if (current_widget_class->write_public_state == state)
+      return;
+    current_widget_class->write_public_state = state;
+  } else {
+    return;
+  }
+
   switch (state) {
     case 0: write_h("private:\n"); break;
     case 1: write_h("public:\n"); break;
@@ -1006,7 +1026,7 @@ std::string Code_Writer::header_guard_macro()
     const char* b = a + strlen(a);
     int len = 0;
     unsigned ucs = fl_utf8decode(a, b, &len);
-    if ((ucs > 127) || (!isalpha(ucs) && (ucs != '_')))
+    if (!fl_ascii_isalpha(ucs) && (ucs != '_'))
       macro_name << '_';
     while (a < b) {
       ucs = fl_utf8decode(a, b, &len);
@@ -1014,7 +1034,7 @@ std::string Code_Writer::header_guard_macro()
         macro_name << "\\U" << std::setw(8) << std::setfill('0') << std::hex << ucs;
       } else if (ucs > 127) { // small unicode character or not an ASCI letter or digit
         macro_name << "\\u" << std::setw(4) << std::setfill('0') << std::hex << ucs;
-      } else if (!isalnum(ucs)) {
+      } else if (!fl_ascii_isalnum(ucs)) {
         macro_name << '_';
       } else {
         macro_name << (char)ucs;

@@ -1,7 +1,7 @@
 //
 // Fluid Project code for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2025 by Bill Spitzak and others.
+// Copyright 1998-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -18,11 +18,15 @@
 #include "Project.h"
 
 #include "message.h"
+#include "io/file_chooser.h"
+#include "io/Project_Reader.h"
+#include "io/Project_Writer.h"
 #include "io/String_Writer.h"
 #include "nodes/Node.h"
 #include "nodes/Widget_Node.h"
 #include "panels/settings_panel.h"
 #include "panels/codeview_panel.h"
+#include "widgets/Node_Browser.h"
 
 using namespace fluid;
 
@@ -70,9 +74,11 @@ void Project::reset() {
   avoid_early_includes = 0;
   header_file_set = 0;
   code_file_set = 0;
+  strings_file_set = 0;
   header_file_name = ".h";
   code_file_name = ".cxx";
-  include_guard = "";
+  strings_file_name.clear();
+  include_guard.clear();
   write_mergeback_data = 0;
 }
 
@@ -91,7 +97,7 @@ void Project::update_settings_dialog() {
  \return the path ending in '/'
  */
 std::string Project::projectfile_path() const {
-  if (!proj_filename) return std::string{};
+  if (proj_filename.empty()) return std::string{};
   return end_with_slash(fl_filename_absolute_str(fl_filename_path_str(proj_filename), Fluid.launch_path()));
 }
 
@@ -100,8 +106,8 @@ std::string Project::projectfile_path() const {
  \return the file name without path
  */
 std::string Project::projectfile_name() const {
-  if (!proj_filename) return std::string{};
-  return fl_filename_name(proj_filename);
+  if (proj_filename.empty()) return std::string{};
+  return fl_filename_name_str(proj_filename);
 }
 
 /**
@@ -110,7 +116,7 @@ std::string Project::projectfile_name() const {
  */
 std::string Project::codefile_path() const {
   std::string path = fl_filename_path_str(code_file_name);
-  if (Fluid.batch_mode)
+  if (Fluid.batch_mode && !Fluid.args.project_relative)
     return end_with_slash(fl_filename_absolute_str(path, Fluid.launch_path()));
   else
     return end_with_slash(fl_filename_absolute_str(path, projectfile_path()));
@@ -123,11 +129,11 @@ std::string Project::codefile_path() const {
 std::string Project::codefile_name() const {
   std::string name = fl_filename_name_str(code_file_name);
   if (name.empty()) {
-    if (!proj_filename) return std::string{};
-    return fl_filename_setext_str(fl_filename_name(proj_filename), ".cxx");
+    if (proj_filename.empty()) return std::string{};
+    return fl_filename_setext_str(fl_filename_name_str(proj_filename), ".cxx");
   } else if (name[0] == '.') {
-    if (!proj_filename) return std::string{};
-    return fl_filename_setext_str(fl_filename_name(proj_filename), code_file_name);
+    if (proj_filename.empty()) return std::string{};
+    return fl_filename_setext_str(fl_filename_name_str(proj_filename), code_file_name);
   } else {
     return name;
   }
@@ -139,7 +145,7 @@ std::string Project::codefile_name() const {
  */
 std::string Project::headerfile_path() const {
   std::string path = fl_filename_path_str(header_file_name);
-  if (Fluid.batch_mode)
+  if (Fluid.batch_mode && !Fluid.args.project_relative)
     return end_with_slash(fl_filename_absolute_str(path, Fluid.launch_path()));
   else
     return end_with_slash(fl_filename_absolute_str(path, projectfile_path()));
@@ -152,10 +158,10 @@ std::string Project::headerfile_path() const {
 std::string Project::headerfile_name() const {
   std::string name = fl_filename_name_str(header_file_name);
   if (name.empty()) {
-    if (!proj_filename) return std::string{};
+    if (proj_filename.empty()) return std::string{};
     return fl_filename_setext_str(fl_filename_name_str(proj_filename), ".h");
   } else if (name[0] == '.') {
-    if (!proj_filename) return std::string{};
+    if (proj_filename.empty()) return std::string{};
     return fl_filename_setext_str(fl_filename_name_str(proj_filename), header_file_name);
   } else {
     return name;
@@ -171,10 +177,11 @@ std::string Project::headerfile_name() const {
  \return the path ending in '/'
  */
 std::string Project::stringsfile_path() const {
-  if (Fluid.batch_mode)
-    return Fluid.launch_path();
+  std::string path = fl_filename_path_str(strings_file_name);
+  if (Fluid.batch_mode && !Fluid.args.project_relative)
+    return end_with_slash(fl_filename_absolute_str(path, Fluid.launch_path()));
   else
-    return projectfile_path();
+    return end_with_slash(fl_filename_absolute_str(path, projectfile_path()));
 }
 
 /**
@@ -182,11 +189,21 @@ std::string Project::stringsfile_path() const {
  \return the file name without path
  */
 std::string Project::stringsfile_name() const {
-  if (!proj_filename) return std::string{};
-  switch (i18n.type) {
-    default: return fl_filename_setext_str(fl_filename_name(proj_filename), ".txt");
-    case fluid::I18n_Type::GNU: return fl_filename_setext_str(fl_filename_name(proj_filename), ".po");
-    case fluid::I18n_Type::POSIX: return fl_filename_setext_str(fl_filename_name(proj_filename), ".msg");
+  std::string name = fl_filename_name_str(strings_file_name);
+  if (name.empty()) {
+    if (proj_filename.empty()) return std::string{};
+    std::string ext;
+    switch (i18n.type) {
+      default: ext = ".txt"; break;
+      case fluid::I18n_Type::GNU: ext = ".po"; break;
+      case fluid::I18n_Type::POSIX: ext = ".msg"; break;
+    }
+    return fl_filename_setext_str(fl_filename_name_str(proj_filename), ext);
+  } else if (name[0] == '.') {
+    if (proj_filename.empty()) return std::string{};
+    return fl_filename_setext_str(fl_filename_name_str(proj_filename), strings_file_name);
+  } else {
+    return name;
   }
 }
 
@@ -195,8 +212,8 @@ std::string Project::stringsfile_name() const {
  \return the file name without path or extension
  */
 std::string Project::basename() const {
-  if (!proj_filename) return std::string{};
-  return fl_filename_setext_str(fl_filename_name(proj_filename), "");
+  if (proj_filename.empty()) return std::string{};
+  return fl_filename_setext_str(fl_filename_name_str(proj_filename), "");
 }
 
 
@@ -225,7 +242,7 @@ void Project::enter_project_dir() {
   // check if we are already in the project dir and do nothing if so
   if (in_project_dir>1) return;
   // check if there is an active project, and do nothing if there is none
-  if (!proj_filename || !*proj_filename) {
+  if (proj_filename.empty()) {
     fprintf(stderr, "** Fluid internal error: enter_project_dir() no filename set\n");
     return;
   }
@@ -273,13 +290,83 @@ void Project::set_filename(std::nullptr_t) {
  \param[in] c the new absolute filename and path
  */
 void Project::set_filename(const std::string &c) {
-  if (proj_filename) free((void *)proj_filename);
-  proj_filename = c.empty() ? nullptr : fl_strdup(c.c_str());
-
-  if (proj_filename && !Fluid.batch_mode)
+  proj_filename = c;
+  if (!proj_filename.empty() && !Fluid.batch_mode)
     Fluid.history.update(proj_filename);
-
   set_modflag(modflag);
+}
+
+/**
+ Save the current design to the file given by \c proj_filename.
+
+ If no filename is set, or \c option requests one, open a filechooser first.
+
+ \param[in] option SaveOption::ASK_FOR_FILENAME always prompts for a filename
+    before saving; SaveOption::SAVE_COPY prompts for a filename and writes the
+    file without changing the project's filename or clearing the modified
+    flag ("save a copy...")
+ */
+void Project::save(SaveOption option) {
+  Fluid.flush_text_widgets();
+
+  std::string c = proj_filename;
+  std::string new_filename;
+  if (option == SaveOption::ASK_FOR_FILENAME || option == SaveOption::SAVE_COPY || c.empty()) {
+    new_filename = fluid::io::filechooser(
+      fluid::io::FileChooserType::SAVE_FILE,
+      fluid::io::FileChooserPath::ABSOLUTE_PATH,
+      "Save Project File As",
+      "Can't create project file:\n%s.",
+      c.c_str(),
+      Fluid.history.latest_project_path(),
+      "Fluid Project Files\t*.fl"
+    );
+    if (new_filename.empty()) return;
+    c = new_filename;
+
+#if 0 // filechooser is already doing this check, so we don't need to do it again here
+    if (!fl_access(c, 0)) {
+      std::string basename = fl_filename_name_str(c);
+      if (fluid_choice("The file \"%s\" already exists.\n"
+                    "Do you want to replace it?", "Cancel",
+                    "Replace", nullptr, basename.c_str()) == 0) return;
+    }
+#endif
+    if (option != SaveOption::SAVE_COPY) set_filename(c);
+  }
+  if (!fluid::io::write_file(*this, c.c_str())) {
+    fluid::alert("Fluid ERROR", "Can't save project file '" + c + "':\n" + strerror(errno));
+    return;
+  }
+
+  if (option != SaveOption::SAVE_COPY) {
+    set_modflag(0, 1);
+    undo.save_ = undo.current_;
+  }
+}
+
+/**
+ Reload the file using the current filename, replacing the current project.
+ If the project is marked modified, a dialog will ask for confirmation.
+ */
+void Project::revert() {
+  if (modflag) {
+    if (!fluid_choice("This user interface has been changed. Really revert?",
+                   "Cancel", "Revert", nullptr)) return;
+  }
+  undo.suspend();
+  if (!fluid::io::read_file(*this, proj_filename.c_str(), 0)) {
+    undo.resume();
+    widget_browser->rebuild();
+    update_settings_dialog();
+    fluid::alert("Fluid ERROR", "Can't load project file '" + proj_filename + "':\n" + strerror(errno));
+    return;
+  }
+  widget_browser->rebuild();
+  undo.resume();
+  set_modflag(0, 0);
+  undo.clear();
+  update_settings_dialog();
 }
 
 /**
@@ -287,15 +374,15 @@ void Project::set_filename(const std::string &c) {
  */
 void Project::write_strings() {
   Fluid.flush_text_widgets();
-  if (!proj_filename) {
-    Fluid.save_project_file(nullptr);
-    if (!proj_filename) return;
+  if (proj_filename.empty()) {
+    save();
+    if (proj_filename.empty()) return;
   }
   std::string filename = stringsfile_path() + stringsfile_name();
   int x = fluid::io::write_strings(*this, filename);
   if (x) {
     fluid_message("Can't write %s: %s", filename.c_str(), strerror(errno));
-  } else if (completion_button->value() && !Fluid.batch_mode) {
+  } else if (!Fluid.batch_mode && completion_button->value()) {
     fluid_message("Wrote %s", stringsfile_name().c_str());
   }
 }
@@ -336,8 +423,8 @@ void Project::set_modflag(int mf, int mfc) {
 
   if (Fluid.main_window) {
     std::string basename;
-    if (!proj_filename) basename = "Untitled.fl";
-    else basename = fl_filename_name_str(std::string(proj_filename));
+    if (proj_filename.empty()) basename = "Untitled.fl";
+    else basename = fl_filename_name_str(proj_filename);
     code_ext = fl_filename_ext(code_file_name.c_str());
     char mod_star = modflag ? '*' : ' ';
     char mod_c_star = modflag_c ? '*' : ' ';
@@ -352,3 +439,96 @@ void Project::set_modflag(int mf, int mfc) {
   if (codeview_panel && codeview_panel->visible() && cv_autorefresh->value())
     codeview_defer_update();
 }
+
+/**
+ Give the user the opportunity to save a project before clearing it.
+
+ If the project has unsaved changes, this function pops up a dialog, that
+ allows the user to save the project, continue without saving the project,
+ or to cancel the operation.
+
+ If the user chooses to save, and no filename was set, a file dialog allows
+ the user to pick a name and location, or to cancel the operation.
+
+ \return false if the user aborted the operation and the calling function
+ should abort as well
+ */
+bool Project::confirm_clear() {
+  if (modflag == 0) return true;
+  switch (fluid_choice("This project has unsaved changes. Do you want to save\n"
+                    "the project file before proceeding?",
+                    "Cancel", "Save", "Don't Save"))
+  {
+    case 0 : /* Cancel */
+      return false;
+    case 1 : /* Save */
+      save();
+      if (modflag) return false;  // user canceled the "Save As" dialog
+  }
+  return true;
+}
+
+/**
+ Load a project from the give file name and path.
+
+ The project file is inserted at the currently selected type.
+
+ If no filename is given, FLUID will open a file chooser dialog.
+
+ \param[in] filename_arg path and name of the new project file
+ \return false if the operation failed
+ */
+bool Project::load_or_merge(const std::string &filename_arg) {
+  bool is_a_merge = (!tree.empty());
+  std::string title = is_a_merge ? "Merge Project File" : "Load Project File";
+
+  // ask for a filename if none was given
+  std::string new_filename = filename_arg;
+  if (new_filename.empty()) {
+    new_filename = fluid::io::filechooser(
+      fluid::io::FileChooserType::LOAD_FILE,
+      fluid::io::FileChooserPath::ABSOLUTE_PATH,
+      title,
+      "Can't open project file:\n%s.",
+      Fluid.history.latest_project_path(),
+      Fluid.launch_path(),
+      "Fluid Project Files\t*.f[ld]"
+    );
+    if (new_filename.empty()) {
+      return false;
+    }
+  }
+
+  const char *c = new_filename.c_str();
+  std::string oldfilename = proj_filename;
+  proj_filename.clear();
+  set_filename(c);
+  if (is_a_merge)
+    undo.checkpoint();
+  undo.suspend();
+  if (!fluid::io::read_file(*this, c, is_a_merge)) {
+    undo.resume();
+    widget_browser->rebuild();
+    update_settings_dialog();
+    fluid_message("Can't read %s: %s", c, strerror(errno));
+    proj_filename.clear();
+    proj_filename = oldfilename;
+    if (Fluid.main_window)
+      set_modflag(modflag);
+    return false;
+  }
+  undo.resume();
+  widget_browser->rebuild();
+  if (is_a_merge) {
+    // Inserting a file; restore the original filename...
+    set_filename(oldfilename);
+    set_modflag(1);
+  } else {
+    // Loaded a file; free the old filename...
+    set_modflag(0, 0);
+    undo.clear();
+  }
+  update_settings_dialog();
+  return true;
+}
+

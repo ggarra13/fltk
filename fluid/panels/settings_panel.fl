@@ -206,7 +206,7 @@ Function {make_settings_window()} {uid 5023 open
 } {
   Fl_Window settings_window {uid 6ae5
     label {FLUID Settings} open
-    xywh {499 208 360 585} type Double align 80 resizable size_range {340 580 0 0} visible
+    xywh {593 275 360 585} type Double align 80 resizable size_range {340 580 0 0} visible
   } {
     Fl_Tabs w_settings_tabs {uid f85f
       callback {propagate_load(o, v);} open
@@ -400,6 +400,20 @@ or just ".ext" to set extension.}
 }}
           tooltip {Include the header file from the code file.} xywh {110 160 230 20} down_box DOWN_BOX labelsize 12
         }
+        Fl_Input strings_file_input {uid 9319
+          label {Strings File:}
+          user_data 1
+          callback {if (v == LOAD) {
+  o->value(Fluid.proj.strings_file_name.c_str());
+} else {
+  if (strcmp(Fluid.proj.strings_file_name.c_str(), o->value())) {
+    Fluid.proj.strings_file_name = o->value();
+    Fluid.proj.set_modflag(1);
+  }
+}}
+          tooltip {Filename for internationalisation strings lookup file} xywh {110 182 230 20} box THIN_DOWN_BOX labelfont 1 labelsize 12 when 1 textfont 4 textsize 12
+          code2 {o->placeholder("automatic (.txt/.po/.msg)");}
+        }
         Fl_Input include_guard_input {uid 56c4
           label {Include Guard:}
           user_data 1 user_data_type {void*}
@@ -417,11 +431,11 @@ an include guard in header file:
 \#ifdef GUARD
 \#define GUARD
 ...
-\#endif} xywh {110 188 230 20} box THIN_DOWN_BOX labelfont 1 labelsize 12 when 1 textfont 4 textsize 12
+\#endif} xywh {110 213 230 20} box THIN_DOWN_BOX labelfont 1 labelsize 12 when 1 textfont 4 textsize 12
         }
         Fl_Box {} {uid 9c15
           label {Options: }
-          xywh {110 214 0 20} labelfont 1 labelsize 12 align 4
+          xywh {110 239 0 20} labelfont 1 labelsize 12 align 4
         }
         Fl_Check_Button use_FL_COMMAND_button {uid 2b8a
           label {Menu shortcuts use FL_COMMAND}
@@ -433,7 +447,7 @@ an include guard in header file:
     Fluid.proj.use_FL_COMMAND = o->value();
   }
 }}
-          tooltip {Replace FL_CTRL and FL_META with FL_COMMAND when generating menu shortcuts} xywh {110 214 230 20} down_box DOWN_BOX labelsize 12
+          tooltip {Replace FL_CTRL and FL_META with FL_COMMAND when generating menu shortcuts} xywh {110 239 230 20} down_box DOWN_BOX labelsize 12
         }
         Fl_Check_Button utf8_in_src_button {uid 91e5
           label {Allow Unicode UTF-8 in source code}
@@ -445,7 +459,7 @@ an include guard in header file:
     Fluid.proj.utf8_in_src = o->value();
   }
 }}
-          tooltip {For older compilers, characters outside of the printable ASCII range are escaped using octal notation `\\0123`. If this option is checked, Fluid will write UTF-8 characters unchanged.} xywh {110 234 230 20} down_box DOWN_BOX labelsize 12
+          tooltip {For older compilers, characters outside of the printable ASCII range are escaped using octal notation `\\0123`. If this option is checked, Fluid will write UTF-8 characters unchanged.} xywh {110 259 230 20} down_box DOWN_BOX labelsize 12
         }
         Fl_Check_Button avoid_early_includes_button {uid 6a9b
           label {Avoid early include of Fl.H}
@@ -457,11 +471,11 @@ an include guard in header file:
     Fluid.proj.avoid_early_includes = o->value();
   }
 }}
-          tooltip {Do not emit \#include <FL//Fl.H> until it is needed by another include file.} xywh {110 254 230 20} down_box DOWN_BOX labelsize 12
+          tooltip {Do not emit \#include <FL//Fl.H> until it is needed by another include file.} xywh {110 279 230 20} down_box DOWN_BOX labelsize 12
         }
         Fl_Box {} {uid f84d
           label {Experimental: }
-          xywh {110 280 0 20} labelfont 1 labelsize 12 align 4
+          xywh {110 305 0 20} labelfont 1 labelsize 12 align 4
         }
         Fl_Check_Button w_proj_mergeback {uid c339
           label {Generate MergeBack data}
@@ -473,7 +487,7 @@ an include guard in header file:
     Fluid.proj.write_mergeback_data = o->value();
   }
 }}
-          tooltip {MergeBack is a feature under construction that allows changes in code files to be merged back into the project file. Checking this option will generate additional data in code and project files.} xywh {110 280 230 20} down_box DOWN_BOX labelsize 12
+          tooltip {MergeBack is a feature under construction that allows changes in code files to be merged back into the project file. Checking this option will generate additional data in code and project files.} xywh {110 305 230 20} down_box DOWN_BOX labelsize 12
         }
         Fl_Box {} {uid f5f6
           xywh {110 530 230 10} hide resizable
@@ -953,8 +967,8 @@ list:}
   if (g_shell_config) {
     o->clear();
     w_settings_shell_list_selected = 0;
-    for (int i=0; i<g_shell_config->list_size; i++) {
-      Fd_Shell_Command *cmd = g_shell_config->list[i];
+    for (int i=0; i<(int)g_shell_config->list.size(); i++) {
+      Fd_Shell_Command *cmd = g_shell_config->list[i].get();
       o->add(cmd->name.c_str());
       if (cmd->storage == fluid::Tool_Store::USER)
         o->icon(i+1, w_settings_shell_fd_user->image());
@@ -1014,7 +1028,7 @@ if (v==LOAD) {
   }
 } else {
   if (!selected) return;
-  Fd_Shell_Command *cmd = new Fd_Shell_Command(g_shell_config->list[selected-1]);
+  Fd_Shell_Command *cmd = new Fd_Shell_Command(g_shell_config->list[selected-1].get());
   g_shell_config->insert(selected, cmd);
   w_settings_shell_list->insert(selected+1, cmd->name.c_str());
   w_settings_shell_list->deselect();
@@ -1044,7 +1058,7 @@ if (v==LOAD) {
 } else {
   if (!selected) return;
   int ret = fluid_choice("Delete the shell command\\n\\"%s\\"?\\n\\nThis can not be undone.",
-    "Delete", "Cancel", nullptr, g_shell_config->list[selected-1]->name.c_str());
+    "Delete", "Cancel", nullptr, g_shell_config->list[selected-1].get()->name.c_str());
   if (ret==1) return;
   if (g_shell_config->at(selected-1)->storage == fluid::Tool_Store::PROJECT) Fluid.proj.set_modflag(1);
   g_shell_config->remove(selected-1);
@@ -1115,7 +1129,7 @@ if (v==LOAD) {
   }
 } else {
   if (!selected) return;
-  Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+  Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
   cmd->run();
 }}
               tooltip {run the selected shell command} xywh {280 200 60 22} labelsize 12 deactivate
@@ -1139,13 +1153,13 @@ if (v==LOAD) {
             callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->name.c_str());
+    o->value(g_shell_config->list[selected-1].get()->name.c_str());
   } else {
     o->value("");
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     cmd->name = o->value();
     w_settings_shell_list->text(selected, o->value());
     if (cmd->storage == fluid::Tool_Store::PROJECT) Fluid.proj.set_modflag(1);
@@ -1158,13 +1172,13 @@ if (v == LOAD) {
             callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->label.c_str());
+    o->value(g_shell_config->list[selected-1].get()->label.c_str());
   } else {
     o->value("");
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     cmd->label = o->value();
     cmd->update_shell_menu();
     if (cmd->storage == fluid::Tool_Store::PROJECT) Fluid.proj.set_modflag(1);
@@ -1181,14 +1195,14 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->shortcut);
+    o->value(g_shell_config->list[selected-1].get()->shortcut);
     //o->default_value(o->value());
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     cmd->shortcut = o->value();
     cmd->update_shell_menu();
     if (cmd->storage == fluid::Tool_Store::PROJECT) Fluid.proj.set_modflag(1);
@@ -1203,14 +1217,14 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    fluid::Tool_Store ts = g_shell_config->list[selected-1]->storage;
+    fluid::Tool_Store ts = g_shell_config->list[selected-1].get()->storage;
     o->value(o->find_item_with_argument((long)ts));
   } else {
     o->value(o->find_item_with_argument((long)fluid::Tool_Store::USER));
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     fluid::Tool_Store ts = (fluid::Tool_Store)(o->mvalue()->argument());
     if (cmd->storage == fluid::Tool_Store::PROJECT) Fluid.proj.set_modflag(1);
     cmd->storage = ts;
@@ -1241,7 +1255,7 @@ if (v == LOAD) {
 int cond = Fd_Shell_Command::ALWAYS;
 if (v == LOAD) {
   if (selected) {
-    cond = g_shell_config->list[selected-1]->condition;
+    cond = g_shell_config->list[selected-1].get()->condition;
     o->value(o->find_item_with_argument(cond));
   } else {
     o->value(o->find_item_with_argument(0));
@@ -1249,7 +1263,7 @@ if (v == LOAD) {
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     cond = (int)(o->mvalue()->argument());
     cmd->condition = cond;
     g_shell_config->rebuild_shell_menu();
@@ -1313,12 +1327,12 @@ else
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected)
-    o->value(g_shell_config->list[selected-1]->condition_data.c_str());
+    o->value(g_shell_config->list[selected-1].get()->condition_data.c_str());
   else
     o->value("");
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     cmd->condition_data = o->value();
     g_shell_config->rebuild_shell_menu();
     if (cmd->storage == fluid::Tool_Store::PROJECT)
@@ -1337,13 +1351,13 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->buffer()->text(g_shell_config->list[selected-1]->command.c_str());
+    o->buffer()->text(g_shell_config->list[selected-1].get()->command.c_str());
   } else {
     o->buffer()->text("");
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     cmd->command = o->buffer()->text();
     if (cmd->storage == fluid::Tool_Store::PROJECT) Fluid.proj.set_modflag(1);
   }
@@ -1453,13 +1467,13 @@ script_panel->hide();}
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->flags & Fd_Shell_Command::SAVE_PROJECT);
+    o->value(g_shell_config->list[selected-1].get()->flags & Fd_Shell_Command::SAVE_PROJECT);
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     int v = o->value();
     if (v) {
       cmd->flags |= Fd_Shell_Command::SAVE_PROJECT;
@@ -1476,13 +1490,13 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->flags & Fd_Shell_Command::SAVE_SOURCECODE);
+    o->value(g_shell_config->list[selected-1].get()->flags & Fd_Shell_Command::SAVE_SOURCECODE);
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     int v = o->value();
     if (v) {
       cmd->flags |= Fd_Shell_Command::SAVE_SOURCECODE;
@@ -1499,13 +1513,13 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->flags & Fd_Shell_Command::SAVE_STRINGS);
+    o->value(g_shell_config->list[selected-1].get()->flags & Fd_Shell_Command::SAVE_STRINGS);
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     int v = o->value();
     if (v) {
       cmd->flags |= Fd_Shell_Command::SAVE_STRINGS;
@@ -1522,13 +1536,13 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(!(g_shell_config->list[selected-1]->flags & Fd_Shell_Command::DONT_SHOW_TERMINAL));
+    o->value(!(g_shell_config->list[selected-1].get()->flags & Fd_Shell_Command::DONT_SHOW_TERMINAL));
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     int v = o->value();
     if (!v) {
       cmd->flags |= Fd_Shell_Command::DONT_SHOW_TERMINAL;
@@ -1545,13 +1559,13 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->flags & Fd_Shell_Command::CLEAR_TERMINAL);
+    o->value(g_shell_config->list[selected-1].get()->flags & Fd_Shell_Command::CLEAR_TERMINAL);
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     int v = o->value();
     if (v) {
       cmd->flags |= Fd_Shell_Command::CLEAR_TERMINAL;
@@ -1568,13 +1582,13 @@ if (v == LOAD) {
               callback {int selected = w_settings_shell_list_selected;
 if (v == LOAD) {
   if (selected) {
-    o->value(g_shell_config->list[selected-1]->flags & Fd_Shell_Command::CLEAR_HISTORY);
+    o->value(g_shell_config->list[selected-1].get()->flags & Fd_Shell_Command::CLEAR_HISTORY);
   } else {
     o->value(0);
   }
 } else {
   if (selected) {
-    Fd_Shell_Command *cmd = g_shell_config->list[selected-1];
+    Fd_Shell_Command *cmd = g_shell_config->list[selected-1].get();
     int v = o->value();
     if (v) {
       cmd->flags |= Fd_Shell_Command::CLEAR_HISTORY;
@@ -1918,7 +1932,7 @@ Node_Browser::name_font = FL_HELVETICA;
 Node_Browser::code_color = FL_FOREGROUND_COLOR;
 Node_Browser::code_font = FL_HELVETICA;
 Node_Browser::comment_color = FL_DARK_GREEN;
-Node_Browser::comment_font = FL_DARK_GREEN;
+Node_Browser::comment_font = FL_HELVETICA;
 o->parent()->do_callback(o->parent(), LOAD);
 widget_browser->redraw();
 widget_browser->save_prefs();}

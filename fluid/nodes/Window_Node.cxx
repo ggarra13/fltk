@@ -358,7 +358,8 @@ void Window_Node::setlabel(const char *n) {
 void Overlay_Window::resize(int X,int Y,int W,int H) {
   // Make sure we don't create undo checkpoints if the window does not actually change.
   // Some WMs seem to send spurious resize events.
-  if (X!=x() || Y!=y() || W!=w() || H!=h()) {
+  // Some window managers reposition the window, so ignore those changes too.
+  if ( /*X!=x() || Y!=y() ||*/ W!=w() || H!=h()) {
     // Set a checkpoint on the first resize event, ignore further resizes until
     // a different type of checkpoint is triggered.
     if (Fluid.proj.undo.checkpoint(fluid::proj::Undo::OnceType::WINDOW_RESIZE))
@@ -793,7 +794,6 @@ void toggle_restricted_cb(Fl_Check_Button *o, void *v) {
 extern void select(Node *,int);
 extern void select_only(Node *);
 extern void deselect();
-extern Node* in_this_only;
 extern void fix_group_size(Node *t);
 
 extern Fl_Menu_Item New_Menu[];
@@ -1003,7 +1003,6 @@ int Window_Node::handle(int event) {
         return 1;
       }
 
-      in_this_only = this;
       popupx = Fl::event_x();
       popupy = Fl::event_y();
       // If the selected widget at dnd start and the drop target are the same,
@@ -1022,7 +1021,6 @@ int Window_Node::handle(int event) {
       }
       popupx = 0x7FFFFFFF;
       popupy = 0x7FFFFFFF; // mark as invalid (MAXINT)
-      in_this_only = nullptr;
       widget_browser->display(Fluid.proj.tree.current);
       widget_browser->rebuild();
       return 1;
@@ -1033,13 +1031,11 @@ int Window_Node::handle(int event) {
     drag = dx = dy = 0;
     // test for popup menu:
     if (Fl::event_button() >= 3) {
-      in_this_only = this; // modifies how some menu items work.
       static const Fl_Menu_Item* myprev;
       popupx = mx; popupy = my;
       const Fl_Menu_Item* m = New_Menu->popup(mx,my,"New",myprev);
       if (m && m->callback()) {myprev = m; m->do_callback(this->o);}
       popupx = 0x7FFFFFFF; popupy = 0x7FFFFFFF; // mark as invalid (MAXINT)
-      in_this_only = nullptr;
       return 1;
     }
     // find the innermost item clicked on:
@@ -1186,10 +1182,8 @@ int Window_Node::handle(int event) {
     }}
 
   case FL_SHORTCUT: {
-    in_this_only = this; // modifies how some menu items work.
     const Fl_Menu_Item* m = Fluid.main_menu->test_shortcut();
     if (m && m->callback()) m->do_callback(this->o);
-    in_this_only = nullptr;
     return (m != nullptr);}
 
   default:
@@ -1314,8 +1308,6 @@ int Window_Node::read_fdesign(const char* propname, const char* value) {
 
 Widget_Class_Node Widget_Class_Node::prototype;
 
-Widget_Class_Node *current_widget_class = nullptr;
-
 /**
  Create and add a new Widget Class node.
  \param[in] strategy add after current or as last child
@@ -1386,9 +1378,8 @@ void Widget_Class_Node::write_code1(fluid::io::Code_Writer& f) {
 #if 0
   Widget_Node::write_code1(fluid::io::Code_Writer& f);
 #endif // 0
-
-  current_widget_class = this;
-  write_public_state = 1;
+  f.class_stack.push_back(this);
+  write_public_state = 1; // public:, because the constructors follow.
 
   std::string c = subclass();
   if (c.empty()) c = "Fl_Group";
@@ -1487,18 +1478,16 @@ void Widget_Class_Node::write_code2(fluid::io::Code_Writer& f) {
     f.write_c(f.indent() + "resize(X, Y, W, H);\n");
   f.indent_less();
   f.write_c("}\n");
+  //class_stack.pop_back(); is called in Code_Writer::write_code(Node* p)
 }
 
 
 ////////////////////////////////////////////////////////////////
 // live mode support
 
-Fl_Widget *Window_Node::enter_live_mode(int) {
+Fl_Widget *Window_Node::enter_live_mode() {
   Fl_Window *win = new Fl_Window(10, 10, o->w(), o->h());
   return propagate_live_mode(win);
-}
-
-void Window_Node::leave_live_mode() {
 }
 
 /**

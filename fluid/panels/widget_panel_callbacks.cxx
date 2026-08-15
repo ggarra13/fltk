@@ -639,22 +639,13 @@ void propagate_load(Fl_Group* g, void* v) {
   }
 }
 
-void set_cb(Fl_Button*, void*) {
-  haderror = 0;
-  Fl_Widget*const* a = the_panel->array();
-  for (int i=the_panel->children(); i--;) {
-    Fl_Widget* o = *a++;
-    if (o->changed()) {
-      o->do_callback();
-      if (haderror) return;
-      o->clear_changed();
-    }
-  }
-}
-
 void ok_cb(Fl_Return_Button* o, void* v) {
-  set_cb(o,v);
-  if (!haderror) the_panel->hide();
+  haderror = 0;
+  Fluid.flush_text_widgets();
+  if (haderror)
+    {} // Keep the panel open
+  else
+    the_panel->hide();
 }
 
 void toggle_overlays(Fl_Widget*, void*); // in Window_Node.cxx
@@ -668,7 +659,6 @@ void leave_live_mode_cb(Fl_Widget*, void*);
 void live_mode_cb(Fl_Button* o, void *) {
   /// \todo live mode should end gracefully when the application quits
   ///       or when the user closes the live widget
-  static Node* live_type = nullptr;
   static Fl_Widget* live_widget = nullptr;
   static Fl_Window* live_window = nullptr;
 
@@ -685,9 +675,8 @@ void live_mode_cb(Fl_Button* o, void *) {
   if (o->value()) {
     if (numselected == 1) {
       Fl_Group::current(nullptr);
-      live_widget = current_widget->enter_live_mode(1);
+      live_widget = current_widget->enter_live_mode();
       if (live_widget) {
-        live_type = current_widget;
         Fl_Group::current(nullptr);
         int w = live_widget->w();
         int h = live_widget->h();
@@ -722,13 +711,10 @@ void live_mode_cb(Fl_Button* o, void *) {
       } else o->value(0);
     } else o->value(0);
   } else {
-    if (live_type)
-      live_type->leave_live_mode();
     if (live_window) {
       live_window->hide();
       Fl::delete_widget(live_window);
     }
-    live_type = nullptr;
     live_widget = nullptr;
     live_window = nullptr;
   }
@@ -850,12 +836,13 @@ extern void update_codeview_position();
 void selection_changed(Node* p) {
   // store all changes to the current selected objects:
   if (p && the_panel && the_panel->visible()) {
-    set_cb(nullptr,nullptr);
+    haderror = 0;
+    Fluid.flush_text_widgets();
     // if there was an error, we try to leave the selected set unchanged:
     if (haderror) {
       Node* q = nullptr;
       for (Node* o = Fluid.proj.tree.first; o; o = o->next) {
-        o->new_selected = o->selected;
+        o->selected = o->backup_selected;
         if (!q && o->selected) q = o;
       }
       if (!p || !p->selected) p = q;
@@ -867,7 +854,7 @@ void selection_changed(Node* p) {
   // update the selected flags to new set:
   Node* q = nullptr;
   for (Node* o = Fluid.proj.tree.first; o; o = o->next) {
-    o->selected = o->new_selected;
+    o->backup_selected = o->selected;
     if (!q && o->selected) q = o;
   }
   if (!p || !p->selected) p = q;

@@ -3785,65 +3785,18 @@ int Fl_Cocoa_Window_Driver::set_cursor(const Fl_RGB_Image *image, int hotx, int 
     image2->normalize();
     image = image2;
   }
-  // OS X >= 10.6 can create a NSImage from a CGImage, but we need to
-  // support older versions, hence this pesky handling.
 
-  NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
-                              initWithBitmapDataPlanes:NULL
-                              pixelsWide:image->data_w()
-                              pixelsHigh:image->data_h()
-                              bitsPerSample:8
-                              samplesPerPixel:image->d()
-                              hasAlpha:!(image->d() & 1)
-                              isPlanar:NO
-                              colorSpaceName:(image->d() <= 2 ?
-                                              NSDeviceWhiteColorSpace : NSDeviceRGBColorSpace)
-                              bytesPerRow:(image->data_w() * image->d())
-                              bitsPerPixel:(image->d()*8)];
-
-  // Alpha needs to be premultiplied for this format
-
-  const uchar *i = (const uchar*)*image->data();
-  const int extra_data = image->ld() ? (image->ld() - image->data_w() * image->d()) : 0;
-  unsigned char *o = [bitmap bitmapData];
-  for (int y = 0;y < image->data_h();y++) {
-    if (!(image->d() & 1)) {
-      for (int x = 0;x < image->data_w();x++) {
-        unsigned int alpha;
-        if (image->d() == 4) {
-          alpha = i[3];
-          *o++ = (unsigned char)((unsigned int)*i++ * alpha / 255);
-          *o++ = (unsigned char)((unsigned int)*i++ * alpha / 255);
-        }
-
-        alpha = i[1];
-        *o++ = (unsigned char)((unsigned int)*i++ * alpha / 255);
-        *o++ = alpha;
-        i++;
+  CGImageRef* cgimg = Fl_Quartz_Graphics_Driver::cached_image((Fl_RGB_Image*)image);
+  if (!*cgimg) {
+    Fl_Quartz_Printer_Graphics_Driver dr;
+    dr.cache((Fl_RGB_Image*)image);
   }
-    } else {
-      // No alpha, so we can just copy everything directly.
-      int len = image->data_w() * image->d();
-      memcpy(o, i, len);
-      o += len;
-      i += len;
-    }
-    i += extra_data;
-  }
-
-  NSImage *nsimage = [[NSImage alloc]
-                      initWithSize:NSMakeSize(image->w(), image->h())];
-
-  [nsimage addRepresentation:bitmap];
-
-  cursor = [[NSCursor alloc]
-            initWithImage:nsimage
-            hotSpot:NSMakePoint(hotx, hoty)];
-
+  NSImage *nsimage = [[NSImage alloc] initWithCGImage:*cgimg // 10.6
+                                                 size:NSMakeSize(image->w(), image->h())];
+  cursor = [[NSCursor alloc] initWithImage:nsimage hotSpot:NSMakePoint(hotx, hoty)];
+  [nsimage release];
   [fl_xid(pWindow) invalidateCursorRectsForView:[fl_xid(pWindow) contentView]];
 
-  [bitmap release];
-  [nsimage release];
   if (image->as_svg_image()) delete image;
 
   return 1;
@@ -4595,26 +4548,23 @@ static NSImage* rgb_to_nsimage(const Fl_RGB_Image *rgb) {
   if (!rgb) return nil;
   int ld = rgb->ld();
   if (!ld) ld = rgb->data_w() * rgb->d();
-  NSImage *win_icon = nil;
-  if (fl_mac_os_version >= 101000) {
-    NSBitmapImageRep *bitmap =
-    [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
-                                            pixelsWide:rgb->data_w()
-                                            pixelsHigh:rgb->data_h()
-                                         bitsPerSample:8
-                                       samplesPerPixel:rgb->d()
-                                              hasAlpha:!(rgb->d() & 1)
-                                              isPlanar:NO
-                                        colorSpaceName:(rgb->d() <= 2 ? NSDeviceWhiteColorSpace :
-                                                        NSDeviceRGBColorSpace)
-                                          bitmapFormat:NSBitmapFormatAlphaNonpremultiplied
-                                           bytesPerRow:ld
-                                          bitsPerPixel:rgb->d() * 8]; // 10.4
-    memcpy([bitmap bitmapData], rgb->array, rgb->data_h() * ld);
-    win_icon = [[NSImage alloc] initWithSize:NSMakeSize(0, 0)];
-    [win_icon addRepresentation:bitmap];
-    [bitmap release];
-  }
+  NSBitmapImageRep *bitmap =
+  [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:NULL
+                                          pixelsWide:rgb->data_w()
+                                          pixelsHigh:rgb->data_h()
+                                       bitsPerSample:8
+                                     samplesPerPixel:rgb->d()
+                                            hasAlpha:!(rgb->d() & 1)
+                                            isPlanar:NO
+                                      colorSpaceName:(rgb->d() <= 2 ? NSDeviceWhiteColorSpace :
+                                                                      NSDeviceRGBColorSpace)
+                                        bitmapFormat:NSBitmapFormatAlphaNonpremultiplied
+                                         bytesPerRow:ld
+                                        bitsPerPixel:rgb->d() * 8]; // 10.4
+  memcpy([bitmap bitmapData], rgb->array, rgb->data_h() * ld);
+  NSImage *win_icon = [[NSImage alloc] initWithSize:NSMakeSize(rgb->w(), rgb->h())];
+  [win_icon addRepresentation:bitmap];
+  [bitmap release];
   return win_icon;
 }
 

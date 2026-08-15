@@ -24,7 +24,6 @@
 #include <FL/fl_utf8.h>
 #include "flstring.h"
 #include <stdlib.h>
-#include <ctype.h>
 
 #define MAXBUF 1024
 static int l_secret;
@@ -211,8 +210,8 @@ double Fl_Input_::expandpos(
   int l;
   if (input_type()==FL_SECRET_INPUT) {
     while (p<e) {
-      l = fl_utf8len((char)p[0]);
-      if (l >= 1) n += l_secret;
+      l = fl_utf8len1((char)p[0]);    // len->len1: issue #1576
+      n += l_secret;
       p += l;
     }
   } else while (p<e) {
@@ -325,7 +324,24 @@ void Fl_Input_::drawtext(int X, int Y, int W, int H, bool draw_active) {
       draw_box(box(), X-Fl::box_dx(box()), Y-Fl::box_dy(box()),
                W+Fl::box_dw(box()), H+Fl::box_dh(box()), color());
     }
+    // If there is no text, but a placeholder, draw the placeholder text in a light color
+    if (placeholder_ && *placeholder_) {
+      Fl_Color fg = textcolor();
+      Fl_Color bg = color();
+      if (!active_r()) {
+        fg = fl_inactive(fg);
+        bg = fl_inactive(bg);
+      }
+      fl_color(fl_color_average(fg, bg, .5f));
+      fl_font(textfont(), textsize());
+      fl_draw(placeholder_, X, Y, W, H, FL_ALIGN_LEFT|FL_ALIGN_INSIDE);
+    }
     return;
+  }
+  // Make sure that a previously drawn placeholder text is cleared when draw_active is set.
+  if (!size() && placeholder_ && do_mu) {
+    draw_box(box(), X-Fl::box_dx(box()), Y-Fl::box_dy(box()),
+              W+Fl::box_dw(box()), H+Fl::box_dh(box()), color());
   }
 
   int selstart, selend;
@@ -1518,6 +1534,24 @@ double Fl_Input_::dvalue() const {
 }
 
 /**
+ Set the placeholder text.
+ \param [in] text the placeholder text
+*/
+void Fl_Input_::placeholder(const char* text) {
+  if (placeholder_) free((void*)placeholder_);
+  placeholder_ = text ? strdup(text) : nullptr;
+}
+
+/**
+ Get the placeholder text.
+ \return pointer to an internal buffer to the placeholder text, or nullptr. The
+ buffer will be freed when the widget is destroyed or a new placeholder is set.
+*/
+const char* Fl_Input_::placeholder() const {
+  return placeholder_;
+}
+
+/**
   Changes the size of the widget.
   This call updates the text layout so that the cursor is visible.
   \param [in] X, Y, W, H new size of the widget
@@ -1540,6 +1574,7 @@ Fl_Input_::~Fl_Input_() {
   delete redo_list_;
   delete undo_;
   if (bufsize) free((void*)buffer);
+  if (placeholder_) free((void*)placeholder_);
 }
 
 /** \internal

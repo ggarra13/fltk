@@ -21,21 +21,10 @@
 // in.  Search other files for "_WIN32" or filenames ending in _win32.cxx
 // for other system-specific code.
 
-#include <iostream>
+/* We require at least Windows 2000 features (e.g. VK definitions) */
 
-/* We require Windows 2000 features (e.g. VK definitions) */
-# if !defined(WINVER) || (WINVER < 0x0500)
-#  ifdef WINVER
-#   undef WINVER
-#  endif
-#  define WINVER 0x0500
-# endif
-# if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0500)
-#  ifdef _WIN32_WINNT
-#   undef _WIN32_WINNT
-#  endif
-#  define _WIN32_WINNT 0x0500
-# endif
+#define FL_WIN32_TARGET_VERSION 0x0500
+#include <FL/win32_target.h>
 
 // recent versions of MinGW warn: "Please include winsock2.h before windows.h"
 #if !defined(__CYGWIN__)
@@ -61,7 +50,9 @@ void fl_cleanup_dc_list(void);
 #include "Fl_Timeout.h"
 #include "print_button.h"
 #include <FL/Fl_Graphics_Driver.H> // for fl_graphics_driver
+#if FLTK_HAVE_PEN_SUPPORT
 #include "drivers/WinAPI/Fl_WinAPI_Pen_Driver.H"
+#endif
 #include "drivers/WinAPI/Fl_WinAPI_Window_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_System_Driver.H"
 #include "drivers/WinAPI/Fl_WinAPI_Screen_Driver.H"
@@ -1153,7 +1144,7 @@ static const struct {
   {VK_DIVIDE,   FL_KP+'/'},
   {VK_NUMLOCK,  FL_Num_Lock},
   {VK_SCROLL,   FL_Scroll_Lock},
-#if defined(_WIN32_WINNT) && (_WIN32_WINNT >= 0x0500)
+
   {VK_BROWSER_BACK,     FL_Back},
   {VK_BROWSER_FORWARD,  FL_Forward},
   {VK_BROWSER_REFRESH,  FL_Refresh},
@@ -1169,7 +1160,7 @@ static const struct {
   {VK_MEDIA_STOP,       FL_Media_Stop},
   {VK_MEDIA_PLAY_PAUSE, FL_Media_Play},
   {VK_LAUNCH_MAIL,      FL_Mail},
-#endif
+
   {0xba,        ';'},
   {0xbb,        '='},   // 0xbb == VK_OEM_PLUS (see #1086)
   {0xbc,        ','},
@@ -1189,7 +1180,7 @@ static int ms2fltk(WPARAM vk, int extended) {
   if (!vklut[1]) { // init the table
     unsigned int i;
     for (i = 0; i < 256; i++)
-      vklut[i] = tolower(i);
+      vklut[i] = fl_ascii_tolower(i);
     for (i = VK_F1; i <= VK_F16; i++)
       vklut[i] = i + (FL_F - (VK_F1 - 1));
     for (i = VK_NUMPAD0; i <= VK_NUMPAD9; i++)

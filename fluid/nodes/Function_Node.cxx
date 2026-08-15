@@ -41,9 +41,6 @@ using namespace fluid;
 using namespace fluid::io;
 using namespace fluid::proj;
 
-/// Set a current class, so that the code of the children is generated correctly.
-Class_Node *current_class = nullptr;
-
 /**
  Check if the node tree has a top-level function with the given return type and signature.
  \param[in] return_type_regex regex for the return type of the function,
@@ -328,7 +325,7 @@ void Function_Node::write_code1(fluid::io::Code_Writer& f) {
       f.write_c("int main(int argc, char** argv) {\n");
   } else {
     std::string rtype = return_type();
-    std::string star = "";
+    std::string star{};
     // from matt: let the user type "static " at the start of type
     // in order to declare a static method;
     int is_static = 0;
@@ -360,16 +357,16 @@ void Function_Node::write_code1(fluid::io::Code_Writer& f) {
       }
     }
 
-    const char* k = class_name(0);
-    if (k) {
+    std::string k = class_name();
+    if (!k.empty()) {
       f.write_public(public_);
       if (havechildren)
         write_comment_c(f);
       if (name()[0] == '~')
         constructor = 1;
       else {
-        size_t n = strlen(k);
-        if (!strncmp(name(), k, n) && name()[n] == '(') constructor = 1;
+        auto n = k.size();
+        if (!strncmp(name(), k.c_str(), n) && name()[n] == '(') constructor = 1;
       }
       f.write_h(f.indent(1));
       if (is_static) f.write_h("static ");
@@ -401,7 +398,7 @@ void Function_Node::write_code1(fluid::io::Code_Writer& f) {
       }
       if (havechildren) {
         clean_function_for_implementation(s, name());
-        f.write_c(std::string(k) + "::" + std::string(s) + " {\n");
+        f.write_c(k + "::" + std::string(s) + " {\n");
       }
     } else {
       if (havechildren)
@@ -831,7 +828,7 @@ void Decl_Node::write_code1(fluid::io::Code_Writer& f) {
   if (csc!=e) e = csc; // comment found
   // lose spaces between text and comment, if any
   while (e>c && e[-1]==' ') e--;
-  if (class_name(1)) {
+  if (is_in_class()) {
     f.write_public(public_);
     write_comment_h(f, f.indent(1).c_str());
     f.write_hc(f.indent(1), std::string(c, e-c), std::string(csc));
@@ -955,17 +952,17 @@ void Data_Node::write_code1(fluid::io::Code_Writer& f) {
   // path should be set correctly already
   if (!filename().empty() && !f.write_codeview) {
     Fluid.proj.enter_project_dir();
-    FILE *f = fl_fopen(filename().c_str(), "rb");
+    FILE *infile = fl_fopen(filename().c_str(), "rb");
     Fluid.proj.leave_project_dir();
-    if (!f) {
+    if (!infile) {
       message = "Can't include data from file. Can't open";
     } else {
-      fseek(f, 0, SEEK_END);
-      nData = (int)ftell(f);
-      fseek(f, 0, SEEK_SET);
+      fseek(infile, 0, SEEK_END);
+      nData = (int)ftell(infile);
+      fseek(infile, 0, SEEK_SET);
       if (nData) {
         data = (char*)calloc(nData, 1);
-        if (fread(data, nData, 1, f)==0) { /* use default */ }
+        if (fread(data, nData, 1, infile)==0) { /* use default */ }
         if ((output_format_ == 2) || (output_format_ == 5)) {
           uncompressedDataSize = nData;
           uLong nzData = compressBound(nData);
@@ -976,7 +973,7 @@ void Data_Node::write_code1(fluid::io::Code_Writer& f) {
           nData = (int)nzData;
         }
       }
-      fclose(f);
+      fclose(infile);
     }
   } else {
     if (filename().empty())
@@ -989,11 +986,11 @@ void Data_Node::write_code1(fluid::io::Code_Writer& f) {
       write_comment_c(f);
       if (output_format_ == 1) {
         f.write_h(f.indent(1) + "static const char* " + c + ";\n");
-        f.write_c("const char* " + std::string(class_name(1)) + "::" + c + " = /* text inlined from " + fn + " */\n");
+        f.write_c("const char* " + full_class_name() + "::" + c + " = /* text inlined from " + fn + " */\n");
       } else {
         f.write_h_once("#include <string>");
         f.write_h(f.indent(1) + "static const std::string " + c + ";\n");
-        f.write_c("const std::string " + std::string(class_name(1)) + "::" + c + " = /* text inlined from " + fn + " */\n");
+        f.write_c("const std::string " + full_class_name() + "::" + c + " = /* text inlined from " + fn + " */\n");
       }
       if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
       f.write_cstring(fluid::string_view(data, nData));
@@ -1001,15 +998,15 @@ void Data_Node::write_code1(fluid::io::Code_Writer& f) {
       f.write_h(f.indent(1) + "static int " + c + "_size;\n");
       f.write_c("\n");
       write_comment_c(f);
-      f.write_c("int " + std::string(class_name(1)) + "::" + c + "_size = " + std::to_string(uncompressedDataSize) + ";\n");
+      f.write_c("int " + full_class_name() + "::" + c + "_size = " + std::to_string(uncompressedDataSize) + ";\n");
       if (output_format_ == 2) {
         f.write_h(f.indent(1) + "static unsigned char " + c + "[" + std::to_string(nData) + "];\n");
-        f.write_c("unsigned char " + std::string(class_name(1)) + "::" + c + "[" + std::to_string(nData) + "] = /* data compressed and inlined from " + fn + " */\n");
+        f.write_c("unsigned char " + full_class_name() + "::" + c + "[" + std::to_string(nData) + "] = /* data compressed and inlined from " + fn + " */\n");
       } else {
         f.write_h_once("#include <stdint.h>");
         f.write_h_once("#include <vector>");
         f.write_h(f.indent(1) + "static std::vector<uint8_t> " + c + ";\n");
-        f.write_c("std::vector<uint8_t> " + std::string(class_name(1)) + "::" + c + " = /* data compressed and inlined from " + fn + " */\n");
+        f.write_c("std::vector<uint8_t> " + full_class_name() + "::" + c + " = /* data compressed and inlined from " + fn + " */\n");
       }
       if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
       f.write_cdata(fluid::string_view(data, nData));
@@ -1018,12 +1015,12 @@ void Data_Node::write_code1(fluid::io::Code_Writer& f) {
       write_comment_c(f);
       if (output_format_ == 0) {
         f.write_h(f.indent(1) + "static unsigned char " + c + "[" + std::to_string(nData) + "];\n");
-        f.write_c("unsigned char " + std::string(class_name(1)) + "::" + c + "[" + std::to_string(nData) + "] = /* data inlined from " + fn + " */\n");
+        f.write_c("unsigned char " + full_class_name() + "::" + c + "[" + std::to_string(nData) + "] = /* data inlined from " + fn + " */\n");
       } else {
         f.write_h_once("#include <stdint.h>");
         f.write_h_once("#include <vector>");
         f.write_h(f.indent(1) + "static std::vector<uint8_t> " + c + ";\n");
-        f.write_c("std::vector<uint8_t> " + std::string(class_name(1)) + "::" + c + " = /* data inlined from " + fn + " */\n");
+        f.write_c("std::vector<uint8_t> " + full_class_name() + "::" + c + " = /* data inlined from " + fn + " */\n");
       }
       if (message) f.write_c("#error " + std::string(message) + " " + fn + "\n");
       f.write_cdata(fluid::string_view(data, nData));
@@ -1492,9 +1489,8 @@ void Class_Node::open() {
  Write the header code that declares this class.
  */
 void Class_Node::write_code1(fluid::io::Code_Writer& f) {
-  parent_class = current_class;
-  current_class = this;
-  write_public_state = 0;
+  f.class_stack.push_back(this);
+  write_public_state = 0; // private:
   f.write_h("\n");
   write_comment_h(f);
   if (!prefix().empty())
@@ -1512,6 +1508,6 @@ void Class_Node::write_code1(fluid::io::Code_Writer& f) {
  */
 void Class_Node::write_code2(fluid::io::Code_Writer& f) {
   f.write_h("};\n");
-  current_class = parent_class;
+  f.class_stack.pop_back();
 }
 

@@ -1,7 +1,7 @@
 //
 // Support for Cairo graphics for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 2021-2024 by Bill Spitzak and others.
+// Copyright 2021-2026 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -67,41 +67,6 @@ FL_EXPORT Fl_Fontdesc *fl_fonts = built_in_table;
 // Number of fonts found by Fl::set_fonts(char*) beyond FL_FREE_FONT
 // -1 denotes "not yet initialised"
 Fl_Font Fl_Cairo_Graphics_Driver::font_count_ = -1;
-
-// duplicated from Fl_PostScript.cxx
-struct callback_data {
-  const uchar *data;
-  int D, LD;
-};
-static const int dashes_flat[5][7]={
-{-1,0,0,0,0,0,0},
-{3,1,-1,0,0,0,0},
-{1,1,-1,0,0,0,0},
-{3,1,1,1,-1,0,0},
-{3,1,1,1,1,1,-1}
-};
-static const double dashes_cap[5][7]={
-{-1,0,0,0,0,0,0},
-{2,2,-1,0,0,0,0},
-{0.01,1.99,-1,0,0,0,0},
-{2,2,0.01,1.99,-1,0,0},
-{2,2,0.01,1.99,0.01,1.99,-1}
-};
-static void draw_image_cb(void *data, int x, int y, int w, uchar *buf) {
-  struct callback_data *cb_data;
-  const uchar *curdata;
-
-  cb_data = (struct callback_data*)data;
-  int last = x+w;
-  const size_t aD = abs(cb_data->D);
-  curdata = cb_data->data + x*cb_data->D + y*cb_data->LD;
-  for (; x<last; x++) {
-    memcpy(buf, curdata, aD);
-    buf += aD;
-    curdata += cb_data->D;
-  }
-}
-// end of duplicated part
 
 
 Fl_Cairo_Graphics_Driver::Fl_Cairo_Graphics_Driver() : Fl_Graphics_Driver() {
@@ -1285,32 +1250,58 @@ void Fl_Cairo_Graphics_Driver::font(Fl_Font fnum, Fl_Fontsize s) {
 const char *Fl_Cairo_Graphics_Driver::clean_utf8(const char* str, int &n) {
   static char *utf8_buffer = NULL;
   static int utf8_buffer_len = 0;
-  char *q = utf8_buffer;
+  int q = 0;
   const char *p = str;
-  const char *retval = str;
   int len, len2;
   const char *end = str + n;
-  char buf4[4];
+  char buf6[6];
+  bool use_priv_buffer = false;
   while (p < end) {
     unsigned codepoint = fl_utf8decode(p, end, &len);
-    if (retval != str || (len == 1 &&  *(uchar*)p >= 0x80)) { // switch to using utf8_buffer
-      len2 = fl_utf8encode(codepoint, buf4);
-      if (!utf8_buffer_len || utf8_buffer_len < (q - utf8_buffer) + len2) {
-        utf8_buffer_len += (q - utf8_buffer) + len2 + 1000;
+    bool invalid = (len == 1 && *(uchar*)p >= 0x80);
+
+    // Switch to using utf8_buffer if needed
+    if (!use_priv_buffer && invalid) {
+      // Make room if needed
+      if (utf8_buffer_len < p - str) {
+        utf8_buffer_len = (p - str) + 1000;
         utf8_buffer = (char *)realloc(utf8_buffer, utf8_buffer_len);
       }
-      if (retval == str) {
-        retval = utf8_buffer;
-        q = utf8_buffer;
-        if (p > str) { memcpy(q, str, p - str); q += (p - str); }
+      use_priv_buffer = true;
+      // Fill private buffer with data so far
+      if (p > str) {
+        memcpy(utf8_buffer, str, p - str);
+        q = (p - str);
       }
-      memcpy(q, buf4, len2);
+    }
+
+    if (use_priv_buffer) {
+      if (invalid) {
+        len2 = fl_utf8encode(codepoint, buf6);
+      } else {
+        memcpy(buf6, p, len);
+        len2 = len;
+      }
+
+      // Increase buffer if needed
+      if (utf8_buffer_len < q + len2) {
+        utf8_buffer_len = q + len2 + 1000;
+        utf8_buffer = (char *)realloc(utf8_buffer, utf8_buffer_len);
+      }
+
+      // Copy decoded codepoint
+      memcpy(utf8_buffer + q, buf6, len2);
       q += len2;
     }
     p += len;
   }
-  if (retval != str) n = q - retval;
-  return retval;
+
+  if (use_priv_buffer) {
+    n = q;
+    return utf8_buffer;
+  }
+
+  return str;
 }
 
 
