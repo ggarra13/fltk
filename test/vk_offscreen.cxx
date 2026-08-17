@@ -545,7 +545,6 @@ void vk_offscreen_window::destroy_mesh()
 
 void vk_offscreen_window::destroy()
 {
-    DBG;
     if (device() == VK_NULL_HANDLE)
         return;
 
