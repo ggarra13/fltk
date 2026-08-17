@@ -1168,6 +1168,7 @@ void Fl_Vk_Window::shutdown_vulkan() {
                                              nullptr);
       }
 
+      std::cerr << "destroy instance" << std::endl;
       vkDestroyInstance(m_instance, nullptr);
       m_instance = VK_NULL_HANDLE;
     }
