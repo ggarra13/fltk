@@ -664,7 +664,7 @@ static double key_repeat_interval = 0.05;  // sec
 // sitting unprocessed rather than having failed to occur. In that case it's
 // safer to skip this repeat than to risk injecting a spurious FL_KEYDOWN for
 // a key that has, physically, already been released.
-static const double key_repeat_late_tolerance = 0.15; // sec
+static const double key_repeat_late_tolerance = 0.05; // sec
 
 static double monotonic_now() {
   struct timespec ts;
