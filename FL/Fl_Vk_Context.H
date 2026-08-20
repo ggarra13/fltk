@@ -47,22 +47,22 @@ struct Fl_Vk_Context
     VkPhysicalDevice   gpu;
     VkPhysicalDeviceProperties gpu_props;
     VkPhysicalDeviceFeatures gpu_features;
-    
+
     VkDevice           device;   // created once and filled later from Fl_Vk_Window_Driver
-    VkPipelineCache    pipelineCache; 
+    VkPipelineCache    pipelineCache;
 
     VkQueueFamilyProperties* queue_props;
     Fl_Vk_Queue*      safe_thread_queue;
     uint32_t                queue_count;
     uint32_t           queueFamilyIndex;
-    
+
     VkCommandPool           commandPool;  // memory for command buffers
 
     VkFormat                     format;   // for depth and color formats
     VkColorSpaceKHR          colorSpace; // sRGB, HDR10 or HLG for example
 
     VmaAllocator             allocator;
-    
+
     // List of enabled layers
     std::vector<const char*> enabled_layers;
 
@@ -84,7 +84,7 @@ struct Fl_Vk_Context
     PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask;
     PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask;
     // !@}
-    
+
     // Thread safe queue (use lock_guard on mutex when submitting)
     VkQueue& queue() { return safe_thread_queue->queue; }
     std::mutex& queue_mutex() { return safe_thread_queue->mutex; }
@@ -109,9 +109,6 @@ struct Fl_Vk_Context
 
     void destroy()
         {
-            VkResult result = vkDeviceWaitIdle(device);
-            VK_CHECK(result);
-            
             if (pipelineCache != VK_NULL_HANDLE)
             {
                 vkDestroyPipelineCache(device, pipelineCache, nullptr);
