@@ -1136,18 +1136,43 @@ void Fl_Vk_Window::shutdown_vulkan() {
       if (m_allocator != VK_NULL_HANDLE)
       {
 #ifndef NDEBUG
+
+        std::string file;
+#ifdef _WIN32
+        const char* tmppath = nullptr;
+        tmppath = fl_getenv("TMP");
+        if (tmppath)
+        {
+            file = tmppath;
+        }
+        else if (tmppath = fl_getenv("TEMP"))
+        {
+            file = tmppath;
+        }
+        else
+        {
+            file = "C:";
+        }
+        file += "\\vma_dump.json";
+#else
+        file = "/tmp/vma_dump.json";
+#endif
+        std::cout << "Saving VMA allocator dump to " << file << std::endl;
+
+
         char* statsString;
 
         // VK_TRUE gives you the detailed breakdown of every single allocation
         vmaBuildStatsString(m_allocator, &statsString, VK_TRUE);
 
         // Write the dump to a file (it can be very large)
-        std::ofstream out("/tmp/vma_dump.json");
+        std::ofstream out(file);
         if (out.is_open()) {
           out << statsString;
           out.close();
         }
 
+        // Free the stats string.
         vmaFreeStatsString(m_allocator, statsString);
 #endif
 
