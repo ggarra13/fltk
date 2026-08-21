@@ -702,6 +702,25 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 #   define VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME "VK_KHR_get_physical_device_properties2"
 #endif
 
+    // VK_KHR_video_queue supplies the queue-family video-capability query
+    // (vkGetPhysicalDeviceQueueFamilyProperties2 + VkQueueFamilyVideoPropertiesKHR)
+    // and VK_KHR_video_decode_queue supplies vkCmdDecodeVideoKHR itself. Both
+    // must be present and enabled together for video decode to be usable;
+    // codec-specific extensions (VK_KHR_video_decode_h264/h265/av1) are
+    // deliberately not checked here since which of those are needed depends
+    // on what the caller (e.g. FFmpeg) actually decodes.
+#ifndef VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
+#   define VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME "VK_KHR_synchronization2"
+#endif
+#ifndef VK_KHR_VIDEO_QUEUE_EXTENSION_NAME
+#   define VK_KHR_VIDEO_QUEUE_EXTENSION_NAME "VK_KHR_video_queue"
+#endif
+#ifndef VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME
+#   define VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME "VK_KHR_video_decode_queue"
+#endif
+    bool videoQueueExtFound = false;
+    bool videoDecodeQueueExtFound = false;
+
     if (device_extension_count > 0)
     {
         VkExtensionProperties *device_extensions =
@@ -721,10 +740,34 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
                 pWindow->ctx.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
             }
 
+            if (!strcmp(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+            }
+
+            if (!strcmp(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+                videoQueueExtFound = true;
+            }
+
+            if (!strcmp(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+                videoDecodeQueueExtFound = true;
+            }
+
 #ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
             FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
             FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #endif
+        }
+
+        if (videoQueueExtFound && videoDecodeQueueExtFound)
+        {
+            pWindow->ctx.device_extensions.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+            pWindow->ctx.device_extensions.push_back(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
+            pWindow->ctx.device_extensions.push_back(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME);
         }
 
         auto wanted_device_extensions = pWindow->get_device_extensions();
@@ -770,6 +813,58 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 
     vkGetPhysicalDeviceFeatures(pWindow->gpu(), &pWindow->ctx.gpu_features);
 
+    // Steps 2-4: find a video-decode-capable queue family, preferring one
+    // dedicated to video decode (no GRAPHICS/COMPUTE bits) over one that
+    // also does graphics/compute. Which specific queue we'll actually use
+    // within the chosen family, and whether it ends up shared with the
+    // graphics queue, is decided later in create_device() once the
+    // graphics/present family is also known.
+    if (videoQueueExtFound && videoDecodeQueueExtFound)
+    {
+        std::vector<VkQueueFamilyProperties2> qfp2(pWindow->ctx.queue_count);
+        std::vector<VkQueueFamilyVideoPropertiesKHR> videoProps(pWindow->ctx.queue_count);
+        for (uint32_t q = 0; q < pWindow->ctx.queue_count; q++)
+        {
+            videoProps[q] = {};
+            videoProps[q].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_VIDEO_PROPERTIES_KHR;
+            qfp2[q] = {};
+            qfp2[q].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+            qfp2[q].pNext = &videoProps[q];
+        }
+
+        uint32_t qc = pWindow->ctx.queue_count;
+        vkGetPhysicalDeviceQueueFamilyProperties2(pWindow->gpu(), &qc, qfp2.data());
+
+        uint32_t bestIdx = UINT32_MAX;
+        bool     bestDedicated = false;
+        for (uint32_t q = 0; q < qc; q++)
+        {
+            VkQueueFlags flags = qfp2[q].queueFamilyProperties.queueFlags;
+            if (!(flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)) continue;
+            if (videoProps[q].videoCodecOperations == 0) continue; // sanity guard
+
+            bool dedicated = (flags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) == 0;
+
+            // Step 3/4: keep the first candidate found; only switch to a
+            // later one if it's dedicated and our current pick isn't.
+            if (bestIdx == UINT32_MAX || (dedicated && !bestDedicated))
+            {
+                bestIdx = q;
+                bestDedicated = dedicated;
+            }
+        }
+
+        if (bestIdx != UINT32_MAX)
+        {
+            Fl_Vk_Video_Queue_Family family;
+            family.idx = (int32_t)bestIdx;
+            family.num = 0; // finalized in create_device() once queues are allocated
+            family.flags = qfp2[bestIdx].queueFamilyProperties.queueFlags;
+            family.video_caps = videoProps[bestIdx].videoCodecOperations;
+            pWindow->ctx.video_decode_queue_families.push_back(family);
+        }
+    }
+
 }
 
 void Fl_Vk_Window_Driver::create_device()
@@ -805,19 +900,77 @@ void Fl_Vk_Window_Driver::create_device()
     // So you can modify them like this:
     deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
 
-    float queue_priorities = 1.0;
-    VkDeviceQueueCreateInfo queueCreateInfo = {};
-    queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueCreateInfo.pNext = NULL;
-    queueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
-    queueCreateInfo.queueCount = 1;
-    queueCreateInfo.pQueuePriorities = &queue_priorities;
+    // Steps 5-6: decide how the video decode queue (if any was found by
+    // init_vk()) relates to the graphics queue family chosen just before
+    // this call. Three cases:
+    //  a) video decode family != graphics family -> fully separate queue,
+    //     queue index 0 of its own family.
+    //  b) same family, and that family has more than one queue available ->
+    //     request a 2nd queue from the family so decode gets its own queue.
+    //  c) same family with only one queue total -> must share queue 0 with
+    //     graphics; synchronized via the shared Fl_Vk_Queue mutex.
+    bool     haveVideoDecode = !pWindow->ctx.video_decode_queue_families.empty();
+    int32_t  videoDecodeFamilyIndex = -1;
+    uint32_t videoDecodeQueueIndex = 0;
+    bool     videoDecodeSharesGraphicsQueue = false;
+
+    if (haveVideoDecode)
+    {
+        Fl_Vk_Video_Queue_Family &vf = pWindow->ctx.video_decode_queue_families[0];
+        videoDecodeFamilyIndex = vf.idx;
+
+        if (videoDecodeFamilyIndex != (int32_t)m_queueFamilyIndex)
+        {
+            // (a) separate family entirely.
+            videoDecodeQueueIndex = 0;
+        }
+        else
+        {
+            uint32_t familyQueueCount = pWindow->ctx.queue_props[vf.idx].queueCount;
+            if (familyQueueCount > 1)
+            {
+                // (b) same family, a spare queue is available.
+                videoDecodeQueueIndex = 1;
+            }
+            else
+            {
+                // (c) only one queue in this family - must share.
+                videoDecodeQueueIndex = 0;
+                videoDecodeSharesGraphicsQueue = true;
+            }
+        }
+    }
+
+    // At most 2 queues are ever requested from the graphics family: one for
+    // graphics/present, and a second only in case (b) above.
+    float queue_priorities[2] = { 1.0, 1.0 };
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+    VkDeviceQueueCreateInfo graphicsQueueCreateInfo = {};
+    graphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    graphicsQueueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
+    graphicsQueueCreateInfo.queueCount =
+        (haveVideoDecode && videoDecodeFamilyIndex == (int32_t)m_queueFamilyIndex &&
+         videoDecodeQueueIndex == 1) ? 2 : 1;
+    graphicsQueueCreateInfo.pQueuePriorities = queue_priorities;
+    queueCreateInfos.push_back(graphicsQueueCreateInfo);
+
+    if (haveVideoDecode && videoDecodeFamilyIndex != (int32_t)m_queueFamilyIndex)
+    {
+        VkDeviceQueueCreateInfo videoQueueCreateInfo = {};
+        videoQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        videoQueueCreateInfo.queueFamilyIndex = (uint32_t)videoDecodeFamilyIndex;
+        videoQueueCreateInfo.queueCount = 1;
+        videoQueueCreateInfo.pQueuePriorities = queue_priorities;
+        queueCreateInfos.push_back(videoQueueCreateInfo);
+    }
 
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceInfo.pNext = &deviceFeatures2;
-    deviceInfo.queueCreateInfoCount = 1;
-    deviceInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
+    deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
     deviceInfo.enabledLayerCount = pWindow->ctx.enabled_layers.size();
     deviceInfo.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
     deviceInfo.enabledExtensionCount = pWindow->ctx.device_extensions.size();
@@ -827,6 +980,32 @@ void Fl_Vk_Window_Driver::create_device()
     VK_CHECK(result);
 
     vkGetDeviceQueue(m_device, m_queueFamilyIndex, 0, &m_queue);
+
+    if (haveVideoDecode)
+    {
+        Fl_Vk_Video_Queue_Family &vf = pWindow->ctx.video_decode_queue_families[0];
+        vf.num = 1; // exactly one queue is ever used for video decode
+
+        if (videoDecodeSharesGraphicsQueue)
+        {
+            // Reuse the *same* Fl_Vk_Queue wrapper as the graphics queue so
+            // submissions - ours or FFmpeg's - serialize through one mutex
+            // rather than racing on the shared VkQueue. pWindow->m_queue's
+            // .queue field is filled in by the caller right after this
+            // function returns; aliasing the pointer here is fine since
+            // both windows onto it resolve after that assignment.
+            pWindow->ctx.safe_thread_video_decode_queue = pWindow->m_queue;
+        }
+        else
+        {
+            VkQueue videoQueue = VK_NULL_HANDLE;
+            vkGetDeviceQueue(m_device, (uint32_t)videoDecodeFamilyIndex,
+                             videoDecodeQueueIndex, &videoQueue);
+            Fl_Vk_Queue *wrapper = new Fl_Vk_Queue();
+            wrapper->queue = videoQueue;
+            pWindow->ctx.safe_thread_video_decode_queue = wrapper;
+        }
+    }
 }
 
 void Fl_Vk_Window_Driver::init_colorspace() {
