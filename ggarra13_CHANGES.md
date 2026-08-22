@@ -23,3 +23,6 @@ File libdecor/src/plugins/gtk/libdecor-gtk.c, added:
 #endif
 
 
+File src/drivers/Wayland/Fl_Wayland_Screen_Driver.cxx, added:
+
+monotonic due date for key repetitions.  Fixes key repeats when feedback takes too long.
