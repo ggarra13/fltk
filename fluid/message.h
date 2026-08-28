@@ -31,13 +31,14 @@ extern void fluid_message(const char *fmt, ...);
 extern void fluid_message(const char *fmt, va_list ap);
 extern int fluid_choice(const char *fmt, const char *b0, const char *b1, const char *b2, ...);
 extern int fluid_choice(const char *fmt, const char *b0, const char *b1, const char *b2, va_list ap);
+extern int fluid_choice(const char *title, const char *fmt, const char *b0, const char *b1, const char *b2, va_list ap);
 // fl_input
 
 namespace fluid {
 
 namespace msg {
 
-using Option = struct { const std::string &label; char key; };
+using Option = struct Option { const std::string &label; char key; };
 constexpr int CLOSE = -2;
 constexpr int ESC = -1;
 constexpr int ABORT = 0;
@@ -50,7 +51,8 @@ void alert(const std::string &title, const std::string &message);
 int error_choice(const std::string &title, const std::string &message);
 int choice(const std::string &title, const std::string &message,
     const std::vector<msg::Option> &option);
-
+int big_choice(const std::string &title, const std::string &message,
+    const std::vector<msg::Option> &option);
 } // namespace fluid
 
 #endif // FLUID_MESSAGE_H

@@ -66,11 +66,18 @@ int Fl_Scrollbar::handle(int event) {
   int area;
   int X=x(); int Y=y(); int W=w(); int H=h();
 
-  // adjust slider area to be inside the arrow buttons:
+  // Adjust slider area to be inside the arrow buttons
+  // Don't draw tiny buttons (less than 7 pixels)
   if (horizontal()) {
-    if (W >= 3*H) {X += H; W -= 2*H;}
+    if ((W >= 3*H) && (H >= 7)) {
+      X += H;
+      W -= 2*H;
+    }
   } else {
-    if (H >= 3*W) {Y += W; H -= 2*W;}
+    if ((H >= 3*W) && (W >= 7)) {
+      Y += W;
+      H -= 2*W;
+    }
   }
 
   // which widget part is highlighted?
@@ -130,14 +137,24 @@ int Fl_Scrollbar::handle(int event) {
     return Fl_Slider::handle(event, X,Y,W,H);
   case FL_MOUSEWHEEL :
     if (horizontal()) {
-      if (Fl::e_dx==0) return 0;
+      // use hires scrolling input and map it to scrollbar line resolution
+      if (Fl::e_dx_f==0.0f) return 0;
+      // map pixel scrolling to line scrolling
       int ls = maximum()>=minimum() ? linesize_ : -linesize_;
-      handle_drag(clamp(value() + ls * Fl::e_dx));
+      scroll_err_ += Fl::e_dx_f * ls;
+      float dxi = floorf(scroll_err_);
+      scroll_err_ -= dxi;
+      handle_drag(clamp(value() + int(dxi)));
       return 1;
     } else {
-      if (Fl::e_dy==0) return 0;
+      // use hires scrolling input and map it to scrollbar line resolution
+      if (Fl::e_dy_f==0.0f) return 0;
+      // map pixel scrolling to line scrolling
       int ls = maximum()>=minimum() ? linesize_ : -linesize_;
-      handle_drag(clamp(value() + ls * Fl::e_dy));
+      scroll_err_ += Fl::e_dy_f * ls;
+      float dyi = floorf(scroll_err_);
+      scroll_err_ -= dyi;
+      handle_drag(clamp(value() + int(dyi)));
       return 1;
     }
   case FL_SHORTCUT:
@@ -208,7 +225,9 @@ void Fl_Scrollbar::draw() {
     inset = 1;
 
   if (horizontal()) {
-    if (W < 3*H) {
+    // If the slider is relatively short, or the buttons would be tiny, just
+    // draw the slider itself and no left/right buttons
+    if ((W < 3*H) || (H < 7)) {
       Fl_Slider::draw(X, Y, W, H);
       return;
     }
@@ -228,7 +247,9 @@ void Fl_Scrollbar::draw() {
       fl_draw_arrow(ab, FL_ARROW_SINGLE, FL_ORIENT_RIGHT, arrowcolor); // right arrow
     }
   } else { // vertical
-    if (H < 3*W) {
+    // If the slider is relatively short, or the buttons would be tiny, just
+    // draw the slider itself and no up/down buttons
+    if ((H < 3*W) || (W < 7)) {
       Fl_Slider::draw(X, Y, W, H);
       return;
     }

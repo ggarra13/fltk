@@ -25,6 +25,8 @@
 #include "Fl_Screen_Driver.H"
 #include "flstring.h"
 
+#include <algorithm> // std::min/max
+
 static int fl_match(const char *a, const char *s, int atleast = 1) {
   const char *b = s;
   while (*a && (*a == *b || fl_ascii_tolower(*a) == *b)) {a++; b++;}
@@ -41,6 +43,8 @@ static const char *title;
 extern const char *fl_fg;
 extern const char *fl_bg;
 extern const char *fl_bg2;
+// user selected application scaling
+float fl_scaling_factor = 1.0f;
 
 /**
   Parse a single switch from \p argv, starting at word \p i.
@@ -206,6 +210,12 @@ int Fl::arg(int argc, char **argv, int &i) {
   } else if (fl_match(s, "fg", 2) || fl_match(s, "foreground", 10)) {
     fl_fg = v;
 
+  } else if (fl_match(s, "scaling", 2) || fl_match(s, "scaling_factor", 14)) {
+    float f = (float)atof(v);
+    if ((f == 0.0f) && (v[0] < '0' || v[0] > '9')) // invalid number
+      f = 1.0f; // default to 1.0
+    fl_scaling_factor = std::min(std::max(f, 0.25f), 4.0f); // clamp to [0.25, 4.0]
+
   } else if (fl_match(s, "scheme", 1)) {
     Fl::scheme(v);
 
@@ -349,6 +359,7 @@ static const char * const helpmsg =
 " -nok[bd]\n"
 " -not[ooltips]\n"
 " -s[cheme] scheme\n"
+" -scaling[_factor] (0.25...4.0)\n"
 " -ti[tle] windowtitle\n"
 " -to[oltips]";
 

@@ -28,6 +28,8 @@
 #include <FL/filename.H>
 
 #include <string>
+#include <exception>
+#include <stdexcept>
 
 constexpr int BROWSERWIDTH = 300;
 constexpr int BROWSERHEIGHT = 500;
@@ -53,6 +55,23 @@ class Layout_List;
 namespace widget {
 class App_Menu_Bar;
 }
+
+
+class Exception : public std::runtime_error {
+public:
+  explicit Exception(const std::string& msg) : std::runtime_error(msg) {}
+};
+
+class UserCanceledException : public Exception {
+public:
+  UserCanceledException() : Exception("Operation cancelled by user") {}
+};
+
+class ReadException : public Exception {
+public:
+  explicit ReadException(const std::string& msg) : Exception("Read error: " + msg) {}
+};
+
 
 /**
  Indicate the storage location for tools like layout suites and shell macros.

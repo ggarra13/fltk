@@ -127,7 +127,7 @@ class Overlay_Window : public Fl_Overlay_Window {
   void draw_overlay() override;
   static void close_cb(Overlay_Window *self, void*);
 public:
-  Window_Node *window;
+  Window_Node *window = nullptr;
   int handle(int) override;
   Overlay_Window(int W,int H) : Fl_Overlay_Window(W,H) {
     Fl_Group::current(nullptr);
@@ -239,8 +239,32 @@ Node *Window_Node::make(Strategy strategy) {
     p = p->parent;
   }
   if (!p) {
-    fluid_message("Please select a function");
-    return nullptr;
+    if (strategy.source() == Strategy::FROM_FILE) {
+      return nullptr; // trigger a file read error
+    }
+    int ret = fluid::big_choice(
+      "Fluid: Window Container Required",
+      "A Window can only be created inside a Function or a Widget Class container.\n\n"
+      "Would you like to create a new container or select an existing one?",
+      {
+        {"Create a &Function and add the window", 'f'},
+        {"Create a &Widget Class and add the window", 'w'},
+        {"&Cancel and let me select an existing container", 'c'}
+      } );
+    switch (ret) {
+      case 0:
+        p = add_new_widget_from_user("function", Strategy::AFTER_CURRENT, false);
+        Fluid.proj.tree.current = anchor = p;
+        strategy.placement(Strategy::AS_LAST_CHILD);
+        break;
+      case 1:
+        p = add_new_widget_from_user("widget_class", Strategy::AFTER_CURRENT, true);
+        Fluid.proj.tree.current = anchor = p;
+        strategy.placement(Strategy::AS_LAST_CHILD);
+        break;
+      default:
+        return nullptr;
+    }
   }
   Window_Node *myo = new Window_Node();
   if (!this->o) {// template widget

@@ -85,6 +85,9 @@ enum class State {
  */
 struct Menu_State
 {
+  // true for tall (non-sub-)menu positioned by constraints (e.g., Wayland)
+  bool is_huge = false;
+
   // menu item under the mouse pinter or selected by keyboard, or nullptr
   const Fl_Menu_Item* current_item = nullptr;
 
@@ -297,6 +300,9 @@ public:
 
   // Scroll so item i is visible on screen. This may move the entire window..
   void autoscroll(item_index_t i);
+
+  // Scroll the window up or down by the given number of pixels if parts are offscreen.
+  void scroll(int dy_pixels);
 
   // Also reposition the title (relative to the parent_ window?)
   void position(int x, int y);
@@ -613,10 +619,10 @@ int Menu_State::handle_mouse_events(int e) {
     case FL_RELEASE:
       // Mouse must either be held down/dragged some, or this must be
       // the second click (not the one that popped up the menu):
-      if (   !Fl::event_is_click()
-          || state == State::PUSHED
+      if (   !Fl::event_is_click() || ((!is_huge) && (
+           state == State::PUSHED
           || (in_menubar && current_item && !current_item->submenu()) // button
-          ) {
+          ))) {
 #if 0 // makes the check/radio items leave the menu up
         const Fl_Menu_Item* m = current_item;
         if (m && button && (m->flags & (FL_MENU_TOGGLE|FL_MENU_RADIO))) {
@@ -629,6 +635,7 @@ int Menu_State::handle_mouse_events(int e) {
                                    (!current_item->submenu() || current_item->callback_ || (in_menubar && current_menu_ix <= 0))))
             state = State::DONE;
       }
+      is_huge = false;
       return 1;
   }
   return 0;
@@ -932,6 +939,12 @@ int Menu_Window::handle(int e) {
   return ret;
 }
 
+
+static void after_show(Menu_Window *win) {
+  win->handle(FL_ENTER);
+}
+
+
 /* Window event handling implementation.
  \param[in] e event number
  \return 1 if the event was used
@@ -946,12 +959,35 @@ int Menu_Window::handle_part1(int e) {
       if (pp.handle_shortcut()) return 1;
       break;
     case FL_MOVE:
+      menu_state->is_huge = false;
     case FL_ENTER:
     case FL_PUSH:
     case FL_DRAG:
     case FL_RELEASE:
       if (pp.handle_mouse_events(e)) return 1;
       break;
+    case FL_SHOW: {
+      int retval = Fl_Window::handle(e);
+      if (!Fl::screen_driver()->screen_boundaries_known() &&
+          !Fl_Window_Driver::menu_leftorigin(this)) {
+        int HH;
+        Fl_Window_Driver::menu_parent(&HH);
+        if (h() > HH) {
+          wait_for_expose();
+          menu_state->is_huge = true;
+          Fl::add_timeout(0., (Fl_Timeout_Handler)after_show, this);
+        }
+      }
+      return retval;
+    }
+    case FL_MOUSEWHEEL:
+      // if (pp.current_menu_ix >= 0 && pp.current_menu_ix < pp.num_menus &&
+      //     pp.menu_window[pp.current_menu_ix] == this) {
+      if (Fl::event_x_root() >= x() && Fl::event_x_root() < x()+w() &&
+          Fl::event_y_root() >= y() && Fl::event_y_root() < y()+h()) {
+        scroll(static_cast<int>(Fl::event_dy_f() * -10.0));
+        return 1;
+      }
   }
   return Fl_Window::handle(e);
 }
@@ -1059,6 +1095,37 @@ void Menu_Window::autoscroll(item_index_t n) {
   }
   Fl_Window_Driver::driver(this)->reposition_menu_window(x(), y()+Y);
   // y(y()+Y); // don't wait for response from X
+}
+
+/**
+ * Scroll the window up or down by the given number of pixels if parts are offscreen.
+ * \param[in] dy_pixels number of pixels to scroll
+ */
+void Menu_Window::scroll(int dy_pixels) {
+  int scr_y, scr_h;
+  int xx, ww;
+  int Y = y() + dy_pixels;
+
+  Fl_Window_Driver::driver(this)->menu_window_area(xx, scr_y, ww, scr_h, this->screen_num());
+  if (dy_pixels > 0) {
+    // We can only move the menu window down if the top is above the top of the screen
+    if (y() >= scr_y) return;
+    // Don't move the window lower than the top boundary of the screen
+    if (Y > scr_y) Y = scr_y;
+  } else {
+    // We can only move the menu window up if the bottom is below the bottom of the screen
+    if (y() + h() <= scr_y + scr_h) return;
+    // Don't move the window higher than the bottom boundary of the screen
+    if (Y + h() < scr_y + scr_h) {
+      Y = scr_y + scr_h - h();
+    }
+  }
+  Fl_Window_Driver::driver(this)->reposition_menu_window(x(), Y);
+  Menu_State &pp = *menu_state;
+  int ix = find_selected(Fl::event_x_root(), Fl::event_y_root());
+  if (ix >= 0) {
+    pp.set_current_item(pp.current_menu_ix, ix);
+  }
 }
 
 /* Set the position of this menu and its title window. */
