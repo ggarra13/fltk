@@ -52,7 +52,6 @@
 #include <poll.h>
 #include <errno.h>
 #include <string.h> // for strerror()
-#include <time.h> // for clock_gettime() used by monotonic_now()
 #include <math.h> // floorf()
 #include <map>
 
@@ -683,40 +682,15 @@ static void wl_keyboard_enter(void *data, struct wl_keyboard *wl_keyboard,
 struct key_repeat_data_t {
   uint32_t serial;
   Fl_Window *window;
-  double due; // monotonic time (seconds) at which this repeat was expected to fire
 };
 
 static double key_repeat_delay = 0.5; // sec
 static double key_repeat_interval = 0.05;  // sec
 
-// Allowed slack between when a repeat was scheduled to fire and when it
-// actually does. If the timer fires later than this, the whole event loop
-// (not just this timeout) was stalled -- e.g. by synchronous decode work in
-// an app's playback path -- meaning a real key-up for this key may simply be
-// sitting unprocessed rather than having failed to occur. In that case it's
-// safer to skip this repeat than to risk injecting a spurious FL_KEYDOWN for
-// a key that has, physically, already been released.
-static const double key_repeat_late_tolerance = 0.05; // sec
-
-static double monotonic_now() {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return ts.tv_sec + ts.tv_nsec / 1e9;
-}
-
 
 static void key_repeat_timer_cb(key_repeat_data_t *key_repeat_data) {
   if (last_keydown_serial == key_repeat_data->serial && key_repeat_interval > 0) {
-    double late = monotonic_now() - key_repeat_data->due;
-    if (late > key_repeat_late_tolerance) {
-#if (DEBUG_KEYBOARD)
-      fprintf(stderr, "[SYNTH-REPEAT] SKIPPED (event loop stalled, %.3fs late) serial=%u\n",
-              late, key_repeat_data->serial);
-#endif
-    } else {
-      Fl::handle(FL_KEYDOWN, key_repeat_data->window);
-    }
-    key_repeat_data->due += key_repeat_interval;
+    Fl::handle(FL_KEYDOWN, key_repeat_data->window);
     Fl::add_timeout(key_repeat_interval, (Fl_Timeout_Handler)key_repeat_timer_cb, key_repeat_data);
   }
   else delete key_repeat_data;
@@ -955,7 +929,6 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     key_repeat_data_t *key_repeat_data = new key_repeat_data_t;
     key_repeat_data->serial = serial;
     key_repeat_data->window = win;
-    key_repeat_data->due = monotonic_now() + key_repeat_delay;
     last_keydown_serial = serial;
     Fl::add_timeout(key_repeat_delay, (Fl_Timeout_Handler)key_repeat_timer_cb,
                     key_repeat_data);
@@ -2252,6 +2225,7 @@ int Fl_Wayland_Screen_Driver::poll_or_select_with_delay(double time_to_wait) {
   if (libdecor_context && libdecor_dispatch(libdecor_context, 0) > 0) return 1;
   return Fl_Unix_Screen_Driver::poll_or_select_with_delay(time_to_wait);
 }
+
 
 // like Fl_Wayland_Screen_Driver::poll_or_select_with_delay(0.0) except no callbacks are done:
 int Fl_Wayland_Screen_Driver::poll_or_select() {
