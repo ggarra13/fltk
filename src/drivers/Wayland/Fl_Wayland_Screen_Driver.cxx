@@ -52,6 +52,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <string.h> // for strerror()
+#include <time.h> // for clock_gettime() used by monotonic_now()
 #include <math.h> // floorf()
 #include <map>
 
