@@ -43,7 +43,7 @@ void I18n::reset() {
 
 void I18n::read(io::Project_Reader &f, const char *key) {
   if (!strcmp(key, "i18n_type")) {
-    type = static_cast<fluid::I18n_Type>(atoi(f.read_word()));
+    type = static_cast<fluid::I18n_Type>(atoi(f.read_word().c_str()));
   } else if (!strcmp(key, "i18n_gnu_function")) {
     gnu_function = f.read_word();
   } else if (!strcmp(key, "i18n_gnu_static_function")) {

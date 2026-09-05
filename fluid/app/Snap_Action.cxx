@@ -260,14 +260,12 @@ void Layout_Preset::write(fluid::io::Project_Writer *out) {
  Read presets from an .fl project file.
  */
 void Layout_Preset::read(fluid::io::Project_Reader *in) {
-  const char *key;
-  key = in->read_word(1);
-  if (key && !strcmp(key, "{")) {
+  std::string key = in->read_word(1);
+  if (key == "{") {
     for (;;) {
       key = in->read_word();
-      if (!key) return;
-      if (key[0] == '}') break;
-      int ver = atoi(key);
+      if (key == "}") break;
+      int ver = atoi(key.c_str());
       if (ver == 0) {
         continue;
       } else if (ver == 1) {
@@ -302,7 +300,7 @@ void Layout_Preset::read(fluid::io::Project_Reader *in) {
       } else { // skip unknown chunks
         for (;;) {
           key = in->read_word(1);
-          if (key && (key[0] == '}'))
+          if (key == "}")
             return;
         }
       }
@@ -369,19 +367,17 @@ void Layout_Suite::write(fluid::io::Project_Writer *out) {
  Read a presets suite from an .fl project file.
  */
 void Layout_Suite::read(fluid::io::Project_Reader *in) {
-  const char *key;
-  key = in->read_word(1);
-  if (key && !strcmp(key, "{")) {
+  std::string key = in->read_word(1);
+  if (key == "{") {
     int ix = 0;
     for (;;) {
       key = in->read_word();
-      if (!key) return;
-      if (!strcmp(key, "name")) {
-        name(in->read_word());
-      } else if (!strcmp(key, "preset")) {
+      if (key == "name") {
+        name(in->read_word().c_str());
+      } else if (key == "preset") {
         if (ix >= 3) return; // file format error
         layout[ix++]->read(in);
-      } else if (!strcmp(key, "}")) {
+      } else if (key == "}") {
         break;
       } else {
         in->read_word(); // unknown key, ignore, hopefully a key-value pair
@@ -747,25 +743,23 @@ void Layout_List::write(fluid::io::Project_Writer *out) {
  Read Suite and Layout selection and project layout data from an .fl project file.
  */
 void Layout_List::read(fluid::io::Project_Reader *in) {
-  const char *key;
-  key = in->read_word(1);
-  if (key && !strcmp(key, "{")) {
+  std::string key = in->read_word(1);
+  if (key == "{") {
     std::string cs;
     int cp = 0;
     for (;;) {
       key = in->read_word();
-      if (!key) return;
-      if (!strcmp(key, "ver")) {
+      if (key == "ver") {
         in->read_int();
-      } else if (!strcmp(key, "current_suite")) {
+      } else if (key == "current_suite") {
         cs = in->read_word();
-      } else if (!strcmp(key, "current_preset")) {
+      } else if (key == "current_preset") {
         cp = in->read_int();
-      } else if (!strcmp(key, "suite")) {
+      } else if (key == "suite") {
         int n = add(in->filename_name().c_str());
         list_[n].read(in);
         list_[n].storage(fluid::Tool_Store::PROJECT);
-      } else if (!strcmp(key, "}")) {
+      } else if (key == "}") {
         break;
       } else {
         in->read_word(); // unknown key, ignore, hopefully a key-value pair

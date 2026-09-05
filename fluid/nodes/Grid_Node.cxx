@@ -410,15 +410,15 @@ void Grid_Node::read_property(fluid::io::Project_Reader &f, const std::string& c
   Fl_Grid* grid = (Fl_Grid*)o;
   if (c == "dimensions") {
     int rows = 3, cols = 3;
-    if (sscanf(f.read_word(),"%d %d", &rows, &cols) == 2)
+    if (sscanf(f.read_word().c_str(),"%d %d", &rows, &cols) == 2)
       grid->layout(rows, cols);
   } else if (c == "margin") {
     int lm, tm, rm, bm;
-    if (sscanf(f.read_word(),"%d %d %d %d", &lm, &tm, &rm, &bm) == 4)
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d", &lm, &tm, &rm, &bm) == 4)
       grid->margin(lm, tm, rm, bm);
   } else if (c == "gap") {
     int rg, cg;
-    if (sscanf(f.read_word(),"%d %d", &rg, &cg) == 2)
+    if (sscanf(f.read_word().c_str(),"%d %d", &rg, &cg) == 2)
       grid->gap(rg, cg);
   } else if (c == "rowheights") {
     int rows = grid->rows();
@@ -511,29 +511,27 @@ void Grid_Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, 
   Fl_Widget *child_widget = ((Widget_Node*)child)->o;
   if (property == "location") {
     int row = -1, col = -1;
-    const char *value = f.read_word();
-    sscanf(value, "%d %d", &row, &col);
+    sscanf(f.read_word().c_str(), "%d %d", &row, &col);
     Fl_Grid::Cell *cell = grid->widget(child_widget, row, col);
     if (cell) {
       int min_w = 20, min_h = 20;
       cell->minimum_size(min_w, min_h);
     }
   } else if (property == "colspan") {
-    int colspan = atoi(f.read_word());
+    int colspan = atoi(f.read_word().c_str());
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->colspan(colspan);
   } else if (property == "rowspan") {
-    int rowspan = atoi(f.read_word());
+    int rowspan = atoi(f.read_word().c_str());
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->rowspan(rowspan);
   } else if (property == "align") {
-    int align = atoi(f.read_word());
+    int align = atoi(f.read_word().c_str());
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->align((Fl_Grid_Align)align);
   } else if (property == "minsize") {
     int min_w = 20, min_h = 20;
-    const char *value = f.read_word();
-    sscanf(value, "%d %d", &min_w, &min_h);
+    sscanf(f.read_word().c_str(), "%d %d", &min_w, &min_h);
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->minimum_size(min_w, min_h);
   } else {

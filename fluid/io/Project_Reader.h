@@ -46,16 +46,11 @@ protected:
   FILE *fin = nullptr;
   /// Number of most recently read line
   int lineno = 0;
-  /// Pointer to the file path and name (not copied!)
+  /// The file path and name
   std::string fname { };
-  /// Expanding buffer to store the most recently read word
-  char *buffer = nullptr;
-  /// Exact size of the expanding buffer in bytes
-  int buflen = 0;
-
-  void expand_buffer(int length);
 
   int nextchar() { for (;;) { int ret = fgetc(fin); if (ret!='\r') return ret; } }
+  int skip_to_word();
 
 public:
   /// Holds the file version number after reading the "version" tag
@@ -71,9 +66,10 @@ public:
   Node *read_children(Node *p, int merge, Strategy strategy, char skip_options=0);
   int read_project(const std::string& filename, int merge, Strategy strategy=Strategy::FROM_FILE_AS_LAST_CHILD);
   void read_error(const char *format, ...);
-  const char *read_word(int wantbrace = 0);
+  bool more_words();
+  std::string read_word(int wantbrace = 0);
   int read_int();
-  int read_fdesign_line(const char*& name, const char*& value);
+  int read_fdesign_line(std::string& name, std::string& value);
   void read_fdesign();
   int current_line_number() const { return lineno; }
 };

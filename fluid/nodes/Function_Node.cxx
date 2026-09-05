@@ -1311,7 +1311,7 @@ void DeclBlock_Node::read_property(fluid::io::Project_Reader &f, const std::stri
   } else if(c == "protected") {
     //
   } else if(c == "map") {
-    write_map_ = (int)atol(f.read_word());
+    write_map_ = (int)atol(f.read_word().c_str());
   } else  if (c == "after") {
     end_code(f.read_word());
   } else {
@@ -1428,7 +1428,7 @@ void Preprocessor_Node::write_properties(fluid::io::Project_Writer &f) {
  */
 void Preprocessor_Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
   if (c == "use") {
-    use_ = static_cast<Use>(atoi(f.read_word()));
+    use_ = static_cast<Use>(atoi(f.read_word().c_str()));
   } else {
     Node::read_property(f, c);
   }

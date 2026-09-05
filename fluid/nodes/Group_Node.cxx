@@ -384,22 +384,19 @@ void Flex_Node::read_property(fluid::io::Project_Reader &f, const std::string& c
   suspend_auto_layout = 1;
   if (c == "margin") {
     int lm, tm, rm, bm;
-    if (sscanf(f.read_word(),"%d %d %d %d",&lm,&tm,&rm,&bm) == 4)
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d",&lm,&tm,&rm,&bm) == 4)
       flex->margin(lm, tm, rm, bm);
   } else if (c == "gap") {
     int g;
-    if (sscanf(f.read_word(),"%d",&g))
+    if (sscanf(f.read_word().c_str(),"%d",&g))
       flex->gap(g);
   } else if (c == "fixed_size_tuples") {
     f.read_word(1); // must be '{'
-    const char *nStr = f.read_word(1); // number of indices in table
-    fixedSizeTupleSize = atoi(nStr);
+    fixedSizeTupleSize = f.read_int(); // number of indices in table
     fixedSizeTuple = new int[fixedSizeTupleSize*2];
     for (int i=0; i<fixedSizeTupleSize; i++) {
-      const char *ix = f.read_word(1); // child at that index is fixed in size
-      fixedSizeTuple[i*2] = atoi(ix);
-      const char *size = f.read_word(1); // fixed size of that child
-      fixedSizeTuple[i*2+1] = atoi(size);
+      fixedSizeTuple[i*2] = f.read_int(); // child at that index is fixed in size
+      fixedSizeTuple[i*2+1] = f.read_int(); // fixed size of that child
     }
     f.read_word(1); // must be '}'
   } else {

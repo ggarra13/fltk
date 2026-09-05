@@ -726,10 +726,8 @@ void Node::write_properties(fluid::io::Project_Writer &f) {
  */
 void Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
   if (c == "uid") {
-    const char *hex = f.read_word();
     int x = 0;
-    if (hex)
-      sscanf(hex, "%04x", &x); // defaults x to 0 if format fails
+    sscanf(f.read_word().c_str(), "%04x", &x); // defaults x to 0 if format fails
     set_uid(x);
   } else if (c == "label")
     label(f.read_word());
@@ -747,11 +745,11 @@ void Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
     select(this,1);
   else if (c == "parent_properties")
     if (parent) {
-      const char *cc = f.read_word(1);
-      if (strcmp(cc, "{")==0) {
+      std::string cc = f.read_word(1);
+      if (cc == "{") {
         for (;;) {
           cc = f.read_word();
-          if (!cc || cc[0]==0 || strcmp(cc, "}")==0) break;
+          if (cc.empty() || cc == "}") break;
           parent->read_parent_property(f, this, cc);
         }
       } else {

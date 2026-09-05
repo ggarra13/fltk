@@ -1306,7 +1306,7 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
   } else if (c == "protected") {
     public_ = 2;
   } else if (c == "xywh") {
-    if (sscanf(f.read_word(),"%d %d %d %d",&x,&y,&w,&h) == 4) {
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d",&x,&y,&w,&h) == 4) {
       x += Fluid.pasteoffset;
       y += Fluid.pasteoffset;
       // Reading FLTK 2 projects into FLTK 1 Fluid requires adjusting the x
@@ -1320,7 +1320,7 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
   } else if (c == "tooltip") {
     tooltip(f.read_word());
   } else if (c == "scale_image") {
-    if (sscanf(f.read_word(),"%d %d",&w,&h) == 2) {
+    if (sscanf(f.read_word().c_str(),"%d %d",&w,&h) == 2) {
       active_image.scale_w = w;
       active_image.scale_h = h;
     }
@@ -1336,11 +1336,11 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
         && (ext != ".svgz"))
       active_image.compress = 0; // if it is neither of those, default to uncompressed
   } else if (c == "bind_image") {
-    active_image.bind = (int)atol(f.read_word());
+    active_image.bind = (int)atol(f.read_word().c_str());
   } else if (c == "compress_image") {
-    active_image.compress = (int)atol(f.read_word());
+    active_image.compress = (int)atol(f.read_word().c_str());
   } else if (c == "scale_deimage") {
-    if (sscanf(f.read_word(),"%d %d",&w,&h) == 2) {
+    if (sscanf(f.read_word().c_str(),"%d %d",&w,&h) == 2) {
       inactive_image.scale_w = w;
       inactive_image.scale_h = h;
     }
@@ -1356,48 +1356,47 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
         && (ext != ".svgz"))
       inactive_image.compress = 0; // if it is neither of those, default to uncompressed
   } else if (c == "bind_deimage") {
-    inactive_image.bind = (int)atol(f.read_word());
+    inactive_image.bind = (int)atol(f.read_word().c_str());
   } else if (c == "compress_deimage") {
-    inactive_image.compress = (int)atol(f.read_word());
+    inactive_image.compress = (int)atol(f.read_word().c_str());
   } else if (c == "type") {
     if (dynamic_cast<Spinner_Node*>(this))
-      ((Fl_Spinner*)o)->type(item_number(subtypes(), f.read_word()));
+      ((Fl_Spinner*)o)->type(item_number(subtypes(), f.read_word().c_str()));
     else
-      o->type(item_number(subtypes(), f.read_word()));
+      o->type(item_number(subtypes(), f.read_word().c_str()));
   } else if (c == "box") {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       o->box((Fl_Boxtype)x);
-    } else if (sscanf(value,"%d",&x) == 1) o->box((Fl_Boxtype)x);
+    } else if (sscanf(value.c_str(),"%d",&x) == 1) o->box((Fl_Boxtype)x);
   } else if (dynamic_cast<Button_Node*>(this) && c == "down_box") {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       ((Fl_Button*)o)->down_box((Fl_Boxtype)x);
     }
   } else if (dynamic_cast<Input_Choice_Node*>(this) && c == "down_box") {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       ((Fl_Input_Choice*)o)->down_box((Fl_Boxtype)x);
     }
   } else if (dynamic_cast<Menu_Base_Node*>(this) && c == "down_box") {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       ((Fl_Menu_*)o)->down_box((Fl_Boxtype)x);
     }
   } else if (is_button() && c == "value") {
-    const char* value = f.read_word();
-    ((Fl_Button*)o)->value(atoi(value));
+    ((Fl_Button*)o)->value(atoi(f.read_word().c_str()));
   } else if (c == "color") {
-    const char* cw = f.read_word();
+    std::string cw = f.read_word();
     if (cw[0]=='0' && cw[1]=='x') {
-      sscanf(cw,"0x%x",&x);
+      sscanf(cw.c_str(),"0x%x",&x);
       o->color(x);
     } else {
-      int n = sscanf(cw,"%d %d",&x,&y);
+      int n = sscanf(cw.c_str(),"%d %d",&x,&y);
       if (n == 2) { // back compatibility...
         if (x != 47) o->color(x);
         o->selection_color(y);
@@ -1406,54 +1405,54 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
       }
     }
   } else if (c == "selection_color") {
-    if (sscanf(f.read_word(),"%d",&x)) o->selection_color(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x)) o->selection_color(x);
   } else if (c == "labeltype") {
-    const char* type = f.read_word();
-    if (!strcmp(type,"image")) {
+    std::string type = f.read_word();
+    if (type == "image") {
       if (!Fluid.proj.image_assets.find_or_create(label()))
         f.read_error("Image file '%s' not found", label().c_str());
       active_image.set(label(), dynamic_cast<Window_Node*>(this) ? nullptr : o, false);
       if (!dynamic_cast<Window_Node*>(this)) redraw();
       label("");
     } else {
-      o->labeltype((Fl_Labeltype)item_number(labeltypemenu,type));
+      o->labeltype((Fl_Labeltype)item_number(labeltypemenu,type.c_str()));
     }
   } else if (c == "labelfont") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->labelfont(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->labelfont(x);
   } else if (c == "labelsize") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->labelsize(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->labelsize(x);
   } else if (c == "labelcolor") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->labelcolor(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->labelcolor(x);
   } else if (c == "align") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->align(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->align(x);
   } else if (c == "h_label_margin") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->horizontal_label_margin(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->horizontal_label_margin(x);
   } else if (c == "v_label_margin") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->vertical_label_margin(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->vertical_label_margin(x);
   } else if (c == "image_spacing") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->label_image_spacing(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->label_image_spacing(x);
   } else if (c == "when") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->when(x);
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->when(x);
   } else if (c == "minimum") {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->minimum(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->minimum(strtod(f.read_word(),nullptr));
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->minimum(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->minimum(strtod(f.read_word().c_str(),nullptr));
   } else if (c == "maximum") {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->maximum(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->maximum(strtod(f.read_word(),nullptr));
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->maximum(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->maximum(strtod(f.read_word().c_str(),nullptr));
   } else if (c == "step") {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->step(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->step(strtod(f.read_word(),nullptr));
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->step(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->step(strtod(f.read_word().c_str(),nullptr));
   } else if (c == "value") {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->value(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->value(strtod(f.read_word(),nullptr));
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->value(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->value(strtod(f.read_word().c_str(),nullptr));
   } else if ( (c == "slider_size" || c == "size") && dynamic_cast<Slider_Node*>(this)) {
-    ((Fl_Slider*)o)->slider_size(strtod(f.read_word(),nullptr));
+    ((Fl_Slider*)o)->slider_size(strtod(f.read_word().c_str(),nullptr));
   } else if (c == "textfont") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) {ft=(Fl_Font)x; textstuff(1,ft,s,cc);}
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) {ft=(Fl_Font)x; textstuff(1,ft,s,cc);}
   } else if (c == "textsize") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) {s=x; textstuff(2,ft,s,cc);}
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) {s=x; textstuff(2,ft,s,cc);}
   } else if (c == "textcolor") {
-    if (sscanf(f.read_word(),"%d",&x) == 1) {cc=(Fl_Color)x;textstuff(3,ft,s,cc);}
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) {cc=(Fl_Color)x;textstuff(3,ft,s,cc);}
   } else if (c == "hide") {
     o->hide();
   } else if (c == "deactivate") {
@@ -1470,38 +1469,38 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
   } else if (c == "class") {
     subclass(f.read_word());
   } else if (c == "shortcut") {
-    int shortcut = (int)strtol(f.read_word(),nullptr,0);
+    int shortcut = (int)strtol(f.read_word().c_str(),nullptr,0);
     if (is_button()) ((Fl_Button*)o)->shortcut(shortcut);
     else if (dynamic_cast<Input_Node*>(this)) ((Fl_Input_*)o)->shortcut(shortcut);
     else if (dynamic_cast<Value_Input_Node*>(this)) ((Fl_Value_Input*)o)->shortcut(shortcut);
     else if (dynamic_cast<Text_Display_Node*>(this)) ((Fl_Text_Display*)o)->shortcut(shortcut);
   } else if (c == "code0") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(0, f.read_word());
     }
   } else if (c == "code1") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(1, f.read_word());
     }
   } else if (c == "code2") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(2, f.read_word());
     }
   } else if (c == "code3") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(3, f.read_word());
     }
   } else if (c == "extra_code") { // fdesign file compatibility
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(3, f.read_word());
     }

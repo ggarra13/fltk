@@ -1338,7 +1338,7 @@ void Window_Node::read_property(fluid::io::Project_Reader &f, const std::string&
     ((Fl_Window*)o)->xclass(xclass.c_str());
   } else if (c == "size_range") {
     int mw, mh, MW, MH;
-    if (sscanf(f.read_word(),"%d %d %d %d",&mw,&mh,&MW,&MH) == 4) {
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d",&mw,&mh,&MW,&MH) == 4) {
       sr_min_w = mw; sr_min_h = mh; sr_max_w = MW; sr_max_h = MH;
     }
   } else if (c == "xywh") {
