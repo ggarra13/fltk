@@ -66,7 +66,7 @@ class Project_Writer;
     void Node::add(Node *p, Strategy strategy)
     int read_file(const char *filename, int merge, Strategy strategy)
     Node *fluid::io::Project_Reader::read_children(Node *p, int merge, Strategy strategy, char skip_options)
-    int fluid::io::Project_Reader::read_project(const char *filename, int merge, Strategy strategy)
+    int fluid::io::Project_Reader::read_project(const std::string& filename, int merge, Strategy strategy)
  */
 typedef struct Strategy {
   enum Flags {

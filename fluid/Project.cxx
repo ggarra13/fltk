@@ -355,7 +355,7 @@ void Project::revert() {
                    "Cancel", "Revert", nullptr)) return;
   }
   undo.suspend();
-  if (!fluid::io::read_file(*this, proj_filename.c_str(), 0)) {
+  if (!fluid::io::read_file(*this, proj_filename, 0)) {
     undo.resume();
     widget_browser->rebuild();
     update_settings_dialog();

@@ -762,7 +762,7 @@ void Layout_List::read(fluid::io::Project_Reader *in) {
       } else if (!strcmp(key, "current_preset")) {
         cp = in->read_int();
       } else if (!strcmp(key, "suite")) {
-        int n = add(in->filename_name());
+        int n = add(in->filename_name().c_str());
         list_[n].read(in);
         list_[n].storage(fluid::Tool_Store::PROJECT);
       } else if (!strcmp(key, "}")) {

@@ -207,7 +207,7 @@ void Application::run_interactive(int argc, char **argv, const std::string& file
   toggle_codeview_cb(nullptr,nullptr);
 
   proj.undo.suspend();
-  if (!filename.empty() && !fluid::io::read_file(proj, filename.c_str(),0)) {
+  if (!filename.empty() && !fluid::io::read_file(proj, filename, 0)) {
     fluid_message("Can't read project file '%s': %s", filename.c_str(), strerror(errno));
   }
   proj.undo.resume();
@@ -243,7 +243,7 @@ void Application::run_batch(const std::string& filename)
     proj.set_filename(filename);
   }
   proj.undo.suspend();
-  if (!filename.empty() && !fluid::io::read_file(proj, filename.c_str(),0)) {
+  if (!filename.empty() && !fluid::io::read_file(proj, filename, 0)) {
     fluid_message("Can't read project file '%s': %s", filename.c_str(), strerror(errno));
     if (batch_mode) exit(1);
   }
@@ -666,7 +666,7 @@ bool Application::new_project_from_template()
       fclose(outfile);
 
       proj.undo.suspend();
-      fluid::io::read_file(proj, dup_buffer_filename().c_str(), 0);
+      fluid::io::read_file(proj, dup_buffer_filename(), 0);
       fl_unlink(dup_buffer_filename().c_str());
       proj.undo.resume();
     } else {
@@ -874,7 +874,7 @@ void Application::paste_from_clipboard() {
       //strategy = Strategy::FROM_FILE_AS_FIRST_CHILD;
     }
   }
-  if (!fluid::io::read_file(proj, cut_buffer_filename().c_str(), 1, strategy)) {
+  if (!fluid::io::read_file(proj, cut_buffer_filename(), 1, strategy)) {
     widget_browser->rebuild();
     fluid_message("Can't read %s: %s", cut_buffer_filename().c_str(), strerror(errno));
   }
@@ -926,7 +926,7 @@ void Application::duplicate_selected() {
   pasteoffset  = 0;
   proj.undo.checkpoint();
   proj.undo.suspend();
-  if (!fluid::io::read_file(proj, dup_buffer_filename().c_str(), 1, Strategy::FROM_FILE_AFTER_CURRENT)) {
+  if (!fluid::io::read_file(proj, dup_buffer_filename(), 1, Strategy::FROM_FILE_AFTER_CURRENT)) {
     fluid_message("Can't read %s: %s", dup_buffer_filename().c_str(), strerror(errno));
   }
   fl_unlink(dup_buffer_filename().c_str());

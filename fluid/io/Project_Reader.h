@@ -34,7 +34,7 @@ namespace io {
 
 extern int fdesign_flip;
 
-int read_file(Project &proj, const char *, int merge, Strategy strategy=Strategy::FROM_FILE_AS_LAST_CHILD);
+int read_file(Project &proj, const std::string& filename, int merge, Strategy strategy=Strategy::FROM_FILE_AS_LAST_CHILD);
 
 class Project_Reader
 {
@@ -47,7 +47,7 @@ protected:
   /// Number of most recently read line
   int lineno = 0;
   /// Pointer to the file path and name (not copied!)
-  const char *fname = nullptr;
+  std::string fname { };
   /// Expanding buffer to store the most recently read word
   char *buffer = nullptr;
   /// Exact size of the expanding buffer in bytes
@@ -64,12 +64,12 @@ public:
 public:
   Project_Reader(Project &proj);
   ~Project_Reader();
-  int open_read(const char *s);
+  int open_read(const std::string& s);
   int close_read();
-  const char *filename_name();
+  std::string filename_name() const;
   int read_quoted();
   Node *read_children(Node *p, int merge, Strategy strategy, char skip_options=0);
-  int read_project(const char *, int merge, Strategy strategy=Strategy::FROM_FILE_AS_LAST_CHILD);
+  int read_project(const std::string& filename, int merge, Strategy strategy=Strategy::FROM_FILE_AS_LAST_CHILD);
   void read_error(const char *format, ...);
   const char *read_word(int wantbrace = 0);
   int read_int();

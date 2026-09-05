@@ -60,7 +60,7 @@ int fluid::io::fdesign_flip = 0;
  \param[in] strategy add new nodes after current or as last child
  \return 0 if the operation failed, 1 if it succeeded
  */
-int fluid::io::read_file(Project &proj, const char *filename, int merge, Strategy strategy) {
+int fluid::io::read_file(Project &proj, const std::string& filename, int merge, Strategy strategy) {
   Project_Reader f(proj);
   strategy.source(Strategy::FROM_FILE);
   return f.read_project(filename, merge, strategy);
@@ -118,13 +118,13 @@ Project_Reader::~Project_Reader()
  \param[in] s filename, if nullptr, read from stdin instead
  \return 0 if the operation failed, 1 if it succeeded
  */
-int Project_Reader::open_read(const char *s) {
+int Project_Reader::open_read(const std::string& s) {
   lineno = 1;
-  if (!s) {
+  if (s.empty()) {
     fin = stdin;
     fname = "stdin";
   } else {
-    FILE *f = fl_fopen(s, "rb");
+    FILE *f = fl_fopen(s.c_str(), "rb");
     if (!f)
       return 0;
     fin = f;
@@ -138,6 +138,9 @@ int Project_Reader::open_read(const char *s) {
  \return 0 if the operation failed, 1 if it succeeded
  */
 int Project_Reader::close_read() {
+  if (fin == nullptr) {
+    return 1;
+  }
   if (fin != stdin) {
     int x = fclose(fin);
     fin = nullptr;
@@ -150,8 +153,8 @@ int Project_Reader::close_read() {
  Return the name part of the current filename and path.
  \return a pointer into a string that is not owned by this class
  */
-const char *Project_Reader::filename_name() {
-  return fl_filename_name(fname);
+std::string Project_Reader::filename_name() const {
+  return fl_filename_name_str(fname);
 }
 
 /**
@@ -400,7 +403,7 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
  \param[in] strategy add new nodes after current or as last child
  \return 0 if the operation failed, 1 if it succeeded
  */
-int Project_Reader::read_project(const char *filename, int merge, Strategy strategy) {
+int Project_Reader::read_project(const std::string& filename, int merge, Strategy strategy) {
   Node *o;
   proj_.undo.suspend();
   read_version = 0.0;
