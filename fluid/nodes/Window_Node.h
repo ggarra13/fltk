@@ -108,7 +108,7 @@ public:
 
   void write_properties(fluid::io::Project_Writer &f) override;
   void read_property(fluid::io::Project_Reader &f, const std::string&) override;
-  int read_fdesign(const char*, const char*) override;
+  int read_fdesign(const std::string&, const std::string&) override;
 
   void add_child(Node*, Node*) override;
   void move_child(Node*, Node*) override;

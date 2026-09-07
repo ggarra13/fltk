@@ -75,7 +75,7 @@ public: // Methods
   I18n(Project &p) : project_(p) {};
   ~I18n() = default;
   void reset();
-  void read(io::Project_Reader &f, const char *key);
+  void read(io::Project_Reader &f, const std::string& key);
   void write(io::Project_Writer &f) const;
 };
 

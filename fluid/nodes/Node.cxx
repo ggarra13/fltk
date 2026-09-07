@@ -835,7 +835,7 @@ void Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const
 /**
  Read part of the Forms FDesign file.
  */
-int Node::read_fdesign(const char*, const char*) {
+int Node::read_fdesign(const std::string&, const std::string&) {
   return 0;
 }
 

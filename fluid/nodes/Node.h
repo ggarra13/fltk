@@ -372,7 +372,7 @@ public:
   virtual void postprocess_read() { }
 
   // Back compatibility to Forms FDesign project files
-  virtual int read_fdesign(const char*, const char*);
+  virtual int read_fdesign(const std::string&, const std::string&);
 
 
   // ---- Type classification methods

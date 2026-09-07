@@ -1336,9 +1336,9 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
         && (ext != ".svgz"))
       active_image.compress = 0; // if it is neither of those, default to uncompressed
   } else if (c == "bind_image") {
-    active_image.bind = (int)atol(f.read_word().c_str());
+    active_image.bind = f.read_int();
   } else if (c == "compress_image") {
-    active_image.compress = (int)atol(f.read_word().c_str());
+    active_image.compress = f.read_int();
   } else if (c == "scale_deimage") {
     if (sscanf(f.read_word().c_str(),"%d %d",&w,&h) == 2) {
       inactive_image.scale_w = w;
@@ -1356,9 +1356,9 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
         && (ext != ".svgz"))
       inactive_image.compress = 0; // if it is neither of those, default to uncompressed
   } else if (c == "bind_deimage") {
-    inactive_image.bind = (int)atol(f.read_word().c_str());
+    inactive_image.bind = f.read_int();
   } else if (c == "compress_deimage") {
-    inactive_image.compress = (int)atol(f.read_word().c_str());
+    inactive_image.compress = f.read_int();
   } else if (c == "type") {
     if (dynamic_cast<Spinner_Node*>(this))
       ((Fl_Spinner*)o)->type(item_number(subtypes(), f.read_word().c_str()));
@@ -1389,7 +1389,7 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string&
       ((Fl_Menu_*)o)->down_box((Fl_Boxtype)x);
     }
   } else if (is_button() && c == "value") {
-    ((Fl_Button*)o)->value(atoi(f.read_word().c_str()));
+    ((Fl_Button*)o)->value(f.read_int());
   } else if (c == "color") {
     std::string cw = f.read_word();
     if (cw[0]=='0' && cw[1]=='x') {
@@ -1537,11 +1537,11 @@ int lookup_symbol(const char *, int &, int numberok = 0);
 /**
  Back compatibility to Forms FDesign project files.
  */
-int Widget_Node::read_fdesign(const char* propname, const char* value) {
+int Widget_Node::read_fdesign(const std::string& propname, const std::string& value) {
   int v;
-  if (!strcmp(propname,"box")) {
+  if (propname == "box") {
     float x,y,w,h;
-    if (sscanf(value,"%f %f %f %f",&x,&y,&w,&h) == 4) {
+    if (sscanf(value.c_str(),"%f %f %f %f",&x,&y,&w,&h) == 4) {
       if (fluid::io::fdesign_flip) {
         Node* p;
         for (p = parent; p && !dynamic_cast<Window_Node*>(p); p = p->parent) {/*empty*/}
@@ -1551,42 +1551,41 @@ int Widget_Node::read_fdesign(const char* propname, const char* value) {
       y += Fluid.pasteoffset;
       o->resize(int(x),int(y),int(w),int(h));
     }
-  } else if (!strcmp(propname,"label")) {
+  } else if (propname == "label") {
     label(value);
-  } else if (!strcmp(propname,"name")) {
+  } else if (propname == "name") {
     this->name(value);
-  } else if (!strcmp(propname,"callback")) {
+  } else if (propname == "callback") {
     callback(value); user_data_type("long");
-  } else if (!strcmp(propname,"argument")) {
+  } else if (propname == "argument") {
     user_data(value);
-  } else if (!strcmp(propname,"shortcut")) {
-    if (value[0]) {
-      char buf[128]; sprintf(buf,"o->shortcut(\"%s\");", value);
-      extra_code(0, buf);
+  } else if (propname == "shortcut") {
+    if (!value.empty()) {
+      extra_code(0, "o->shortcut(\"" + value + "\");");
     }
-  } else if (!strcmp(propname,"style")) {
-    if (!strncmp(value,"FL_NORMAL",9)) return 1;
-    if (!lookup_symbol(value,v,1)) return 0;
+  } else if (propname == "style") {
+    if (value.compare(0, 9, "FL_NORMAL") == 0) return 1;
+    if (!lookup_symbol(value.c_str(),v,1)) return 0;
     o->labelfont(v); o->labeltype((Fl_Labeltype)(v>>8));
-  } else if (!strcmp(propname,"size")) {
-    if (!lookup_symbol(value,v,1)) return 0;
+  } else if (propname == "size") {
+    if (!lookup_symbol(value.c_str(),v,1)) return 0;
     o->labelsize(v);
-  } else if (!strcmp(propname,"type")) {
-    if (!strncmp(value,"NORMAL",6)) return 1;
-    if (lookup_symbol(value,v,1)) {o->type(v); return 1;}
-    if (!strcmp(value+strlen(value)-5,"FRAME")) goto TRY_BOXTYPE;
-    if (!strcmp(value+strlen(value)-3,"BOX")) goto TRY_BOXTYPE;
+  } else if (propname == "type") {
+    if (value.compare(0, 6, "NORMAL") == 0) return 1;
+    if (lookup_symbol(value.c_str(),v,1)) {o->type(v); return 1;}
+    if (value.size() >= 5 && value.compare(value.size()-5, 5, "FRAME") == 0) goto TRY_BOXTYPE;
+    if (value.size() >= 3 && value.compare(value.size()-3, 3, "BOX") == 0) goto TRY_BOXTYPE;
     return 0;
-  } else if (!strcmp(propname,"lcol")) {
-    if (!lookup_symbol(value,v,1)) return 0;
+  } else if (propname == "lcol") {
+    if (!lookup_symbol(value.c_str(),v,1)) return 0;
     o->labelcolor(v);
-  } else if (!strcmp(propname,"return")) {
-    if (!lookup_symbol(value,v,0)) return 0;
+  } else if (propname == "return") {
+    if (!lookup_symbol(value.c_str(),v,0)) return 0;
     o->when(v|FL_WHEN_RELEASE);
-  } else if (!strcmp(propname,"alignment")) {
-    if (!lookup_symbol(value,v)) {
+  } else if (propname == "alignment") {
+    if (!lookup_symbol(value.c_str(),v)) {
       // convert old numeric values:
-      int v1 = atoi(value); if (v1 <= 0 && strcmp(value,"0")) return 0;
+      int v1 = atoi(value.c_str()); if (v1 <= 0 && value != "0") return 0;
       v = 0;
       if (v1 >= 5) {v = FL_ALIGN_INSIDE; v1 -= 5;}
       switch (v1) {
@@ -1599,24 +1598,24 @@ int Widget_Node::read_fdesign(const char* propname, const char* value) {
       }
     }
     o->align(v);
-  } else if (!strcmp(propname,"resizebox")) {
+  } else if (propname == "resizebox") {
     resizable(1);
-  } else if (!strcmp(propname,"colors")) {
-    char* p = (char*)value;
-    while (*p != ' ') {if (!*p) return 0; p++;}
-    *p = 0;
+  } else if (propname == "colors") {
+    size_t sp = value.find(' ');
+    if (sp == std::string::npos) return 0;
+    std::string c1 = value.substr(0, sp);
+    std::string c2 = value.substr(sp + 1);
     int v1;
-    if (!lookup_symbol(value,v,1) || !lookup_symbol(p+1,v1,1)) {
-      *p=' '; return 0;}
+    if (!lookup_symbol(c1.c_str(),v,1) || !lookup_symbol(c2.c_str(),v1,1)) return 0;
     o->color(v,v1);
-  } else if (!strcmp(propname,"resize")) {
-    return !strcmp(value,"FL_RESIZE_ALL");
-  } else if (!strcmp(propname,"gravity")) {
-    return !strcmp(value,"FL_NoGravity FL_NoGravity");
-  } else if (!strcmp(propname,"boxtype")) {
+  } else if (propname == "resize") {
+    return value == "FL_RESIZE_ALL";
+  } else if (propname == "gravity") {
+    return value == "FL_NoGravity FL_NoGravity";
+  } else if (propname == "boxtype") {
   TRY_BOXTYPE:
-    int x = boxnumber(value);
-    if (!x) {x = item_number(boxmenu1, value); if (x < 0) return 0;}
+    int x = boxnumber(value.c_str());
+    if (!x) {x = item_number(boxmenu1, value.c_str()); if (x < 0) return 0;}
     if (x == ZERO_ENTRY) {
       x = 0;
       if (o->box() != ((Widget_Node*)factory)->o->box()) return 1; // kludge for frame

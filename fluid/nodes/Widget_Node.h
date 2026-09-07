@@ -219,7 +219,7 @@ public:
   void read_property(fluid::io::Project_Reader& f, const std::string&) override;
 
   // Back compatibility to Forms FDesign project files
-  int read_fdesign(const char*, const char*) override;
+  int read_fdesign(const std::string&, const std::string&) override;
 
 
   // ---- Live mode support

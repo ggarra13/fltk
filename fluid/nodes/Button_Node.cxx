@@ -79,7 +79,7 @@ void Button_Node::write_properties(fluid::io::Project_Writer &f) {
 void Button_Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
   Fl_Button *btn = (Fl_Button*)o;
   if (c == "compact") {
-    btn->compact((uchar)atol(f.read_word().c_str()));
+    btn->compact((uchar)f.read_int());
   } else {
     Widget_Node::read_property(f, c);
   }

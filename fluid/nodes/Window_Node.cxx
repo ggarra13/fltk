@@ -1349,18 +1349,18 @@ void Window_Node::read_property(fluid::io::Project_Reader &f, const std::string&
   }
 }
 
-int Window_Node::read_fdesign(const char* propname, const char* value) {
+int Window_Node::read_fdesign(const std::string& propname, const std::string& value) {
   int x;
   o->box(FL_NO_BOX); // because fdesign always puts an Fl_Box next
-  if (!strcmp(propname,"Width")) {
-    if (sscanf(value,"%d",&x) == 1) o->size(x,o->h());
-  } else if (!strcmp(propname,"Height")) {
-    if (sscanf(value,"%d",&x) == 1) o->size(o->w(),x);
-  } else if (!strcmp(propname,"NumberofWidgets")) {
+  if (propname == "Width") {
+    if (sscanf(value.c_str(),"%d",&x) == 1) o->size(x,o->h());
+  } else if (propname == "Height") {
+    if (sscanf(value.c_str(),"%d",&x) == 1) o->size(o->w(),x);
+  } else if (propname == "NumberofWidgets") {
     return 1; // we can figure out count from file
-  } else if (!strcmp(propname,"border")) {
-    if (sscanf(value,"%d",&x) == 1) ((Fl_Window*)o)->border(x);
-  } else if (!strcmp(propname,"title")) {
+  } else if (propname == "border") {
+    if (sscanf(value.c_str(),"%d",&x) == 1) ((Fl_Window*)o)->border(x);
+  } else if (propname == "title") {
     label(value);
   } else {
     return Widget_Node::read_fdesign(propname,value);

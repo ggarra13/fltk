@@ -518,15 +518,15 @@ void Grid_Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, 
       cell->minimum_size(min_w, min_h);
     }
   } else if (property == "colspan") {
-    int colspan = atoi(f.read_word().c_str());
+    int colspan = f.read_int();
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->colspan(colspan);
   } else if (property == "rowspan") {
-    int rowspan = atoi(f.read_word().c_str());
+    int rowspan = f.read_int();
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->rowspan(rowspan);
   } else if (property == "align") {
-    int align = atoi(f.read_word().c_str());
+    int align = f.read_int();
     Fl_Grid::Cell *cell = grid->cell(child_widget);
     if (cell) cell->align((Fl_Grid_Align)align);
   } else if (property == "minsize") {

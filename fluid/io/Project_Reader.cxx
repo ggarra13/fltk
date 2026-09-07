@@ -249,7 +249,7 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
         goto CONTINUE;
       }
       if (c.compare(0, 5, "i18n_") == 0) {
-        proj_.i18n.read(*this, c.c_str());
+        proj_.i18n.read(*this, c);
         goto CONTINUE;
       }
       if (c == "header_name") {
@@ -692,7 +692,7 @@ static void forms_end(Fl_Group *g, int flip) {
  \see http://xforms-toolkit.org
  */
 void Project_Reader::read_fdesign() {
-  int fdesign_magic = atoi(read_word().c_str());
+  int fdesign_magic = read_int();
   fdesign_flip = (fdesign_magic < 13000);
   Widget_Node *window = nullptr;
   Widget_Node *group = nullptr;
@@ -739,7 +739,7 @@ void Project_Reader::read_fdesign() {
       }
 
     } else if (widget) {
-      if (!widget->read_fdesign(name.c_str(), value.c_str()))
+      if (!widget->read_fdesign(name, value))
         fluid_message("Ignoring \"%s: %s\"\n", name.c_str(), value.c_str());
     }
   }
