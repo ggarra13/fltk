@@ -18,6 +18,7 @@
 #define _FLUID_FD_SNAP_ACTION_H
 
 #include <string>
+#include <vector>
 
 class Window_Node;
 class Widget_Node;
@@ -45,8 +46,7 @@ namespace app {
  There are three Presets available in one Suite, marked "application",
  "dialog", and "toolbox".
  */
-class Layout_Preset {
-public:
+struct Layout_Preset {
   int left_window_margin;   ///< gap between the window border and the widget
   int right_window_margin;
   int top_window_margin;
@@ -96,7 +96,17 @@ extern Layout_Preset *default_layout_preset;
  */
 class Layout_Suite {
 public:
-  char *name_;                  ///< name of the suite
+  Layout_Suite();
+  Layout_Suite(const std::string& name, char* menu_label,
+               Layout_Preset* app_preset, Layout_Preset* dlg_preset, Layout_Preset* tool_preset,
+               fluid::Tool_Store storage);
+  Layout_Suite(const Layout_Suite&) = delete;
+  Layout_Suite& operator=(const Layout_Suite&) = delete;
+  Layout_Suite(Layout_Suite&& other) noexcept;
+  Layout_Suite& operator=(Layout_Suite&& other) noexcept;
+  ~Layout_Suite();
+
+  std::string name_;                  ///< name of the suite
   char *menu_label;             ///< label text used in pulldown menu
   Layout_Preset *layout[3];  ///< presets for application, dialog, and toolbox windows
   fluid::Tool_Store storage_;       ///< storage location (see fluid::Tool_Store::INTERNAL, etc.)
@@ -106,11 +116,8 @@ public:
   void read(fluid::io::Project_Reader*);
   void update_label();
   void storage(fluid::Tool_Store s) { storage_ = s; update_label(); }
-  void name(const char *n);
+  void name(const std::string& n);
   void init();
-  ~Layout_Suite();
-public:
-
 };
 
 
@@ -125,10 +132,8 @@ class Layout_List {
 public:
   Fl_Menu_Item *main_menu_;
   Fl_Menu_Item *choice_menu_;
-  Layout_Suite *list_;
-  int list_size_;
-  int list_capacity_;
-  bool list_is_static_;
+  bool menus_are_static_;       ///< true while main_menu_/choice_menu_ still alias static arrays
+  std::vector<Layout_Suite> list_;
   int current_suite_;
   int current_preset_;
   std::string filename_;
@@ -139,13 +144,13 @@ public:
   void update_menu_labels();
   int current_suite() const { return current_suite_; }
   void current_suite(int ix);
-  void current_suite(std::string);
+  void current_suite(const std::string& name);
   int current_preset() const { return current_preset_; }
   void current_preset(int ix);
   Layout_Suite &operator[](int ix) { return list_[ix]; }
   int add(const char *name);
   void rename(const char *name);
-  void capacity(int);
+  void grow_menus(int old_n, int new_n);
 
   int load(const std::string &filename);
   int save(const std::string &filename);
