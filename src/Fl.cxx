@@ -1689,7 +1689,9 @@ int Fl::handle_(int e, Fl_Window* window)
     return 1;
 
   case FL_MOUSEWHEEL:
-    fl_xfocus = window; // this should not happen!  But maybe it does:
+    // Comment out next statement because FL_MOUSEWHEEL doesn't make the OS
+    // believe its window has focus (#1604)
+    // fl_xfocus = window;
 
     // Try sending it to the "grab" first
     if (grab() && grab()!=modal() && grab()!=window) {
