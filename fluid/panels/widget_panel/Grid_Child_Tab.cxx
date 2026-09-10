@@ -120,11 +120,11 @@ void Grid_Child_Tab::cb_Horizontal(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item Grid_Child_Tab::menu_Horizontal[] = {
- {"GRID_LEFT", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"GRID_CENTER", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"GRID_RIGHT", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"GRID_FILL", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_HORIZONTAL), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "GRID_LEFT", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "GRID_CENTER", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "GRID_RIGHT", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "GRID_FILL", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_HORIZONTAL), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 Fl_Menu_Item* Grid_Child_Tab::GRID_LEFT = Grid_Child_Tab::menu_Horizontal + 0;
 
@@ -167,11 +167,11 @@ void Grid_Child_Tab::cb_Vertical(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item Grid_Child_Tab::menu_Vertical[] = {
- {"GRID_TOP", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"GRID_CENTER", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"GRID_BOTTOM", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"GRID_FILL", 0,  nullptr, (void*)((fl_intptr_t)FL_GRID_VERTICAL), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "GRID_TOP", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "GRID_CENTER", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "GRID_BOTTOM", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "GRID_FILL", 0, nullptr, (void*)((fl_intptr_t)FL_GRID_VERTICAL), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 void Grid_Child_Tab::cb_Width_i(fluid::widget::Formula_Input* o, void* v) {

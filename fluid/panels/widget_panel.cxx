@@ -772,38 +772,38 @@ static void cb_Browse1(Fl_Button* o, void* v) {
 Fl_Group* wp_gui_alignment = (Fl_Group*)nullptr;
 
 Fl_Menu_Item menu_[] = {
- {"   Image Alignment   ", 0,  nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
- {"image over text", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_OVER_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"text over image", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_OVER_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"text next to image", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_NEXT_TO_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"image next to text", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_NEXT_TO_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"image is backdrop", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_BACKDROP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "   Image Alignment   ", 0, nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
+  { "image over text", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_OVER_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "text over image", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_OVER_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "text next to image", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_NEXT_TO_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "image next to text", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_NEXT_TO_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "image is backdrop", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_BACKDROP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Menu_Item menu_1[] = {
- {"   Inside && Outside   ", 0,  nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
- {"top left", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"top", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"top right", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"left", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"center", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"right", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"bottom left", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"bottom", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"bottom right", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"   Outside Alignment   ", 0,  nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
- {"left top", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"right top", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"left bottom", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"right bottom", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "   Inside && Outside   ", 0, nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
+  { "top left", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "top", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "top right", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "left", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "center", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "right", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "bottom left", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "bottom", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "bottom right", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "   Outside Alignment   ", 0, nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
+  { "left top", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "right top", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "left bottom", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "right bottom", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 fluid::widget::Formula_Input* widget_x_input = (fluid::widget::Formula_Input*)nullptr;
 
 static void cb_widget_x_input(fluid::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---==~--=~-=~=-=~~=-~~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ---=~-=~-----=-~-~~~-= ▼ ﬂ//
   if (v == LOAD) {
     if (current_widget->is_true_widget()) {
       o->value(((Widget_Node *)current_widget)->o->x());
@@ -958,16 +958,16 @@ static void cb_Children(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_Children[] = {
- {"Fixed", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Reposition", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Resize", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "Fixed", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Reposition", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Resize", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Group* wp_gui_flexp = (Fl_Group*)nullptr;
 
 static void cb_wp_gui_flexp(Fl_Group* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---=~~----~~-~=~~~~~-- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback --~=~==~=~-~~-=-=~=~~- ▼ ﬂ//
   if (v == LOAD) {
     if (Flex_Node::parent_is_flex(current_widget)) {
       o->show();
@@ -2343,20 +2343,20 @@ static void cb_11(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_2[] = {
- {"private", 0,  nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Menu_Item menu_3[] = {
- {"local", 0,  nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"global", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "local", 0, nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "global", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_code_choice(Fl_Button*, void* v) {
-//ﬂ ▼ ---------------------- callback -~~=---=~~---~-~~--~-- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~-~-=--~~-~-~=--=-~~~- ▼ ﬂ//
   int ix = fl_int(v);
   w_cpp_code_wiz->value(ix);
   if (w_cpp_code_act[ix])
@@ -2600,9 +2600,9 @@ static void cb_13(Fl_Input_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_4[] = {
- {"void*", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
- {"long", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "void*", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
+  { "long", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Box* w_when_box = (Fl_Box*)nullptr;
@@ -2610,7 +2610,7 @@ Fl_Box* w_when_box = (Fl_Box*)nullptr;
 Grid_Tab* widget_tab_grid = (Grid_Tab*)nullptr;
 
 static void cb_widget_tab_grid(Grid_Tab* o, void*) {
-//ﬂ ▼ ---------------------- callback -~~-=----=--=~=~-=-=~~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback -~-~-=~-=~~-=-~--~-=~= ▼ ﬂ//
   o->callback((Fl_Callback*)propagate_load);
 //ﬂ ▲ ----------=~-=~-=---~=------------=-~=--=~~=--=~~--=~- ▲ ﬂ//
 }
@@ -2659,15 +2659,15 @@ static void cb_14(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_5[] = {
- {"in source file only", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in header file only", 0,  nullptr, nullptr, 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"\"static\" in source file", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in source and \"extern\" in header", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "in source file only", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in header file only", 0, nullptr, nullptr, 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "\"static\" in source file", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in source and \"extern\" in header", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_15(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~=--~=~---~~-~-=-~~= ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~~-~=--=~=----=--~~-=~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
 
@@ -2691,14 +2691,14 @@ static void cb_15(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_6[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_16(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---~~-~~--=~=~~=~~=--= ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback -~=-=-----~=~~~-=~=--= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
 
@@ -2714,17 +2714,17 @@ static void cb_16(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_7[] = {
- {"binary: unsigned char[]", 0,  nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"text: const char*", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"compressed: unsigned char[]", 0,  nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"binary: std::vector<uint8_t>", 0,  nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"text: std::string", 0,  nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"compressed: std::vector<uint8_t>", 0,  nullptr, (void*)(5), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "binary: unsigned char[]", 0, nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "text: const char*", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "compressed: unsigned char[]", 0, nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "binary: std::vector<uint8_t>", 0, nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "text: std::string", 0, nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "compressed: std::vector<uint8_t>", 0, nullptr, (void*)(5), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_Name(Fl_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~~=--=~=~-------~=~- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback -~-~-~=~~=-~----=~~-~~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
    if (v == LOAD) {
@@ -3025,14 +3025,14 @@ static void cb_17(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_8[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_Attribute(Fl_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~~~~-----~-=~=~-~~=~- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~-=-~==--~-=~~~--==-~- ▼ ﬂ//
   if (!current_node || !dynamic_cast<Class_Node*>(current_node)) return;
   Class_Node* nd = (Class_Node*)current_node;
 
@@ -3289,16 +3289,16 @@ static void cb_Type(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_Type[] = {
- {"Start of condition (#if, #ifdef)", 0,  nullptr, (void*)(Preprocessor_Node::Use::IFDEF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Inside condition block (#elif, #else)", 0,  nullptr, (void*)(Preprocessor_Node::Use::ELSE), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"End of condition (#endif)", 0,  nullptr, (void*)(Preprocessor_Node::Use::ENDIF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Verbatim in Header (#include, #define, ...)", 0,  nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_H), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Verbatim in Source (#include, #define, #pragma, ...)", 0,  nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_CXX), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "Start of condition (#if, #ifdef)", 0, nullptr, (void*)(Preprocessor_Node::Use::IFDEF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Inside condition block (#elif, #else)", 0, nullptr, (void*)(Preprocessor_Node::Use::ELSE), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "End of condition (#endif)", 0, nullptr, (void*)(Preprocessor_Node::Use::ENDIF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Verbatim in Header (#include, #define, ...)", 0, nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_H), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Verbatim in Source (#include, #define, #pragma, ...)", 0, nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_CXX), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_Directive(Fl_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---=-=--~~-~=-=-=~=--= ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~-~~~=--~~-==~-~~=~=-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Preprocessor_Node*>(current_node)) return;
   Preprocessor_Node* nd = (Preprocessor_Node*)current_node;
    if (v == LOAD) {
@@ -3371,15 +3371,15 @@ static void cb_18(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_9[] = {
- {"in source file only", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in header file only", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"\"static\" in source file", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in source and \"extern\" in header", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "in source file only", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in header file only", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "\"static\" in source file", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in source and \"extern\" in header", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_19(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~-~~-~-=~---==~~~-==~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~~-=~==---=~---~-==~~= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Decl_Node*>(current_node)) return;
   Decl_Node* nd = (Decl_Node*)current_node;
 
@@ -3403,14 +3403,14 @@ static void cb_19(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_a[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_1a(Fl_Tile* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~=-=~=--=-=~=~-~~---- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback --~-~=~~-~=~~~=--~=~-- ▼ ﬂ//
   propagate_load(o, v);
 //ﬂ ▲ ----------=~~~-=~==~-=----------~--~~~-~~=-~=~=-=~~-~- ▲ ﬂ//
 }
@@ -3584,14 +3584,14 @@ static void cb_1c(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_b[] = {
- {"static", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"global", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"local", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "static", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "global", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "local", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_1d(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~~==~=~---~--~~~-~=-~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~~~-=~~=-~=-~=-=--=~-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Function_Node*>(current_node)) return;
   Function_Node* nd = (Function_Node*)current_node;
 
@@ -3615,14 +3615,14 @@ static void cb_1d(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_c[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_declare(Fl_Check_Button* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~=-~=~~=-=~~=~~-~==~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ---=-==-=----==~~--~-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Function_Node*>(current_node)) return;
   Function_Node* nd = (Function_Node*)current_node;
 

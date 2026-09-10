@@ -2630,6 +2630,7 @@ static void cocoaKeyboardHandler(NSEvent *theEvent)
   static char *received_utf8 = NULL;
   static int lreceived = 0;
   char *p = (char*)[aString UTF8String];
+  if (p == nullptr) p = (char*)"";
   int l = (int)strlen(p);
   if (l > 0) {
     if (lreceived == 0) {

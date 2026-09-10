@@ -515,19 +515,27 @@ void Menu_Item_Node::write_static(fluid::io::Code_Writer& f) {
     int i;
     f.write_c("\nFl_Menu_Item " + menu_name(f, i) + "[] = {\n");
   }
+  f.indent_reset();
+  f.indent_more();
   Node* t = prev; while (t && dynamic_cast<Menu_Item_Node*>(t)) t = t->prev;
   for (Node* q = t->next; q && dynamic_cast<Menu_Item_Node*>(q); q = q->next) {
     ((Menu_Item_Node*)q)->write_item(f);
-    int thislevel = q->level; if (q->can_have_children()) thislevel++;
+    int thislevel = q->level;
+    if (q->can_have_children()) {
+      thislevel++;
+      f.indent_more();
+    }
     int nextlevel =
       (q->next && dynamic_cast<Menu_Item_Node*>(q->next)) ? q->next->level : t->level+1;
     while (thislevel > nextlevel) {
       // text, shortcut, callback, user_data, flags, labeltype, labelfont, labelsize, labelcolor
-      f.write_c(" { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 },\n");
+      f.write_c(f.indent() + "{ nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 },\n");
       thislevel--;
+      f.indent_less();
     }
   }
-  f.write_c(" { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }\n};\n");
+  f.write_c(f.indent() + "{ nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }\n};\n");
+  f.indent_reset();
 
   if (!k.empty()) {
     // Write menu item variables...
@@ -581,7 +589,7 @@ void Menu_Item_Node::write_item(fluid::io::Code_Writer& f) {
 
   // Start of Fl_Menu_Item array member
   write_comment_inline_c(f, " ");
-  f.write_c(" {");
+  f.write_c(f.indent() + "{ ");
 
   // Label, can not be nullptr which has a special meaning here
   if (!label().empty())
@@ -614,7 +622,7 @@ void Menu_Item_Node::write_item(fluid::io::Code_Writer& f) {
     if (s & FL_SHIFT) { f.write_c("FL_SHIFT|"); s &= ~FL_SHIFT; }
     if (s & FL_ALT) { f.write_c("FL_ALT|"); s &= ~FL_ALT; }
     if ((s < 127) && fl_ascii_isprint(s))
-      f.write_c("'" + std::string(1, (char)s) + "'");
+      f.write_c("'" + std::string(1, (char)s) + "', ");
     else
       f.write_c("0x" + fluid::io::to_string_8x(s) + ", ");
   } else {
@@ -637,24 +645,28 @@ void Menu_Item_Node::write_item(fluid::io::Code_Writer& f) {
       if (!is_function_name(callback()))
         k = full_class_name();
       if (!k.empty()) {
-        f.write_c(" (Fl_Callback*)" + k + "::" + callback_name(f) + ",");
+        f.write_c("(Fl_Callback*)" + k + "::" + callback_name(f) + ", ");
       } else {
-        f.write_c(" (Fl_Callback*)" + callback_name(f) + ",");
+        f.write_c("(Fl_Callback*)" + callback_name(f) + ", ");
       }
     }
-  } else
-    f.write_c(" nullptr,");
+  } else {
+    f.write_c("nullptr, ");
+  }
 
   // Write user_data or nullptr
   if (!user_data().empty())
-    f.write_c(" (void*)(" + user_data() + "),");
+    f.write_c("(void*)(" + user_data() + "), ");
   else
-    f.write_c(" nullptr,");
+    f.write_c("nullptr, ");
 
   // Write flags, labeltype, labelfont, labelsize, and labelcolor
-  f.write_c(" " + std::to_string(flags()) + ", (uchar)" + labeltypes[o->labeltype()] + ", "
-           + std::to_string(o->labelfont()) + ", " + std::to_string(o->labelsize()) + ", " + std::to_string(o->labelcolor()) + " ");
-  f.write_c("},\n");
+  f.write_c(std::to_string(flags()) + ", "
+    + "(uchar)" + labeltypes[o->labeltype()] + ", "
+    + std::to_string(o->labelfont()) + ", "
+    + std::to_string(o->labelsize()) + ", "
+    + std::to_string(o->labelcolor())
+    + " },\n");
 }
 
 void start_menu_initialiser(fluid::io::Code_Writer& f, int &initialized, const std::string& name, int index) {

@@ -372,12 +372,12 @@ static void cb_cv_code_choice_w(Fl_Choice* o, void*) {
 }
 
 Fl_Menu_Item menu_cv_code_choice_w[] = {
- {"prolog", 0,  nullptr, (void*)(0), 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"static data", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"instantiate", 0,  nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"setup", 0,  nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"finalize", 0,  nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "prolog", 0, nullptr, (void*)(0), 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "static data", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "instantiate", 0, nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "setup", 0, nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "finalize", 0, nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Double_Window* make_codeview() {
