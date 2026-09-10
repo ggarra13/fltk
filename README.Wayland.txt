@@ -172,6 +172,12 @@ Feedback for other writing systems would be helpful.
 * Using OpenGL inside Wayland windows doesn't seem to work on RaspberryPi hardware,
 although it works inside X11 windows on the same hardware.
 
+* Drag-and-drop initiation from a subwindow doesn't work under versions < 6.4.5
+of the KDE/Plasma desktop. Bug-less versions are available in Ubuntu ≥ 25.10
+and Debian forky 14. Mutter, Weston and Sway don't suffer from this limitation.
+A workaround is proposed in issue #997 of the FLTK github repository
+(https://github.com/fltk/fltk/issues/997).
+
 3 Platform Specific Notes
 =========================
 
