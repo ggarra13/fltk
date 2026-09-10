@@ -91,11 +91,6 @@
 #  define BTN_STYLUS3 0x149   // third barrel button (uncommon)
 #endif
 
-extern "C" {
-  bool fl_is_surface_from_GTK_titlebar (struct wl_surface *surface, struct libdecor_frame *frame,
-                                        bool *using_GTK);
-}
-
 static struct wl_surface *gtk_shell_surface;
 static libdecor_frame *gtk_shell_frame = nullptr;
 static Fl_Window *gtk_shell_window = nullptr;
@@ -506,23 +501,13 @@ static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
   tool->ev.state = (tool->type == ZWP_TABLET_TOOL_V2_TYPE_ERASER
     ? State::ERASER_HOVERS : State::TIP_HOVERS) | btn_bits;
 
-  auto drvr = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
-  auto seat = drvr->seat;
-  static bool using_GTK = seat->gtk_shell &&
-    (gtk_shell1_get_version(seat->gtk_shell) >= GTK_SURFACE1_TITLEBAR_GESTURE_SINCE_VERSION);
-  if (!tool->focus_win && using_GTK) {
+  if (!tool->focus_win) {
     // check whether surface is the headerbar of a GTK-decorated window
-    Fl_X *xp = Fl_X::first;
-    while (xp && using_GTK) { // all mapped windows
-      struct wld_window *xid = (struct wld_window*)xp->xid;
-      if (xid->kind == Fl_Wayland_Window_Driver::DECORATED &&
-          fl_is_surface_from_GTK_titlebar(surface, xid->frame, &using_GTK)) {
-        gtk_shell_surface = surface;
-        gtk_shell_frame = xid->frame;
-        gtk_shell_window = xp->w;
-        break;
-      }
-      xp = xp->next;
+    auto item = Fl_Wayland_Window_Driver::titlebar_surface_map.find(surface);
+    if (item != Fl_Wayland_Window_Driver::titlebar_surface_map.end()) {
+      gtk_shell_surface = surface;
+      gtk_shell_frame = item->second->frame;
+      gtk_shell_window = item->second->fl_win;
     }
   }
 }
