@@ -808,6 +808,7 @@ void Fl_Vk_Window::swap_buffers() {
 
   // Advance to next frame
   m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
+  ++frameIndex;
 }
 
 /**
@@ -1438,6 +1439,7 @@ void Fl_Vk_Window::init_vulkan() {
   }
 
   m_currentFrameIndex = 0;
+  frameIndex = 0;
 }
 
 
@@ -1547,6 +1549,7 @@ void Fl_Vk_Window::init() {
   m_current_buffer = 0;
   m_currentFrameIndex = 0;
   m_swapchainImageCount = 0; // Track swapchain image count
+  frameIndex = 0;
 
   // Global Vulkan window counter
   g_active_vulkan_windows++;
