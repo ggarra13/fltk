@@ -92,8 +92,6 @@
 #endif
 
 static struct wl_surface *gtk_shell_surface;
-static libdecor_frame *gtk_shell_frame = nullptr;
-static Fl_Window *gtk_shell_window = nullptr;
 
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
@@ -503,11 +501,9 @@ static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
 
   if (!tool->focus_win) {
     // check whether surface is the headerbar of a GTK-decorated window
-    auto item = Fl_Wayland_Window_Driver::titlebar_surface_map.find(surface);
-    if (item != Fl_Wayland_Window_Driver::titlebar_surface_map.end()) {
+    if (Fl_Wayland_Window_Driver::titlebar_surface_map.find(surface) !=
+        Fl_Wayland_Window_Driver::titlebar_surface_map.end()) {
       gtk_shell_surface = surface;
-      gtk_shell_frame = item->second->frame;
-      gtk_shell_window = item->second->fl_win;
     }
   }
 }
@@ -517,8 +513,6 @@ static void tool_cb_proximity_out(void *data, struct zwp_tablet_tool_v2 *) {
   tool->in_proximity         = false;
   tool->frame_proximity_out  = true;
   gtk_shell_surface          = nullptr;
-  gtk_shell_frame            = nullptr;
-  gtk_shell_window           = nullptr;
 }
 
 static void tool_cb_down(void *data, struct zwp_tablet_tool_v2 *,
@@ -630,18 +624,18 @@ static void tool_cb_button(void *data, struct zwp_tablet_tool_v2 *,
   The return values are yet to be defined.
 */
 static int handle_frame_events(TabletTool *tool) {
-  if (gtk_shell_surface && gtk_shell_frame) {
-    auto drvr = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+  if (gtk_shell_surface) {
     if (tool->frame_down) {
-      if (gtk_shell_window) gtk_shell_window->show(); // raise the clicked window to the top and activate
-      libdecor_frame_ref(gtk_shell_frame); // lock for multiple calls
-      libdecor_frame_move(gtk_shell_frame, drvr->seat->wl_seat, tool->serial);
-      libdecor_frame_unref(gtk_shell_frame);
+      auto drvr = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+      auto item = Fl_Wayland_Window_Driver::titlebar_surface_map.find(gtk_shell_surface);
+      item->second->fl_win->show(); // raise the clicked window to the top and activate
+      libdecor_frame_ref(item->second->frame); // lock for multiple calls
+      libdecor_frame_move(item->second->frame, drvr->seat->wl_seat, tool->serial);
+      libdecor_frame_unref(item->second->frame);
       // libdecor_frame_close(struct libdecor_frame *frame)
       // libdecor_frame_set_fullscreen(struct libdecor_frame *frame, struct wl_output *output)
       // libdecor_frame_set_maximized(struct libdecor_frame *frame)
       // libdecor_frame_resize(struct libdecor_frame *frame,struct wl_seat *wl_seat,uint32_t serial,enum libdecor_resize_edge edge)
-      // libdecor_frame_close(struct libdecor_frame *frame)
       // see: pointer_button, handle_button_on_header, and handle_button_on_shadow in libdecor-gtk.c
     }
   }
@@ -673,7 +667,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   // Handle pen events inside the title bar.
   // \todo proof of concept, we still need to find the correct location
   // for this code, and the use of return codes for aborting event handling.
-  if (gtk_shell_surface && gtk_shell_frame) {
+  if (gtk_shell_surface) {
     int result = handle_frame_events(tool);
     (void)result; // silence unused result warning
   }
