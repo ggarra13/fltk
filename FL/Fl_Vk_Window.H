@@ -434,9 +434,6 @@ private:
 
 
 protected:
-  // Max. frames in flight counter
-  uint32_t               frameIndex;
-
   float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
