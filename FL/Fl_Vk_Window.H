@@ -309,6 +309,9 @@ public:
   //! Required device extensions used on creation (overload it)
   virtual std::vector<const char*> get_device_extensions();
 
+  //! Virtual function to change the max. frames per flight (default: 2)
+  virtual int get_max_frames_per_flight() { return 2; }
+
   //! Log level of Vulkan API
   virtual int log_level() const { return 0; }
 
@@ -434,8 +437,6 @@ private:
 
 
 protected:
-  uint32_t               frameIndex;
-
   float                  m_pixels_per_unit;
   uint32_t               m_swapchainImageCount; // Track swapchain image count
   std::vector<Fl_Vk_SwapchainBuffer> m_buffers;
@@ -443,7 +444,7 @@ protected:
 
   //! Frame data
   std::vector<FrameData>  m_frames;
-  uint32_t                m_currentFrameIndex;
+  uint32_t                frameIndex;  // index to frame in flight
   VkImageLayout           m_currentDepthLayout;
 
   //! Flag used to handle resizes (swapchain and other resources recreation)
@@ -503,7 +504,7 @@ public:
 
   void setDebugSync(bool enable) { m_debugSync = enable; }
   VkCommandBuffer getCurrentCommandBuffer() const {
-      return m_frames[m_currentFrameIndex].commandBuffer;
+      return m_frames[frameIndex].commandBuffer;
   }
   uint32_t getCurrentBufferIndex() const {
       return m_current_buffer;

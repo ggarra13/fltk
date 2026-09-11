@@ -279,7 +279,7 @@ void Fl_Vk_Window::recreate_swapchain() {
   }
 
   // Resize frame data
-  m_frames.resize(m_swapchainImageCount);
+  m_frames.resize(get_max_frames_per_flight());
   VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   VkFenceCreateInfo fenceInfo = {
     VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -358,7 +358,7 @@ void Fl_Vk_Window::end_render_pass(VkCommandBuffer cmd)
 
 void Fl_Vk_Window::end_render_pass()
 {
-  FrameData& frame = m_frames[m_currentFrameIndex];
+  FrameData& frame = m_frames[frameIndex];
   if (!pVkWindowDriver->buffers_ready() || frame.commandBuffer == VK_NULL_HANDLE)
   {
     fprintf(stderr, "Skipping vk_draw_end: Invalid state\n");
@@ -400,11 +400,11 @@ bool Fl_Vk_Window::vk_draw_begin() {
     m_pixels_per_unit = pixels_per_unit();
 
     // After recreation, make sure we don't present old frames
-    m_currentFrameIndex = 0;
+    frameIndex = 0;
   }
 
   // Get current frame data
-  FrameData& frame = m_frames[m_currentFrameIndex];
+  FrameData& frame = m_frames[frameIndex];
 
   // Wait for this frame’s previous use
   if (frame.fence != VK_NULL_HANDLE)
@@ -412,7 +412,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
     if (m_debugSync) {
       fprintf(stderr, "%s Waiting for frame %u fence\n",
               vulkan_window_label(this),
-              m_currentFrameIndex);
+              frameIndex);
     }
     result = vkWaitForFences(device(), 1, &frame.fence, VK_TRUE,
                              kFenceTimeout);
@@ -434,7 +434,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
   if (m_debugSync) {
     fprintf(stderr, "%s Resetting fence for frame %u\n",
             vulkan_window_label(this),
-            m_currentFrameIndex);
+            frameIndex);
   }
 
   if (pVkWindowDriver->is_headless()) {
@@ -448,7 +448,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
       {
         fprintf(stderr, "%s Acquiring image for frame %u\n",
                 vulkan_window_label(this),
-                m_currentFrameIndex);
+                frameIndex);
       }
       result = vkAcquireNextImageKHR(device(), m_swapchain, kAcquireTimeout,
                                      frame.imageAcquiredSemaphore, VK_NULL_HANDLE,
@@ -502,7 +502,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
   if (m_debugSync) {
     fprintf(stderr, "%s Acquired image index %u for frame %u %ux%u\n",
             vulkan_window_label(this),
-            m_current_buffer, m_currentFrameIndex,
+            m_current_buffer, frameIndex,
             m_buffers[m_current_buffer].extent.width,
             m_buffers[m_current_buffer].extent.height);
   }
@@ -510,7 +510,7 @@ bool Fl_Vk_Window::vk_draw_begin() {
   // Reset and begin command buffer
   if (!frame.commandBuffer)
   {
-    fprintf(stderr, "No command buffer for frame %u\n", m_currentFrameIndex);
+    fprintf(stderr, "No command buffer for frame %u\n", frameIndex);
     return false;
   }
 
@@ -601,7 +601,7 @@ void Fl_Vk_Window::vk_draw_end()
 {
   end_render_pass();
 
-  FrameData& frame = m_frames[m_currentFrameIndex];
+  FrameData& frame = m_frames[frameIndex];
   if (!pVkWindowDriver->buffers_ready() || frame.commandBuffer == VK_NULL_HANDLE)
   {
     if (m_debugSync) {
@@ -663,7 +663,7 @@ void Fl_Vk_Window::swap_buffers() {
   VkResult result;
 
   // Check state
-  FrameData& frame = m_frames[m_currentFrameIndex];
+  FrameData& frame = m_frames[frameIndex];
   if (!pVkWindowDriver->buffers_ready() ||
       frame.commandBuffer == VK_NULL_HANDLE) {
     if (m_debugSync) {
@@ -715,7 +715,7 @@ void Fl_Vk_Window::swap_buffers() {
   if (m_debugSync) {
     fprintf(stderr, "%s Submitting frame %u for image index %u pixels_per_unit()=%f\n",
             vulkan_window_label(this),
-            m_currentFrameIndex, m_current_buffer,
+            frameIndex, m_current_buffer,
             pixels_per_unit());
   }
 
@@ -756,7 +756,7 @@ void Fl_Vk_Window::swap_buffers() {
       {
         fprintf(stderr, "%s : ***************ERROR*********** Would present wrong image size, index %u for frame %u %ux%u %f\n",
                 vulkan_window_label(this),
-                m_current_buffer, m_currentFrameIndex,
+                m_current_buffer, frameIndex,
                 W, H, pixels_per_unit());
         reinit_swapchain();
         return;
@@ -767,7 +767,7 @@ void Fl_Vk_Window::swap_buffers() {
     if (m_debugSync) {
       fprintf(stderr, "%s Presenting image index %u for frame %u %ux%u pixels_per_unit()=%f\n",
               vulkan_window_label(this),
-              m_current_buffer, m_currentFrameIndex,
+              m_current_buffer, frameIndex,
               m_buffers[m_current_buffer].extent.width,
               m_buffers[m_current_buffer].extent.height,
               pixels_per_unit());
@@ -794,7 +794,7 @@ void Fl_Vk_Window::swap_buffers() {
     if (m_debugSync) {
       fprintf(stderr, "%s Presented image index %u for frame %u\n",
               vulkan_window_label(this),
-              m_current_buffer, m_currentFrameIndex);
+              m_current_buffer, frameIndex);
     }
   } else {
     // Headless: nothing to present. The fence signaled by vkQueueSubmit
@@ -802,13 +802,12 @@ void Fl_Vk_Window::swap_buffers() {
     // capture_vk_rectangle()) is the only synchronization needed.
     if (m_debugSync) {
       fprintf(stderr, "%s Headless: skipping present for frame %u\n",
-              vulkan_window_label(this), m_currentFrameIndex);
+              vulkan_window_label(this), frameIndex);
     }
   }
 
   // Advance to next frame
-  m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
-  ++frameIndex;
+  frameIndex = (frameIndex + 1) % m_frames.size();
 }
 
 /**
@@ -858,7 +857,7 @@ void Fl_Vk_Window::flush() {
 
   if (m_debugSync) {
     fprintf(stderr, "%s flush for frame %u\n",
-            vulkan_window_label(this), m_currentFrameIndex);
+            vulkan_window_label(this), frameIndex);
   }
 
   if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
@@ -879,7 +878,7 @@ void Fl_Vk_Window::flush() {
     if (m_debugSync) {
       fprintf(stderr, "%s pVkWindowDriver->flush_begin failed "
               "for frame %u\n",
-              vulkan_window_label(this), m_currentFrameIndex);
+              vulkan_window_label(this), frameIndex);
     }
     return;
   }
@@ -1438,7 +1437,7 @@ void Fl_Vk_Window::init_vulkan() {
     }
   }
 
-  m_currentFrameIndex = 0;
+  frameIndex = 0;
   frameIndex = 0;
 }
 
@@ -1547,9 +1546,8 @@ void Fl_Vk_Window::init() {
 
   // Counters
   m_current_buffer = 0;
-  m_currentFrameIndex = 0;
-  m_swapchainImageCount = 0; // Track swapchain image count
   frameIndex = 0;
+  m_swapchainImageCount = 0; // Track swapchain image count
 
   // Global Vulkan window counter
   g_active_vulkan_windows++;
