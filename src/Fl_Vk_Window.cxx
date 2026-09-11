@@ -808,6 +808,7 @@ void Fl_Vk_Window::swap_buffers() {
 
   // Advance to next frame
   m_currentFrameIndex = (m_currentFrameIndex + 1) % m_frames.size();
+  ++frameIndex;
 }
 
 /**
