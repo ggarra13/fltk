@@ -299,7 +299,6 @@ unsigned char *fl_libdecor_titlebar_buffer(struct libdecor_frame *frame,
   return NULL;
 }
 
-
 /* Returns the libdecor-created wl_surface of given GTK3 frame */
 struct wl_surface* fl_libdecor_get_titlebar_surface(struct libdecor_frame *frame) {
   if (get_plugin_kind(NULL) != GTK3) return NULL;
@@ -307,7 +306,16 @@ struct wl_surface* fl_libdecor_get_titlebar_surface(struct libdecor_frame *frame
   return frame_gtk->headerbar.wl_surface;
 }
 
-/* Returns whether surface is the libdecor-created GTK-titlebar of frame */
+/* Returns whether surface is the libdecor-created GTK- titlebar of frame */
+bool fl_is_surface_from_GTK_titlebar (struct wl_surface *surface, struct libdecor_frame *frame,
+                                      bool *using_GTK) {
+  *using_GTK = (get_plugin_kind(NULL) == GTK3);
+  if (!*using_GTK) return false;
+  struct libdecor_frame_gtk *frame_gtk = (struct libdecor_frame_gtk*)frame;
+  return (frame_gtk->headerbar.wl_surface == surface);
+}
+
+/* Returns whether surface is the libdecor-created cairo titlebar of frame */
 bool fl_is_surface_from_cairo_titlebar (struct wl_surface *surface, struct libdecor_frame *frame,
                                       bool *using_CAIRO) {
   *using_CAIRO = (get_plugin_kind(NULL) == CAIRO);
