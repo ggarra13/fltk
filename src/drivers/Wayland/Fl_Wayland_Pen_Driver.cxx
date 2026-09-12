@@ -105,6 +105,9 @@ extern "C" {
 }
 
 static struct wl_surface *gtk_shell_surface;
+static libdecor_frame *gtk_shell_frame = nullptr;
+static Fl_Window *gtk_shell_window = nullptr;
+
 
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
