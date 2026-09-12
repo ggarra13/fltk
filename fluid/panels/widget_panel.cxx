@@ -705,7 +705,7 @@ static void cb_Browse(Fl_Button* o, void* v) {
     int mod = 0;
     auto image_asset = ui_find_image(widget_image_input->value());
     if (image_asset) {
-      widget_image_input->value(image_asset->filename());
+      widget_image_input->value(image_asset->filename().c_str());
       for (Widget_Node *q: Fluid.proj.tree.all_selected_widgets()) {
         q->active_image.set(image_asset->filename(), dynamic_cast<Window_Node*>(q) ? nullptr : q->o, false);
         q->redraw();
@@ -714,7 +714,7 @@ static void cb_Browse(Fl_Button* o, void* v) {
       if (mod) Fluid.proj.set_modflag(1);
     }
   }
-//ﬂ ▲ ----------=~-=-~-~=-=------------~---=~=-~=-=~=-~=~=~- ▲ ﬂ//
+//ﬂ ▲ ----------=~-=-~-~=-=-----------~-~-=--==-=---~~=~~-=- ▲ ﬂ//
 }
 
 static void cb_(Fl_Button*, void* v) {
@@ -757,7 +757,7 @@ static void cb_Browse1(Fl_Button* o, void* v) {
     int mod = 0;
     auto image_asset = ui_find_image(widget_deimage_input->value());
     if (image_asset) {
-      widget_deimage_input->value(image_asset->filename());
+      widget_deimage_input->value(image_asset->filename().c_str());
       for (Widget_Node *q: Fluid.proj.tree.all_selected_widgets()) {
         q->inactive_image.set(image_asset->filename(), dynamic_cast<Window_Node*>(q) ? nullptr : q->o, true);
         q->redraw();
@@ -766,44 +766,44 @@ static void cb_Browse1(Fl_Button* o, void* v) {
       if (mod) Fluid.proj.set_modflag(1);
     }
   }
-//ﬂ ▲ ----------~=~-=-~~~~~=-----------~=~--~-=-=---~~---==~ ▲ ﬂ//
+//ﬂ ▲ ----------~=~-=-~~~~~=-----------~=~~-~~=~-~~=-=~~=~-= ▲ ﬂ//
 }
 
 Fl_Group* wp_gui_alignment = (Fl_Group*)nullptr;
 
 Fl_Menu_Item menu_[] = {
- {"   Image Alignment   ", 0,  nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
- {"image over text", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_OVER_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"text over image", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_OVER_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"text next to image", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_NEXT_TO_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"image next to text", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_NEXT_TO_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"image is backdrop", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_BACKDROP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "   Image Alignment   ", 0, nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
+  { "image over text", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_OVER_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "text over image", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_OVER_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "text next to image", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TEXT_NEXT_TO_IMAGE), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "image next to text", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_NEXT_TO_TEXT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "image is backdrop", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_IMAGE_BACKDROP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Menu_Item menu_1[] = {
- {"   Inside && Outside   ", 0,  nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
- {"top left", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"top", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"top right", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"left", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"center", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"right", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"bottom left", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"bottom", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"bottom right", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"   Outside Alignment   ", 0,  nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
- {"left top", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"right top", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"left bottom", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- {"right bottom", 0,  nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "   Inside && Outside   ", 0, nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
+  { "top left", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "top", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "top right", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_TOP_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "left", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "center", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_CENTER), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "right", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "bottom left", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_LEFT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "bottom", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "bottom right", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_BOTTOM_RIGHT), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "   Outside Alignment   ", 0, nullptr, (void*)((fl_intptr_t)-1), 0, (uchar)FL_NORMAL_LABEL, 1, 10, 0 },
+  { "left top", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "right top", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_TOP), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "left bottom", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_LEFT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { "right bottom", 0, nullptr, (void*)((fl_intptr_t)FL_ALIGN_RIGHT_BOTTOM), 0, (uchar)FL_NORMAL_LABEL, 0, 9, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 fluid::widget::Formula_Input* widget_x_input = (fluid::widget::Formula_Input*)nullptr;
 
 static void cb_widget_x_input(fluid::widget::Formula_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---==~--=~-=~=-=~~=-~~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ---=~-=~-----=-~-~~~-= ▼ ﬂ//
   if (v == LOAD) {
     if (current_widget->is_true_widget()) {
       o->value(((Widget_Node *)current_widget)->o->x());
@@ -958,16 +958,16 @@ static void cb_Children(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_Children[] = {
- {"Fixed", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Reposition", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Resize", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "Fixed", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Reposition", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Resize", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Group* wp_gui_flexp = (Fl_Group*)nullptr;
 
 static void cb_wp_gui_flexp(Fl_Group* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---=~~----~~-~=~~~~~-- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback --~=~==~=~-~~-=-=~=~~- ▼ ﬂ//
   if (v == LOAD) {
     if (Flex_Node::parent_is_flex(current_widget)) {
       o->show();
@@ -1553,7 +1553,7 @@ static void cb_3(Fl_Input* o, void* v) {
     if (dynamic_cast<Window_Node*>(current_widget)) {
       o->show();
       o->parent()->show();
-      o->value(((Window_Node *)current_widget)->xclass);
+      o->value(((Window_Node *)current_widget)->xclass.c_str());
     } else {
       o->hide();
       o->parent()->hide(); // hides the "X Class:" label as well
@@ -1566,12 +1566,12 @@ static void cb_3(Fl_Input* o, void* v) {
         mod = 1;
         Window_Node *wt = (Window_Node *)q;
         storestring(o->value(), wt->xclass);
-        ((Fl_Window*)(wt->o))->xclass(wt->xclass);
+        ((Fl_Window*)(wt->o))->xclass(wt->xclass.c_str());
       }
     }
     if (mod) Fluid.proj.set_modflag(1);
   }
-//ﬂ ▲ ----------~==~~~-=~-=~----------~~=~=-=-=~~~~-~~=-=-=~ ▲ ﬂ//
+//ﬂ ▲ ----------~==~~~-=~-=~-----------~-~---==~-=--=-=-~--= ▲ ﬂ//
 }
 
 static void cb_Border(Fl_Light_Button* o, void* v) {
@@ -1634,7 +1634,7 @@ static void cb_Visible(Fl_Light_Button* o, void* v) {
       }
       n ? q->o->show() : q->o->hide();
       q->redraw();
-      if (n && q->parent && q->parent->type_name()) {
+      if (n && q->parent) {
         if (dynamic_cast<Tabs_Node*>(q->parent)) {
           ((Fl_Tabs *)q->o->parent())->value(q->o);
         } else if (dynamic_cast<Wizard_Node*>(q->parent)) {
@@ -1647,7 +1647,7 @@ static void cb_Visible(Fl_Light_Button* o, void* v) {
       redraw_browser();
     }
   }
-//ﬂ ▲ ----------~=~~=-~-=~~~-----------~~-~~=~-~--=~-=~=~=-= ▲ ﬂ//
+//ﬂ ▲ ----------~=~~=-~-=~~~-----------~--=-~~~~=----=--~==~ ▲ ﬂ//
 }
 
 static void cb_Active(Fl_Light_Button* o, void* v) {
@@ -2301,22 +2301,21 @@ static void cb_10(Fl_Input* o, void* v) {
         snprintf(buf, sizeof(buf), "Widget Properties (%d widgets)", numselected);
         o->hide();
       } else {
-        o->value(current_widget->name());
+        o->value(current_widget->name().c_str());
         o->show();
-        snprintf(buf, sizeof(buf), "%s Properties", current_widget->title());
+        snprintf(buf, sizeof(buf), "%s Properties", current_widget->title().c_str());
       }
-
-      the_panel->label(buf);
+       the_panel->label(buf);
     } else {
       if (numselected == 1) {
         current_widget->name(o->value());
         // I don't update window title, as it probably is being closed
         // and wm2 (a window manager) barfs if you retitle and then
         // hide a window:
-        // ((Fl_Window*)(o->parent()->parent()->parent()))->label(current_widget->title());
+        // ((Fl_Window*)(o->parent()->parent()->parent()))->label(current_widget->title().c_str());
       }
     }
-//ﬂ ▲ ----------~=~~~~-~=-~-------------~~~-=-=~=--~=-=--==~ ▲ ﬂ//
+//ﬂ ▲ ----------~=~~~~-~=-~-----------~~~--==-~==~-~~=~---~- ▲ ﬂ//
 }
 
 static void cb_11(Fl_Choice* o, void* v) {
@@ -2344,20 +2343,20 @@ static void cb_11(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_2[] = {
- {"private", 0,  nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Menu_Item menu_3[] = {
- {"local", 0,  nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"global", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "local", 0, nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "global", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_code_choice(Fl_Button*, void* v) {
-//ﬂ ▼ ---------------------- callback -~~=---=~~---~-~~--~-- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~-~-=--~~-~-~=--=-~~~- ▼ ﬂ//
   int ix = fl_int(v);
   w_cpp_code_wiz->value(ix);
   if (w_cpp_code_act[ix])
@@ -2426,19 +2425,18 @@ static void cb_wComment(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback --~==-=-~=~=~~-~=~--~- ▼ ﬂ//
   bool has_text = false;
   if (v == LOAD) {
-    const char *cmttext = current_widget->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
-    has_text = (cmttext && *cmttext);
+    const std::string& cmttext = current_widget->comment();
+    o->buffer()->text( cmttext.c_str() );
+    has_text = !cmttext.empty();
   } else {
     int mod = 0;
-    char *c = o->buffer()->text();
-    has_text = (c && *c);
+    std::string c = o->buffer()->text();
+    has_text = !c.empty();
     for (Node *n: Fluid.proj.tree.all_selected_nodes()) {
       n->comment(c);
       mod = 1;
     }
     if (mod) Fluid.proj.set_modflag(1);
-    free(c);
   }
   if (has_text) {
     code_choice[0]->labelfont(FL_HELVETICA_BOLD_ITALIC);
@@ -2446,7 +2444,7 @@ static void cb_wComment(Fl_Text_Editor* o, void* v) {
     code_choice[0]->labelfont(FL_HELVETICA);
   }
   code_choice[0]->redraw();
-//ﬂ ▲ ----------~=--=~--~~=~----------~--~-~=-~~=--==~-----= ▲ ﬂ//
+//ﬂ ▲ ----------~=--=~--~~=~------------=-=-~-~~-~--=~~~-~=- ▲ ﬂ//
 }
 
 static void cb_v_code_input(fluid::widget::Code_Editor* o, void* v) {
@@ -2481,14 +2479,14 @@ static void cb_wCallback(fluid::widget::Code_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~---~~----~~=--=--=~-- ▼ ﬂ//
   bool has_text = false;
   if (v == LOAD) {
-    const char *cbtext = current_widget->callback();
-    has_text = (cbtext && *cbtext);
-    o->buffer()->text( cbtext ? cbtext : "" );
+    const std::string& cbtext = current_widget->callback();
+    has_text = !cbtext.empty();
+    o->buffer()->text( cbtext.c_str() );
   } else {
     int mod = 0;
-    char *c = o->buffer()->text();
-    has_text = (c && *c);
-    const char *d = c_check(c);
+    std::string c = o->buffer()->text();
+    has_text = !c.empty();
+    const char *d = c_check(c.c_str());
     if (d) {
       fluid_message("Error in callback: %s",d);
       if (o->window()) o->window()->make_current();
@@ -2499,7 +2497,6 @@ static void cb_wCallback(fluid::widget::Code_Editor* o, void* v) {
       mod = 1;
     }
     if (mod) Fluid.proj.set_modflag(1);
-    free(c);
   }
   if (has_text) {
     code_choice[5]->labelfont(FL_HELVETICA_BOLD_ITALIC);
@@ -2507,7 +2504,7 @@ static void cb_wCallback(fluid::widget::Code_Editor* o, void* v) {
     code_choice[5]->labelfont(FL_HELVETICA);
   }
   code_choice[5]->redraw();
-//ﬂ ▲ ----------~=-==~~~=-~~----------~~--=~=~-=--~==-~=-=-= ▲ ﬂ//
+//ﬂ ▲ ----------~=-==~~~=-~~-------------~~=~--~-=-~-=----=~ ▲ ﬂ//
 }
 
 Fl_Group* wp_cpp_callback = (Fl_Group*)nullptr;
@@ -2603,9 +2600,9 @@ static void cb_13(Fl_Input_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_4[] = {
- {"void*", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
- {"long", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "void*", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
+  { "long", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 4, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Box* w_when_box = (Fl_Box*)nullptr;
@@ -2613,7 +2610,7 @@ Fl_Box* w_when_box = (Fl_Box*)nullptr;
 Grid_Tab* widget_tab_grid = (Grid_Tab*)nullptr;
 
 static void cb_widget_tab_grid(Grid_Tab* o, void*) {
-//ﬂ ▼ ---------------------- callback -~~-=----=--=~=~-=-=~~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback -~-~-=~-=~~-=-~--~-=~= ▼ ﬂ//
   o->callback((Fl_Callback*)propagate_load);
 //ﬂ ▲ ----------=~-=~-=---~=------------=-~=--=~~=--=~~--=~- ▲ ﬂ//
 }
@@ -2662,15 +2659,15 @@ static void cb_14(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_5[] = {
- {"in source file only", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in header file only", 0,  nullptr, nullptr, 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"\"static\" in source file", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in source and \"extern\" in header", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "in source file only", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in header file only", 0, nullptr, nullptr, 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "\"static\" in source file", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in source and \"extern\" in header", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_15(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~=--~=~---~~-~-=-~~= ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~~-~=--=~=----=--~~-=~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
 
@@ -2694,14 +2691,14 @@ static void cb_15(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_6[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_16(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---~~-~~--=~=~~=~~=--= ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback -~=-=-----~=~~~-=~=--= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
 
@@ -2717,34 +2714,32 @@ static void cb_16(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_7[] = {
- {"binary: unsigned char[]", 0,  nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"text: const char*", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"compressed: unsigned char[]", 0,  nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"binary: std::vector<uint8_t>", 0,  nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"text: std::string", 0,  nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"compressed: std::vector<uint8_t>", 0,  nullptr, (void*)(5), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "binary: unsigned char[]", 0, nullptr, (void*)(0), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "text: const char*", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "compressed: unsigned char[]", 0, nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "binary: std::vector<uint8_t>", 0, nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "text: std::string", 0, nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "compressed: std::vector<uint8_t>", 0, nullptr, (void*)(5), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_Name(Fl_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~~=--=~=~-------~=~- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback -~-~-~=~~=-~----=~~-~~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
-
-  if (v == LOAD) {
-    o->value( nd->name() );
+   if (v == LOAD) {
+    o->value( nd->name().c_str() );
     the_panel->label("Inline Data Properties");
   } else {
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
-    {
-      nd->name( o->value() );
+    const std::string& nn = nd->name();
+    std::string ov = o->value();
+    if (nn != ov) {
+      nd->name(ov);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
   }
-//ﬂ ▲ ----------~=-~~==-~==------------~---=~~-~=~~-=-~=~=-= ▲ ﬂ//
+//ﬂ ▲ ----------~=-~~==-~==-----------~-~=--~--~~=---=~~=~-~ ▲ ﬂ//
 }
 
 Fl_Input* wp_data_filename = (Fl_Input*)nullptr;
@@ -2789,23 +2784,19 @@ static void cb_Comment(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback -~---~~--~=-=~=-~-~~=- ▼ ﬂ//
   if (!current_node || !dynamic_cast<Data_Node*>(current_node)) return;
   Data_Node* nd = (Data_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------=~-~=--~~~=~----------~-~~----=~=~----~~=-=~ ▲ ﬂ//
+//ﬂ ▲ ----------=~-~=--~~~=~-----------~~=-=~~~=--~--=~-=~=~ ▲ ﬂ//
 }
 
 Fl_Tabs* comment_tabs = (Fl_Tabs*)nullptr;
@@ -2825,24 +2816,19 @@ static void cb_comment_tabs_name(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback -~~~~~=~-~--~=~=-~--=- ▼ ﬂ//
   if (!current_node || !dynamic_cast<Comment_Node*>(current_node)) return;
   Comment_Node* nd = (Comment_Node*)current_node;
-
-  if (v == LOAD) {
+   if (v == LOAD) {
     the_panel->label("Comment Properties");
-    const char *cmttext = nd->name();
-    o->buffer()->text( cmttext ? cmttext : "" );
+    o->buffer()->text( nd->name().c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->name();
+    if (c != nn) {
       nd->name(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------=~-==~~-=-=------------~--=~=~-~--=--=-~-=~- ▲ ﬂ//
+//ﬂ ▲ ----------=~-==~~-=-=-----------~-=-~-~~-==~~=-~~--==~ ▲ ﬂ//
 }
 
 Fl_Menu_Button* comment_predefined_2 = (Fl_Menu_Button*)nullptr;
@@ -3039,14 +3025,14 @@ static void cb_17(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_8[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_Attribute(Fl_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~~~~-----~-=~=~-~~=~- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~-=-~==--~-=~~~--==-~- ▼ ﬂ//
   if (!current_node || !dynamic_cast<Class_Node*>(current_node)) return;
   Class_Node* nd = (Class_Node*)current_node;
 
@@ -3069,42 +3055,29 @@ static void cb_Class(Fl_Input* o, void* v) {
   Class_Node* nd = (Class_Node*)current_node;
    if (v == LOAD) {
     the_panel->label("Class Properties");
-    o->value( nd->name() );
+    o->value( nd->name().c_str() );
   } else {
-    const char *nn = nd->name();
-    char *nv = strdup( o->value() );
+    const std::string& nn = nd->name();
+    std::string nv = o->value();
     // There is an inconsistency in the project file reader, so this string
-    // must not coantain anything but alphanumeric and underscore characters.
-    char *s = (char*)nv;
-    char *d = (char*)nv;
-    while (*s) {
-      if (fl_ascii_isalnum((unsigned char)*s) || *s == '_') {
-        *d++ = *s;
+    // must not contain anything but alphanumeric and underscore characters.
+    std::string filtered;
+    for (char c : nv) {
+      if (fl_ascii_isalnum((unsigned char)c) || c == '_') {
+        filtered += c;
       }
-      s++;
     }
-    *d = 0;
-    // The class name must not be empty either
-    if (*nv == 0) {
-      free((void*)nv);
-      nv = strdup("MyClass");
+    if (filtered.empty()) {
+      filtered = "MyClass";
     }
-    // The class name may have changed, so update the widget
-    o->value( nv );
-    // Now copy the new name into the node if it changed
-    if (   ( nn && (strcmp(nn, nv) != 0))
-        || (!nn && (strcmp("", nv) != 0)) )
-    {
-      nd->name( nv );
+    o->value(filtered.c_str());
+    if (nn != filtered) {
+      nd->name(filtered);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    // Don't forget to clean up
-    if (nv) {
-      free((void*)nv);
-    }
   }
-//ﬂ ▲ ----------~=-~--~~-=~--------------=-=~~~--==~~=~==~~~ ▲ ﬂ//
+//ﬂ ▲ ----------~=-~--~~-=~-----------~~~--~=-~=-=~---~~---= ▲ ﬂ//
 }
 
 static void cb_Base(Fl_Input* o, void* v) {
@@ -3128,23 +3101,19 @@ static void cb_Comment1(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~-=~-~--=-------~~-=-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Class_Node*>(current_node)) return;
   Class_Node* nd = (Class_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~==-=-~--~~=-----------~-=---~-==-=~--~=-~-- ▲ ﬂ//
+//ﬂ ▲ ----------~==-=-~--~~=----------~~=~-~=~-~=~-~-==--==- ▲ ﬂ//
 }
 
 Fl_Tabs* declblock_tabs = (Fl_Tabs*)nullptr;
@@ -3162,21 +3131,19 @@ static void cb_Start(Fl_Input* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~-=-=-~--=~=~=~~-~~=-- ▼ ﬂ//
   if (!current_node || !dynamic_cast<DeclBlock_Node*>(current_node)) return;
   DeclBlock_Node* nd = (DeclBlock_Node*)current_node;
-
-  if (v == LOAD) {
+   if (v == LOAD) {
     the_panel->label("Declaration Block Properties");
-    o->value( nd->name() );
+    o->value( nd->name().c_str() );
   } else {
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
-    {
-      nd->name( o->value() );
+    const std::string& nn = nd->name();
+    std::string ov = o->value();
+    if (nn != ov) {
+      nd->name(ov);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
   }
-//ﬂ ▲ ----------=~---~~-=--~-----------~~-~------~~==~~--=-= ▲ ﬂ//
+//ﬂ ▲ ----------=~---~~-=--~----------~-~--==~-~-=-----=~~~- ▲ ﬂ//
 }
 
 static void cb_End(Fl_Input* o, void* v) {
@@ -3278,23 +3245,19 @@ static void cb_Comment2(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback -~~=----~-~=---=-~~~~~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<DeclBlock_Node*>(current_node)) return;
   DeclBlock_Node* nd = (DeclBlock_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~=-=~~~~~--------------~=--==~~~--=--=---~=~ ▲ ﬂ//
+//ﬂ ▲ ----------~=-=~~~~~----------------=--~--=--~=-----~=~ ▲ ﬂ//
 }
 
 Fl_Tabs* preprocessor_tabs = (Fl_Tabs*)nullptr;
@@ -3326,56 +3289,50 @@ static void cb_Type(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_Type[] = {
- {"Start of condition (#if, #ifdef)", 0,  nullptr, (void*)(Preprocessor_Node::Use::IFDEF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Inside condition block (#elif, #else)", 0,  nullptr, (void*)(Preprocessor_Node::Use::ELSE), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"End of condition (#endif)", 0,  nullptr, (void*)(Preprocessor_Node::Use::ENDIF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Verbatim in Header (#include, #define, ...)", 0,  nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_H), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"Verbatim in Source (#include, #define, #pragma, ...)", 0,  nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_CXX), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "Start of condition (#if, #ifdef)", 0, nullptr, (void*)(Preprocessor_Node::Use::IFDEF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Inside condition block (#elif, #else)", 0, nullptr, (void*)(Preprocessor_Node::Use::ELSE), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "End of condition (#endif)", 0, nullptr, (void*)(Preprocessor_Node::Use::ENDIF), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Verbatim in Header (#include, #define, ...)", 0, nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_H), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "Verbatim in Source (#include, #define, #pragma, ...)", 0, nullptr, (void*)(Preprocessor_Node::Use::VERBATIM_CXX), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_Directive(Fl_Input* o, void* v) {
-//ﬂ ▼ ---------------------- callback ---=-=--~~-~=-=-=~=--= ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~-~~~=--~~-==~-~~=~=-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Preprocessor_Node*>(current_node)) return;
   Preprocessor_Node* nd = (Preprocessor_Node*)current_node;
-
-  if (v == LOAD) {
+   if (v == LOAD) {
     the_panel->label("Preprocessor Directive Properties");
-    o->value( nd->name() );
+    o->value( nd->name().c_str() );
   } else {
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
-    {
-      nd->name( o->value() );
+    const std::string& nn = nd->name();
+    std::string ov = o->value();
+    if (nn != ov) {
+      nd->name(ov);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
   }
-//ﬂ ▲ ----------=~=-~--~~~=--------------=--~=~-=-~~-=~-~=~~ ▲ ﬂ//
+//ﬂ ▲ ----------=~=-~--~~~=-----------~~~~~--~~-~=-=-~~--=-= ▲ ﬂ//
 }
 
 static void cb_Comment3(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~----~~=-=~---~==~~=-~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Preprocessor_Node*>(current_node)) return;
   Preprocessor_Node* nd = (Preprocessor_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~=-~-~=~~=--------------~-~-~~=-~=~-~~-=~~-~ ▲ ﬂ//
+//ﬂ ▲ ----------~=-~-~=~~=-------------~-=~~-~=~~---~~-=~=~= ▲ ﬂ//
 }
 
 Fl_Tabs* decl_tabs = (Fl_Tabs*)nullptr;
@@ -3414,15 +3371,15 @@ static void cb_18(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_9[] = {
- {"in source file only", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in header file only", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"\"static\" in source file", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"in source and \"extern\" in header", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "in source file only", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in header file only", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "\"static\" in source file", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "in source and \"extern\" in header", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_19(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~-~~-~-=~---==~~~-==~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~~-=~==---=~---~-==~~= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Decl_Node*>(current_node)) return;
   Decl_Node* nd = (Decl_Node*)current_node;
 
@@ -3446,14 +3403,14 @@ static void cb_19(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_a[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_1a(Fl_Tile* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~=-=~=--=-=~=~-~~---- ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback --~-~=~~-~=~~~=--~=~-- ▼ ﬂ//
   propagate_load(o, v);
 //ﬂ ▲ ----------=~~~-=~==~-=----------~--~~~-~~=-~=~=-=~~-~- ▲ ﬂ//
 }
@@ -3462,47 +3419,38 @@ static void cb_Declaration(fluid::widget::Code_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~~~~~~-==-=~-~-=~~=~-~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Decl_Node*>(current_node)) return;
   Decl_Node* nd = (Decl_Node*)current_node;
-
-  if (v == LOAD) {
+   if (v == LOAD) {
     the_panel->label("Declaration Properties");
-    const char *cmttext = nd->name();
-    o->buffer()->text( cmttext ? cmttext : "" );
+    o->buffer()->text( nd->name().c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->name();
+    if (nn != c) {
       nd->name(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~=~=-~-~=---------------~=~~~==-=~--~~=---~= ▲ ﬂ//
+//ﬂ ▲ ----------~=~=-~-~=---------------=--~~=~~~--~-==~-~-= ▲ ﬂ//
 }
 
 static void cb_Comment4(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback --=~-~~--~---~=~=--=-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Decl_Node*>(current_node)) return;
   Decl_Node* nd = (Decl_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~==~~=-==~~~----------~~~~~--=~-=~=-~=~=--~- ▲ ﬂ//
+//ﬂ ▲ ----------~==~~=-==~~~----------~--~~-~==~~--=~-=-=--= ▲ ﬂ//
 }
 
 Fl_Tabs* codeblock_tabs = (Fl_Tabs*)nullptr;
@@ -3520,21 +3468,19 @@ static void cb_Start1(Fl_Input* o, void* v) {
 //ﬂ ▼ ---------------------- callback -~~-=~-~-==~=----~-~~- ▼ ﬂ//
   if (!current_node || !dynamic_cast<CodeBlock_Node*>(current_node)) return;
   CodeBlock_Node* nd = (CodeBlock_Node*)current_node;
-
-  if (v == LOAD) {
-    o->value( nd->name() );
+   if (v == LOAD) {
+    o->value( nd->name().c_str() );
     the_panel->label("Code Block Properties");
   } else {
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, o->value()) != 0))
-        || (!nn && (strcmp("", o->value()) != 0)) )
-    {
-      nd->name( o->value() );
+    const std::string& nn = nd->name();
+    std::string ov = o->value();
+    if (nn != ov) {
+      nd->name(ov);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
   }
-//ﬂ ▲ ----------=~-=--~~-==~-----------~=-=-~=~~-=--~=---~=~ ▲ ﬂ//
+//ﬂ ▲ ----------=~-=--~~-==~----------~~-~--~-=~~~=--~=~-=-~ ▲ ﬂ//
 }
 
 static void cb_End1(Fl_Input* o, void* v) {
@@ -3552,23 +3498,19 @@ static void cb_Comment5(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback ~~-~---==~-=-~=-~~-~~= ▼ ﬂ//
   if (!current_node || !dynamic_cast<CodeBlock_Node*>(current_node)) return;
   CodeBlock_Node* nd = (CodeBlock_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~=-==----~~-----------~~~--=-~-=-~=~-~-~~~-= ▲ ﬂ//
+//ﬂ ▲ ----------~=-==----~~------------~-=~-~~--~~~=-~=~~~~~ ▲ ﬂ//
 }
 
 Fl_Tabs* code_tabs = (Fl_Tabs*)nullptr;
@@ -3588,16 +3530,13 @@ static void cb_1b(fluid::widget::Code_Editor* o, void* v) {
   Code_Node* nd = (Code_Node*)current_node;
    if (v == LOAD) {
     the_panel->label("Code Editor");
-    const char *cmttext = nd->name();
-    o->buffer()->text( cmttext ? cmttext : "" );
+    o->buffer()->text( nd->name().c_str() );
     o->insert_position(nd->cursor_position());
     o->scroll(nd->code_input_scroll_row(), nd->code_input_scroll_col());
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->name();
+    if (c != nn) {
       nd->name(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
@@ -3605,9 +3544,8 @@ static void cb_1b(fluid::widget::Code_Editor* o, void* v) {
     nd->save_editor_state(o->insert_position(),
                           o->scroll_row(),
                           o->scroll_col());
-    free(c);
   }
-//ﬂ ▲ ----------=~~---~~=~~=-------------~--~==-~-~~~---~-~~ ▲ ﬂ//
+//ﬂ ▲ ----------=~~---~~=~~=----------~--~~~~--==-~=~-=-~~-= ▲ ﬂ//
 }
 
 Fl_Tabs* func_tabs = (Fl_Tabs*)nullptr;
@@ -3646,14 +3584,14 @@ static void cb_1c(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_b[] = {
- {"static", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"global", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"local", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "static", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "global", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "local", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_1d(Fl_Choice* o, void* v) {
-//ﬂ ▼ ---------------------- callback -~~==~=~---~--~~~-~=-~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ~~~-=~~=-~=-~=-=--=~-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Function_Node*>(current_node)) return;
   Function_Node* nd = (Function_Node*)current_node;
 
@@ -3677,14 +3615,14 @@ static void cb_1d(Fl_Choice* o, void* v) {
 }
 
 Fl_Menu_Item menu_c[] = {
- {"private", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"public", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"protected", 0,  nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "private", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "public", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "protected", 0, nullptr, nullptr, 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 static void cb_declare(Fl_Check_Button* o, void* v) {
-//ﬂ ▼ ---------------------- callback ~-~=-~=~~=-=~~=~~-~==~ ▼ ﬂ//
+//ﬂ ▼ ---------------------- callback ---=-==-=----==~~--~-= ▼ ﬂ//
   if (!current_node || !dynamic_cast<Function_Node*>(current_node)) return;
   Function_Node* nd = (Function_Node*)current_node;
 
@@ -3709,24 +3647,19 @@ static void cb_Function(fluid::widget::Code_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback --~--~-~-=--=~---~~=~- ▼ ﬂ//
   if (!current_node || !dynamic_cast<Function_Node*>(current_node)) return;
   Function_Node* nd = (Function_Node*)current_node;
-
-  if (v == LOAD) {
+   if (v == LOAD) {
     the_panel->label("Function Properties");
-    const char *cmttext = nd->name();
-    o->buffer()->text( cmttext ? cmttext : "" );
+    o->buffer()->text( nd->name().c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->name();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->name();
+    if (c != nn) {
       nd->name(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------=~--~~---~-=----------~-~-~-~-~=-~-~~-~~=~~- ▲ ﬂ//
+//ﬂ ▲ ----------=~--~~---~-=------------~=~~-~~-~=~-~=-=--~= ▲ ﬂ//
 }
 
 static void cb_Return(fluid::widget::Code_Editor* o, void* v) {
@@ -3744,23 +3677,19 @@ static void cb_Comment6(Fl_Text_Editor* o, void* v) {
 //ﬂ ▼ ---------------------- callback -----~-=--~--~-~-~~=-~ ▼ ﬂ//
   if (!current_node || !dynamic_cast<Function_Node*>(current_node)) return;
   Function_Node* nd = (Function_Node*)current_node;
-
-  if (v == LOAD) {
-    const char *cmttext = nd->comment();
-    o->buffer()->text( cmttext ? cmttext : "" );
+   if (v == LOAD) {
+    const std::string& cmttext = nd->comment();
+    o->buffer()->text( cmttext.c_str() );
   } else {
-    char *c = o->buffer()->text();
-    const char *nn = nd->comment();
-    if (   ( nn && (strcmp(nn, c) != 0))
-        || (!nn && (strcmp("", c) != 0)) )
-    {
+    std::string c = o->buffer()->text();
+    const std::string& nn = nd->comment();
+    if (c != nn) {
       nd->comment(c);
       Fluid.proj.set_modflag(1);
       redraw_browser();
     }
-    free(c);
   }
-//ﬂ ▲ ----------~=~~--=~~--~-----------~-~-~=~~--~--~-~=~=~= ▲ ﬂ//
+//ﬂ ▲ ----------~=~~--=~~--~-----------~=---=--~=~=~~-=~~=-- ▲ ﬂ//
 }
 
 Fl_Tabs* widget_tabs_repo = (Fl_Tabs*)nullptr;

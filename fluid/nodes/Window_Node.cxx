@@ -226,6 +226,56 @@ int Overlay_Window::handle(int e) {
 }
 
 /**
+ Help the user to create a missing Function or Class method for this Window.
+
+ A Window can only be created inside a Function or a Class method. If
+ none is found, this opens a dialog offering to create a new Function, or
+ a new method inside an existing or new Class, or to cancel so the user
+ can pick an existing container instead.
+
+ \param[in,out] strategy placement strategy, updated to place the window
+    inside the newly created container
+ \param[out] anchor updated to the newly created container node
+ \return true if a container was created and \p anchor and \p strategy
+    were updated, false if the user canceled
+ */
+bool Window_Node::node_creation_assistant(Strategy& strategy, Node*& anchor)
+{
+  Node *klass = nullptr;
+  int ret = fluid::big_choice(
+    "Fluid: Window Node requires a Container",
+    "A Window can only be created inside a Function or a Class method.\n\n"
+    "Would you like to create a new container, or cancel and select an existing one?\n\n",
+    {
+      {"Create a &Function and add the window", 'f'},
+      {"Create a &Method in a Class and add the window", 'm'},
+      {"&Cancel and select an existing container", 'c'}
+    } );
+  switch (ret) {
+    case 0:
+      // Walk up above the topmost class node before adding the function.
+      while (Fluid.proj.tree.current && (klass = Fluid.proj.tree.current->find_parent_class_node()))
+        Fluid.proj.tree.current = klass->parent;
+      anchor = add_new_widget_from_user("function", Strategy::AFTER_CURRENT, false);
+      Fluid.proj.tree.current = anchor;
+      strategy.placement(Strategy::AS_LAST_CHILD);
+      break;
+    case 1:
+      if (!Fluid.proj.tree.current || !(klass = Fluid.proj.tree.current->find_parent_class_node()))
+        klass = add_new_widget_from_user("class", Strategy::AFTER_CURRENT, true);
+      Fluid.proj.tree.current = klass;
+      anchor = add_new_widget_from_user("function", Strategy::AS_LAST_CHILD, false);
+      Fluid.proj.tree.current = anchor;
+      strategy.placement(Strategy::AS_LAST_CHILD);
+      break;
+    default:
+      return false;
+  }
+  return true;
+}
+
+
+/**
  Make and add a new Window node.
  \param[in] strategy is Strategy::AS_LAST_CHILD or Strategy::AFTER_CURRENT
  \return new node
@@ -241,29 +291,8 @@ Node *Window_Node::make(Strategy strategy) {
   if (!p) {
     if (strategy.source() == Strategy::FROM_FILE) {
       return nullptr; // trigger a file read error
-    }
-    int ret = fluid::big_choice(
-      "Fluid: Window Container Required",
-      "A Window can only be created inside a Function or a Widget Class container.\n\n"
-      "Would you like to create a new container or select an existing one?",
-      {
-        {"Create a &Function and add the window", 'f'},
-        {"Create a &Widget Class and add the window", 'w'},
-        {"&Cancel and let me select an existing container", 'c'}
-      } );
-    switch (ret) {
-      case 0:
-        p = add_new_widget_from_user("function", Strategy::AFTER_CURRENT, false);
-        Fluid.proj.tree.current = anchor = p;
-        strategy.placement(Strategy::AS_LAST_CHILD);
-        break;
-      case 1:
-        p = add_new_widget_from_user("widget_class", Strategy::AFTER_CURRENT, true);
-        Fluid.proj.tree.current = anchor = p;
-        strategy.placement(Strategy::AS_LAST_CHILD);
-        break;
-      default:
-        return nullptr;
+    } else if (node_creation_assistant(strategy, anchor) == false) {
+      return nullptr; // user canceled the creation assitant
     }
   }
   Window_Node *myo = new Window_Node();
@@ -374,8 +403,8 @@ void Window_Node::ideal_size(int &w, int &h) {
 
 Window_Node Window_Node::prototype;
 
-void Window_Node::setlabel(const char *n) {
-  if (o) ((Fl_Window *)o)->label(n);
+void Window_Node::setlabel(const std::string& n) {
+  if (o) ((Fl_Window *)o)->copy_label(n.c_str());
 }
 
 // Resize from window manager...
@@ -1232,7 +1261,7 @@ void Window_Node::write_code1(fluid::io::Code_Writer& f) {
  \param f the source code output stream
  */
 void Window_Node::write_code2(fluid::io::Code_Writer& f) {
-  const char *var = is_class() ? "this" : name() ? name() : "o";
+  const char *var = is_class() ? "this" : !name().empty() ? name().c_str() : "o";
   // make the window modal or non-modal
   if (modal) {
     f.write_c(f.indent() + var + "->set_modal();\n");
@@ -1244,14 +1273,14 @@ void Window_Node::write_code2(fluid::io::Code_Writer& f) {
     f.write_c(f.indent() + var + "->clear_border();\n");
   }
   // set the xclass of the window
-  if (xclass) {
+  if (!xclass.empty()) {
     f.write_c(f.indent() + var + "->xclass(");
     f.write_cstring(xclass);
     f.write_c(");\n");
   }
   // make the window resizable
   if (((Fl_Window*)o)->resizable() == o)
-    f.write_c(f.indent() + var + "->resizable(" + std::string(var) + ");\n");
+    f.write_c(f.indent() + var + "->resizable(" + var + ");\n");
   // set the size range last
   if (sr_max_w || sr_max_h) {
     f.write_c(f.indent() + var + "->size_range(" +
@@ -1272,36 +1301,47 @@ void Window_Node::write_code2(fluid::io::Code_Writer& f) {
 
 void Window_Node::write_properties(fluid::io::Project_Writer &f) {
   Widget_Node::write_properties(f);
-  if (modal) f.write_string("modal");
-  else if (non_modal) f.write_string("non_modal");
-  if (!((Fl_Window*)o)->border()) f.write_string("noborder");
-  if (xclass) {f.write_string("xclass"); f.write_word(xclass);}
-  if (sr_min_w || sr_min_h || sr_max_w || sr_max_h)
+  if (modal) {
+    f.write_string("modal");
+  } else if (non_modal) {
+    f.write_string("non_modal");
+  }
+  if (!((Fl_Window*)o)->border()) {
+    f.write_string("noborder");
+  }
+  if (!xclass.empty()) {
+    f.write_string("xclass");
+    f.write_word(xclass);
+  }
+  if (sr_min_w || sr_min_h || sr_max_w || sr_max_h) {
     f.write_string("size_range {%d %d %d %d}", sr_min_w, sr_min_h, sr_max_w, sr_max_h);
-  if (o->visible() || override_visible_) f.write_string("visible");
+  }
+  if (o->visible() || override_visible_) {
+    f.write_string("visible");
+  }
 }
 
-void Window_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
-  if (!strcmp(c,"modal")) {
+void Window_Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
+  if (c == "modal") {
     modal = 1;
-  } else if (!strcmp(c,"non_modal")) {
+  } else if (c == "non_modal") {
     non_modal = 1;
-  } else if (!strcmp(c, "visible")) {
+  } else if (c == "visible") {
     if (Fluid.batch_mode) // don't actually open any windows in batch mode
       override_visible_ = 1;
     else // in interactive mode, we simply show the window
       open_();
-  } else if (!strcmp(c,"noborder")) {
+  } else if (c == "noborder") {
     ((Fl_Window*)o)->border(0);
-  } else if (!strcmp(c,"xclass")) {
+  } else if (c == "xclass") {
     storestring(f.read_word(),xclass);
-    ((Fl_Window*)o)->xclass(xclass);
-  } else if (!strcmp(c,"size_range")) {
+    ((Fl_Window*)o)->xclass(xclass.c_str());
+  } else if (c == "size_range") {
     int mw, mh, MW, MH;
-    if (sscanf(f.read_word(),"%d %d %d %d",&mw,&mh,&MW,&MH) == 4) {
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d",&mw,&mh,&MW,&MH) == 4) {
       sr_min_w = mw; sr_min_h = mh; sr_max_w = MW; sr_max_h = MH;
     }
-  } else if (!strcmp(c,"xywh")) {
+  } else if (c == "xywh") {
     Widget_Node::read_property(f, c);
     Fluid.pasteoffset = 0; // make it not apply to contents
   } else {
@@ -1309,18 +1349,18 @@ void Window_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
   }
 }
 
-int Window_Node::read_fdesign(const char* propname, const char* value) {
+int Window_Node::read_fdesign(const std::string& propname, const std::string& value) {
   int x;
   o->box(FL_NO_BOX); // because fdesign always puts an Fl_Box next
-  if (!strcmp(propname,"Width")) {
-    if (sscanf(value,"%d",&x) == 1) o->size(x,o->h());
-  } else if (!strcmp(propname,"Height")) {
-    if (sscanf(value,"%d",&x) == 1) o->size(o->w(),x);
-  } else if (!strcmp(propname,"NumberofWidgets")) {
+  if (propname == "Width") {
+    if (sscanf(value.c_str(),"%d",&x) == 1) o->size(x,o->h());
+  } else if (propname == "Height") {
+    if (sscanf(value.c_str(),"%d",&x) == 1) o->size(o->w(),x);
+  } else if (propname == "NumberofWidgets") {
     return 1; // we can figure out count from file
-  } else if (!strcmp(propname,"border")) {
-    if (sscanf(value,"%d",&x) == 1) ((Fl_Window*)o)->border(x);
-  } else if (!strcmp(propname,"title")) {
+  } else if (propname == "border") {
+    if (sscanf(value.c_str(),"%d",&x) == 1) ((Fl_Window*)o)->border(x);
+  } else if (propname == "title") {
     label(value);
   } else {
     return Widget_Node::read_fdesign(propname,value);
@@ -1375,10 +1415,10 @@ void Widget_Class_Node::write_properties(fluid::io::Project_Writer &f) {
     f.write_string("position_relative_rescale");
 }
 
-void Widget_Class_Node::read_property(fluid::io::Project_Reader &f, const char *c) {
-  if (!strcmp(c,"position_relative")) {
+void Widget_Class_Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
+  if (c == "position_relative") {
     wc_relative = 1;
-  } else if (!strcmp(c,"position_relative_rescale")) {
+  } else if (c == "position_relative_rescale") {
       wc_relative = 2;
   } else {
     Window_Node::read_property(f, c);
@@ -1387,14 +1427,9 @@ void Widget_Class_Node::read_property(fluid::io::Project_Reader &f, const char *
 
 // Convert A::B::C::D to D (i.e. keep only innermost name)
 // This is useful for classes that contain a namespace component
-static const char *trimclassname(const char *n) {
-  if (!n)
-    return nullptr;
-  const char *nn;
-  while((nn = strstr(n, "::"))) {
-    n = nn + 2;
-  }
-  return(n);
+static std::string trimclassname(const std::string& n) {
+  size_t pos = n.rfind("::");
+  return (pos == std::string::npos) ? n : n.substr(pos + 2);
 }
 
 
@@ -1411,44 +1446,46 @@ void Widget_Class_Node::write_code1(fluid::io::Code_Writer& f) {
   f.write_c("\n");
   f.write_h("\n");
   write_comment_h(f);
-  f.write_h("class " + std::string(name()) + " : public " + c + " {\n");
+  f.write_h("class " + name() + " : public " + c + " {\n");
   if (c.find("Window")!=c.npos) {
-    f.write_h(f.indent(1) + "void _" + std::string(trimclassname(name())) + "();\n");
+    f.write_h(f.indent(1) + "void _" + trimclassname(name()) + "();\n");
     f.write_h("public:\n");
-    f.write_h(f.indent(1) + std::string(trimclassname(name())) + "(int X, int Y, int W, int H, const char* L=nullptr);\n");
-    f.write_h(f.indent(1) + std::string(trimclassname(name())) + "(int W, int H, const char* L=nullptr);\n");
-    f.write_h(f.indent(1) + std::string(trimclassname(name())) + "();\n");
+    f.write_h(f.indent(1) + trimclassname(name()) + "(int X, int Y, int W, int H, const char* L=nullptr);\n");
+    f.write_h(f.indent(1) + trimclassname(name()) + "(int W, int H, const char* L=nullptr);\n");
+    f.write_h(f.indent(1) + trimclassname(name()) + "();\n");
 
     // a constructor with all four dimensions plus label
-    f.write_c(std::string(name()) + "::" + std::string(trimclassname(name())) + "(int X, int Y, int W, int H, const char* L) :\n");
+    f.write_c(name() + "::" + trimclassname(name()) + "(int X, int Y, int W, int H, const char* L) :\n");
     f.write_c(f.indent(1) + c + "(X, Y, W, H, L)\n{\n");
-    f.write_c(f.indent(1) + "_" + std::string(trimclassname(name())) + "();\n");
+    f.write_c(f.indent(1) + "_" + trimclassname(name()) + "();\n");
     f.write_c("}\n\n");
 
     // a constructor with just the size and label. The window manager will position the window
-    f.write_c(std::string(name()) + "::" + std::string(trimclassname(name())) + "(int W, int H, const char* L) :\n");
+    f.write_c(name() + "::" + trimclassname(name()) + "(int W, int H, const char* L) :\n");
     f.write_c(f.indent(1) + c + "(0, 0, W, H, L)\n{\n");
     f.write_c(f.indent(1) + "clear_flag(16);\n");
-    f.write_c(f.indent(1) + "_" + std::string(trimclassname(name())) + "();\n");
+    f.write_c(f.indent(1) + "_" + trimclassname(name()) + "();\n");
     f.write_c("}\n\n");
 
     // a constructor that takes size and label from the Fluid database
-    f.write_c(std::string(name()) + "::" + std::string(trimclassname(name())) + "() :\n");
+    f.write_c(name() + "::" + trimclassname(name()) + "() :\n");
     f.write_c(f.indent(1) + c + "(0, 0, " + std::to_string(o->w()) + ", " + std::to_string(o->h()) + ", ");
-    const char *cstr = label();
-    if (cstr) f.write_cstring(cstr);
-    else f.write_c("nullptr");
+    if (!label().empty()) {
+      f.write_cstring(label().c_str());
+    } else {
+      f.write_c("nullptr");
+    }
     f.write_c(")\n{\n");
     f.write_c(f.indent(1) + "clear_flag(16);\n");
-    f.write_c(f.indent(1) + "_" + std::string(trimclassname(name())) + "();\n");
+    f.write_c(f.indent(1) + "_" + trimclassname(name()) + "();\n");
     f.write_c("}\n\n");
 
-    f.write_c("void " + std::string(name()) + "::_" + std::string(trimclassname(name())) + "() {\n");
+    f.write_c("void " + name() + "::_" + trimclassname(name()) + "() {\n");
 //    f.write_c("%s%s* w = this;\n", f.indent(1), name());
   } else {
     f.write_h("public:\n");
-    f.write_h(f.indent(1) + std::string(trimclassname(name())) + "(int X, int Y, int W, int H, const char* L=nullptr);\n");
-    f.write_c(std::string(name()) + "::" + std::string(trimclassname(name())) + "(int X, int Y, int W, int H, const char* L) :\n");
+    f.write_h(f.indent(1) + trimclassname(name()) + "(int X, int Y, int W, int H, const char* L=nullptr);\n");
+    f.write_c(name() + "::" + trimclassname(name()) + "(int X, int Y, int W, int H, const char* L) :\n");
     if (wc_relative==1)
       f.write_c(f.indent(1) + c + "(0, 0, W, H, L)\n{\n");
     else if (wc_relative==2)
@@ -1481,7 +1518,7 @@ void Widget_Class_Node::write_code2(fluid::io::Code_Writer& f) {
   // clear the window border
   if (!((Fl_Window*)o)->border()) f.write_c(f.indent() + "clear_border();\n");
   // set the xclass of the window
-  if (xclass) {
+  if (!xclass.empty()) {
     f.write_c(f.indent() + "xclass(");
     f.write_cstring(xclass);
     f.write_c(");\n");

@@ -275,7 +275,7 @@ void Node_Browser::item_select(void *l,int v) {
 int Node_Browser::item_height(void *l) const {
   Node *t = (Node*)l;
   if (t->visible) {
-    if (Fluid.show_comments && t->comment())
+    if (Fluid.show_comments && !t->comment().empty())
       return textsize()*2+4;
     else
       return textsize()+5;
@@ -332,9 +332,9 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
   // items can contain a comment. If they do, the comment gets a second text
   // line inside this browser line
   int comment_incr = 0;
-  if (Fluid.show_comments && l->comment()) {
+  if (Fluid.show_comments && !l->comment().empty()) {
     // -- comment
-    copy_trunc(buf, l->comment(), 80, 0, 1);
+    copy_trunc(buf, l->comment().c_str(), 80, 0, 1);
     comment_incr = textsize()-1;
     if (l->selected) fl_color(fl_contrast(comment_color, FL_SELECTION_COLOR));
     else fl_color(comment_color);
@@ -371,7 +371,7 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
   }
 
   // Width=18: Draw the icon associated with the type.
-  Fl_Pixmap *pm = pixmap_for(l->type_name());
+  Fl_Pixmap *pm = pixmap_for(l->type_name().c_str());
   if (pm) pm->draw(X-18, Y);
 
   // Add tags on top of the icon for locked and protected types.
@@ -402,14 +402,14 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
     else fl_color(class_color);
     fl_draw(c.c_str(), X, Y+13);
     X += int(fl_width(c.c_str())+fl_width('n'));
-    c = l->name() ? l->name() : "";
+    c = l->name();
     if (!c.empty()) {
       // -- name
       fl_font(name_font, textsize());
       if (l->selected) fl_color(fl_contrast(name_color, FL_SELECTION_COLOR));
       else fl_color(name_color);
       fl_draw(c.c_str(), X, Y+13);
-    } else if (l->label()) {
+    } else if (!l->label().empty()) {
       // -- label
       c = l->label();
       fl_font(label_font, textsize());
@@ -424,20 +424,20 @@ void Node_Browser::item_draw(void *v, int X, int Y, int, int) const {
       fl_font(func_font, textsize());
       if (l->selected) fl_color(fl_contrast(func_color, FL_SELECTION_COLOR));
       else fl_color(func_color);
-      copy_trunc(buf, l->title(), 55, 0, 0);
+      copy_trunc(buf, l->title().c_str(), 55, 0, 0);
     } else {
       if (dynamic_cast<Comment_Node*>(l)) {
         // -- comment (in main line, not above entry)
         fl_font(comment_font, textsize());
         if (l->selected) fl_color(fl_contrast(comment_color, FL_SELECTION_COLOR));
         else fl_color(comment_color);
-        copy_trunc(buf, l->title(), 55, 0, 0);
+        copy_trunc(buf, l->title().c_str(), 55, 0, 0);
       } else {
         // -- code
         fl_font(code_font, textsize());
         if (l->selected) fl_color(fl_contrast(code_color, FL_SELECTION_COLOR));
         else fl_color(code_color);
-        copy_trunc(buf, l->title(), 55, 0, 1);
+        copy_trunc(buf, l->title().c_str(), 55, 0, 1);
       }
     }
     fl_draw(buf, X, Y+13);
@@ -467,20 +467,20 @@ int Node_Browser::item_width(void *v) const {
   int W = 3 + 13 + 18 + l->level * 12;
 
   if (l->is_widget() || l->is_class()) {
-    const char* c = l->type_name();
+    const char* c = l->type_name().c_str();
     if (!strncmp(c,"Fl_",3)) c += 3;
     fl_font(textfont(), textsize());
     W += int(fl_width(c) + fl_width('n'));
-    c = l->name();
-    if (c) {
+    c = l->name().c_str();
+    if (c && *c) {
       fl_font(textfont()|FL_BOLD, textsize());
       W += int(fl_width(c));
-    } else if (l->label()) {
-      copy_trunc(buf, l->label(), 32, 1, 0); // quoted string
+    } else if (!l->label().empty()) {
+      copy_trunc(buf, l->label().c_str(), 32, 1, 0); // quoted string
       W += int(fl_width(buf));
     }
   } else {
-    copy_trunc(buf, l->title(), 55, 0, 0);
+    copy_trunc(buf, l->title().c_str(), 55, 0, 0);
     fl_font(textfont() | (l->is_code_block() && (l->level==0 || l->parent->is_class())?0:FL_BOLD), textsize());
     W += int(fl_width(buf));
   }

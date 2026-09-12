@@ -727,7 +727,7 @@ void Code_Writer::write_i18n_prologue()
       }
       if (proj_.i18n.type == fluid::I18n_Type::POSIX) {
         write_c("#" + indent() + "ifndef catgets\n");
-        write_c("#" + std::string(indent_plus(1)) + "define catgets(catalog, set, msgid, text) text\n");
+        write_c("#" + indent_plus(1) + "define catgets(catalog, set, msgid, text) text\n");
         write_c("#" + indent() + "endif\n");
       }
       indentation--;
@@ -735,7 +735,7 @@ void Code_Writer::write_i18n_prologue()
     }
     if (proj_.i18n.type == fluid::I18n_Type::GNU && proj_.i18n.gnu_static_function[0]) {
       write_c("#ifndef " + proj_.i18n.gnu_static_function + "\n");
-      write_c("#" + std::string(indent_plus(1)) + "define " + proj_.i18n.gnu_static_function + "(text) text\n");
+      write_c("#" + indent_plus(1) + "define " + proj_.i18n.gnu_static_function + "(text) text\n");
       write_c("#endif\n");
     }
   }

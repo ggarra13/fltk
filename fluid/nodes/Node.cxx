@@ -223,49 +223,25 @@ void Node::delete_children() {
 
 /**
  Update a string.
- Replace a string pointer with new value, strips leading/trailing blanks.
+ Replace a string with a new value, strips leading/trailing blanks.
  As a side effect, this call also sets the mod flags.
- \param[in] n new string, can be nullptr
- \param[out] p update this pointer, possibly reallocate memory
+ \param[in] n new string
+ \param[out] p update this string
  \param[in] nostrip if set, do not strip leading and trailing spaces and tabs
  \return 1 if the string in p changed
  */
-int storestring(const char *n, const char * & p, int nostrip) {
-  if (n == p) return 0;
+int storestring(const std::string& n, std::string& p, int nostrip) {
+  if (&n == &p) return 0;
+  size_t begin = 0, end = n.size();
+  if (!nostrip) { // strip leading & trailing blanks
+    while (begin < end && fl_ascii_isspace(n[begin])) begin++;
+    while (end > begin && fl_ascii_isspace(n[end - 1])) end--;
+  }
+  if (n.compare(begin, end - begin, p) == 0) return 0;
   Fluid.proj.undo.checkpoint();
-  int length = 0;
-  if (n) { // see if blank, strip leading & trailing blanks
-    if (!nostrip) while (fl_ascii_isspace(*n)) n++;
-    const char *e = n + strlen(n);
-    if (!nostrip) while (e > n && fl_ascii_isspace(*(e-1))) e--;
-    length = int(e-n);
-    if (!length) n = nullptr;
-  }
-  if (n == p) return 0;
-  if (n && p && !strncmp(n,p,length) && !p[length]) return 0;
-  if (p) free((void *)p);
-  if (!n || !*n) {
-    p = nullptr;
-  } else {
-    char *q = (char *)malloc(length+1);
-    strlcpy(q,n,length+1);
-    p = q;
-  }
+  p.assign(n, begin, end - begin);
   Fluid.proj.set_modflag(1);
   return 1;
-}
-
-// C++11 version, still using the original to copy all the side effects.
-int storestring(const std::string& n, std::string& p, int nostrip) {
-  const char *buffer { nullptr };
-  int ret = storestring(n.c_str(), buffer);
-  if (buffer) {
-    p = buffer;
-    free((void*)buffer);
-  } else {
-    p.clear();
-  }
-  return ret;
 }
 
 /**
@@ -322,10 +298,6 @@ Node::~Node() {
   if (current_widget == this) current_widget = nullptr;
   if (current_node == this) current_node = nullptr;
   if (parent) parent->remove_child(this);
-  if (name_) free((void*)name_);
-  if (label_) free((void*)label_);
-  if (callback_) free((void*)callback_);
-  if (comment_) free((void*)comment_);
 }
 
 // Return the previous sibling in the tree structure or nullptr.
@@ -355,10 +327,9 @@ Node *Node::first_child() {
 }
 
 // Generate a descriptive text for this item, to put in browser & window titles
-const char* Node::title() {
-  const char* c = name();
-  if (c)
-    return c;
+const std::string& Node::title() {
+  if (!name().empty())
+    return name();
   return type_name();
 }
 
@@ -549,7 +520,7 @@ int Node::msgnum() {
   Node       *p;
 
   for (count = 0, p = this; p;) {
-    if (p->label()) count ++;
+    if (!p->label().empty()) count ++;
     if (p != this && p->is_widget() && !((Widget_Node *)p)->tooltip().empty()) count ++;
 
     if (p->prev) p = p->prev;
@@ -600,7 +571,7 @@ Node *Node::remove() {
 /**
  Update the name of the node.
  */
-void Node::name(const char *n) {
+void Node::name(const std::string& n) {
   int nostrip = dynamic_cast<Comment_Node*>(this) != nullptr;
   if (storestring(n,name_,nostrip)) {
     if (visible) widget_browser->redraw();
@@ -610,17 +581,17 @@ void Node::name(const char *n) {
 /**
  Update the label of the node.
  */
-void Node::label(const char *n) {
-  if (storestring(n,label_,1)) {
+void Node::label(const std::string& n) {
+  if (storestring(n, label_, 1)) {
     setlabel(label_);
-    if (visible && !name_) widget_browser->redraw();
+    if (visible && name().empty()) widget_browser->redraw();
   }
 }
 
 /**
  Update the callback text of the node.
  */
-void Node::callback(const char *n) {
+void Node::callback(const std::string&n) {
   storestring(n,callback_);
 }
 
@@ -641,7 +612,7 @@ void Node::user_data_type(const std::string& n) {
 /**
  Update the comment of the node.
  */
-void Node::comment(const char *n) {
+void Node::comment(const std::string& n) {
   if (storestring(n,comment_,1)) {
     if (visible) widget_browser->redraw();
   }
@@ -651,7 +622,7 @@ void Node::comment(const char *n) {
  Open the dialog box that allows editing of the node.
  */
 void Node::open() {
-  fluid_alert("Opening node type '%s' is not yet implemented\n",type_name());
+  fluid_alert("Opening node type '%s' is not yet implemented\n",type_name().c_str());
 }
 
 /**
@@ -722,7 +693,7 @@ void Node::write_properties(fluid::io::Project_Writer &f) {
     f.write_word("uid");
     f.write_string("%04x", uid_);
   }
-  if (label()) {
+  if (!label().empty()) {
     f.write_indent(level+1);
     f.write_word("label");
     f.write_word(label());
@@ -736,12 +707,12 @@ void Node::write_properties(fluid::io::Project_Writer &f) {
     f.write_word("user_data_type");
     f.write_word(user_data_type());
   }
-  if (callback()) {
+  if (!callback().empty()) {
     f.write_indent(level+1);
     f.write_word("callback");
     f.write_word(callback());
   }
-  if (comment()) {
+  if (!comment().empty()) {
     f.write_indent(level+1);
     f.write_word("comment");
     f.write_word(comment());
@@ -753,34 +724,32 @@ void Node::write_properties(fluid::io::Project_Writer &f) {
 /**
  Read one property of the node from the project file.
  */
-void Node::read_property(fluid::io::Project_Reader &f, const char *c) {
-  if (!strcmp(c,"uid")) {
-    const char *hex = f.read_word();
+void Node::read_property(fluid::io::Project_Reader &f, const std::string& c) {
+  if (c == "uid") {
     int x = 0;
-    if (hex)
-      sscanf(hex, "%04x", &x); // defaults x to 0 if format fails
+    sscanf(f.read_word().c_str(), "%04x", &x); // defaults x to 0 if format fails
     set_uid(x);
-  } else if (!strcmp(c,"label"))
+  } else if (c == "label")
     label(f.read_word());
-  else if (!strcmp(c,"user_data"))
+  else if (c == "user_data")
     user_data(f.read_word());
-  else if (!strcmp(c,"user_data_type"))
+  else if (c == "user_data_type")
     user_data_type(f.read_word());
-  else if (!strcmp(c,"callback"))
+  else if (c == "callback")
     callback(f.read_word());
-  else if (!strcmp(c,"comment"))
+  else if (c == "comment")
     comment(f.read_word());
-  else if (!strcmp(c,"open"))
+  else if (c == "open")
     folded_ = 0;
-  else if (!strcmp(c,"selected"))
+  else if (c == "selected")
     select(this,1);
-  else if (!strcmp(c,"parent_properties"))
+  else if (c == "parent_properties")
     if (parent) {
-      const char *cc = f.read_word(1);
-      if (strcmp(cc, "{")==0) {
+      std::string cc = f.read_word(1);
+      if (cc == "{") {
         for (;;) {
           cc = f.read_word();
-          if (!cc || cc[0]==0 || strcmp(cc, "}")==0) break;
+          if (cc.empty() || cc == "}") break;
           parent->read_parent_property(f, this, cc);
         }
       } else {
@@ -791,7 +760,7 @@ void Node::read_property(fluid::io::Project_Reader &f, const char *c) {
       f.read_word();  // skip the entire block (this should generate a warning)
     }
   else
-    f.read_error("Unknown property \"%.32s\" in line %d", c, f.current_line_number());
+    f.read_error("Unknown property \"%.32s\" in line %d", c.c_str(), f.current_line_number());
 }
 
 /** Write parent properties into the child property list.
@@ -852,21 +821,21 @@ void Node::write_parent_properties(fluid::io::Project_Writer &f, Node *child, bo
  does not support a property, it will propagate to its super class.
 
  \see Node::write_parent_properties(fluid::io::Project_Writer &f, Node *child, bool encapsulate)
- \see Grid_Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const char *property)
+ \see Grid_Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const std::string& property)
 
- \param[in] f the project file writer
+ \param[in] f the project file reader
  \param[in] child read properties for this child
  \param[in] property the name of a property, or "}" when we reach the end of the list
  */
-void Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const char *property) {
+void Node::read_parent_property(fluid::io::Project_Reader &f, Node *child, const std::string& property) {
   (void)child;
-  f.read_error("Unknown parent property \"%s\" in line %d", property, f.current_line_number());
+  f.read_error("Unknown parent property \"%s\" in line %d", property.c_str(), f.current_line_number());
 }
 
 /**
  Read part of the Forms FDesign file.
  */
-int Node::read_fdesign(const char*, const char*) {
+int Node::read_fdesign(const std::string&, const std::string&) {
   return 0;
 }
 
@@ -874,97 +843,80 @@ int Node::read_fdesign(const char*, const char*) {
  Write a comment into the header file.
  \param[in] pre indent the comment by this string
 */
-void Node::write_comment_h(fluid::io::Code_Writer& f, const char *pre)
+void Node::write_comment_h(fluid::io::Code_Writer& f, const std::string& pre)
 {
-  if (comment() && *comment()) {
-    bool dox = !(pre && strstr(pre, "//"));
-    if (dox) f.write_h(std::string(pre) + "/**\n");
-    const char *s = comment();
-    f.write_h(std::string(pre) + " ");
-    while(*s) {
-      if (*s=='\n') {
-        if (s[1]) {
-          f.write_h("\n" + std::string(pre) + " ");
+  if (!comment().empty()) {
+    bool dox = pre.find("//") == std::string::npos;
+    if (dox) f.write_h(pre + "/**\n");
+    const std::string& s = comment();
+    std::string line = pre + " ";
+    for (size_t i = 0; i < s.size(); i++) {
+      if (s[i] == '\n') {
+        if (i + 1 < s.size()) {
+          f.write_h(line + "\n");
+          line = pre + " ";
         }
       } else {
-        f.write_h(std::string(1, *s)); // FIXME this is much too slow!
+        line += s[i];
       }
-      s++;
     }
-    f.write_h("\n");
-    if (dox) f.write_h(std::string(pre) + "*/\n");
+    f.write_h(line + "\n");
+    if (dox) f.write_h(pre + "*/\n");
   }
 }
 
 /**
   Write a comment into the source file.
 */
-void Node::write_comment_c(fluid::io::Code_Writer& f, const char *pre)
+void Node::write_comment_c(fluid::io::Code_Writer& f, const std::string& pre)
 {
-  if (comment() && *comment()) {
-    bool dox = !(pre && strstr(pre, "//"));
-    if (dox) f.write_c(std::string(pre) + "/**\n");
-    const char *s = comment();
-    if (*s && *s!='\n')
-      f.write_c(std::string(pre) + " ");
-    while(*s) {
-      if (*s=='\n') {
-        f.write_c("\n");
-        if (s[1] && s[1]!='\n') {
-          f.write_c(std::string(pre) + " ");
-        }
+  if (!comment().empty()) {
+    bool dox = pre.find("//") == std::string::npos;
+    if (dox) f.write_c(pre + "/**\n");
+    const std::string& s = comment();
+    std::string line = (s.front() != '\n') ? pre + " " : std::string();
+    for (size_t i = 0; i < s.size(); i++) {
+      if (s[i] == '\n') {
+        f.write_c(line + "\n");
+        line = (i + 1 < s.size() && s[i + 1] != '\n') ? pre + " " : std::string();
       } else {
-        f.write_c(std::string(1, *s)); // FIXME this is much too slow!
+        line += s[i];
       }
-      s++;
     }
-    f.write_c("\n");
-    if (dox) f.write_c(std::string(pre) + "*/\n");
+    f.write_c(line + "\n");
+    if (dox) f.write_c(pre + "*/\n");
   }
 }
 
 /**
   Write a comment into the source file.
 */
-void Node::write_comment_inline_c(fluid::io::Code_Writer& f, const char *pre)
+void Node::write_comment_inline_c(fluid::io::Code_Writer& f, const std::string& pre)
 {
-  if (comment() && *comment()) {
-    const char *s = comment();
-    if (strchr(s, '\n')==nullptr) {
+  if (!comment().empty()) {
+    const std::string& s = comment();
+    if (s.find('\n') == std::string::npos) {
       // single line comment
-      if (pre) f.write_c(std::string(pre));
-      f.write_c("// " + std::string(s) + "\n");
-      if (!pre) f.write_c(f.indent_plus(1));
+      if (!pre.empty()) f.write_c(pre);
+      f.write_c("// " + s + "\n");
+      if (pre.empty()) f.write_c(f.indent_plus(1));
     } else {
-      if (pre)
-        f.write_c(std::string(pre) + "/*\n");
+      if (!pre.empty())
+        f.write_c(pre + "/*\n");
       else
         f.write_c("/*\n");
-      if (*s && *s!='\n') {
-        if (pre)
-          f.write_c(std::string(pre) + " ");
-        else
-          f.write_c(f.indent_plus(1) + " ");
-      }
-      while(*s) {
-        if (*s=='\n') {
-          f.write_c("\n");
-          if (s[1] && s[1]!='\n') {
-            if (pre)
-              f.write_c(std::string(pre) + " ");
-            else
-              f.write_c(f.indent_plus(1) + " ");
-          }
+      auto line_prefix = [&]() { return (!pre.empty() ? pre : f.indent_plus(1)) + " "; };
+      std::string line = (s.front() != '\n') ? line_prefix() : std::string();
+      for (size_t i = 0; i < s.size(); i++) {
+        if (s[i] == '\n') {
+          f.write_c(line + "\n");
+          line = (i + 1 < s.size() && s[i + 1] != '\n') ? line_prefix() : std::string();
         } else {
-          f.write_c(std::string(1, *s)); // FIXME this is much too slow!
+          line += s[i];
         }
-        s++;
       }
-      if (pre)
-        f.write_c("\n" + std::string(pre) + " */\n");
-      else
-        f.write_c("\n" + f.indent_plus(1) + " */\n");
-      if (!pre)
+      f.write_c(line + "\n" + line_prefix() + "*/\n");
+      if (pre.empty())
         f.write_c(f.indent_plus(1));
     }
   }
@@ -989,7 +941,7 @@ void Node::copy_properties() {
  */
 std::string Node::callback_name(fluid::io::Code_Writer& f) {
   if (is_function_name(callback())) return callback();
-  return f.unique_id(this, "cb", (name()?name():""), (label()?label():""));
+  return f.unique_id(this, "cb", name(), label());
 }
 
 /**
@@ -1005,7 +957,7 @@ std::string Node::class_name() const {
   Node* p = parent;
   while (p) {
     if (p->is_class()) {
-      return p->name() ? p->name() : "";
+      return p->name();
     }
     p = p->parent;
   }
@@ -1026,9 +978,9 @@ std::string Node::full_class_name() const {
   Node* p = parent;
   std::string qualified_name;
   while (p) {
-    if (p->is_class() && p->name()) {
+    if (p->is_class() && !p->name().empty()) {
       if (!qualified_name.empty()) {
-        qualified_name = std::string(p->name()) + "::" + qualified_name;
+        qualified_name = p->name() + "::" + qualified_name;
       } else {
         qualified_name = p->name();
       }
@@ -1081,8 +1033,8 @@ void Node::write_static_after(fluid::io::Code_Writer&) {
   Write instantiation code for this node.
  */
 void Node::write_code1(fluid::io::Code_Writer& f) {
-  f.write_h("// Header for " + std::string(title()) + "\n");
-  f.write_c("// Code for " + std::string(title()) + "\n");
+  f.write_h("// Header for " + title() + "\n");
+  f.write_c("// Code for " + title() + "\n");
 }
 
 /**

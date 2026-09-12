@@ -101,7 +101,7 @@ private: // Methods
   virtual Widget_Node* _make() = 0; // virtual constructor
 
   // Override to call `label()` for the right subclass of the widget in `o`.
-  void setlabel(const char*) override;
+  void setlabel(const std::string&) override;
 
 protected:
 
@@ -148,6 +148,9 @@ public:
 
   // Make a new Node and add it to the tree
   Node* make(Strategy strategy) override;
+
+  // Help the user create the required hierarchy for this widget
+  bool node_creation_assistant(Strategy& strategy, Node*& anchor) override;
 
   // Open the Node editor panel
   void open() override;
@@ -213,10 +216,10 @@ public:
   void write_properties(fluid::io::Project_Writer& f) override;
 
   // Read a property of this node, calls super class if property is not recognized
-  void read_property(fluid::io::Project_Reader& f, const char*) override;
+  void read_property(fluid::io::Project_Reader& f, const std::string&) override;
 
   // Back compatibility to Forms FDesign project files
-  int read_fdesign(const char*, const char*) override;
+  int read_fdesign(const std::string&, const std::string&) override;
 
 
   // ---- Live mode support

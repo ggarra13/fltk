@@ -30,6 +30,7 @@
 #include <math.h>
 #include <string.h>
 #include <assert.h>
+#include <utility>
 #undef min
 #undef max
 #include <algorithm>
@@ -100,20 +101,36 @@ static Layout_Preset grid_tool = {
 
 Layout_Preset *fluid::app::default_layout_preset = &fltk_app;
 
-static Layout_Suite static_suite_list[] = {
-  { (char*)"FLTK", (char*)"@fd_beaker FLTK", { &fltk_app, &fltk_dlg, &fltk_tool }, fluid::Tool_Store::INTERNAL },
-  { (char*)"Grid", (char*)"@fd_beaker Grid", { &grid_app, &grid_dlg, &grid_tool }, fluid::Tool_Store::INTERNAL }
-};
+/**
+ \brief The two built-in layout suites, "FLTK" and "Grid".
+
+ This is a function-local static (construct-on-first-use) rather than a
+ plain file-scope array. Layout_List is a member of the global Fluid
+ object, defined in a different translation unit (Fluid.cxx); C++ gives no
+ guarantee about relative initialization order across translation units,
+ so a plain static array here could still be in its zero-initialized
+ state (all-null Layout_Suite entries) at the point Layout_List's own
+ constructor runs and tries to use it. A function-local static is
+ guaranteed to be fully constructed the first time this function is
+ called, regardless of global static-initialization order.
+ */
+static Layout_Suite *builtin_suites() {
+  static Layout_Suite suites[] = {
+    Layout_Suite("FLTK", (char*)"@fd_beaker FLTK", &fltk_app, &fltk_dlg, &fltk_tool, fluid::Tool_Store::INTERNAL),
+    Layout_Suite("Grid", (char*)"@fd_beaker Grid", &grid_app, &grid_dlg, &grid_tool, fluid::Tool_Store::INTERNAL)
+  };
+  return suites;
+}
 
 Fl_Menu_Item main_layout_submenu_[] = {
-  { static_suite_list[0].menu_label, 0, select_layout_suite_cb, (void*)0, FL_MENU_RADIO|FL_MENU_VALUE },
-  { static_suite_list[1].menu_label, 0, select_layout_suite_cb, (void*)1, FL_MENU_RADIO },
+  { builtin_suites()[0].menu_label, 0, select_layout_suite_cb, (void*)0, FL_MENU_RADIO|FL_MENU_VALUE },
+  { builtin_suites()[1].menu_label, 0, select_layout_suite_cb, (void*)1, FL_MENU_RADIO },
   { nullptr }
 };
 
 static Fl_Menu_Item static_choice_menu[] = {
-  { static_suite_list[0].menu_label },
-  { static_suite_list[1].menu_label },
+  { builtin_suites()[0].menu_label },
+  { builtin_suites()[1].menu_label },
   { nullptr }
 };
 
@@ -127,7 +144,7 @@ void layout_suite_marker(Fl_Widget *, void *) {
 void select_layout_suite_cb(Fl_Widget *, void *user_data) {
   int index = (int)(fl_intptr_t)user_data;
   assert(index >= 0);
-  assert(index < Fluid.layout_list.list_size_);
+  assert(index < (int)Fluid.layout_list.list_.size());
   Fluid.layout_list.current_suite(index);
   Fluid.layout_list.update_dialogs();
 }
@@ -260,14 +277,12 @@ void Layout_Preset::write(fluid::io::Project_Writer *out) {
  Read presets from an .fl project file.
  */
 void Layout_Preset::read(fluid::io::Project_Reader *in) {
-  const char *key;
-  key = in->read_word(1);
-  if (key && !strcmp(key, "{")) {
+  std::string key = in->read_word(1);
+  if (key == "{") {
     for (;;) {
       key = in->read_word();
-      if (!key) return;
-      if (key[0] == '}') break;
-      int ver = atoi(key);
+      if (key == "}") break;
+      int ver = atoi(key.c_str());
       if (ver == 0) {
         continue;
       } else if (ver == 1) {
@@ -302,7 +317,7 @@ void Layout_Preset::read(fluid::io::Project_Reader *in) {
       } else { // skip unknown chunks
         for (;;) {
           key = in->read_word(1);
-          if (key && (key[0] == '}'))
+          if (key == "}")
             return;
         }
       }
@@ -320,7 +335,7 @@ int Layout_Preset::textsize_not_null() {
   if (textsize > 0) return textsize;
   // if the user did not set one, try the label size
   if (labelsize > 0) return labelsize;
-  // if that doesn;t work, fall back to the default value
+  // if that doesn't work, fall back to the default value
   return 14;
 }
 
@@ -328,11 +343,71 @@ int Layout_Preset::textsize_not_null() {
 // ---- Layout_Suite ------------------------------------------------ MARK: -
 
 /**
+ Construct an empty, uninitialized suite; equivalent to calling init().
+ */
+Layout_Suite::Layout_Suite() {
+  init();
+}
+
+/**
+ Construct a fully formed suite.
+ \param[in] name name of the suite
+ \param[in] menu_label label text used in the pulldown menu; stored as
+    given, not copied (matches the string literals used to build the two
+    built-in suites, which live for the entire program)
+ \param[in] app_preset, dlg_preset, tool_preset the three presets for
+    application, dialog, and toolbox windows
+ \param[in] storage storage location (see fluid::Tool_Store::INTERNAL, etc.)
+ */
+Layout_Suite::Layout_Suite(const std::string& name, char* menu_label,
+                           Layout_Preset* app_preset, Layout_Preset* dlg_preset, Layout_Preset* tool_preset,
+                           fluid::Tool_Store storage)
+: name_(name), menu_label(menu_label), layout{app_preset, dlg_preset, tool_preset}, storage_(storage)
+{
+}
+
+/**
+ Move-construct from \p other, taking over its owned menu_label and
+ (for non-INTERNAL suites) its owned Layout_Presets. \p other is left in
+ an empty, safely-destructible state.
+ */
+Layout_Suite::Layout_Suite(Layout_Suite&& other) noexcept
+: name_(std::move(other.name_)), menu_label(other.menu_label),
+  layout{other.layout[0], other.layout[1], other.layout[2]}, storage_(other.storage_)
+{
+  other.menu_label = nullptr;
+  other.layout[0] = other.layout[1] = other.layout[2] = nullptr;
+}
+
+/**
+ Move-assign from \p other: release whatever *this currently owns, then
+ take over other's owned menu_label and (for non-INTERNAL suites) its
+ owned Layout_Presets. \p other is left in an empty, safely-destructible
+ state.
+ */
+Layout_Suite& Layout_Suite::operator=(Layout_Suite&& other) noexcept {
+  if (this != &other) {
+    if (storage_ != fluid::Tool_Store::INTERNAL) {
+      ::free(menu_label);
+      for (int i = 0; i < 3; ++i) delete layout[i];
+    }
+    name_ = std::move(other.name_);
+    menu_label = other.menu_label;
+    layout[0] = other.layout[0];
+    layout[1] = other.layout[1];
+    layout[2] = other.layout[2];
+    storage_ = other.storage_;
+    other.menu_label = nullptr;
+    other.layout[0] = other.layout[1] = other.layout[2] = nullptr;
+  }
+  return *this;
+}
+
+/**
  Write a presets suite to a Preferences database.
  */
 void Layout_Suite::write(Fl_Preferences &prefs) {
   assert(this);
-  assert(name_);
   prefs.set("name", name_);
   for (int i = 0; i < 3; ++i) {
     Fl_Preferences prefs_preset(prefs, Fl_Preferences::Name(i));
@@ -369,19 +444,17 @@ void Layout_Suite::write(fluid::io::Project_Writer *out) {
  Read a presets suite from an .fl project file.
  */
 void Layout_Suite::read(fluid::io::Project_Reader *in) {
-  const char *key;
-  key = in->read_word(1);
-  if (key && !strcmp(key, "{")) {
+  std::string key = in->read_word(1);
+  if (key == "{") {
     int ix = 0;
     for (;;) {
       key = in->read_word();
-      if (!key) return;
-      if (!strcmp(key, "name")) {
-        name(in->read_word());
-      } else if (!strcmp(key, "preset")) {
+      if (key == "name") {
+        name(in->read_word().c_str());
+      } else if (key == "preset") {
         if (ix >= 3) return; // file format error
         layout[ix++]->read(in);
-      } else if (!strcmp(key, "}")) {
+      } else if (key == "}") {
         break;
       } else {
         in->read_word(); // unknown key, ignore, hopefully a key-value pair
@@ -415,13 +488,8 @@ void Layout_Suite::update_label() {
  \brief Update the Suite name and the Suite menu_label.
  Also updates the FLUID user interface.
  */
-void Layout_Suite::name(const char *n) {
-  if (name_)
-    ::free(name_);
-  if (n)
-    name_ = fl_strdup(n);
-  else
-    name_ = nullptr;
+void Layout_Suite::name(const std::string& n) {
+  name_ = n;
   update_label();
 }
 
@@ -429,7 +497,7 @@ void Layout_Suite::name(const char *n) {
  Initialize the class for first use.
  */
 void Layout_Suite::init() {
-  name_ = nullptr;
+  name_.clear();
   menu_label = nullptr;
   layout[0] = layout[1] = layout[2] = nullptr;
   storage_ = fluid::Tool_Store::INTERNAL;
@@ -440,7 +508,7 @@ void Layout_Suite::init() {
  */
 Layout_Suite::~Layout_Suite() {
   if (storage_ == fluid::Tool_Store::INTERNAL) return;
-  if (name_) ::free(name_);
+  ::free(menu_label);
   for (int i = 0; i < 3; ++i) {
     delete layout[i];
   }
@@ -592,13 +660,28 @@ void fd_file(Fl_Color c) {
 Layout_List::Layout_List()
 : main_menu_(main_layout_submenu_),
   choice_menu_(static_choice_menu),
-  list_(static_suite_list),
-  list_size_(2),
-  list_capacity_(2),
-  list_is_static_(true),
+  menus_are_static_(true),
   current_suite_(0),
   current_preset_(0)
 {
+  // Copy the two built-in suites; give each its own owned menu_label
+  // instead of aliasing builtin_suites()'s buffer, which lives for the
+  // whole program and must never be passed to ::free() (e.g. by a later
+  // rename). main_menu_/choice_menu_ keep aliasing the static arrays
+  // above (whose labels already come from builtin_suites(), so they
+  // agree with list_'s content); grow_menus() replaces them with owned
+  // copies lazily, the first time add() is called -- deliberately not
+  // here, since this constructor runs as part of the global Fluid
+  // object's own static initialization, before Fluid.main_menubar
+  // (which grow_menus() needs) is guaranteed to exist.
+  Layout_Suite *builtin = builtin_suites();
+  list_.reserve(2);
+  for (int i = 0; i < 2; i++) {
+    list_.emplace_back(builtin[i].name_, fl_strdup(builtin[i].menu_label),
+                        builtin[i].layout[0], builtin[i].layout[1], builtin[i].layout[2],
+                        builtin[i].storage_);
+  }
+
   fl_add_symbol("fd_beaker", fd_beaker, 1);
   fl_add_symbol("fd_user", fd_user, 1);
   fl_add_symbol("fd_project", fd_project, 1);
@@ -610,15 +693,9 @@ Layout_List::Layout_List()
  */
 Layout_List::~Layout_List() {
   assert(this);
-  if (!list_is_static_) {
+  if (!menus_are_static_) {
     ::free(main_menu_);
     ::free(choice_menu_);
-    for (int i = 0; i < list_size_; i++) {
-      Layout_Suite &suite = list_[i];
-      if (suite.storage_ != fluid::Tool_Store::INTERNAL)
-        suite.~Layout_Suite();
-    }
-    ::free(list_);
   }
 }
 
@@ -633,7 +710,7 @@ void Layout_List::update_dialogs() {
   }
   assert(this);
   assert(current_suite_ >= 0 );
-  assert(current_suite_ < list_size_);
+  assert(current_suite_ < (int)list_.size());
   assert(current_preset_ >= 0 );
   assert(current_preset_ < 3);
   Fluid.proj.layout = list_[current_suite_].layout[current_preset_];
@@ -650,7 +727,7 @@ void Layout_List::update_dialogs() {
  Refresh the label pointers for both pulldown menus.
  */
 void Layout_List::update_menu_labels() {
-  for (int i=0; i<list_size_; i++) {
+  for (size_t i=0; i<list_.size(); i++) {
     main_menu_[i].label(list_[i].menu_label);
     choice_menu_[i].label(list_[i].menu_label);
   }
@@ -686,7 +763,7 @@ void Layout_List::write(Fl_Preferences &prefs, fluid::Tool_Store storage) {
   prefs_list.set("current_suite", list_[current_suite()].name_);
   prefs_list.set("current_preset", current_preset());
   int n = 0;
-  for (int i = 0; i < list_size_; ++i) {
+  for (size_t i = 0; i < list_.size(); ++i) {
     Layout_Suite &suite = list_[i];
     if (suite.storage_ == storage) {
       Fl_Preferences prefs_suite(prefs_list, Fl_Preferences::Name(n++));
@@ -727,7 +804,7 @@ void Layout_List::write(fluid::io::Project_Writer *out) {
   // Don't write the Snap field if no custom layout was used
   if ((current_suite()==0) && (current_preset()==0)) {
     int nSuite = 0;
-    for (int i=0; i<list_size_; i++) {
+    for (size_t i=0; i<list_.size(); i++) {
       if (list_[i].storage_ == fluid::Tool_Store::PROJECT) nSuite++;
     }
     if (nSuite == 0) return;
@@ -735,7 +812,7 @@ void Layout_List::write(fluid::io::Project_Writer *out) {
   out->write_string("\nsnap {\n  ver 1\n");
   out->write_string("  current_suite "); out->write_word(list_[current_suite()].name_); out->write_string("\n");
   out->write_string("  current_preset %d\n", current_preset());
-  for (int i=0; i<list_size_; i++) {
+  for (size_t i=0; i<list_.size(); i++) {
     Layout_Suite &suite = list_[i];
     if (suite.storage_ == fluid::Tool_Store::PROJECT)
       suite.write(out);
@@ -747,25 +824,23 @@ void Layout_List::write(fluid::io::Project_Writer *out) {
  Read Suite and Layout selection and project layout data from an .fl project file.
  */
 void Layout_List::read(fluid::io::Project_Reader *in) {
-  const char *key;
-  key = in->read_word(1);
-  if (key && !strcmp(key, "{")) {
+  std::string key = in->read_word(1);
+  if (key == "{") {
     std::string cs;
     int cp = 0;
     for (;;) {
       key = in->read_word();
-      if (!key) return;
-      if (!strcmp(key, "ver")) {
+      if (key == "ver") {
         in->read_int();
-      } else if (!strcmp(key, "current_suite")) {
+      } else if (key == "current_suite") {
         cs = in->read_word();
-      } else if (!strcmp(key, "current_preset")) {
+      } else if (key == "current_preset") {
         cp = in->read_int();
-      } else if (!strcmp(key, "suite")) {
-        int n = add(in->filename_name());
+      } else if (key == "suite") {
+        int n = add(in->filename_name().c_str());
         list_[n].read(in);
         list_[n].storage(fluid::Tool_Store::PROJECT);
-      } else if (!strcmp(key, "}")) {
+      } else if (key == "}") {
         break;
       } else {
         in->read_word(); // unknown key, ignore, hopefully a key-value pair
@@ -785,7 +860,7 @@ void Layout_List::read(fluid::io::Project_Reader *in) {
  */
 void Layout_List::current_suite(int ix) {
   assert(ix >= 0);
-  assert(ix < list_size_);
+  assert(ix < (int)list_.size());
   current_suite_ = ix;
   Fluid.proj.layout = list_[current_suite_].layout[current_preset_];
 }
@@ -795,12 +870,12 @@ void Layout_List::current_suite(int ix) {
  \param[in] arg_name name of the selected suite
  \return if no name is given or the name is not found, keep the current suite selected
  */
-void Layout_List::current_suite(std::string arg_name) {
+void Layout_List::current_suite(const std::string& arg_name) {
   if (arg_name.empty()) return;
-  for (int i = 0; i < list_size_; ++i) {
+  for (size_t i = 0; i < list_.size(); ++i) {
     Layout_Suite &suite = list_[i];
-    if (suite.name_ && (strcmp(suite.name_, arg_name.c_str()) == 0)) {
-      current_suite(i);
+    if (suite.name_ == arg_name) {
+      current_suite((int)i);
       break;
     }
   }
@@ -818,38 +893,35 @@ void Layout_List::current_preset(int ix) {
 }
 
 /**
- Allocate enough space for n entries in the list.
+ Reallocate main_menu_ and choice_menu_ to hold new_n entries (plus a
+ trailing null terminator), preserving the first old_n entries.
+
+ list_ manages its own storage (it's a std::vector, which handles growth,
+ element construction, and destruction correctly on its own); only the
+ plain-C Fl_Menu_Item arrays that mirror it still need manual reallocation.
  */
-void Layout_List::capacity(int n) {
+void Layout_List::grow_menus(int old_n, int new_n) {
   static Fl_Menu_Item *suite_menu = nullptr;
   if (!suite_menu)
     suite_menu = (Fl_Menu_Item*)Fluid.main_menubar->find_item(layout_suite_marker);
 
-  int old_n = list_size_;
   int i;
 
-  Layout_Suite *new_list = (Layout_Suite*)::calloc(n, sizeof(Layout_Suite));
-  for (i = 0; i < old_n; i++)
-    new_list[i] = list_[i];
-  if (!list_is_static_) ::free(list_);
-  list_ = new_list;
-
-  Fl_Menu_Item *new_main_menu = (Fl_Menu_Item*)::calloc(n+1, sizeof(Fl_Menu_Item));
+  Fl_Menu_Item *new_main_menu = (Fl_Menu_Item*)::calloc(new_n+1, sizeof(Fl_Menu_Item));
   for (i = 0; i < old_n; i++)
     new_main_menu[i] = main_menu_[i];
-  if (!list_is_static_) ::free(main_menu_);
+  if (!menus_are_static_) ::free(main_menu_);
   main_menu_ = new_main_menu;
   suite_menu->user_data(main_menu_);
 
-  Fl_Menu_Item *new_choice_menu = (Fl_Menu_Item*)::calloc(n+1, sizeof(Fl_Menu_Item));
+  Fl_Menu_Item *new_choice_menu = (Fl_Menu_Item*)::calloc(new_n+1, sizeof(Fl_Menu_Item));
   for (i = 0; i < old_n; i++)
     new_choice_menu[i] = choice_menu_[i];
-  if (!list_is_static_) ::free(choice_menu_);
+  if (!menus_are_static_) ::free(choice_menu_);
   choice_menu_ = new_choice_menu;
   if (layout_choice) layout_choice->menu(choice_menu_);
 
-  list_capacity_ = n;
-  list_is_static_ = false;
+  menus_are_static_ = false;
 }
 
 /**
@@ -857,28 +929,30 @@ void Layout_List::capacity(int n) {
  Selects the new layout and updates the UI.
  */
 int Layout_List::add(const char *name) {
-  if (list_size_ == list_capacity_) {
-    capacity(list_capacity_ * 2);
-  }
-  int n = list_size_;
-  Layout_Suite &old_suite = list_[current_suite_];
-  Layout_Suite &new_suite = list_[n];
+  int n = (int)list_.size();
+  const Layout_Suite &old_suite = list_[current_suite_];
+
+  Layout_Suite new_suite;
   new_suite.init();
   new_suite.name(name);
   for (int i=0; i<3; ++i) {
-    new_suite.layout[i] = new Layout_Preset;
-    ::memcpy(new_suite.layout[i], old_suite.layout[i], sizeof(Layout_Preset));
+    new_suite.layout[i] = new Layout_Preset(*old_suite.layout[i]);
   }
   fluid::Tool_Store new_storage = old_suite.storage_;
   if (new_storage == fluid::Tool_Store::INTERNAL)
     new_storage = fluid::Tool_Store::USER;
   new_suite.storage(new_storage);
-  main_menu_[n].label(new_suite.menu_label);
+  // old_suite is no longer needed; safe to invalidate via push_back below.
+
+  list_.push_back(std::move(new_suite));
+  grow_menus(n, n + 1);
+
+  Layout_Suite &added = list_[n];
+  main_menu_[n].label(added.menu_label);
   main_menu_[n].callback(main_menu_[0].callback());
   main_menu_[n].argument(n);
   main_menu_[n].flags = main_menu_[0].flags;
-  choice_menu_[n].label(new_suite.menu_label);
-  list_size_++;
+  choice_menu_[n].label(added.menu_label);
   current_suite(n);
   return n;
 }
@@ -898,16 +972,16 @@ void Layout_List::rename(const char *name) {
  \param[in] ix index into list of suites
  */
 void Layout_List::remove(int ix) {
-  int tail = list_size_-ix-1;
-  if (tail) {
-    for (int i = ix; i < list_size_-1; i++)
-      list_[i] = list_[i+1];
-  }
+  int tail = (int)list_.size()-ix-1;
   ::memmove(main_menu_+ix, main_menu_+ix+1, (tail+1) * sizeof(Fl_Menu_Item));
   ::memmove(choice_menu_+ix, choice_menu_+ix+1, (tail+1) * sizeof(Fl_Menu_Item));
-  list_size_--;
-  if (current_suite() >= list_size_)
-    current_suite(list_size_ - 1);
+  // erase() shifts the remaining elements (via move-assignment) and
+  // destroys exactly the one vacated slot; a manual shift-then-shrink
+  // would leave a duplicate reference to the last entry's owned pointers
+  // that a real destructor could then double-free.
+  list_.erase(list_.begin() + ix);
+  if (current_suite() >= (int)list_.size())
+    current_suite((int)list_.size() - 1);
 }
 
 /**
@@ -915,7 +989,7 @@ void Layout_List::remove(int ix) {
  \param[in] storage storage attribute, see fluid::Tool_Store::INTERNAL, etc.
  */
 void Layout_List::remove_all(fluid::Tool_Store storage) {
-  for (int i=list_size_-1; i>=0; --i) {
+  for (int i=(int)list_.size()-1; i>=0; --i) {
     if (list_[i].storage_ == storage)
       remove(i);
   }

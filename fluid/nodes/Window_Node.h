@@ -68,7 +68,7 @@ protected:
   void newdx();
   void newposition(Widget_Node *,int &x,int &y,int &w,int &h);
   int handle(int);
-  void setlabel(const char *) override;
+  void setlabel(const std::string&) override;
   void write_code1(fluid::io::Code_Writer& f) override;
   void write_code2(fluid::io::Code_Writer& f) override;
   Widget_Node *_make() override {return nullptr;} // we don't call this
@@ -89,15 +89,16 @@ public:
     numselected(0),
     recalc(0),
     modal(0), non_modal(0),
-    xclass(nullptr),
     sr_min_w(0), sr_min_h(0), sr_max_w(0), sr_max_h(0)
   { }
   uchar modal, non_modal;
-  const char *xclass; // junk string, used for shortcut
+  std::string xclass { };
 
   Node *make(Strategy strategy) override;
-  const char *type_name() override {return "Fl_Window";}
-  const char *alt_type_name() override {return "fltk::Window";}
+  const std::string& type_name() override { static const std::string s = "Fl_Window"; return s; }
+  const std::string& alt_type_name() override { static const std::string s = "fltk::Window"; return s; }
+  // Help the user create the required hierarchy for this widget
+  bool node_creation_assistant(Strategy& strategy, Node*& anchor) override;
 
   void open() override;
   void ideal_size(int &w, int &h) override;
@@ -106,8 +107,8 @@ public:
   uchar *read_image(int &ww, int &hh);  // Read an image of the window
 
   void write_properties(fluid::io::Project_Writer &f) override;
-  void read_property(fluid::io::Project_Reader &f, const char *) override;
-  int read_fdesign(const char*, const char*) override;
+  void read_property(fluid::io::Project_Reader &f, const std::string&) override;
+  int read_fdesign(const std::string&, const std::string&) override;
 
   void add_child(Node*, Node*) override;
   void move_child(Node*, Node*) override;
@@ -142,12 +143,12 @@ public:
   char wc_relative; // if 1, reposition all children, if 2, reposition and resize
 
   void write_properties(fluid::io::Project_Writer &f) override;
-  void read_property(fluid::io::Project_Reader &f, const char *) override;
+  void read_property(fluid::io::Project_Reader &f, const std::string&) override;
 
   void write_code1(fluid::io::Code_Writer& f) override;
   void write_code2(fluid::io::Code_Writer& f) override;
   Node *make(Strategy strategy) override;
-  const char *type_name() override {return "widget_class";}
+  const std::string& type_name() override { static const std::string s = "widget_class"; return s; }
   int can_have_children() const override {return 1;}
   int is_code_block() const override {return 1;}
   int is_decl_block() const override {return 1;}

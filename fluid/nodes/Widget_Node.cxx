@@ -142,8 +142,8 @@ int item_number(Fl_Menu_Item* m, const char* i) {
     if (i[0]=='F' && i[1]=='L' && i[2]=='_')
       i += 3;
     while (m->label()) {
-      if (!strcmp(m->label(), i)) return
-        int(m->argument());
+      if (!strcmp(m->label(), i))
+        return int(m->argument());
       m++;
     }
   }
@@ -174,16 +174,20 @@ bool is_lambda(const std::string& name) {
   return (name[0] == '[' || name.substr(0, 10) == "std::bind(");
 }
 
-// Test to see if name() is an array entry.  If so, and this is the
-// highest number, return name[num+1].  Return null if not the highest
-// number or a field or function.  Return name() if not an array entry.
-const char* array_name(Widget_Node* o) {
-  const char* c = o->name();
-  if (!c) return nullptr;
+/**
+ Test to see if name() is an array entry.
+ If so, and this is the highest number, return name[num+1].
+ Return and empty string if not the highest number or a field or function.
+ Return name() if not an array entry.
+ */
+std::string array_name(Widget_Node* o) {
+  if (o->name().empty())
+    return "";
+  const char* c = o->name().c_str();
   const char* d;
   for (d = c; *d != '['; d++) {
     if (!*d) return c;
-    if (fl_ascii_ispunct(*d) && *d!='_') return nullptr;
+    if (fl_ascii_ispunct(*d) && *d!='_') return "";
   }
   int num = atoi(d+1);
   int sawthis = 0;
@@ -195,11 +199,12 @@ const char* array_name(Widget_Node* o) {
   for (; t && t->find_parent_class_node() == cn; tp = t, t = t->prev) {/*empty*/}
   for (t = tp; t && t->find_parent_class_node() == cn; t = t->next) {
     if (t == o) { sawthis=1; continue; }
-    const char* e = t->name();
-    if (!e) continue;
+    if (t->name().empty())
+      continue;
+    const char* e = t->name().c_str();
     if (strncmp(c, e, d-c)) continue;
     int n1 = atoi(e+(d-c)+1);
-    if (n1 > num || (n1==num && sawthis)) return nullptr;
+    if (n1 > num || (n1==num && sawthis)) return "";
   }
   static char buffer[128];
   // MRS: we want strncpy() here...
@@ -396,6 +401,73 @@ void Widget_Node::ideal_size(int &w, int &h) {
 }
 
 /**
+ Offer to the user to create a missing Window or Group container for this Widget.
+
+ A Widget can only be created inside a Window or Group node. If none is
+ found, this opens a dialog offering to create a Window (creating any
+ missing Function or Class method needed to hold it, based on the tree
+ position of \p anchor), or to cancel so the user can pick an existing
+ container instead.
+
+ \param[in,out] strategy placement strategy, updated to place the widget
+    inside the newly created container
+ \param[in,out] anchor node to insert relative to; updated to the new
+    container if one was created
+ \return true if a container was created and \p anchor and \p strategy
+    were updated, false if the user canceled
+ */
+bool Widget_Node::node_creation_assistant(Strategy& strategy, Node*& anchor)
+{
+  enum Job { CREATE_WIDGET, CREATE_WINDOW, CREATE_FUNCTION, CREATE_METHOD } job = CREATE_FUNCTION;
+  Node* old_anchor = anchor;
+  int ret = fluid::big_choice(
+    "Fluid: Widgets require a Container",
+    "A Widget can only be created inside a Window or Group Node.\n\n"
+    "Would you like to create a new container, or cancel and select an existing one?\n\n",
+    {
+      {"Create a &Window and add the Widget", 'w'},
+      {"&Cancel and select an existing container", 'c'}
+    } );
+  switch (ret) {
+    case 0:
+      // Walk up the tree to find a compatible container for the widget.
+      while (anchor) {
+        if (dynamic_cast<Class_Node*>(anchor)) {
+          job = CREATE_METHOD;
+          break;
+        }
+        if (dynamic_cast<Function_Node*>(anchor)) {
+          job = CREATE_WINDOW;
+          break;
+        }
+        old_anchor = anchor;
+        anchor = anchor->parent;
+      }
+      Fluid.proj.tree.current = old_anchor;
+      if (job == CREATE_METHOD) {
+        Fluid.proj.tree.current = add_new_widget_from_user("function", Strategy::AS_LAST_CHILD, false);
+        job = CREATE_WINDOW;
+      }
+      if (job == CREATE_FUNCTION) {
+        Fluid.proj.tree.current = add_new_widget_from_user("function", Strategy::AFTER_CURRENT, false);
+        job = CREATE_WINDOW;
+      }
+      if (!Fluid.proj.tree.current) return false;
+      if (job == CREATE_WINDOW) {
+        Fluid.proj.tree.current = add_new_widget_from_user("Fl_Window", Strategy::AS_FIRST_CHILD, true);
+        job = CREATE_WIDGET;
+      }
+      anchor = Fluid.proj.tree.current;
+      if (!anchor) return false;
+      strategy.placement(Strategy::AS_LAST_CHILD);
+      break;
+    default:
+      return false;
+  }
+  return true;
+}
+
+/**
  Make a new Widget node and add it to the tree.
  \param[in] strategy is Strategy::AS_LAST_CHILD or Strategy::AFTER_CURRENT
  \return new node
@@ -410,8 +482,13 @@ Node* Widget_Node::make(Strategy strategy) {
     pp = pp->parent;
   }
   if (!pp || !pp->is_true_widget() || !anchor->is_true_widget()) {
-    fluid_message("Please select a group widget or window");
-    return nullptr;
+    if (strategy.source() == Strategy::FROM_FILE) {
+      fluid_message("Please select a group widget or window");
+      return nullptr;
+    } else if (node_creation_assistant(strategy, anchor) == false) {
+      return nullptr; // user canceled the creation assitant
+    }
+    pp = anchor;
   }
 
   Widget_Node* p = (Widget_Node*)pp;
@@ -480,8 +557,8 @@ Node* Widget_Node::make(Strategy strategy) {
  Call the required function to set the label of the widget.
  \param[in] n New label text.
  */
-void Widget_Node::setlabel(const char* n) {
-  o->label(n);
+void Widget_Node::setlabel(const std::string& n) {
+  o->copy_label(n.c_str());
   redraw();
 }
 
@@ -662,34 +739,34 @@ void Widget_Node::write_static(fluid::io::Code_Writer& f) {
     f.write_h(extra_code(1));
     f.write_h("\n");
   }
-  if (callback() && is_function_name(callback())) {
-    std::string callback_name_pattern = std::string(callback()) + "(*)";
+  if (is_function_name(callback())) {
+    std::string callback_name_pattern = callback() + "(*)";
     Node* pClass = find_parent_class_node();
     if (pClass && pClass->has_function("static void", callback_name_pattern)) {
       // nothing to do, method already exists
     } else if (has_toplevel_function("*void", callback_name_pattern)) {
       // nothing to do, function already exists
     } else {
-      f.write_h_once("extern void " + std::string(callback()) + "(" + t + "*, " + user_data_type_or_voidp() + ");");
+      f.write_h_once("extern void " + callback() + "(" + t + "*, " + user_data_type_or_voidp() + ");");
     }
   }
   std::string k = full_class_name();
-  const char* c = array_name(this);
-  if (c && k.empty() && !is_class()) {
+  std::string c = array_name(this);
+  if (!c.empty() && k.empty() && !is_class()) {
     f.write_c("\n");
     if (!public_) f.write_c("static ");
     else f.write_h("extern " + t + "* " + c + ";\n");
-    if (strchr(c, '[') == nullptr)
+    if (c.find('[') == std::string::npos)
       f.write_c(t + "* " + c + " = (" + t + "*)nullptr;\n");
     else
       f.write_c(t + "* " + c + " = {(" + t + "*)nullptr};\n");
   }
-  if (callback() && !is_function_name(callback()) && !is_lambda(callback())) {
+  if (!callback().empty() && !is_function_name(callback()) && !is_lambda(callback())) {
     // see if 'o' or 'v' used, to prevent unused argument warnings:
     int use_o = 0;
     int use_v = 0;
     const char* d;
-    for (d = callback(); *d;) {
+    for (d = callback().c_str(); *d;) {
       if (*d == 'o' && !is_id(d[1])) use_o = 1;
       if (*d == 'v' && !is_id(d[1])) use_v = 1;
       do d++; while (is_id(*d));
@@ -709,25 +786,25 @@ void Widget_Node::write_static(fluid::io::Code_Writer& f) {
     f.tag(Mergeback::Tag::GENERIC, Mergeback::Tag::WIDGET_CALLBACK, 0);
     f.write_c_indented(callback(), 1, 0);
     if (*(d-1) != ';' && *(d-1) != '}') {
-      const char* p = strrchr(callback(), '\n');
-      if (p) p ++;
-      else p = callback();
+      const std::string& cb = callback();
+      size_t nl = cb.find_last_of('\n');
+      std::string last_line = (nl == std::string::npos) ? cb : cb.substr(nl + 1);
       // Only add trailing semicolon if the last line is not a preprocessor
       // statement...
-      if (*p != '#' && *p) f.write_c(";");
+      if (!last_line.empty() && last_line.front() != '#') f.write_c(";");
     }
     f.write_c("\n");
     f.tag(Mergeback::Tag::WIDGET_CALLBACK, Mergeback::Tag::GENERIC, get_uid());
     f.write_c("}\n");
     if (!k.empty()) {
-      f.write_c("void " + k + "::" + std::string(cn) + "(" + t + "* o, " + ut + " v) {\n");
+      f.write_c("void " + k + "::" + cn + "(" + t + "* o, " + ut + " v) {\n");
       f.write_c(f.indent(1) + "((" + k + "*)(o");
       Node* q = nullptr;
       for (Node* p = parent; p && p->is_widget(); q = p, p = p->parent)
         f.write_c("->parent()");
       if (!q || !dynamic_cast<Widget_Class_Node*>(q))
         f.write_c("->user_data()");
-      f.write_c("))->" + std::string(cn) + "_i(o,v);\n}\n");
+      f.write_c("))->" + cn + "_i(o,v);\n}\n");
     }
   }
   active_image.write_static(f);
@@ -740,14 +817,14 @@ void Widget_Node::write_static(fluid::io::Code_Writer& f) {
  */
 void Widget_Node::write_code1(fluid::io::Code_Writer& f) {
   std::string t = subclassname(this);
-  const char* c = array_name(this);
-  if (c) {
+  std::string c = array_name(this);
+  if (!c.empty()) {
     if (is_in_class()) {
       f.write_public(public_);
       f.write_h(f.indent(1) + t + "* " + c + ";\n");
     }
   }
-  if (is_in_class() && callback() && !is_function_name(callback())) {
+  if (is_in_class() && !callback().empty() && !is_function_name(callback()) && !is_lambda(callback())) {
     std::string cn = callback_name(f);
     std::string ut = user_data_type_or_voidp();
     f.write_public(0);
@@ -755,12 +832,12 @@ void Widget_Node::write_code1(fluid::io::Code_Writer& f) {
     f.write_h(f.indent(1) + "static void " + cn + "(" + t + "*, " + ut + ");\n");
   }
   // figure out if local variable will be used (prevent compiler warnings):
-  int wused = !name() && dynamic_cast<Window_Node*>(this);
+  int wused = name().empty() && dynamic_cast<Window_Node*>(this);
 
   f.write_c(f.indent() + "{ ");
   write_comment_inline_c(f);
   f.write_c("auto* o = ");
-  if (name()) f.write_c(std::string(name()) + " = ");
+  if (!name().empty()) f.write_c(name() + " = ");
   if (dynamic_cast<Window_Node*>(this)) {
     // Handle special case where user is faking a Fl_Group type as a window,
     // there is no 2-argument constructor in that case:
@@ -779,22 +856,22 @@ void Widget_Node::write_code1(fluid::io::Code_Writer& f) {
               + "(" + std::to_string(o->x()) + ", " + std::to_string(o->y())
               + ", " + std::to_string(o->w()) + ", " + std::to_string(o->h()) );
   }
-  if (label() && *label()) {
+  if (!label().empty()) {
     f.write_c(", ");
     switch (Fluid.proj.i18n.type) {
     case fluid::I18n_Type::NONE : /* None */
-        f.write_cstring(label());
+        f.write_cstring(label().c_str());
         break;
     case fluid::I18n_Type::GNU : /* GNU gettext */
         f.write_c(Fluid.proj.i18n.gnu_function + "(");
-        f.write_cstring(label());
+        f.write_cstring(label().c_str());
         f.write_c(")");
         break;
     case fluid::I18n_Type::POSIX : /* POSIX catgets */
         f.write_c("catgets("
                   + (Fluid.proj.i18n.posix_file.empty() ? std::string("_catalog") : Fluid.proj.i18n.posix_file)
                   + ", " + Fluid.proj.i18n.posix_set + ", " + std::to_string(msgnum()) + ",");
-        f.write_cstring(label());
+        f.write_cstring(label().c_str());
         f.write_c(")");
         break;
     }
@@ -856,7 +933,7 @@ void Widget_Node::write_color(fluid::io::Code_Writer& f, const char* field, Fl_C
   case FL_DARK_CYAN:            color_name = "FL_DARK_CYAN";            break;
   case FL_WHITE:                color_name = "FL_WHITE";                break;
   }
-  const char* var = is_class() ? "this" : name() ? name() : "o";
+  const char* var = is_class() ? "this" : name().empty() ? "o" : name().c_str();
   if (color_name) {
     f.write_c(f.indent() + var + "->" + field + "(" + color_name + ");\n");
   } else {
@@ -870,7 +947,7 @@ void Widget_Node::write_color(fluid::io::Code_Writer& f, const char* field, Fl_C
  */
 void Widget_Node::write_widget_code(fluid::io::Code_Writer& f) {
   Fl_Widget* tplate = ((Widget_Node*)factory)->o;
-  const char* var = is_class() ? "this" : name() ? name() : "o";
+  const char* var = is_class() ? "this" : !name().empty() ? name().c_str() : "o";
 
   if (!tooltip().empty()) {
     f.write_c(f.indent() + var + "->tooltip(");
@@ -1007,7 +1084,7 @@ void Widget_Node::write_widget_code(fluid::io::Code_Writer& f) {
   }}
   std::string ud = user_data();
   if (is_in_class() && !parent->is_widget()) ud = "this";
-  if (callback()) {
+  if (!callback().empty()) {
     if (is_lambda(callback())) { // lambda callback function
       f.write_c(f.indent() + var + "->callback(\n");
       f.tag(Mergeback::Tag::GENERIC, Mergeback::Tag::WIDGET_CALLBACK, 0);
@@ -1058,7 +1135,7 @@ void Widget_Node::write_widget_code(fluid::io::Code_Writer& f) {
 void Widget_Node::write_block_close(fluid::io::Code_Writer& f) {
   f.indent_less();
   f.write_c(f.indent() + "} // " + subclassname(this) + "* "
-          + (name() ? name() : "o") + "\n");
+          + (!name().empty() ? name() : "o") + "\n");
 }
 
 /**
@@ -1206,7 +1283,7 @@ void Widget_Node::write_properties(fluid::io::Project_Writer &f) {
  \param[in] f Project_Reader object to read the property from.
  \param[in] c Name of the property to read.
  */
-void Widget_Node::read_property(fluid::io::Project_Reader &f, const char* c)
+void Widget_Node::read_property(fluid::io::Project_Reader &f, const std::string& c)
 {
   // Assign code according to the first non-whitespace character to stay
   // compatible with pre 1.5.0.20 project files.
@@ -1224,12 +1301,12 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const char* c)
   };
 
   int x,y,w,h; Fl_Font ft; int s; Fl_Color cc;
-  if (!strcmp(c,"private")) {
+  if (c == "private") {
     public_ = 0;
-  } else if (!strcmp(c,"protected")) {
+  } else if (c == "protected") {
     public_ = 2;
-  } else if (!strcmp(c,"xywh")) {
-    if (sscanf(f.read_word(),"%d %d %d %d",&x,&y,&w,&h) == 4) {
+  } else if (c == "xywh") {
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d",&x,&y,&w,&h) == 4) {
       x += Fluid.pasteoffset;
       y += Fluid.pasteoffset;
       // Reading FLTK 2 projects into FLTK 1 Fluid requires adjusting the x
@@ -1240,14 +1317,14 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const char* c)
       }
       o->resize(x,y,w,h);
     }
-  } else if (!strcmp(c,"tooltip")) {
+  } else if (c == "tooltip") {
     tooltip(f.read_word());
-  } else if (!strcmp(c,"scale_image")) {
-    if (sscanf(f.read_word(),"%d %d",&w,&h) == 2) {
+  } else if (c == "scale_image") {
+    if (sscanf(f.read_word().c_str(),"%d %d",&w,&h) == 2) {
       active_image.scale_w = w;
       active_image.scale_h = h;
     }
-  } else if (!strcmp(c,"image")) {
+  } else if (c == "image") {
     active_image.set(f.read_word(), dynamic_cast<Window_Node*>(this) ? nullptr : o, false);
     if (!dynamic_cast<Window_Node*>(this)) redraw();
     // starting in 2023, `image` is always followed by `compress_image`
@@ -1258,16 +1335,16 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const char* c)
         && (ext != ".svg")
         && (ext != ".svgz"))
       active_image.compress = 0; // if it is neither of those, default to uncompressed
-  } else if (!strcmp(c,"bind_image")) {
-    active_image.bind = (int)atol(f.read_word());
-  } else if (!strcmp(c,"compress_image")) {
-    active_image.compress = (int)atol(f.read_word());
-  } else if (!strcmp(c,"scale_deimage")) {
-    if (sscanf(f.read_word(),"%d %d",&w,&h) == 2) {
+  } else if (c == "bind_image") {
+    active_image.bind = f.read_int();
+  } else if (c == "compress_image") {
+    active_image.compress = f.read_int();
+  } else if (c == "scale_deimage") {
+    if (sscanf(f.read_word().c_str(),"%d %d",&w,&h) == 2) {
       inactive_image.scale_w = w;
       inactive_image.scale_h = h;
     }
-  } else if (!strcmp(c,"deimage")) {
+  } else if (c == "deimage") {
     inactive_image.set(f.read_word(), dynamic_cast<Window_Node*>(this) ? nullptr : o, true);
     if (!dynamic_cast<Window_Node*>(this)) redraw();
     // starting in 2023, `deimage` is always followed by `compress_deimage`
@@ -1278,49 +1355,48 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const char* c)
         && (ext != ".svg")
         && (ext != ".svgz"))
       inactive_image.compress = 0; // if it is neither of those, default to uncompressed
-  } else if (!strcmp(c,"bind_deimage")) {
-    inactive_image.bind = (int)atol(f.read_word());
-  } else if (!strcmp(c,"compress_deimage")) {
-    inactive_image.compress = (int)atol(f.read_word());
-  } else if (!strcmp(c,"type")) {
+  } else if (c == "bind_deimage") {
+    inactive_image.bind = f.read_int();
+  } else if (c == "compress_deimage") {
+    inactive_image.compress = f.read_int();
+  } else if (c == "type") {
     if (dynamic_cast<Spinner_Node*>(this))
-      ((Fl_Spinner*)o)->type(item_number(subtypes(), f.read_word()));
+      ((Fl_Spinner*)o)->type(item_number(subtypes(), f.read_word().c_str()));
     else
-      o->type(item_number(subtypes(), f.read_word()));
-  } else if (!strcmp(c,"box")) {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+      o->type(item_number(subtypes(), f.read_word().c_str()));
+  } else if (c == "box") {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       o->box((Fl_Boxtype)x);
-    } else if (sscanf(value,"%d",&x) == 1) o->box((Fl_Boxtype)x);
-  } else if (dynamic_cast<Button_Node*>(this) && !strcmp(c,"down_box")) {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+    } else if (sscanf(value.c_str(),"%d",&x) == 1) o->box((Fl_Boxtype)x);
+  } else if (dynamic_cast<Button_Node*>(this) && c == "down_box") {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       ((Fl_Button*)o)->down_box((Fl_Boxtype)x);
     }
-  } else if (dynamic_cast<Input_Choice_Node*>(this) && !strcmp(c,"down_box")) {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+  } else if (dynamic_cast<Input_Choice_Node*>(this) && c == "down_box") {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       ((Fl_Input_Choice*)o)->down_box((Fl_Boxtype)x);
     }
-  } else if (dynamic_cast<Menu_Base_Node*>(this) && !strcmp(c,"down_box")) {
-    const char* value = f.read_word();
-    if ((x = boxnumber(value))) {
+  } else if (dynamic_cast<Menu_Base_Node*>(this) && c == "down_box") {
+    std::string value = f.read_word();
+    if ((x = boxnumber(value.c_str()))) {
       if (x == ZERO_ENTRY) x = 0;
       ((Fl_Menu_*)o)->down_box((Fl_Boxtype)x);
     }
-  } else if (is_button() && !strcmp(c,"value")) {
-    const char* value = f.read_word();
-    ((Fl_Button*)o)->value(atoi(value));
-  } else if (!strcmp(c,"color")) {
-    const char* cw = f.read_word();
+  } else if (is_button() && c == "value") {
+    ((Fl_Button*)o)->value(f.read_int());
+  } else if (c == "color") {
+    std::string cw = f.read_word();
     if (cw[0]=='0' && cw[1]=='x') {
-      sscanf(cw,"0x%x",&x);
+      sscanf(cw.c_str(),"0x%x",&x);
       o->color(x);
     } else {
-      int n = sscanf(cw,"%d %d",&x,&y);
+      int n = sscanf(cw.c_str(),"%d %d",&x,&y);
       if (n == 2) { // back compatibility...
         if (x != 47) o->color(x);
         o->selection_color(y);
@@ -1328,103 +1404,103 @@ void Widget_Node::read_property(fluid::io::Project_Reader &f, const char* c)
         o->color(x);
       }
     }
-  } else if (!strcmp(c,"selection_color")) {
-    if (sscanf(f.read_word(),"%d",&x)) o->selection_color(x);
-  } else if (!strcmp(c,"labeltype")) {
-    c = f.read_word();
-    if (!strcmp(c,"image")) {
+  } else if (c == "selection_color") {
+    if (sscanf(f.read_word().c_str(),"%d",&x)) o->selection_color(x);
+  } else if (c == "labeltype") {
+    std::string type = f.read_word();
+    if (type == "image") {
       if (!Fluid.proj.image_assets.find_or_create(label()))
-        f.read_error("Image file '%s' not found", label());
+        f.read_error("Image file '%s' not found", label().c_str());
       active_image.set(label(), dynamic_cast<Window_Node*>(this) ? nullptr : o, false);
       if (!dynamic_cast<Window_Node*>(this)) redraw();
       label("");
     } else {
-      o->labeltype((Fl_Labeltype)item_number(labeltypemenu,c));
+      o->labeltype((Fl_Labeltype)item_number(labeltypemenu,type.c_str()));
     }
-  } else if (!strcmp(c,"labelfont")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->labelfont(x);
-  } else if (!strcmp(c,"labelsize")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->labelsize(x);
-  } else if (!strcmp(c,"labelcolor")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->labelcolor(x);
-  } else if (!strcmp(c,"align")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->align(x);
-  } else if (!strcmp(c,"h_label_margin")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->horizontal_label_margin(x);
-  } else if (!strcmp(c,"v_label_margin")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->vertical_label_margin(x);
-  } else if (!strcmp(c,"image_spacing")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->label_image_spacing(x);
-  } else if (!strcmp(c,"when")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) o->when(x);
-  } else if (!strcmp(c,"minimum")) {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->minimum(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->minimum(strtod(f.read_word(),nullptr));
-  } else if (!strcmp(c,"maximum")) {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->maximum(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->maximum(strtod(f.read_word(),nullptr));
-  } else if (!strcmp(c,"step")) {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->step(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->step(strtod(f.read_word(),nullptr));
-  } else if (!strcmp(c,"value")) {
-    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->value(strtod(f.read_word(),nullptr));
-    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->value(strtod(f.read_word(),nullptr));
-  } else if ( (!strcmp(c,"slider_size") || !strcmp(c,"size")) && dynamic_cast<Slider_Node*>(this)) {
-    ((Fl_Slider*)o)->slider_size(strtod(f.read_word(),nullptr));
-  } else if (!strcmp(c,"textfont")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) {ft=(Fl_Font)x; textstuff(1,ft,s,cc);}
-  } else if (!strcmp(c,"textsize")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) {s=x; textstuff(2,ft,s,cc);}
-  } else if (!strcmp(c,"textcolor")) {
-    if (sscanf(f.read_word(),"%d",&x) == 1) {cc=(Fl_Color)x;textstuff(3,ft,s,cc);}
-  } else if (!strcmp(c,"hide")) {
+  } else if (c == "labelfont") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->labelfont(x);
+  } else if (c == "labelsize") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->labelsize(x);
+  } else if (c == "labelcolor") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->labelcolor(x);
+  } else if (c == "align") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->align(x);
+  } else if (c == "h_label_margin") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->horizontal_label_margin(x);
+  } else if (c == "v_label_margin") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->vertical_label_margin(x);
+  } else if (c == "image_spacing") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->label_image_spacing(x);
+  } else if (c == "when") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) o->when(x);
+  } else if (c == "minimum") {
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->minimum(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->minimum(strtod(f.read_word().c_str(),nullptr));
+  } else if (c == "maximum") {
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->maximum(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->maximum(strtod(f.read_word().c_str(),nullptr));
+  } else if (c == "step") {
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->step(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->step(strtod(f.read_word().c_str(),nullptr));
+  } else if (c == "value") {
+    if (dynamic_cast<Valuator_Node*>(this)) ((Fl_Valuator*)o)->value(strtod(f.read_word().c_str(),nullptr));
+    if (dynamic_cast<Spinner_Node*>(this)) ((Fl_Spinner*)o)->value(strtod(f.read_word().c_str(),nullptr));
+  } else if ( (c == "slider_size" || c == "size") && dynamic_cast<Slider_Node*>(this)) {
+    ((Fl_Slider*)o)->slider_size(strtod(f.read_word().c_str(),nullptr));
+  } else if (c == "textfont") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) {ft=(Fl_Font)x; textstuff(1,ft,s,cc);}
+  } else if (c == "textsize") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) {s=x; textstuff(2,ft,s,cc);}
+  } else if (c == "textcolor") {
+    if (sscanf(f.read_word().c_str(),"%d",&x) == 1) {cc=(Fl_Color)x;textstuff(3,ft,s,cc);}
+  } else if (c == "hide") {
     o->hide();
-  } else if (!strcmp(c,"deactivate")) {
+  } else if (c == "deactivate") {
     o->deactivate();
-  } else if (!strcmp(c,"resizable")) {
+  } else if (c == "resizable") {
     resizable(1);
-  } else if (!strcmp(c,"hotspot") || !strcmp(c, "divider")) {
+  } else if (c == "hotspot" || c == "divider") {
     hotspot(1);
-  } else if (!strcmp(c,"headline")) {
+  } else if (c == "headline") {
     if (dynamic_cast<Menu_Item_Node*>(this)) {
       auto nd = dynamic_cast<Menu_Item_Node*>(this);
       if (nd) nd->headline(true);
     }
-  } else if (!strcmp(c,"class")) {
+  } else if (c == "class") {
     subclass(f.read_word());
-  } else if (!strcmp(c,"shortcut")) {
-    int shortcut = (int)strtol(f.read_word(),nullptr,0);
+  } else if (c == "shortcut") {
+    int shortcut = (int)strtol(f.read_word().c_str(),nullptr,0);
     if (is_button()) ((Fl_Button*)o)->shortcut(shortcut);
     else if (dynamic_cast<Input_Node*>(this)) ((Fl_Input_*)o)->shortcut(shortcut);
     else if (dynamic_cast<Value_Input_Node*>(this)) ((Fl_Value_Input*)o)->shortcut(shortcut);
     else if (dynamic_cast<Text_Display_Node*>(this)) ((Fl_Text_Display*)o)->shortcut(shortcut);
-  } else if (!strcmp(c, "code0")) {
+  } else if (c == "code0") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(0, f.read_word());
     }
-  } else if (!strcmp(c, "code1")) {
+  } else if (c == "code1") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(1, f.read_word());
     }
-  } else if (!strcmp(c, "code2")) {
+  } else if (c == "code2") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(2, f.read_word());
     }
-  } else if (!strcmp(c, "code3")) {
+  } else if (c == "code3") {
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(3, f.read_word());
     }
-  } else if (!strcmp(c,"extra_code")) { // fdesign file compatibility
+  } else if (c == "extra_code") { // fdesign file compatibility
     if (f.read_version < 1.050020) {
-      reshuffle(f.read_word());
+      reshuffle(f.read_word().c_str());
     } else {
       extra_code(3, f.read_word());
     }
@@ -1461,11 +1537,11 @@ int lookup_symbol(const char *, int &, int numberok = 0);
 /**
  Back compatibility to Forms FDesign project files.
  */
-int Widget_Node::read_fdesign(const char* propname, const char* value) {
+int Widget_Node::read_fdesign(const std::string& propname, const std::string& value) {
   int v;
-  if (!strcmp(propname,"box")) {
+  if (propname == "box") {
     float x,y,w,h;
-    if (sscanf(value,"%f %f %f %f",&x,&y,&w,&h) == 4) {
+    if (sscanf(value.c_str(),"%f %f %f %f",&x,&y,&w,&h) == 4) {
       if (fluid::io::fdesign_flip) {
         Node* p;
         for (p = parent; p && !dynamic_cast<Window_Node*>(p); p = p->parent) {/*empty*/}
@@ -1475,42 +1551,41 @@ int Widget_Node::read_fdesign(const char* propname, const char* value) {
       y += Fluid.pasteoffset;
       o->resize(int(x),int(y),int(w),int(h));
     }
-  } else if (!strcmp(propname,"label")) {
+  } else if (propname == "label") {
     label(value);
-  } else if (!strcmp(propname,"name")) {
+  } else if (propname == "name") {
     this->name(value);
-  } else if (!strcmp(propname,"callback")) {
+  } else if (propname == "callback") {
     callback(value); user_data_type("long");
-  } else if (!strcmp(propname,"argument")) {
+  } else if (propname == "argument") {
     user_data(value);
-  } else if (!strcmp(propname,"shortcut")) {
-    if (value[0]) {
-      char buf[128]; sprintf(buf,"o->shortcut(\"%s\");", value);
-      extra_code(0, buf);
+  } else if (propname == "shortcut") {
+    if (!value.empty()) {
+      extra_code(0, "o->shortcut(\"" + value + "\");");
     }
-  } else if (!strcmp(propname,"style")) {
-    if (!strncmp(value,"FL_NORMAL",9)) return 1;
-    if (!lookup_symbol(value,v,1)) return 0;
+  } else if (propname == "style") {
+    if (value.compare(0, 9, "FL_NORMAL") == 0) return 1;
+    if (!lookup_symbol(value.c_str(),v,1)) return 0;
     o->labelfont(v); o->labeltype((Fl_Labeltype)(v>>8));
-  } else if (!strcmp(propname,"size")) {
-    if (!lookup_symbol(value,v,1)) return 0;
+  } else if (propname == "size") {
+    if (!lookup_symbol(value.c_str(),v,1)) return 0;
     o->labelsize(v);
-  } else if (!strcmp(propname,"type")) {
-    if (!strncmp(value,"NORMAL",6)) return 1;
-    if (lookup_symbol(value,v,1)) {o->type(v); return 1;}
-    if (!strcmp(value+strlen(value)-5,"FRAME")) goto TRY_BOXTYPE;
-    if (!strcmp(value+strlen(value)-3,"BOX")) goto TRY_BOXTYPE;
+  } else if (propname == "type") {
+    if (value.compare(0, 6, "NORMAL") == 0) return 1;
+    if (lookup_symbol(value.c_str(),v,1)) {o->type(v); return 1;}
+    if (value.size() >= 5 && value.compare(value.size()-5, 5, "FRAME") == 0) goto TRY_BOXTYPE;
+    if (value.size() >= 3 && value.compare(value.size()-3, 3, "BOX") == 0) goto TRY_BOXTYPE;
     return 0;
-  } else if (!strcmp(propname,"lcol")) {
-    if (!lookup_symbol(value,v,1)) return 0;
+  } else if (propname == "lcol") {
+    if (!lookup_symbol(value.c_str(),v,1)) return 0;
     o->labelcolor(v);
-  } else if (!strcmp(propname,"return")) {
-    if (!lookup_symbol(value,v,0)) return 0;
+  } else if (propname == "return") {
+    if (!lookup_symbol(value.c_str(),v,0)) return 0;
     o->when(v|FL_WHEN_RELEASE);
-  } else if (!strcmp(propname,"alignment")) {
-    if (!lookup_symbol(value,v)) {
+  } else if (propname == "alignment") {
+    if (!lookup_symbol(value.c_str(),v)) {
       // convert old numeric values:
-      int v1 = atoi(value); if (v1 <= 0 && strcmp(value,"0")) return 0;
+      int v1 = atoi(value.c_str()); if (v1 <= 0 && value != "0") return 0;
       v = 0;
       if (v1 >= 5) {v = FL_ALIGN_INSIDE; v1 -= 5;}
       switch (v1) {
@@ -1523,24 +1598,24 @@ int Widget_Node::read_fdesign(const char* propname, const char* value) {
       }
     }
     o->align(v);
-  } else if (!strcmp(propname,"resizebox")) {
+  } else if (propname == "resizebox") {
     resizable(1);
-  } else if (!strcmp(propname,"colors")) {
-    char* p = (char*)value;
-    while (*p != ' ') {if (!*p) return 0; p++;}
-    *p = 0;
+  } else if (propname == "colors") {
+    size_t sp = value.find(' ');
+    if (sp == std::string::npos) return 0;
+    std::string c1 = value.substr(0, sp);
+    std::string c2 = value.substr(sp + 1);
     int v1;
-    if (!lookup_symbol(value,v,1) || !lookup_symbol(p+1,v1,1)) {
-      *p=' '; return 0;}
+    if (!lookup_symbol(c1.c_str(),v,1) || !lookup_symbol(c2.c_str(),v1,1)) return 0;
     o->color(v,v1);
-  } else if (!strcmp(propname,"resize")) {
-    return !strcmp(value,"FL_RESIZE_ALL");
-  } else if (!strcmp(propname,"gravity")) {
-    return !strcmp(value,"FL_NoGravity FL_NoGravity");
-  } else if (!strcmp(propname,"boxtype")) {
+  } else if (propname == "resize") {
+    return value == "FL_RESIZE_ALL";
+  } else if (propname == "gravity") {
+    return value == "FL_NoGravity FL_NoGravity";
+  } else if (propname == "boxtype") {
   TRY_BOXTYPE:
-    int x = boxnumber(value);
-    if (!x) {x = item_number(boxmenu1, value); if (x < 0) return 0;}
+    int x = boxnumber(value.c_str());
+    if (!x) {x = item_number(boxmenu1, value.c_str()); if (x < 0) return 0;}
     if (x == ZERO_ENTRY) {
       x = 0;
       if (o->box() != ((Widget_Node*)factory)->o->box()) return 1; // kludge for frame

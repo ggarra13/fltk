@@ -641,25 +641,24 @@ void Fd_Shell_Command::write(Fl_Preferences &prefs, bool save_location) {
 }
 
 void Fd_Shell_Command::read(class fluid::io::Project_Reader *in) {
-  const char *c = in->read_word(1);
-  if (strcmp(c, "{")!=0) return; // expecting start of group
+  if (in->read_word(1) != "{") return; // expecting start of group
   storage = fluid::Tool_Store::PROJECT;
   for (;;) {
-    c = in->read_word(1);
-    if (strcmp(c, "}")==0) break; // end of command list
-    else if (strcmp(c, "name")==0)
+    std::string c = in->read_word(1);
+    if (c == "}") break; // end of command list
+    else if (c == "name")
       name = in->read_word();
-    else if (strcmp(c, "label")==0)
+    else if (c == "label")
       label = in->read_word();
-    else if (strcmp(c, "shortcut")==0)
+    else if (c == "shortcut")
       shortcut = in->read_int();
-    else if (strcmp(c, "condition")==0)
+    else if (c == "condition")
       condition = in->read_int();
-    else if (strcmp(c, "condition_data")==0)
+    else if (c == "condition_data")
       condition_data = in->read_word();
-    else if (strcmp(c, "command")==0)
+    else if (c == "command")
       command = in->read_word();
-    else if (strcmp(c, "flags")==0)
+    else if (c == "flags")
       flags = in->read_int();
     else
       in->read_word(); // skip an unknown word
@@ -780,13 +779,12 @@ void Fd_Shell_Command_List::write(Fl_Preferences &prefs, fluid::Tool_Store stora
  Read shell configuration from a project file.
  */
 void Fd_Shell_Command_List::read(fluid::io::Project_Reader *in) {
-  const char *c = in->read_word(1);
-  if (strcmp(c, "{")!=0) return; // expecting start of group
+  if (in->read_word(1) != "{") return; // expecting start of group
   clear(fluid::Tool_Store::PROJECT);
   for (;;) {
-    c = in->read_word(1);
-    if (strcmp(c, "}")==0) break; // end of command list
-    else if (strcmp(c, "command")==0) {
+    std::string c = in->read_word(1);
+    if (c == "}") break; // end of command list
+    else if (c == "command") {
       Fd_Shell_Command *cmd = new Fd_Shell_Command();
       add(cmd);
       cmd->read(in);

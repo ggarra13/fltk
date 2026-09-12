@@ -27,6 +27,7 @@
 #include <FL/Fl_Plugin.H>
 #include "Fl_Wayland_Screen_Driver.H"
 #include "Fl_Wayland_Graphics_Driver.H"
+#include <map>
 
 
 /*
@@ -79,6 +80,8 @@ public:
     const Fl_RGB_Image *rgb;
     int hotx, hoty;
   };
+  // map: wl_surface-of-GTK3-title-bar ==> wld_window-of-corresponding-toplevel-win
+  static std::map<struct wl_surface*, struct wld_window*> titlebar_surface_map;
   static void delete_cursor(struct custom_cursor *custom, bool delete_rgb = true);
   void decorated_win_size(int &w, int &h);
   void shape_bitmap_(Fl_Image* b);

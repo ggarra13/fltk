@@ -51,14 +51,14 @@ public:
   static Grid_Node prototype;
 public:
   Grid_Node();
-  const char *type_name() override {return "Fl_Grid";}
-  const char *alt_type_name() override {return "fltk::GridGroup";}
+  const std::string& type_name() override { static const std::string s = "Fl_Grid"; return s; }
+  const std::string& alt_type_name() override { static const std::string s = "fltk::GridGroup"; return s; }
   Widget_Node *_make() override { return new Grid_Node(); }
   Fl_Widget *widget(int X,int Y,int W,int H) override;
   void write_properties(fluid::io::Project_Writer &f) override;
-  void read_property(fluid::io::Project_Reader &f, const char *) override;
+  void read_property(fluid::io::Project_Reader &f, const std::string&) override;
   void write_parent_properties(fluid::io::Project_Writer &f, Node *child, bool encapsulate) override;
-  void read_parent_property(fluid::io::Project_Reader &f, Node *child, const char *property) override;
+  void read_parent_property(fluid::io::Project_Reader &f, Node *child, const std::string& property) override;
   Fl_Widget *enter_live_mode() override;
   void copy_properties() override;
   void copy_properties_for_children() override;

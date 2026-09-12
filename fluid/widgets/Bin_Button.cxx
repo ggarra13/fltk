@@ -109,7 +109,7 @@ int fluid::widget::Bin_Window_Button::handle(int inEvent)
         Fl::delete_widget(drag_win);
         drag_win = nullptr;
         // create a new window here
-        Node *prototype = typename_to_prototype((char*)user_data());
+        Node *prototype = typename_to_prototype(std::string((char*)user_data()));
         if (prototype) {
           Node *new_type = add_new_widget_from_user(prototype, Strategy::AFTER_CURRENT);
           if (new_type && dynamic_cast<Window_Node*>(new_type)) {

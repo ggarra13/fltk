@@ -60,7 +60,7 @@ int fluid::io::fdesign_flip = 0;
  \param[in] strategy add new nodes after current or as last child
  \return 0 if the operation failed, 1 if it succeeded
  */
-int fluid::io::read_file(Project &proj, const char *filename, int merge, Strategy strategy) {
+int fluid::io::read_file(Project &proj, const std::string& filename, int merge, Strategy strategy) {
   Project_Reader f(proj);
   strategy.source(Strategy::FROM_FILE);
   return f.read_project(filename, merge, strategy);
@@ -81,24 +81,6 @@ static int hexdigit(int x) {
 
 // ---- Project_Reader ---------------------------------------------- MARK: -
 
-/**
- A simple growing buffer.
- Oh how I wish sometimes we would upgrade to modern C++.
- \param[in] length minimum length in bytes
- */
-void Project_Reader::expand_buffer(int length) {
-  if (length >= buflen) {
-    if (!buflen) {
-      buflen = length+1;
-      buffer = (char*)malloc(buflen);
-    } else {
-      buflen = 2*buflen;
-      if (length >= buflen) buflen = length+1;
-      buffer = (char *)realloc((void *)buffer,buflen);
-    }
-  }
-}
-
 /** \brief Construct local project reader. */
 Project_Reader::Project_Reader(Project &proj)
 : proj_(proj)
@@ -108,9 +90,6 @@ Project_Reader::Project_Reader(Project &proj)
 /** \brief Release project reader resources. */
 Project_Reader::~Project_Reader()
 {
-  // fname is not copied, so do not free it
-  if (buffer)
-    ::free(buffer);
 }
 
 /**
@@ -118,13 +97,13 @@ Project_Reader::~Project_Reader()
  \param[in] s filename, if nullptr, read from stdin instead
  \return 0 if the operation failed, 1 if it succeeded
  */
-int Project_Reader::open_read(const char *s) {
+int Project_Reader::open_read(const std::string& s) {
   lineno = 1;
-  if (!s) {
+  if (s.empty()) {
     fin = stdin;
     fname = "stdin";
   } else {
-    FILE *f = fl_fopen(s, "rb");
+    FILE *f = fl_fopen(s.c_str(), "rb");
     if (!f)
       return 0;
     fin = f;
@@ -138,6 +117,9 @@ int Project_Reader::open_read(const char *s) {
  \return 0 if the operation failed, 1 if it succeeded
  */
 int Project_Reader::close_read() {
+  if (fin == nullptr) {
+    return 1;
+  }
   if (fin != stdin) {
     int x = fclose(fin);
     fin = nullptr;
@@ -150,8 +132,8 @@ int Project_Reader::close_read() {
  Return the name part of the current filename and path.
  \return a pointer into a string that is not owned by this class
  */
-const char *Project_Reader::filename_name() {
-  return fl_filename_name(fname);
+std::string Project_Reader::filename_name() const {
+  return fl_filename_name_str(fname);
 }
 
 /**
@@ -209,16 +191,16 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
   Fluid.proj.tree.current = p;
   Node *last_child_read = nullptr;
   Node *t = nullptr;
+  std::string c;
   for (;;) {
-    const char *c = read_word();
-  REUSE_C:
-    if (!c) {
+    if (!more_words()) {
       if (p && !merge)
         read_error("Missing '}' in line %d", lineno);
       break;
     }
-
-    if (!strcmp(c,"}")) {
+    c = read_word();
+  REUSE_C:
+    if (c == "}") {
       if (!p) read_error("Unexpected '}' in line %d", lineno);
       break;
     }
@@ -226,23 +208,23 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
     // Make sure that we don't go through the list of options for child nodes
     if (!skip_options) {
       // this is the first word in a .fd file:
-      if (!strcmp(c,"Magic:")) {
+      if (c == "Magic:") {
         read_fdesign();
         return nullptr;
       }
 
-      if (!strcmp(c,"version")) {
+      if (c == "version") {
         c = read_word();
-        read_version = strtod(c,nullptr);
+        read_version = strtod(c.c_str(),nullptr);
         if (read_version<=0 || read_version>double(FL_VERSION+0.000021))
           read_error(
             "Project file version '%s' is newer than this version of Fluid\n"
-            "Some features may not be supported.", c);
+            "Some features may not be supported.", c.c_str());
         continue;
       }
 
       // back compatibility with Vincent Penne's original class code:
-      if (!p && !strcmp(c,"define_in_struct")) {
+      if (!p && c == "define_in_struct") {
         Node *t = add_new_widget_from_file("class", Strategy::FROM_FILE_AS_LAST_CHILD);
         t->name(read_word());
         Fluid.proj.tree.current = p = t;
@@ -250,61 +232,61 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
         continue;
       }
 
-      if (!strcmp(c,"do_not_include_H_from_C")) {
+      if (c == "do_not_include_H_from_C") {
         proj_.include_H_from_C=0;
         goto CONTINUE;
       }
-      if (!strcmp(c,"use_FL_COMMAND")) {
+      if (c == "use_FL_COMMAND") {
         proj_.use_FL_COMMAND=1;
         goto CONTINUE;
       }
-      if (!strcmp(c,"utf8_in_src")) {
+      if (c == "utf8_in_src") {
         proj_.utf8_in_src=1;
         goto CONTINUE;
       }
-      if (!strcmp(c,"avoid_early_includes")) {
+      if (c == "avoid_early_includes") {
         proj_.avoid_early_includes=1;
         goto CONTINUE;
       }
-      if (strncmp(c, "i18n_", 5) == 0) {
+      if (c.compare(0, 5, "i18n_") == 0) {
         proj_.i18n.read(*this, c);
         goto CONTINUE;
       }
-      if (!strcmp(c,"header_name")) {
+      if (c == "header_name") {
         if (!proj_.header_file_set) proj_.header_file_name = read_word();
         else read_word();
         goto CONTINUE;
       }
 
-      if (!strcmp(c,"code_name")) {
+      if (c == "code_name") {
         if (!proj_.code_file_set) proj_.code_file_name = read_word();
         else read_word();
         goto CONTINUE;
       }
 
-      if (!strcmp(c,"strings_name")) {
+      if (c == "strings_name") {
         if (!proj_.strings_file_set) proj_.strings_file_name = read_word();
         else read_word();
         goto CONTINUE;
       }
 
-      if (!strcmp(c,"include_guard")) {
+      if (c == "include_guard") {
         proj_.include_guard = read_word();
         goto CONTINUE;
       }
 
-      if (!strcmp(c, "snap")) {
+      if (c == "snap") {
         Fluid.layout_list.read(this);
         goto CONTINUE;
       }
 
-      if (!strcmp(c, "gridx") || !strcmp(c, "gridy")) {
+      if (c == "gridx" || c == "gridy") {
         // grid settings are now global
         read_word();
         goto CONTINUE;
       }
 
-      if (strcmp(c, "shell_commands")==0) {
+      if (c == "shell_commands") {
         if (g_shell_config) {
           g_shell_config->read(this);
         } else {
@@ -313,17 +295,17 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
         goto CONTINUE;
       }
 
-      if (!strcmp(c, "mergeback")) {
+      if (c == "mergeback") {
         proj_.write_mergeback_data = read_int();
         goto CONTINUE;
       }
     }
     t = add_new_widget_from_file(c, strategy);
     if (!t) {
-      if (strlen(c) > 32)
-        read_error("Unknown word \"%.32s...\" in line %d", c, lineno);
+      if (c.size() > 32)
+        read_error("Unknown word \"%.32s...\" in line %d", c.c_str(), lineno);
       else
-        read_error("Unknown word \"%s\" in line %d", c, lineno);
+        read_error("Unknown word \"%s\" in line %d", c.c_str(), lineno);
       continue;
     }
     last_child_read = t;
@@ -335,28 +317,28 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
     c = read_word(1);
     // There can actually be two keywords here. The first one used to be a
     // "prefix", i.e. class attributes.
-    if (strcmp(c,"{") && t->is_class()) {   // <prefix> <name>
+    if (c != "{" && t->is_class()) {   // <prefix> <name>
       ((Class_Node*)t)->prefix( t->name() );
       t->name( c );
       c = read_word(1);
     }
 
-    if (strcmp(c,"{")) {
-      read_error("Missing property list for '%.32s' in line %d",t->title(), lineno);
+    if (c != "{") {
+      read_error("Missing property list for '%.32s' in line %d",t->title().c_str(), lineno);
       goto REUSE_C;
     }
 
     t->folded_ = 1;
     for (;;) {
-      const char *cc = read_word();
-      if (!cc || !strcmp(cc,"}")) break;
+      std::string cc = read_word();
+      if (cc == "}") break;
       t->read_property(*this, cc);
     }
 
     if (t->can_have_children()) {
       c = read_word(1);
-      if (strcmp(c,"{")) {
-        read_error("Missing child list for '%.32s' in line %d",t->title(), lineno);
+      if (c != "{") {
+        read_error("Missing child list for '%.32s' in line %d",t->title().c_str(), lineno);
         goto REUSE_C;
       }
       read_children(t, 0, Strategy::FROM_FILE_AS_LAST_CHILD, skip_options);
@@ -400,7 +382,7 @@ Node *Project_Reader::read_children(Node *p, int merge, Strategy strategy, char 
  \param[in] strategy add new nodes after current or as last child
  \return 0 if the operation failed, 1 if it succeeded
  */
-int Project_Reader::read_project(const char *filename, int merge, Strategy strategy) {
+int Project_Reader::read_project(const std::string& filename, int merge, Strategy strategy) {
   Node *o;
   proj_.undo.suspend();
   read_version = 0.0;
@@ -463,7 +445,53 @@ void Project_Reader::read_error(const char *format, ...) {
 }
 
 /**
- Return a word read from the .fl file, or nullptr at the EOF.
+ Skip whitespace and comments and return the first significant character.
+
+ This is the shared first step of more_words() and read_word(): it consumes
+ all comments (# to end of line) and whitespace, tracking line numbers, and
+ leaves the file position right after the first character that is neither.
+
+ \return the first significant character, or -1 at EOF
+ */
+int Project_Reader::skip_to_word() {
+  int x;
+  for (;;) {
+    x = nextchar();
+    if (x < 0 && feof(fin)) {   // eof
+      return -1;
+    } else if (x == '#') {      // comment
+      do x = nextchar(); while (x >= 0 && x != '\n');
+      lineno++;
+      continue;
+    } else if (x == '\n') {
+      lineno++;
+    } else if (!fl_ascii_isspace(x)) {
+      return x;
+    }
+  }
+}
+
+/**
+ Check whether another word is available before the end of the file.
+
+ This skips whitespace and comments exactly like read_word() does, but does
+ not consume the word itself, so it can be used to tell a genuine, expected
+ end of file (there is no more content to read) apart from an unexpected
+ EOF in the middle of a bracketed structure, which read_word() treats as an
+ error. This is only meaningful at the top level of the file; everywhere
+ else, the surrounding braces make an EOF always an error.
+
+ \return true if there is at least one more word before EOF
+ */
+bool Project_Reader::more_words() {
+  int x = skip_to_word();
+  if (x < 0) return false;
+  ungetc(x, fin);
+  return true;
+}
+
+/**
+ Return a word read from the .fl file.
 
  This will skip all comments (# to end of line), and evaluate
  all \\xxx sequences and use \\ at the end of line to remove the newline.
@@ -475,36 +503,23 @@ void Project_Reader::read_error(const char *format, ...) {
 
  \param[in] wantbrace if set, reading a `{` as the first non-space character
     will return the string `"{"`, if clear, a `{` is seen as the start of a word
- \return a pointer to the internal buffer, containing a copy of the word.
-    Don't free the buffer! Note that most (all?) other file operations will
-    overwrite this buffer. If wantbrace is not set, but we read a leading '{',
-    the returned string will be stripped of its leading and trailing braces.
+ \return the word that was read. If wantbrace is not set, but we read a
+    leading '{', the returned string will be stripped of its leading and
+    trailing braces.
+ \throw fluid::ReadException if the file ends before a word can be read.
+    Call more_words() first if EOF here would be a normal, expected
+    end of file rather than a corrupt or truncated project.
  */
-const char *Project_Reader::read_word(int wantbrace) {
-  int x;
-
-  // skip all the whitespace before it:
-  for (;;) {
-    x = nextchar();
-    if (x < 0 && feof(fin)) {   // eof
-      return nullptr;
-    } else if (x == '#') {      // comment
-      do x = nextchar(); while (x >= 0 && x != '\n');
-      lineno++;
-      continue;
-    } else if (x == '\n') {
-      lineno++;
-    } else if (!fl_ascii_isspace(x)) {
-      break;
-    }
+std::string Project_Reader::read_word(int wantbrace) {
+  int x = skip_to_word();
+  if (x < 0) {
+    throw fluid::ReadException("Unexpected end of file in line " + std::to_string(lineno));
   }
-
-  expand_buffer(100);
 
   if (x == '{' && !wantbrace) {
 
     // read in whatever is between braces
-    int length = 0;
+    std::string word;
     int nesting = 0;
     for (;;) {
       x = nextchar();
@@ -517,32 +532,26 @@ const char *Project_Reader::read_word(int wantbrace) {
       else if (x == '\\') {x = read_quoted(); if (x<0) continue;}
       else if (x == '{') nesting++;
       else if (x == '}') {if (!nesting--) break;}
-      buffer[length++] = x;
-      expand_buffer(length);
+      word.push_back((char)x);
     }
-    buffer[length] = 0;
-    return buffer;
+    return word;
 
   } else if (x == '{' || x == '}') {
     // all the punctuation is a word:
-    buffer[0] = x;
-    buffer[1] = 0;
-    return buffer;
+    return std::string(1, (char)x);
 
   } else {
 
     // read in an unquoted word:
-    int length = 0;
+    std::string word;
     for (;;) {
       if (x == '\\') {x = read_quoted(); if (x<0) continue;}
       else if (x<0 || fl_ascii_isspace(x) || x=='{' || x=='}' || x=='#') break;
-      buffer[length++] = x;
-      expand_buffer(length);
+      word.push_back((char)x);
       x = nextchar();
     }
     ungetc(x, fin);
-    buffer[length] = 0;
-    return buffer;
+    return word;
 
   }
 }
@@ -551,12 +560,7 @@ const char *Project_Reader::read_word(int wantbrace) {
  \return integer value, or 0 if the word is not an integer
  */
 int Project_Reader::read_int() {
-  const char *word = read_word();
-  if (word) {
-    return atoi(word);
-  } else {
-    return 0;
-  }
+  return atoi(read_word().c_str());
 }
 
 /** Read fdesign name/value pairs.
@@ -566,22 +570,20 @@ int Project_Reader::read_int() {
  \param[out] value string
  \return 0 if end of file, else 1
  */
-int Project_Reader::read_fdesign_line(const char*& name, const char*& value) {
-  int length = 0;
+int Project_Reader::read_fdesign_line(std::string& name, std::string& value) {
   int x;
+  name.clear();
   // find a colon:
   for (;;) {
     x = nextchar();
     if (x < 0 && feof(fin)) return 0;
-    if (x == '\n') {length = 0; continue;} // no colon this line...
+    if (x == '\n') {name.clear(); continue;} // no colon this line...
     if (!fl_ascii_isspace(x)) {
-      buffer[length++] = x;
-      expand_buffer(length);
+      name.push_back((char)x);
     }
     if (x == ':') break;
   }
-  int valueoffset = length;
-  buffer[length-1] = 0;
+  name.pop_back(); // drop the trailing ':'
 
   // skip to start of value:
   for (;;) {
@@ -590,16 +592,13 @@ int Project_Reader::read_fdesign_line(const char*& name, const char*& value) {
   }
 
   // read the value:
+  value.clear();
   for (;;) {
     if (x == '\\') {x = read_quoted(); if (x<0) continue;}
     else if (x == '\n') break;
-    buffer[length++] = x;
-    expand_buffer(length);
+    value.push_back((char)x);
     x = nextchar();
   }
-  buffer[length] = 0;
-  name = buffer;
-  value = buffer+valueoffset;
   return 1;
 }
 
@@ -693,7 +692,7 @@ static void forms_end(Fl_Group *g, int flip) {
  \see http://xforms-toolkit.org
  */
 void Project_Reader::read_fdesign() {
-  int fdesign_magic = atoi(read_word());
+  int fdesign_magic = read_int();
   fdesign_flip = (fdesign_magic < 13000);
   Widget_Node *window = nullptr;
   Widget_Node *group = nullptr;
@@ -703,24 +702,23 @@ void Project_Reader::read_fdesign() {
     t->name("create_the_forms()");
     Fluid.proj.tree.current = t;
   }
+  std::string name, value;
   for (;;) {
-    const char *name;
-    const char *value;
     if (!read_fdesign_line(name, value)) break;
 
-    if (!strcmp(name,"Name")) {
+    if (name == "Name") {
 
       window = (Widget_Node*)add_new_widget_from_file("Fl_Window", Strategy::FROM_FILE_AS_LAST_CHILD);
       window->name(value);
       window->label(value);
       Fluid.proj.tree.current = widget = window;
 
-    } else if (!strcmp(name,"class")) {
+    } else if (name == "class") {
 
-      if (!strcmp(value,"FL_BEGIN_GROUP")) {
+      if (value == "FL_BEGIN_GROUP") {
         group = widget = (Widget_Node*)add_new_widget_from_file("Fl_Group", Strategy::FROM_FILE_AS_LAST_CHILD);
         Fluid.proj.tree.current = group;
-      } else if (!strcmp(value,"FL_END_GROUP")) {
+      } else if (value == "FL_END_GROUP") {
         if (group) {
           Fl_Group* g = (Fl_Group*)(group->o);
           g->begin();
@@ -731,18 +729,18 @@ void Project_Reader::read_fdesign() {
         Fluid.proj.tree.current = window;
       } else {
         for (int i = 0; class_matcher[i]; i += 2)
-          if (!strcmp(value,class_matcher[i])) {
+          if (value == class_matcher[i]) {
             value = class_matcher[i+1]; break;}
         widget = (Widget_Node*)add_new_widget_from_file(value, Strategy::FROM_FILE_AS_LAST_CHILD);
         if (!widget) {
-          fluid_message("class %s not found, using Fl_Button\n", value);
+          fluid_message("class %s not found, using Fl_Button\n", value.c_str());
           widget = (Widget_Node*)add_new_widget_from_file("Fl_Button", Strategy::FROM_FILE_AS_LAST_CHILD);
         }
       }
 
     } else if (widget) {
       if (!widget->read_fdesign(name, value))
-        fluid_message("Ignoring \"%s: %s\"\n", name, value);
+        fluid_message("Ignoring \"%s: %s\"\n", name.c_str(), value.c_str());
     }
   }
 }

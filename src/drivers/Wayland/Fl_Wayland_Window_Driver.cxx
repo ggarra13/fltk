@@ -53,7 +53,10 @@ struct cursor_image { // as in wayland-cursor.c of the Wayland project source co
 extern "C" {
 # include "../../../libdecor/src/libdecor-plugin.h"
   uchar *fl_libdecor_titlebar_buffer(struct libdecor_frame *frame, int *w, int *h, int *stride);
+  struct wl_surface* fl_libdecor_get_titlebar_surface(struct libdecor_frame *frame);
 }
+
+std::map<struct wl_surface*, struct wld_window*> Fl_Wayland_Window_Driver::titlebar_surface_map;
 
 #define fl_max(a,b) ((a) > (b) ? (a) : (b))
 #define fl_min(a,b) ((a) < (b) ? (a) : (b))
@@ -487,6 +490,14 @@ void Fl_Wayland_Window_Driver::hide() {
     }
 #endif
     if (wld_win->kind == DECORATED) {
+      auto item = titlebar_surface_map.begin();
+      while (item != titlebar_surface_map.end()) {
+        if (item->second == wld_win) {
+          titlebar_surface_map.erase(item);
+          break;
+        }
+        item++;
+      }
       libdecor_frame_unref(wld_win->frame);
       wld_win->frame = NULL;
       wld_win->xdg_surface = NULL;
@@ -1038,6 +1049,15 @@ static void handle_configure(struct libdecor_frame *frame,
     window->fl_win->clear_damage();
   }
   if (is_2nd_run) driver->force_position(0);
+  if (is_1st_run) { // memorize wl_surface of the GTK3 titlebar, if any
+    Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+    static bool using_GTK3 = scr_driver->seat->gtk_shell &&
+      (gtk_shell1_get_version(scr_driver->seat->gtk_shell) >= GTK_SURFACE1_TITLEBAR_GESTURE_SINCE_VERSION);
+    if (using_GTK3) {
+      struct wl_surface *titlebar_surf = fl_libdecor_get_titlebar_surface(window->frame);
+      if (titlebar_surf) Fl_Wayland_Window_Driver::titlebar_surface_map[titlebar_surf] = window;
+    }
+  }
 }
 
 

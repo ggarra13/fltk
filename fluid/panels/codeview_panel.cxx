@@ -203,7 +203,6 @@ void update_codeview_cb(class Fl_Button*, void*) {
 
 /**
  This is called by the timer itself
-
 */
 void update_codeview_timer(void*) {
   update_codeview_cb(0,0);
@@ -220,7 +219,6 @@ void codeview_defer_update() {
 /**
  Show or hide the source code preview.
  The state is stored in the app preferences.
-
 */
 void codeview_toggle_visibility() {
   if (!codeview_panel) {
@@ -374,12 +372,12 @@ static void cb_cv_code_choice_w(Fl_Choice* o, void*) {
 }
 
 Fl_Menu_Item menu_cv_code_choice_w[] = {
- {"prolog", 0,  nullptr, (void*)(0), 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"static data", 0,  nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"instantiate", 0,  nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"setup", 0,  nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- {"finalize", 0,  nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
- { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
+  { "prolog", 0, nullptr, (void*)(0), 16, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "static data", 0, nullptr, (void*)(1), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "instantiate", 0, nullptr, (void*)(2), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "setup", 0, nullptr, (void*)(3), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { "finalize", 0, nullptr, (void*)(4), 0, (uchar)FL_NORMAL_LABEL, 0, 11, 0 },
+  { nullptr, 0, nullptr, nullptr, 0, 0, 0, 0, 0 }
 };
 
 Fl_Double_Window* make_codeview() {

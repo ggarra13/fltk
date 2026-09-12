@@ -60,13 +60,13 @@ class Project_Writer;
  \see Node *Fl_..._Type::make(Strategy strategy) calls `add()`
  Add single Type:
     Node *add_new_widget_from_user(Node *inPrototype, Strategy strategy, bool and_open)
-    Node *add_new_widget_from_user(const char *inName, Strategy strategy, bool and_open)
-    Node *add_new_widget_from_file(const char *inName, Strategy strategy)
+    Node *add_new_widget_from_user(const std::string& inName, Strategy strategy, bool and_open)
+    Node *add_new_widget_from_file(const std::string& inName, Strategy strategy)
  Add a hierarchy of Types
     void Node::add(Node *p, Strategy strategy)
     int read_file(const char *filename, int merge, Strategy strategy)
     Node *fluid::io::Project_Reader::read_children(Node *p, int merge, Strategy strategy, char skip_options)
-    int fluid::io::Project_Reader::read_project(const char *filename, int merge, Strategy strategy)
+    int fluid::io::Project_Reader::read_project(const std::string& filename, int merge, Strategy strategy)
  */
 typedef struct Strategy {
   enum Flags {
@@ -102,7 +102,6 @@ struct TextSpan2 {
 };
 
 
-int storestring(const char *n, const char * & p, int nostrip=0);
 int storestring(const std::string& n, std::string& p, int nostrip=0);
 
 void select_all_cb(Fl_Widget *,void *);
@@ -135,13 +134,13 @@ class Node
   // ---- Node Properties
 protected:
   /// Name of a widget, or code some non-widget Types
-  const char* name_ { nullptr };
+  std::string name_ { };
 
   /// Label text of a widget
-  const char* label_ { nullptr };
+  std::string label_ { };
 
   /// Callback function name, lambda, or function code
-  const char* callback_ { nullptr };
+  std::string callback_ { };
 
   /// Widget user data field as C++ text.
   std::string user_data_ { };
@@ -150,7 +149,7 @@ protected:
   std::string user_data_type_ { };
 
   /// Optional comment, visible in browser and in the source code
-  const char* comment_ { nullptr };
+  std::string comment_ { };
 
 
   // ---- Properties that should probably not be public
@@ -272,23 +271,25 @@ public:
   // Handle mouse clicks on widget nodes
   virtual Node* click_test(int,int) { return nullptr; }
 
+  // Help the user create the required hierarchy for this widget
+  virtual bool node_creation_assistant(Strategy& strategy, Node*& anchor) { return false; }
 
   // ---- Getter and setter for various properties
 public:
   // Name of the node, used for code generation and as a unique identifier in the project.
-  const char* name() const { return name_; }
-  void name(const char*);
+  const std::string& name() const { return name_; }
+  void name(const std::string&);
 
   // Label text of the node, used for widgets and windows.
-  const char* label() const { return label_; }
-  void label(const char*);
+  const std::string& label() const { return label_; }
+  void label(const std::string&);
 
   // Copy the label text to Widgets and Windows, does nothing in base Node.
-  virtual void setlabel(const char *) { } // virtual part of label(char*)
+  virtual void setlabel(const std::string&) { } // virtual part of label(char*)
 
   // Callback name, callback code, or lambda function for the node, used for widgets and windows.
-  const char* callback() const { return callback_; }
-  void callback(const char*);
+  const std::string& callback() const { return callback_; }
+  void callback(const std::string&);
   std::string callback_name(fluid::io::Code_Writer& f);
 
   // User data associated with the node.
@@ -301,8 +302,8 @@ public:
   void user_data_type(const std::string&);
 
   // Optional comment for the node, used for documentation and code generation.
-  const char* comment() { return comment_; }
-  void comment(const char*);
+  const std::string& comment() { return comment_; }
+  void comment(const std::string&);
 
   // Find the window node that contains this node, or nullptr if not in a window.
   Window_Node* window();
@@ -317,13 +318,13 @@ public:
   bool has_function(const std::string& return_type_regex, const std::string& function_sig_regex) const;
 
   // The node name, or something else human readable if there is no name
-  virtual const char* title(); // string for browser
+  virtual const std::string& title(); // string for browser
 
   // FLTK 1 name of the underlying type
-  virtual const char* type_name() = 0; // type for code output
+  virtual const std::string& type_name() = 0; // type for code output
 
   // fltk 2 name for back compatibility
-  virtual const char* alt_type_name() { return type_name(); }
+  virtual const std::string& alt_type_name() { return type_name(); }
 
 
   // ---- Code Writer functions for generating source code for this widget
@@ -341,13 +342,13 @@ public:
   virtual void write_code2(fluid::io::Code_Writer& f); // code and .h after children
 
   // Write the commentary text into the header file
-  void write_comment_h(fluid::io::Code_Writer& f, const char *ind="");
+  void write_comment_h(fluid::io::Code_Writer& f, const std::string& ind="");
 
   // Write the commentary text into the source file
-  void write_comment_c(fluid::io::Code_Writer& f, const char *ind="");
+  void write_comment_c(fluid::io::Code_Writer& f, const std::string& ind="");
 
   // Write the commentary text
-  void write_comment_inline_c(fluid::io::Code_Writer& f, const char *ind=nullptr);
+  void write_comment_inline_c(fluid::io::Code_Writer& f, const std::string& ind="");
 
 
   // ---- Read and write project files
@@ -362,16 +363,16 @@ public:
   virtual void write_parent_properties(fluid::io::Project_Writer& f, Node *child, bool encapsulate);
 
   // Read one property of this node, or call the parent if not recognized
-  virtual void read_property(fluid::io::Project_Reader& f, const char *);
+  virtual void read_property(fluid::io::Project_Reader& f, const std::string&);
 
   // Read properties that the parent stores for this node
-  virtual void read_parent_property(fluid::io::Project_Reader& f, Node *child, const char *property);
+  virtual void read_parent_property(fluid::io::Project_Reader& f, Node *child, const std::string& property);
 
   // Fixup nodes after all children are read
   virtual void postprocess_read() { }
 
   // Back compatibility to Forms FDesign project files
-  virtual int read_fdesign(const char*, const char*);
+  virtual int read_fdesign(const std::string&, const std::string&);
 
 
   // ---- Type classification methods

@@ -204,7 +204,7 @@ void Group_Node::write_code1(fluid::io::Code_Writer& f) {
 }
 
 void Group_Node::write_code2(fluid::io::Code_Writer& f) {
-  const char *var = name() ? name() : "o";
+  const std::string& var = !name().empty() ? name() : "o";
   if (!extra_code(3).empty()) {
     f.write_c_indented(extra_code(3), 0, '\n');
   }
@@ -263,8 +263,6 @@ void Group_Node::copy_properties() {
 
 Pack_Node Pack_Node::prototype;      // the "factory"
 
-const char pack_type_name[] = "Fl_Pack";
-
 Fl_Menu_Item pack_type_menu[] = {
   {"HORIZONTAL", 0, nullptr, (void*)Fl_Pack::HORIZONTAL},
   {"VERTICAL", 0, nullptr, (void*)Fl_Pack::VERTICAL},
@@ -284,8 +282,6 @@ void Pack_Node::copy_properties()
 }
 
 // ---- Flex_Node --------------------------------------------------- MARK: -
-
-const char flex_type_name[] = "Fl_Flex";
 
 Fl_Menu_Item flex_type_menu[] = {
   {"HORIZONTAL", 0, nullptr, (void*)Fl_Flex::HORIZONTAL},
@@ -382,28 +378,25 @@ void Flex_Node::write_properties(fluid::io::Project_Writer &f)
   }
 }
 
-void Flex_Node::read_property(fluid::io::Project_Reader &f, const char *c)
+void Flex_Node::read_property(fluid::io::Project_Reader &f, const std::string& c)
 {
   Fl_Flex* flex = (Fl_Flex*)o;
   suspend_auto_layout = 1;
-  if (!strcmp(c,"margin")) {
+  if (c == "margin") {
     int lm, tm, rm, bm;
-    if (sscanf(f.read_word(),"%d %d %d %d",&lm,&tm,&rm,&bm) == 4)
+    if (sscanf(f.read_word().c_str(),"%d %d %d %d",&lm,&tm,&rm,&bm) == 4)
       flex->margin(lm, tm, rm, bm);
-  } else if (!strcmp(c,"gap")) {
+  } else if (c == "gap") {
     int g;
-    if (sscanf(f.read_word(),"%d",&g))
+    if (sscanf(f.read_word().c_str(),"%d",&g))
       flex->gap(g);
-  } else if (!strcmp(c,"fixed_size_tuples")) {
+  } else if (c == "fixed_size_tuples") {
     f.read_word(1); // must be '{'
-    const char *nStr = f.read_word(1); // number of indices in table
-    fixedSizeTupleSize = atoi(nStr);
+    fixedSizeTupleSize = f.read_int(); // number of indices in table
     fixedSizeTuple = new int[fixedSizeTupleSize*2];
     for (int i=0; i<fixedSizeTupleSize; i++) {
-      const char *ix = f.read_word(1); // child at that index is fixed in size
-      fixedSizeTuple[i*2] = atoi(ix);
-      const char *size = f.read_word(1); // fixed size of that child
-      fixedSizeTuple[i*2+1] = atoi(size);
+      fixedSizeTuple[i*2] = f.read_int(); // child at that index is fixed in size
+      fixedSizeTuple[i*2+1] = f.read_int(); // fixed size of that child
     }
     f.read_word(1); // must be '}'
   } else {
@@ -431,7 +424,7 @@ void Flex_Node::postprocess_read()
 }
 
 void Flex_Node::write_code2(fluid::io::Code_Writer& f) {
-  const char *var = name() ? name() : "o";
+  const std::string& var = !name().empty() ? name() : "o";
   Fl_Flex* flex = (Fl_Flex*)o;
   int lm, tm, rm, bm;
   flex->margin(&lm, &tm, &rm, &bm);
@@ -725,8 +718,6 @@ void Table_Node::ideal_size(int &w, int &h) {
 
 Tabs_Node Tabs_Node::prototype;
 
-const char tabs_type_name[] = "Fl_Tabs";
-
 // Override group's resize behavior to do nothing to children:
 void Fl_Tabs_Proxy::resize(int X, int Y, int W, int H) {
   if (Fluid.proj.tree.allow_layout > 0) {
@@ -793,8 +784,6 @@ Fl_Widget *Tabs_Node::enter_live_mode() {
 
 Scroll_Node Scroll_Node::prototype;  // the "factory"
 
-const char scroll_type_name[] = "Fl_Scroll";
-
 Fl_Menu_Item scroll_type_menu[] = {
   {"BOTH", 0, nullptr, nullptr/*(void*)Fl_Scroll::BOTH*/},
   {"HORIZONTAL", 0, nullptr, (void*)Fl_Scroll::HORIZONTAL},
@@ -829,8 +818,6 @@ void Scroll_Node::copy_properties() {
 
 Tile_Node Tile_Node::prototype;      // the "factory"
 
-const char tile_type_name[] = "Fl_Tile";
-
 // live mode support
 Fl_Widget* Tile_Node::enter_live_mode() {
   Fl_Group *grp = new Fl_Tile(o->x(), o->y(), o->w(), o->h());
@@ -845,8 +832,6 @@ void Tile_Node::copy_properties() {
 // ---- Wizard_Node ------------------------------------------------ MARK: -
 
 Wizard_Node Wizard_Node::prototype;  // the "factory"
-
-const char wizard_type_name[] = "Fl_Wizard";
 
 // Override group's resize behavior to do nothing to children:
 void Fl_Wizard_Proxy::resize(int X, int Y, int W, int H) {

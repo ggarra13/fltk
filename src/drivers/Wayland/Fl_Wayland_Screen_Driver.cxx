@@ -57,8 +57,6 @@
 
 extern "C" {
   bool libdecor_get_cursor_settings(char **theme, int *size);
-  bool fl_is_surface_from_GTK_titlebar (struct wl_surface *surface, struct libdecor_frame *frame,
-                                        bool *using_GTK);
 }
 
 // set this to 1 for keyboard debug output, 0 for no debug output
@@ -254,23 +252,11 @@ static void pointer_enter(void *data, struct wl_pointer *wl_pointer, uint32_t se
         struct wl_surface *surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
   struct Fl_Wayland_Screen_Driver::seat *seat = (struct Fl_Wayland_Screen_Driver::seat*)data;
   Fl_Window *win = event_coords_from_surface(surface, surface_x, surface_y);
-  static bool using_GTK = seat->gtk_shell &&
-    (gtk_shell1_get_version(seat->gtk_shell) >= GTK_SURFACE1_TITLEBAR_GESTURE_SINCE_VERSION);
-  if (!win && using_GTK) {
-    // check whether surface is the headerbar of a GTK-decorated window
-    Fl_X *xp = Fl_X::first;
-    while (xp && using_GTK) { // all mapped windows
-      struct wld_window *xid = (struct wld_window*)xp->xid;
-      if (xid->kind == Fl_Wayland_Window_Driver::DECORATED &&
-          fl_is_surface_from_GTK_titlebar(surface, xid->frame, &using_GTK)) {
-        gtk_shell_surface = surface;
-        break;
-      }
-      xp = xp->next;
-    }
+  if (!win && Fl_Wayland_Window_Driver::titlebar_surface_map.find(surface) !=
+        Fl_Wayland_Window_Driver::titlebar_surface_map.end()) {
+      gtk_shell_surface = surface;
   }
   if (!win) return;
-  //fprintf(stderr, "pointer_enter window=%p\n", Fl_Wayland_Window_Driver::surface_to_window(surface));
   seat->pointer_focus = surface;
   // use custom cursor if present
   struct wl_cursor *cursor =

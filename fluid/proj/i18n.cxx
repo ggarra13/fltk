@@ -41,24 +41,24 @@ void I18n::reset() {
   posix_set = "1";
 }
 
-void I18n::read(io::Project_Reader &f, const char *key) {
-  if (!strcmp(key, "i18n_type")) {
-    type = static_cast<fluid::I18n_Type>(atoi(f.read_word()));
-  } else if (!strcmp(key, "i18n_gnu_function")) {
+void I18n::read(io::Project_Reader &f, const std::string& key) {
+  if (key == "i18n_type") {
+    type = static_cast<fluid::I18n_Type>(f.read_int());
+  } else if (key == "i18n_gnu_function") {
     gnu_function = f.read_word();
-  } else if (!strcmp(key, "i18n_gnu_static_function")) {
+  } else if (key == "i18n_gnu_static_function") {
     gnu_static_function = f.read_word();
-  } else if (!strcmp(key, "i18n_pos_file")) {
+  } else if (key == "i18n_pos_file") {
     posix_file = f.read_word();
-  } else if (!strcmp(key, "i18n_pos_set")) {
+  } else if (key == "i18n_pos_set") {
     posix_set = f.read_word();
-  } else if (!strcmp(key, "i18n_include")) {
+  } else if (key == "i18n_include") {
     if (type == fluid::I18n_Type::GNU) {
       gnu_include = f.read_word();
     } else if (type == fluid::I18n_Type::POSIX) {
       posix_include = f.read_word();
     }
-  } else if (!strcmp(key, "i18n_conditional")) {
+  } else if (key == "i18n_conditional") {
     if (type == fluid::I18n_Type::GNU) {
       gnu_conditional = f.read_word();
     } else if (type == fluid::I18n_Type::POSIX) {
