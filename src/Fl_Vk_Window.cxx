@@ -279,7 +279,7 @@ void Fl_Vk_Window::recreate_swapchain() {
   }
 
   // Resize frame data
-  m_frames.resize(get_max_frames_per_flight());
+  m_frames.resize(get_max_frames_in_flight());
   VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   VkFenceCreateInfo fenceInfo = {
     VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -1406,7 +1406,7 @@ void Fl_Vk_Window::init_vulkan() {
   }
 
   // Initialize frame data
-  m_frames.resize(get_max_frames_per_flight());
+  m_frames.resize(get_max_frames_in_flight());
   VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
   VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, VK_FENCE_CREATE_SIGNALED_BIT };
   VkCommandBufferAllocateInfo cmdInfo = {};

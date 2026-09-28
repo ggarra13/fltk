@@ -310,7 +310,7 @@ public:
   virtual std::vector<const char*> get_device_extensions();
 
   //! Virtual function to change the max. frames per flight (default: 2)
-  virtual int get_max_frames_per_flight() { return 2; }
+  virtual int get_max_frames_in_flight() { return 2; }
 
   //! Log level of Vulkan API
   virtual int log_level() const { return 0; }
