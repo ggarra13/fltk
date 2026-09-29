@@ -35,9 +35,6 @@
 #include <stdexcept>
 #include <vector>
 
-// Ugly macros
-#define FLTK_CLAMP(v, vmin, vmax) (v < vmin ? vmin : (v > vmax ? vmax : v))
-
 
 //! Returns true or false if extension name is supported.
 static bool isExtensionSupported(const char* extensionName) {
@@ -161,45 +158,46 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
       }
   }
 
-  // Skip recreation if extent matches current and old swapchain is valid
-  if (oldSwapchain != VK_NULL_HANDLE &&
-      !pWindow->empty_buffers() &&
-      swapchainExtent.width == pWindow->m_swapchainExtent.width &&
-      swapchainExtent.height == pWindow->m_swapchainExtent.height) {
-      pWindow->m_swapchain = oldSwapchain;
-      return;
-  }
-
   // Store the authorative extent for this window
   pWindow->m_swapchainExtent = swapchainExtent;
 
-  // Choose present mode (e.g., prefer MAILBOX for low latency)
-  uint32_t presentModeCount;
+  // ---- Choose present mode FIRST, since it is part of the key --------------
+  uint32_t presentModeCount = 0;
   vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
                                             pWindow->m_surface,
                                             &presentModeCount, nullptr);
-  VkPresentModeKHR* presentModes = (VkPresentModeKHR*)
-                                   malloc(presentModeCount * sizeof(VkPresentModeKHR));
+  std::vector<VkPresentModeKHR> presentModes(presentModeCount);
   vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
                                             pWindow->m_surface,
-                                            &presentModeCount, presentModes);
-  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-  if (swap_interval() == 0)
+                                            &presentModeCount,
+                                            presentModes.data());
+
+  VkPresentModeKHR presentMode = (swap_interval() == 0)
+                                     ? VK_PRESENT_MODE_MAILBOX_KHR
+                                     : VK_PRESENT_MODE_FIFO_KHR;
+
+  if (std::find(presentModes.begin(), presentModes.end(), presentMode) ==
+      presentModes.end())
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;   // always available per spec
+
+  // ---- Skip only if EVERYTHING that shapes the swapchain is unchanged -----
+  const Fl_Vk_SwapchainKey newKey(swapchainExtent,
+                                  pWindow->format(),
+                                  pWindow->colorSpace(),
+                                  presentMode);
+
+  if (oldSwapchain != VK_NULL_HANDLE &&
+      !pWindow->empty_buffers() &&
+      m_swapchainKey.valid() &&
+      newKey == m_swapchainKey)
   {
-      presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+      pWindow->m_swapchain = oldSwapchain;   // still valid, keep it
+      return;
   }
-  bool found = false;
-  for (uint32_t i = 0; i < presentModeCount; i++) {
-      if (presentModes[i] == presentMode) {
-          found = true;
-          break;
-      }
-  }
-  free(presentModes);
 
-  if (!found)
-      presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  pWindow->m_swapchainExtent = swapchainExtent;
 
+  // ---- Create the swapchain -----
   VkSwapchainCreateInfoKHR swapchain = {};
   swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   swapchain.surface = pWindow->m_surface;
@@ -261,19 +259,29 @@ void Fl_Vk_Window_Driver::prepare_buffers() {
   }
   pWindow->m_buffers.clear();
 
+  // Nothing valid until creation succeeds
+  m_swapchainKey.reset();
+
   // Create new swapchain
   result = vkCreateSwapchainKHR(pWindow->device(), &swapchain, NULL, &pWindow->m_swapchain);
-  VK_CHECK(result);
-  if (pWindow->m_swapchain == VK_NULL_HANDLE)
+  if (result != VK_SUCCESS || pWindow->m_swapchain == VK_NULL_HANDLE)
   {
-      fprintf(stderr, "vkCreateSwapchainKHR failed: %s\n", string_VkResult(result));
-      pWindow->m_swapchain = oldSwapchain; // Restore old swapchain
+      fprintf(stderr, "vkCreateSwapchainKHR failed: %s\n",
+              string_VkResult(result));
+      // oldSwapchain is retired even on failure (spec), so do NOT restore it.
+      // Leave m_swapchain null so the caller retries.
+      pWindow->m_swapchain = VK_NULL_HANDLE;
+      if (oldSwapchain != VK_NULL_HANDLE)
+          vkDestroySwapchainKHR(pWindow->device(), oldSwapchain, nullptr);
       return;
   }
 
   if (oldSwapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(pWindow->device(), oldSwapchain, NULL);
   }
+
+  // Record only after success.
+  m_swapchainKey = newKey;
 
   // Get new swapchain images
   uint32_t swapchainImageCount = 0;
@@ -1560,6 +1568,8 @@ void Fl_Vk_Window_Driver::destroy_resources()
         vkDestroySwapchainKHR(pWindow->device(), pWindow->m_swapchain, nullptr);
         pWindow->m_swapchain = VK_NULL_HANDLE;
     }
+
+    m_swapchainKey.reset();
 }
 
 

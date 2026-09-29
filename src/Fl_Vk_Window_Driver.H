@@ -33,6 +33,33 @@
 class Fl_Vk_Choice;
 class Fl_Font_Descriptor;
 
+struct Fl_Vk_SwapchainKey {
+    VkExtent2D ext      = { 0, 0 };
+    VkFormat fmt        = VK_FORMAT_UNDEFINED;
+    VkColorSpaceKHR cs  = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    VkPresentModeKHR pm = VK_PRESENT_MODE_FIFO_KHR;
+
+    Fl_Vk_SwapchainKey() = default;
+    Fl_Vk_SwapchainKey(VkExtent2D e, VkFormat f, VkColorSpaceKHR c,
+                       VkPresentModeKHR p) : ext(e), fmt(f), cs(c), pm(p) {};
+
+    bool valid() const { return fmt != VK_FORMAT_UNDEFINED; }
+    void reset() { *this = Fl_Vk_SwapchainKey(); }
+
+    bool operator==(const Fl_Vk_SwapchainKey& other) const
+        {
+            return (ext.width == other.ext.width &&
+                    ext.height == other.ext.height &&
+                    fmt == other.fmt &&
+                    cs  == other.cs  &&
+                    pm  == other.pm);
+        }
+    bool operator!=(const Fl_Vk_SwapchainKey& other) const
+        {
+            return !(*this == other);
+        }
+};
+
 /* The constructor of each Fl_Vk_Window object creates also an object from a
    platform-specific derived class from this class.
 */
@@ -124,7 +151,7 @@ public:
   VkDevice device() { return m_device; }
   VkQueue queue() { return m_queue; }
   uint32_t queueFamily() { return m_queueFamilyIndex; }
-  
+
 protected:
   void create_device();
   void init_instance();
@@ -138,6 +165,8 @@ protected:
   VkDevice m_device;
   VkQueue m_queue;
   uint32_t m_queueFamilyIndex;
+
+  Fl_Vk_SwapchainKey m_swapchainKey;
 };
 
 #endif /* Fl_Vk_Window_Driver_H */
