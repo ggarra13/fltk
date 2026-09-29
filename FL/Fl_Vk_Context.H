@@ -115,13 +115,13 @@ struct Fl_Vk_Context
     //    Function pointers to useful extensitons
 
     // These allow color write masks in Vulkan 1.3
-    PFN_vkCmdSetColorWriteMaskEXT vkCmdSetColorWriteMaskEXT;
+    PFN_vkCmdSetColorWriteMaskEXT vkCmdSetColorWriteMaskEXT = nullptr;
 
     // These allow changing stencil masks/tests
-    PFN_vkCmdSetStencilTestEnableEXT vkCmdSetStencilTestEnableEXT;
-    PFN_vkCmdSetStencilOpEXT vkCmdSetStencilOpEXT;
-    PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask;
-    PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask;
+    PFN_vkCmdSetStencilTestEnableEXT vkCmdSetStencilTestEnableEXT = nullptr;
+    PFN_vkCmdSetStencilOpEXT vkCmdSetStencilOpEXT = nullptr;
+    PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask = nullptr;
+    PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask = nullptr;
     // !@}
 
     // Thread safe queue (use lock_guard on mutex when submitting)
