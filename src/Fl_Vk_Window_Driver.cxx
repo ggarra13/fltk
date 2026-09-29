@@ -879,29 +879,28 @@ void Fl_Vk_Window_Driver::create_device()
 {
     VkResult result;
 
-    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynState3Features{
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT
-    };
-
-    // Chain it to your main features struct
-    VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
-    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-
-    // Assume you already have a VkPhysicalDevice
+    // 1. Properly initialize feature structs and chain them via pNext
     VkPhysicalDeviceColorWriteEnableFeaturesEXT colorWriteEnableFeatures = {};
     colorWriteEnableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
-    deviceFeatures2.pNext = &dynState3Features;
+    colorWriteEnableFeatures.pNext = nullptr;
 
-    // Assuming m_physicalDevice is set
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynState3Features = {};
+    dynState3Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+    dynState3Features.pNext = &colorWriteEnableFeatures; // Link colorWriteEnableFeatures into dynState3Features
+
+    VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    deviceFeatures2.pNext = &dynState3Features; // Link dynState3Features into deviceFeatures2
+
+    // 2. Query physical device features supported by GPU
     vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
 
-    // Enable the desired fatures
-    if (dynState3Features.extendedDynamicState3ColorWriteMask) {
-        // Enable it
-        dynState3Features.extendedDynamicState3ColorWriteMask = VK_TRUE;
+    // 3. Check feature support (vkGetPhysicalDeviceFeatures2 populates fields with VK_TRUE/VK_FALSE)
+    if (dynState3Features.extendedDynamicState3ColorWriteMask == VK_TRUE) {
+        // Feature is supported and currently set to VK_TRUE for device creation
     } else {
-        // Feature not supported on this GPU/driver
-        //fprintf(stderr, "extendedDynamicState3ColorWriteMask not supported\n");
+        // Feature is NOT supported on this GPU/driver
+        // Handle fallback or log warning as appropriate
     }
 
     // The base features are in deviceFeatures2.features
