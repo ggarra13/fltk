@@ -200,6 +200,20 @@ void Fl_Vk_Window::recreate_swapchain() {
   // Wait for all operations to complete on the device, not queue.
   wait_device();
 
+  // Can't build a swapchain for a 0x0 surface (minimized / not yet mapped).
+  // Bail out BEFORE destroying anything, so the old swapchain stays fully usable.
+  if (!pVkWindowDriver->is_headless() && m_surface != VK_NULL_HANDLE)
+  {
+    VkSurfaceCapabilitiesKHR caps;
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(gpu(), m_surface, &caps) == VK_SUCCESS &&
+        caps.currentExtent.width != 0xFFFFFFFF &&
+        (caps.currentExtent.width == 0 || caps.currentExtent.height == 0))
+    {
+      m_swapchain_needs_recreation = true;   // try again later
+      return;                                // nothing was touched
+    }
+  }
+
   //// \@bug: Using these wait on fences for faster swapchain recreation
   ////        would sometimes lead to a vkSemaphore validation error.
   ////
@@ -773,14 +787,15 @@ void Fl_Vk_Window::swap_buffers() {
               pixels_per_unit());
     }
 
+    result = VK_NOT_READY;
+    while (result == VK_NOT_READY)
     {
       std::lock_guard<std::mutex> lock(queue_mutex());
 
       result = vkQueuePresentKHR(queue(), &present_info);
     }
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
-        result == VK_NOT_READY) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
       m_swapchain_needs_recreation = true;
       return;
     }
@@ -1437,7 +1452,6 @@ void Fl_Vk_Window::init_vulkan() {
     }
   }
 
-  frameIndex = 0;
   frameIndex = 0;
 }
 
