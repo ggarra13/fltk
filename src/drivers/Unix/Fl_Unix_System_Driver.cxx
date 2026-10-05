@@ -74,6 +74,9 @@ extern "C" {
 static locale_t c_locale = NULL;
 #endif
 
+Fl_System_Driver *Fl_System_Driver::newSystemDriver() {
+  return new Fl_Unix_System_Driver();
+}
 
 int Fl_Unix_System_Driver::clocale_vprintf(FILE *output, const char *format, va_list args) {
 #if defined(__linux__) && defined(_XOPEN_SOURCE) && _XOPEN_SOURCE >= 700
@@ -891,7 +894,7 @@ void Fl_Unix_System_Driver::read_int(uchar *c, int& i) {
 
 
 // turn BMP image FLTK produced by create_bmp() back to Fl_RGB_Image
-Fl_RGB_Image *Fl_Unix_System_Driver::own_bmp_to_RGB(char *bmp) {
+Fl_RGB_Image *Fl_Unix_System_Driver::own_bmp_to_RGB(const char *bmp) {
   int w, h;
   read_int((uchar*)bmp + 18, w);
   read_int((uchar*)bmp + 22, h);
@@ -900,7 +903,7 @@ Fl_RGB_Image *Fl_Unix_System_Driver::own_bmp_to_RGB(char *bmp) {
   uchar *data = new uchar[w*h*3];
   uchar *p = data;
   for (int i = h-1; i >= 0; i--) {
-    char *s = bmp + i * R;
+    const char *s = bmp + i * R;
     for (int j = 0; j < w; j++) {
       *p++=s[2];
       *p++=s[1];
