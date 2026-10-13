@@ -1341,10 +1341,21 @@ void Fl_Vk_Window::init_vulkan() {
   init_colorspace();
 
   // Get the default function pointers after creating the VkDevice
-  FLTK_ADD_DEVICE_EXTENSION(vkCmdSetColorWriteMaskEXT);
+  // Only load what the device actually enabled (see create_device()).  Calling
+  // an extension command whose feature was not enabled is invalid, and on
+  // MoltenVK (macOS) extendedDynamicState3ColorWriteMask is not available.
+  if (ctx.has_dyn_state3_color_write_mask)
+  {
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetColorWriteMaskEXT);
+  }
 
-  FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilTestEnableEXT);
-  FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilOpEXT);
+  if (ctx.has_extended_dynamic_state)
+  {
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilTestEnableEXT);
+    FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilOpEXT);
+  }
+
+  // These two are core Vulkan 1.0 commands.
   FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilWriteMask);
   FLTK_ADD_DEVICE_EXTENSION(vkCmdSetStencilCompareMask);
 
@@ -1466,6 +1477,10 @@ std::vector<const char*> Fl_Vk_Window::get_device_extensions()
 
   // For easily changing write masks
   out.push_back("VK_EXT_extended_dynamic_state3");
+
+  // Optional per-attachment color write on/off (fallback where EDS3 color
+  // write mask is missing).  Only enabled if the GPU exposes it.
+  out.push_back("VK_EXT_color_write_enable");
   return out;
 }
 
