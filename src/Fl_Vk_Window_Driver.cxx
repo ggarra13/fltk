@@ -978,8 +978,8 @@ void Fl_Vk_Window_Driver::create_device()
     deviceInfo.pNext = &deviceFeatures2;
     deviceInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
     deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
-    deviceInfo.enabledLayerCount = pWindow->ctx.enabled_layers.size();
-    deviceInfo.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
+    deviceInfo.enabledLayerCount = 0;
+    deviceInfo.ppEnabledLayerNames = nullptr;
     deviceInfo.enabledExtensionCount = pWindow->ctx.device_extensions.size();
     deviceInfo.ppEnabledExtensionNames = pWindow->ctx.device_extensions.data();
 
