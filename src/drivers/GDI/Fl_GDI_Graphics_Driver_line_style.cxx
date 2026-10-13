@@ -54,8 +54,7 @@ void Fl_GDI_Graphics_Driver::line_style_unscaled(int style, int width, char* das
     Fl::error("fl_line_style(): Could not create GDI pen object.");
     return;
   }
-  HPEN oldpen = (HPEN)SelectObject(gc_, newpen);
-  DeleteObject(oldpen);
+  SelectObject(gc_, newpen);
   DeleteObject(fl_current_xmap->pen);
   fl_current_xmap->pen = newpen;
   style_ = style;
@@ -79,10 +78,10 @@ void Fl_GDIplus_Graphics_Driver::line_style(int style, int width, char* dashes) 
   else if(!dashes || !*dashes)
     pen_->SetDashStyle(Gdiplus::DashStyleSolid);
 
-  if (style & FL_CAP_ROUND ) {
+  if ( (style & 0x300) == FL_CAP_ROUND ) {
     pen_->SetStartCap(Gdiplus::LineCapRound);
     pen_->SetEndCap(Gdiplus::LineCapRound);
-  } else if (style & FL_CAP_SQUARE ) {
+  } else if ( (style & 0x300) == FL_CAP_SQUARE ) {
     pen_->SetStartCap(Gdiplus::LineCapSquare);
     pen_->SetEndCap(Gdiplus::LineCapSquare);
   } else {
@@ -90,9 +89,9 @@ void Fl_GDIplus_Graphics_Driver::line_style(int style, int width, char* dashes) 
     pen_->SetEndCap(Gdiplus::LineCapFlat);
   }
 
-  if (style & FL_JOIN_MITER ) {
+  if ( (style & 0x3000) == FL_JOIN_MITER ) {
     pen_->SetLineJoin(Gdiplus::LineJoinMiter);
-  } else if (style & FL_JOIN_BEVEL ) {
+  } else if ( (style & 0x3000) == FL_JOIN_BEVEL ) {
     pen_->SetLineJoin(Gdiplus::LineJoinBevel);
   } else {
     pen_->SetLineJoin(Gdiplus::LineJoinRound);

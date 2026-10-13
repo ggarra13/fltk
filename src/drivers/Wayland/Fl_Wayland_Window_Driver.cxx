@@ -895,12 +895,12 @@ static void does_window_cover_parent(Fl_Window *win) {
 }
 
 
-// recursively explore all shown subwindows in a window and call f for each
+// recursively explore all visible subwindows in a window and call f for each
 static void scan_subwindows(Fl_Group *g, void (*f)(Fl_Window *)) {
   for (int i = 0; i < g->children(); i++) {
     Fl_Widget *o = g->child(i);
     if (o->as_window()) {
-      if (!o->as_window()->shown()) continue;
+      if (!o->as_window()->visible()) continue;
       f(o->as_window());
     }
     if (o->as_group()) scan_subwindows(o->as_group(), f);
@@ -927,6 +927,32 @@ static void deferred_check_app_deactivate(void*) {
   }
   if (!app_has_active_window) Fl::handle(FL_APP_DEACTIVATE, nullptr);
 }
+
+
+static bool is_mutter_bug_present() {
+  // Determine whether the version of the running Mutter compositor contains the bug
+  static int bug_present = 2; // 2: not known yet, 1: present, 0: not present
+  if (bug_present == 2) {
+    bug_present = 1;
+    FILE *pipe = popen("gnome-shell --version", "r");
+    if (pipe) {
+      char line[50], *p;
+      p = fgets(line, sizeof(line), pipe);
+      pclose(pipe);
+      if (p && strncmp(line, "GNOME Shell ", 12) == 0)  {
+        p = line + 12;
+        if (*p) {
+          int version = 0, sub = 0;
+          sscanf(p, "%d.%d", &version, &sub);
+          // Mutter version 50.5 has fixed the bug handled here (#878)
+          if (version > 50 || (version == 50 && sub >= 5)) bug_present = 0;
+        }
+      }
+    }
+  }
+  return (bool)bug_present;
+}
+
 
 static void handle_configure(struct libdecor_frame *frame,
      struct libdecor_configuration *configuration, void *user_data)
@@ -984,7 +1010,8 @@ static void handle_configure(struct libdecor_frame *frame,
       }
     } else { width = height = 0; }
   }
-  if (is_2nd_run && Fl_Wayland_Screen_Driver::compositor == Fl_Wayland_Screen_Driver::MUTTER) {
+  if (is_2nd_run && Fl_Wayland_Screen_Driver::compositor == Fl_Wayland_Screen_Driver::MUTTER &&
+      is_mutter_bug_present()) {
     scan_subwindows(window->fl_win, does_window_cover_parent); // issue #878
   }
 
@@ -1075,23 +1102,15 @@ void Fl_Wayland_Window_Driver::wait_for_expose()
   struct wld_window * xid = fl_wl_xid(pWindow);
   if (!xid) return;
   Fl_Wayland_Screen_Driver *scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
-  if (pWindow->fullscreen_active()) {
-    if (xid->kind == DECORATED) {
-      while (!(xid->state & LIBDECOR_WINDOW_STATE_FULLSCREEN)) {
-        libdecor_dispatch(scr_driver->libdecor_context, 0);
-      }
-    } else if (xid->kind == UNFRAMED) {
-      wl_display_roundtrip(Fl_Wayland_Screen_Driver::wl_display);
-    }
-  } else if (xid->kind == DECORATED) {
-    // necessary for the windowfocus demo program with recent Wayland versions
-    if (!(xid->state & LIBDECOR_WINDOW_STATE_ACTIVE)) {
+  // Compositors differ in the order of appearance of events "fullscreen-state" and "entered-output".
+  if (pWindow->fullscreen_active() && xid->kind == DECORATED) {
+    while (!(xid->state & LIBDECOR_WINDOW_STATE_FULLSCREEN)) {
       libdecor_dispatch(scr_driver->libdecor_context, 0);
     }
-  } else {
-     while (!wl_list_length(&xid->outputs))
-       wl_display_dispatch(Fl_Wayland_Screen_Driver::wl_display);
   }
+  while (Fl_Wayland_Screen_Driver::compositor != Fl_Wayland_Screen_Driver::OWL &&
+         !wl_list_length(&xid->outputs))
+    libdecor_dispatch(scr_driver->libdecor_context, 0);
 }
 
 
