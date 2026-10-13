@@ -676,11 +676,21 @@ struct key_repeat_data_t {
 static double key_repeat_delay = 0.5; // sec
 static double key_repeat_interval = 0.05;  // sec
 
-
 static void key_repeat_timer_cb(key_repeat_data_t *key_repeat_data) {
-  if (last_keydown_serial == key_repeat_data->serial && key_repeat_interval > 0) {
-    Fl::handle(FL_KEYDOWN, key_repeat_data->window);
-    Fl::add_timeout(key_repeat_interval, (Fl_Timeout_Handler)key_repeat_timer_cb, key_repeat_data);
+  Fl_Wayland_Screen_Driver *scr_driver =
+      (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+  Fl_Window *win = NULL;
+  if (last_keydown_serial == key_repeat_data->serial && key_repeat_interval > 0 &&
+      scr_driver && scr_driver->seat && scr_driver->seat->keyboard_surface) {
+    // Don't use the window stored at key-down time: it may have been deleted.
+    win = (Fl::focus() ? Fl::focus()->top_window() :
+           Fl_Wayland_Window_Driver::surface_to_window(scr_driver->seat->keyboard_surface));
+  }
+  if (win) {
+    key_repeat_data->window = win;
+    Fl::handle(FL_KEYDOWN, win);
+    Fl::add_timeout(key_repeat_interval, (Fl_Timeout_Handler)key_repeat_timer_cb,
+                    key_repeat_data);
   }
   else delete key_repeat_data;
 }
