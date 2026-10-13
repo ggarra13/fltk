@@ -111,6 +111,15 @@ struct Fl_Vk_Context
     // List of device extensions
     std::vector<const char*> device_extensions;
 
+    // Set by Fl_Vk_Window_Driver::create_device() to what was ACTUALLY enabled
+    // on the VkDevice (extension present AND feature enabled), not merely what
+    // the GPU advertises.  Pipeline creation and command recording must check
+    // these before using the matching dynamic states / vkCmdSet* functions.
+    bool has_extended_dynamic_state        = false; // VK_EXT_extended_dynamic_state
+    bool has_extended_dynamic_state2       = false; // VK_EXT_extended_dynamic_state2
+    bool has_dyn_state3_color_write_mask   = false; // EDS3::extendedDynamicState3ColorWriteMask
+    bool has_color_write_enable            = false; // VK_EXT_color_write_enable
+
     // !@{
     //    Function pointers to useful extensitons
 

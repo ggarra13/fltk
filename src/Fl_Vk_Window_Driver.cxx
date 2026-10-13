@@ -875,37 +875,104 @@ void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
 
 }
 
+#ifndef VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
+#   define VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME "VK_EXT_extended_dynamic_state"
+#endif
+#ifndef VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME
+#   define VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME "VK_EXT_extended_dynamic_state2"
+#endif
+#ifndef VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
+#   define VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME "VK_EXT_extended_dynamic_state3"
+#endif
+#ifndef VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME
+#   define VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME "VK_EXT_color_write_enable"
+#endif
+
+// Device-level capabilities actually enabled on the (single, shared) VkDevice.
+// The device is created only once, by the first window, but every window has
+// its own Fl_Vk_Context, so create_device() stores the result here and
+// init_colorspace() copies it into each window's ctx.
+static bool g_has_extended_dynamic_state      = false;
+static bool g_has_extended_dynamic_state2     = false;
+static bool g_has_dyn_state3_color_write_mask = false;
+static bool g_has_color_write_enable          = false;
+
 void Fl_Vk_Window_Driver::create_device()
 {
     VkResult result;
 
-    // 1. Properly initialize feature structs and chain them via pNext
-    VkPhysicalDeviceColorWriteEnableFeaturesEXT colorWriteEnableFeatures = {};
-    colorWriteEnableFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
-    colorWriteEnableFeatures.pNext = nullptr;
+    // 1. Which of the optional extensions did init_vk() actually find on this
+    //    GPU?  A feature struct may only be chained into
+    //    vkGetPhysicalDeviceFeatures2()/vkCreateDevice() if its extension is
+    //    enabled, and a feature may only be *used* if it was enabled.
+    auto ext_enabled = [this](const char *name) {
+        for (const char *e : pWindow->ctx.device_extensions)
+            if (!strcmp(e, name)) return true;
+        return false;
+    };
+    const bool hasEDS1 = ext_enabled(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    const bool hasEDS2 = ext_enabled(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    const bool hasEDS3 = ext_enabled(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    const bool hasCWE  = ext_enabled(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
 
-    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT dynState3Features = {};
-    dynState3Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
-    dynState3Features.pNext = &colorWriteEnableFeatures; // Link colorWriteEnableFeatures into dynState3Features
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT eds1 = {};
+    eds1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT eds2 = {};
+    eds2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT eds3 = {};
+    eds3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+    VkPhysicalDeviceColorWriteEnableFeaturesEXT cwe = {};
+    cwe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
 
     VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
     deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    deviceFeatures2.pNext = &dynState3Features; // Link dynState3Features into deviceFeatures2
 
-    // 2. Query physical device features supported by GPU
+    // Build the pNext chain only from structs whose extension is enabled.
+    void **tail = &deviceFeatures2.pNext;
+    if (hasEDS1) { *tail = &eds1; tail = &eds1.pNext; }
+    if (hasEDS2) { *tail = &eds2; tail = &eds2.pNext; }
+    if (hasEDS3) { *tail = &eds3; tail = &eds3.pNext; }
+    if (hasCWE)  { *tail = &cwe;  tail = &cwe.pNext;  }
+
+    // 2. Ask the GPU/driver what it really supports.
     vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
 
-    // 3. Check feature support (vkGetPhysicalDeviceFeatures2 populates fields with VK_TRUE/VK_FALSE)
-    if (dynState3Features.extendedDynamicState3ColorWriteMask == VK_TRUE) {
-        // Feature is supported and currently set to VK_TRUE for device creation
-    } else {
-        // Feature is NOT supported on this GPU/driver
-        // Handle fallback or log warning as appropriate
+    // 3. Record the result.  (On Linux drivers these are normally all true;
+    //    MoltenVK on macOS does not implement extendedDynamicState3ColorWriteMask.)
+    g_has_extended_dynamic_state      = hasEDS1 && eds1.extendedDynamicState  == VK_TRUE;
+    g_has_extended_dynamic_state2     = hasEDS2 && eds2.extendedDynamicState2 == VK_TRUE;
+    g_has_dyn_state3_color_write_mask = hasEDS3 && eds3.extendedDynamicState3ColorWriteMask == VK_TRUE;
+    g_has_color_write_enable          = hasCWE  && cwe.colorWriteEnable       == VK_TRUE;
+
+    // 4. Enable only what we actually use, instead of everything the GPU
+    //    offers (EDS3 alone has ~30 feature bits).  Keep each struct's pNext.
+    {
+        void *n = eds1.pNext;
+        eds1 = {}; eds1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+        eds1.pNext = n;
+        eds1.extendedDynamicState = g_has_extended_dynamic_state ? VK_TRUE : VK_FALSE;
+
+        n = eds2.pNext;
+        eds2 = {}; eds2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+        eds2.pNext = n;
+        eds2.extendedDynamicState2 = g_has_extended_dynamic_state2 ? VK_TRUE : VK_FALSE;
+
+        n = eds3.pNext;
+        eds3 = {}; eds3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+        eds3.pNext = n;
+        eds3.extendedDynamicState3ColorWriteMask = g_has_dyn_state3_color_write_mask ? VK_TRUE : VK_FALSE;
+
+        n = cwe.pNext;
+        cwe = {}; cwe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
+        cwe.pNext = n;
+        cwe.colorWriteEnable = g_has_color_write_enable ? VK_TRUE : VK_FALSE;
     }
 
-    // The base features are in deviceFeatures2.features
-    // So you can modify them like this:
-    deviceFeatures2.features.fillModeNonSolid = VK_TRUE;
+    // Base features were filled in by the query above (everything the GPU
+    // supports is enabled).  Never force a core feature on: if it is missing,
+    // vkCreateDevice() would fail with VK_ERROR_FEATURE_NOT_PRESENT.
+    if (!deviceFeatures2.features.fillModeNonSolid)
+        Fl::warning("fillModeNonSolid is not supported by this GPU.");
 
     // Steps 5-6: decide how the video decode queue (if any was found by
     // init_vk()) relates to the graphics queue family chosen just before
@@ -1118,6 +1185,13 @@ void Fl_Vk_Window_Driver::init_colorspace() {
     pWindow->device() = pWindow->m_device;
     pWindow->ctx.safe_thread_queue = pWindow->m_queue;
     pWindow->ctx.allocator = pWindow->m_allocator;
+
+    // The device is shared, but each window has its own ctx: publish what was
+    // actually enabled on the device so pipeline code can query it.
+    pWindow->ctx.has_extended_dynamic_state      = g_has_extended_dynamic_state;
+    pWindow->ctx.has_extended_dynamic_state2     = g_has_extended_dynamic_state2;
+    pWindow->ctx.has_dyn_state3_color_write_mask = g_has_dyn_state3_color_write_mask;
+    pWindow->ctx.has_color_write_enable          = g_has_color_write_enable;
 
     VkColorSpaceKHR color_space;
     VkFormat view_format;
