@@ -16,6 +16,7 @@
 
 
 #include "Fl_Emscripten_Graphics_Driver.H"
+#include "../../Fl_Scalable_Graphics_Driver.H"
 #include <FL/Enumerations.H>
 #include <FL/Fl_Graphics_Driver.H>
 #include <FL/Fl_Image.H>
