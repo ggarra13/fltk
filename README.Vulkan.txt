@@ -136,7 +136,7 @@ You need to download the Vulkan SDK from LunarG.   Once installed, the normal lo
 
 4.0 API
 
-The API of Vulkan relies on two new classes: Fl_Vk_Window (which you must derive from) and Fl_Vk_Window_Driver (which you should not change).
+The API of Vulkan relies on two new classes: Fl_Vk_Window (which you must derive from) and Fl_Vk_Window_Driver (which you should not change).  There's also a Fl_Vk_Window_Headless to open a Fl_Vk_Window headless and render offscreen.
 All Vulkan primitives are kept in FL/Fl_Vk_Context.H and can be accessed by Fl_Vk_Windows' accessors.  This allows us to change the implementation of them as the API evolves, without breaking backwards compatibility.
 Also, passing a reference or pointer of Fl_Vk_Context is simpler and more efficient than passing each Vulkan handle individually.
 
@@ -168,6 +168,10 @@ All extensions (VkInstance and VkDevice ones) are added to the functions provide
 5  Demos
 --------
 
+The demos are kept simple using just the Vulkan C SDK and a built-in copy of the VMA (Vulkan Memory Allocator for speed).
+
+For more complex work, it is recommended you rely on a library that abstracts rendering and one that loads Vulkan function pointers dynamically like Volk.
+
 vk_shape   - similar to FLTK's OpenGL shape.  Draws a triangle/circle.
 vk_texture - Like vk_shape but with a simple texture.  It also tests depth/stencil.
 vk_cube    - similar to FLTK's OpenGL cube.  Requires the glm math library.
@@ -179,6 +183,7 @@ For projects using this Vulkan fork of FLTK, please take a look at:
 
 https://github.com/ggarra13/mrv2
 HDR video player (vmrv2) - Relative mature.
+It also has a fork of grizzlypeak3D's tlRender which has Vulkan drawing library mainly targeting video players.
 
 https://github.com/ggarra13/usdviewer
 OpenUSD Scanline Renderer (Early WIP)
