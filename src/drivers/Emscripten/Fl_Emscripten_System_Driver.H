@@ -24,7 +24,6 @@ class Fl_Emscripten_System_Driver : public Fl_System_Driver {
 public:
   Fl_Emscripten_System_Driver();
   double wait(double) FL_OVERRIDE;
-  char *strdup(const char *) FL_OVERRIDE;
 };
 
 #endif

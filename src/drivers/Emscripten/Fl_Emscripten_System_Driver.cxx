@@ -34,7 +34,3 @@ double Fl_Emscripten_System_Driver::wait(double v) {
   wait_depth--;
   return ret;
 }
-
-char *Fl_Emscripten_System_Driver::strdup(const char *s) {
-  return ::strdup(s);
-}
