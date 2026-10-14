@@ -31,6 +31,10 @@
 #include <stdlib.h>
 #include "flstring.h"
 
+#ifdef __EMSCRIPTEN__
+  #include <emscripten.h>
+#endif
+
 #if defined(DEBUG) || defined(DEBUG_WATCH)
 #  include <stdio.h>
 #endif // DEBUG || DEBUG_WATCH
@@ -720,7 +724,11 @@ double Fl::wait(double time_to_wait) {
   \code    while (!Fl::program_should_quit()) Fl::wait(1e20); \endcode
 */
 int Fl::run() {
+#ifndef __EMSCRIPTEN__
   while (Fl_X::first) wait(FOREVER);
+#else
+  emscripten_set_main_loop([]() { Fl::wait(); }, 0, true);
+#endif
   return 0;
 }
 
