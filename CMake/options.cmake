@@ -274,7 +274,7 @@ set(HAVE_LIBJPEG 1)
 
 #######################################################################
 
-if(UNIX)
+if(UNIX AND NOT EMSCRIPTEN)
   option(FLTK_INSTALL_LINKS "create backwards compatibility links" OFF)
   list(APPEND FLTK_LDLIBS -lm)
 
@@ -419,7 +419,7 @@ if(UNIX)
     endif(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "FreeBSD")
 
   endif(FLTK_USE_WAYLAND)
-endif(UNIX)
+endif(UNIX AND NOT EMSCRIPTEN)
 
 if(WIN32)
   option(FLTK_GRAPHICS_GDIPLUS "use GDI+ when possible for antialiased graphics" ON)
@@ -435,7 +435,7 @@ endif(WIN32)
 
 # find X11 libraries and headers
 set(PATH_TO_XLIBS)
-if(FLTK_BACKEND_X11)
+if(FLTK_BACKEND_X11 AND NOT EMSCRIPTEN)
   include(FindX11)
   if(X11_FOUND)
     set(FLTK_USE_X11 1)
