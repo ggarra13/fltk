@@ -29,6 +29,8 @@ using namespace emscripten;
 
 extern unsigned int fl_cmap[256];
 
+// We use a std vector and not Font Descriptors for simplicity.
+// Emscripten depends on the C++ std library, so might as well use it!
 static Fl_Fontdesc built_in_table[] = {
     {" Arial"},   {"BArial"},   {"IArial"},   {"PArial"},     {" Courier"}, {"BCourier"},
     {"ICourier"}, {"PCourier"}, {" Times"},   {"BTimes"},     {"ITimes"},   {"PTimes"},
