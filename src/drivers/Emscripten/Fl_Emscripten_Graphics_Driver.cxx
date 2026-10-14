@@ -29,9 +29,7 @@ using namespace emscripten;
 
 extern unsigned int fl_cmap[256];
 
-// We use a std vector and not Font Descriptors for simplicity.
-// Emscripten depends on the C++ std library, so might as well use it!
-static std::vector<Fl_Fontdesc> built_in_table = {
+static Fl_Fontdesc built_in_table[] = {
     {" Arial"},   {"BArial"},   {"IArial"},   {"PArial"},     {" Courier"}, {"BCourier"},
     {"ICourier"}, {"PCourier"}, {" Times"},   {"BTimes"},     {"ITimes"},   {"PTimes"},
     {" Symbol"},  {" Verdana"}, {"BVerdana"}, {" Wingdings"},
@@ -53,7 +51,7 @@ const char *style(const char *font) {
   }
 }
 
-FL_EXPORT Fl_Fontdesc *fl_fonts = built_in_table.data();
+FL_EXPORT Fl_Fontdesc *fl_fonts = built_in_table;
 
 
 static const int dashes_flat[5][7] = {{-1, 0, 0, 0, 0, 0, 0},
