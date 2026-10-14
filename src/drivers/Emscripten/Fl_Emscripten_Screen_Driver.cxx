@@ -155,21 +155,21 @@ void Fl_Emscripten_Screen_Driver::copy(const char *stuff, int len, int clipboard
 EM_ASYNC_JS(EM_VAL, get_clipboard_image, (), {
   const itemList = await navigator.clipboard.read();
   let imageType;
-  
+
   // Find the first item that is an image
   const item = itemList.find(item => item.types.some(type => type.startsWith('image/')));
 
   if (item) {
     // Get the blob of the image
     const imageBlob = await item.getType(imageType = item.types.find(type => type.startsWith('image/')));
-    
+
     // Create an ImageBitmap from the blob
     const imageBitmap = await createImageBitmap(imageBlob);
-    
+
     // Create a canvas to draw the image onto
     const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
     const context = canvas.getContext('2d');
-    
+
     // Draw the image onto the canvas
     context.drawImage(imageBitmap, 0, 0);
 
@@ -193,7 +193,7 @@ void Fl_Emscripten_Screen_Driver::paste(Fl_Widget &receiver, int clipboard, cons
       std::string clipText =
           navigator["clipboard"].call<val>("readText").await().as<std::string>();
       size_t len = clipText.size();
-      Fl::e_text = clipText.data();
+      Fl::e_text = (char*)clipText.data();
       Fl::e_length = len;
       fl_selection_buffer[clipboard][len - 1] = 0;
       fl_selection_length[1] = len;
