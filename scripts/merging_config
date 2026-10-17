@@ -1,0 +1,31 @@
+[core]
+	repositoryformatversion = 0
+	filemode = false
+	bare = false
+	logallrefupdates = true
+[advice]
+	detachedhead = false
+[remote "origin"]
+	url = git@github.com:ggarra13/fltk.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "master"]
+	remote = origin
+	merge = refs/heads/master
+[branch "vk"]
+	remote = origin
+	merge = refs/heads/vk
+[branch "vk_test"]
+	remote = origin
+	merge = refs/heads/vk_test
+[remote "upstream"]
+	url = https://github.com/fltk/fltk.git
+	fetch = +refs/heads/*:refs/remotes/upstream/*
+[branch "original"]
+	remote = upstream
+	merge = refs/heads/master
+# [remote "via"]
+# 	url = https://github.com/via/fltk.git
+# 	fetch = +refs/heads/*:refs/remotes/via/*
+# [branch "touchpad"]
+# 	remote = via
+# 	merge = refs/heads/master

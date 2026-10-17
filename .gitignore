@@ -36,4 +36,8 @@ TAGS
 # todo: maybe move the source files to folder /util/ ?
 
 /misc/doxystar
+
+# Build directories
+build_*
+
 /misc/fromdos

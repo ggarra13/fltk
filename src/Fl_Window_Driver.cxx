@@ -188,7 +188,7 @@ void Fl_Window_Driver::redraw_overlay() {
 
 void Fl_Window_Driver::flush()
 {
-  pWindow->flush();
+    pWindow->flush();
 }
 
 int Fl_Window_Driver::set_cursor(Fl_Cursor) {

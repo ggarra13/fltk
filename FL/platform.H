@@ -41,6 +41,8 @@ class Fl_Window;
 #    include "x11.H"
 #  elif defined(__APPLE__)
 #    include "mac.H"
+#  elif defined(__EMSCRIPTEN__)
+#    include "emscripten32.H"
 #  endif // _WIN32
 
 //

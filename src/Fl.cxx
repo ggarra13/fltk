@@ -31,6 +31,10 @@
 #include <stdlib.h>
 #include "flstring.h"
 
+#ifdef __EMSCRIPTEN__
+  #include <emscripten.h>
+#endif
+
 #if defined(DEBUG) || defined(DEBUG_WATCH)
 #  include <stdio.h>
 #endif // DEBUG || DEBUG_WATCH
@@ -720,7 +724,11 @@ double Fl::wait(double time_to_wait) {
   \code    while (!Fl::program_should_quit()) Fl::wait(1e20); \endcode
 */
 int Fl::run() {
+#ifndef __EMSCRIPTEN__
   while (Fl_X::first) wait(FOREVER);
+#else
+  emscripten_set_main_loop([]() { Fl::wait(); }, 0, true);
+#endif
   return 0;
 }
 
@@ -2282,6 +2290,23 @@ void Fl::use_high_res_GL(int val) {
   \version Default value set to 1 starting with FLTK 1.5
  */
 int Fl::use_high_res_GL() {
+  return Private::use_high_res_GL_;
+}
+
+/**  sets whether GL windows should be drawn at high resolution on Apple
+  computers with retina displays
+  \version 1.3.4
+ */
+void Fl::use_high_res_VK(int val) {
+  Private::use_high_res_GL_ = val;
+}
+
+/**  returns whether GL windows should be drawn at high resolution on Apple
+  computers with retina displays.
+  Default is no.
+  \version 1.3.4
+ */
+int Fl::use_high_res_VK() {
   return Private::use_high_res_GL_;
 }
 
