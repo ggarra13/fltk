@@ -383,4 +383,4 @@
 /*
  * Is EMSCRIPTEN getting compiled?
  */
-#cmakedefine HAVE_EMSCRIPTEN
+#cmakedefine01 HAVE_EMSCRIPTEN

@@ -436,7 +436,9 @@ void Fl_Gl_Window::draw_end() {
   glMatrixMode(GL_PROJECTION);
   glPopMatrix();
 
+#ifndef HAVE_EMSCRIPTEN
   glPopAttrib(); // GL_ALL_ATTRIB_BITS
+#endif
 
   Fl_Surface_Device::pop_current();
   if (mode() & FL_OPENGL3) pGlWindowDriver->switch_back();
@@ -600,7 +602,9 @@ Fl_RGB_Image* Fl_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int w, int
   glw->flush(); // forces a GL redraw, necessary for the glpuzzle demo
   // Read OpenGL context pixels directly.
   // For extra safety, save & restore OpenGL states that are changed
+#ifndef HAVE_EMSCRIPTEN
   glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
+#endif
   glPixelStorei(GL_PACK_ALIGNMENT, 4); /* Force 4-byte alignment */
   glPixelStorei(GL_PACK_ROW_LENGTH, 0);
   glPixelStorei(GL_PACK_SKIP_ROWS, 0);
@@ -617,7 +621,9 @@ Fl_RGB_Image* Fl_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int w, int
   glReadPixels(x, glw->pixel_h() - (y+h), w, h,
                GL_RGB, GL_UNSIGNED_BYTE,
                baseAddress);
+#ifndef HAVE_EMSCRIPTEN
   glPopClientAttrib();
+#endif
   // GL gives a bottom-to-top image, convert it to top-to-bottom
   uchar *tmp = new uchar[mByteWidth];
   uchar *p = baseAddress ;
