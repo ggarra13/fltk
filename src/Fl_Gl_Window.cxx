@@ -263,10 +263,14 @@ void Fl_Gl_Window::flush() {
           glLoadIdentity();
           glViewport(0, 0, pixel_w(), pixel_h());
           glOrtho(0, pixel_w(), 0, pixel_h(), -1, 1);
+#ifndef HAVE_EMSCRIPTEN
           glRasterPos2i(0,0);
+#endif
           ortho_window = this;
         }
+#ifndef HAVE_EMSCRIPTEN
         glCopyPixels(0,0,pixel_w(),pixel_h(),GL_COLOR);
+#endif
         make_current(); // set current context back to draw overlay
         damage1_ = 0;
 
@@ -396,7 +400,9 @@ void Fl_Gl_Window::draw_begin() {
     valid(1);
   }
 
+#ifndef HAVE_EMSCRIPTEN
   glPushAttrib(GL_ALL_ATTRIB_BITS);
+#endif
 
   glMatrixMode(GL_PROJECTION);
   glPushMatrix();

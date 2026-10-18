@@ -378,3 +378,9 @@
  */
 
 #cmakedefine01 HAVE_PRIMARY_SELECTION
+
+
+/*
+ * Is EMSCRIPTEN getting compiled?
+ */
+#cmakedefine HAVE_EMSCRIPTEN
