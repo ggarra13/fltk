@@ -24,11 +24,22 @@
 #include <emscripten/html5.h>
 #include <emscripten/emscripten.h>
 
-// Describes context choices needed for Emscripten WebGL.
+// Describes context choices and holds translated WebGL attributes.
 class Fl_Emscripten_Gl_Choice : public Fl_Gl_Choice {
   friend class Fl_Emscripten_Gl_Window_Driver;
+private:
+  EmscriptenWebGLContextAttributes attrs;
 public:
-  Fl_Emscripten_Gl_Choice(int m, const int *alistp, Fl_Gl_Choice *n) : Fl_Gl_Choice(m, alistp, n) {}
+  Fl_Emscripten_Gl_Choice(int m, const int *alistp, Fl_Gl_Choice *n) : Fl_Gl_Choice(m, alistp, n) {
+    emscripten_webgl_init_context_attributes(&attrs);
+    attrs.alpha = (m & FL_ALPHA) ? 1 : 0;
+    attrs.depth = ((m & FL_DEPTH) || (m & FL_DEPTH32)) ? 1 : 0;
+    attrs.stencil = (m & FL_STENCIL) ? 1 : 0;
+    attrs.antialias = (m & FL_MULTISAMPLE) ? 1 : 0;
+    attrs.enableExtensionsByDefault = 1;
+    attrs.majorVersion = 2;
+    attrs.minorVersion = 0;
+  }
 };
 
 Fl_Gl_Window_Driver *Fl_Gl_Window_Driver::newGlWindowDriver(Fl_Gl_Window *w)
@@ -55,14 +66,9 @@ void Fl_Emscripten_Gl_Window_Driver::get_list(Fl_Font_Descriptor *fd, int r) {
   (void)fd; (void)r;
 }
 
-Fl_Font_Descriptor** Fl_Emscripten_Gl_Window_Driver::fontnum_to_fontdescriptor(int fnum) {
-  Fl_Fontdesc *s = fl_fonts + fnum;
-  return &(s->first);
-}
-
 Fl_Gl_Choice *Fl_Emscripten_Gl_Window_Driver::find(int m, const int *alistp)
 {
-  Fl_Emscripten_Gl_Choice *g = (Fl_Emscripten_Gl_Choice*)Fl_Gl_Window_Driver::find_begin(m, alistp);
+  Fl_Gl_Choice *g = Fl_Gl_Window_Driver::find_begin(m, alistp);
   if (g) return g;
 
   g = new Fl_Emscripten_Gl_Choice(m, alistp, first);
@@ -72,26 +78,17 @@ Fl_Gl_Choice *Fl_Emscripten_Gl_Window_Driver::find(int m, const int *alistp)
 
 GLContext Fl_Emscripten_Gl_Window_Driver::create_gl_context(Fl_Window* window,
                                                             const Fl_Gl_Choice* g) {
-  (void)window;
-  EmscriptenWebGLContextAttributes attrs;
-  emscripten_webgl_init_context_attributes(&attrs);
+  fl_uintptr_t xid = fl_xid(window);
+  char target[64];
+  snprintf(target, sizeof(target), "#fltk_canvas%d", (int)xid);
 
-  // Translate FLTK flags to EmscriptenWebGLContextAttributes
-  int m = g->mode();
-  attrs.alpha = (m & FL_ALPHA) ? 1 : 0;
-  attrs.depth = ((m & FL_DEPTH) || (m & FL_DEPTH32)) ? 1 : 0;
-  attrs.stencil = (m & FL_STENCIL) ? 1 : 0;
-  attrs.antialias = (m & FL_MULTISAMPLE) ? 1 : 0;
-  attrs.enableExtensionsByDefault = 1;
+  const EmscriptenWebGLContextAttributes &attrs = ((Fl_Emscripten_Gl_Choice*)g)->attrs;
 
-  // Attempt WebGL 2 first, falling back to WebGL 1 if unavailable
-  attrs.majorVersion = 2;
-  attrs.minorVersion = 0;
-
-  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attrs);
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(target, &attrs);
   if (!ctx && attrs.majorVersion == 2) {
-    attrs.majorVersion = 1;
-    ctx = emscripten_webgl_create_context(0, &attrs);
+    EmscriptenWebGLContextAttributes fallback_attrs = attrs;
+    fallback_attrs.majorVersion = 1;
+    ctx = emscripten_webgl_create_context(target, &fallback_attrs);
   }
 
   if (ctx) {
@@ -127,7 +124,7 @@ void Fl_Emscripten_Gl_Window_Driver::redraw_overlay() {
 }
 
 void Fl_Emscripten_Gl_Window_Driver::before_show(int&) {
-  Fl_X::make_xid(pWindow, 0, 0);
+    //Fl_X::make_xid(pWindow, 0, 0);
 }
 
 float Fl_Emscripten_Gl_Window_Driver::pixels_per_unit()
@@ -137,11 +134,14 @@ float Fl_Emscripten_Gl_Window_Driver::pixels_per_unit()
 }
 
 int Fl_Emscripten_Gl_Window_Driver::mode_(int m, const int *a) {
+  int oldmode = mode();
   mode(m); alist(a);
   if (pWindow->shown()) {
     g( find(m, a) );
-    pWindow->hide();
-    pWindow->show();
+    if ((oldmode ^ m) & FL_DOUBLE) {
+      pWindow->hide();
+      pWindow->show();
+    }
   } else {
     g(0);
   }
@@ -151,7 +151,6 @@ int Fl_Emscripten_Gl_Window_Driver::mode_(int m, const int *a) {
 void Fl_Emscripten_Gl_Window_Driver::swap_buffers() {
   if (!fl_xid(pWindow))
     return;
-  // Emscripten handles buffer swapping on the canvas automatically per frame render.
 }
 
 char Fl_Emscripten_Gl_Window_Driver::swap_type() {

@@ -47,10 +47,6 @@ class Fl_Emscripten_Gl_Window_Driver : public Fl_Gl_Window_Driver {
   void gl_bitmap_font(Fl_Font_Descriptor *fl_fontsize) FL_OVERRIDE;
   void get_list(Fl_Font_Descriptor *fd, int r) FL_OVERRIDE;
   int genlistsize() FL_OVERRIDE;
-#if !(USE_XFT || FLTK_USE_CAIRO)
-  virtual Fl_Font_Descriptor** fontnum_to_fontdescriptor(int fnum) FL_OVERRIDE;
-#endif
-  //static GLContext create_gl_context(XVisualInfo* vis);
 };
 
 
