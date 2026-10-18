@@ -121,8 +121,10 @@ void gl_remove_displaylist_fonts()
           // prevDesc should not be NULL, but this test will make static analysis shut up
           prevDesc->next = desc->next;
         }
+#if !HAVE_EMSCRIPTEN
         // It would be nice if this next line was in a destructor somewhere
         glDeleteLists(desc->listbase, Fl_Gl_Window_Driver::global()->genlistsize());
+#endif
         delete desc;
       } else {
         prevDesc = desc;
@@ -341,7 +343,9 @@ void gl_texture_fifo::display_texture(int rank)
   // GL_ENABLE_BIT for GL_DEPTH_TEST, GL_LIGHTING
   // GL_TEXTURE_BIT for GL_TEXTURE_RECTANGLE_ARB
   // GL_COLOR_BUFFER_BIT for GL_BLEND and glBlendFunc,
+#if !HAVE_EMSCRIPTEN
   glPushAttrib(GL_TRANSFORM_BIT | GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
+#endif
   //setup matrices
   glMatrixMode (GL_PROJECTION);
   glPushMatrix();
@@ -389,7 +393,7 @@ void gl_texture_fifo::display_texture(int rank)
   glMatrixMode (GL_PROJECTION);
   glPopMatrix();
   glPopAttrib(); // GL_TRANSFORM_BIT | GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT
-#if HAVE_GL_GLU_H
+#if HAVE_GL_GLU_H && !HAVE_EMSCRIPTEN
   //set the raster position to end of string
   pos[0] += width;
   GLdouble modelmat[16];

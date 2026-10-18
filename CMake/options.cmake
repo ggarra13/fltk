@@ -727,6 +727,14 @@ if(FLTK_BUILD_VK)
   set(FLTK_USE_VK TRUE)
 endif()
 
+#
+# Define whether FLTK is getting compiled under EMSCRIPTEN
+#
+if(EMSCRIPTEN)
+    set(HAVE_EMSCRIPTEN TRUE)
+endif()
+
+
 if(FLTK_BUILD_GL)
   if(FLTK_USE_WAYLAND)
     pkg_check_modules(WLD_EGL IMPORTED_TARGET wayland-egl)
