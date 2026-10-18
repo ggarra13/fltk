@@ -41,7 +41,11 @@ void Fl_OpenGL_Graphics_Driver::arc(int x,int y,int w,int h,double a1,double a2)
 
   glBegin(GL_LINE_STRIP);
   for (int i=0; i<=nSeg; i++) {
+#if !HAVE_EMSCRIPTEN
     glVertex2d(cx+cos(a1)*rx, cy-sin(a1)*ry);
+#else
+    glVertex2f(cx+cos(a1)*rx, cy-sin(a1)*ry);
+#endif
     a1 += incr;
   }
   glEnd();
@@ -62,9 +66,17 @@ void Fl_OpenGL_Graphics_Driver::pie(int x,int y,int w,int h,double a1,double a2)
   double incr = (a2-a1)/(double)nSeg;
 
   glBegin(GL_TRIANGLE_FAN);
+#if !HAVE_EMSCRIPTEN
   glVertex2d(cx, cy);
+#else
+  glVertex2f(cx, cy);
+#endif
   for (int i=0; i<=nSeg; i++) {
+#if !HAVE_EMSCRIPTEN
     glVertex2d(cx+cos(a1)*rx, cy-sin(a1)*ry);
+#else
+    glVertex2f(cx+cos(a1)*rx, cy-sin(a1)*ry);
+#endif
     a1 += incr;
   }
   glEnd();
