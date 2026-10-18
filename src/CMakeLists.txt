@@ -545,6 +545,9 @@ elseif(APPLE)
 elseif(WIN32)
   set(GL_DRIVER_FILES ${GL_DRIVER_FILES} drivers/WinAPI/Fl_WinAPI_Gl_Window_Driver.cxx)
   set(GL_DRIVER_HEADER_FILES drivers/WinAPI/Fl_WinAPI_Gl_Window_Driver.H)
+elseif(EMSCRIPTEN)
+  set(GL_DRIVER_FILES ${GL_DRIVER_FILES} drivers/Emscripten/Fl_Emscripten_Gl_Window_Driver.cxx)
+  set(GL_DRIVER_HEADER_FILES drivers/Emscripten/Fl_Emscripten_Gl_Window_Driver.H)
 endif(FLTK_USE_WAYLAND)
 
 set(GL_DRIVER_HEADER_FILES ${GL_DRIVER_FILES}
