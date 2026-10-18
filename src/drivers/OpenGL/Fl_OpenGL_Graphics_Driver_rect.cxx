@@ -29,6 +29,20 @@
 #include <FL/math.h>
 #include <stack>
 
+#ifdef __EMSCRIPTEN__
+// Emscripten's legacy GL layer misses glRectf; supply a fallback implementation
+extern "C" {
+    void glRectf(GLfloat x1, GLfloat y1, GLfloat x2, GLfloat y2) {
+        glBegin(GL_QUADS);
+        glVertex2f(x1, y1);
+        glVertex2f(x2, y1);
+        glVertex2f(x2, y2);
+        glVertex2f(x1, y2);
+        glEnd();
+    }
+}
+#endif
+
 // --- line and polygon drawing with integer coordinates
 
 void Fl_OpenGL_Graphics_Driver::point(int x, int y) {
