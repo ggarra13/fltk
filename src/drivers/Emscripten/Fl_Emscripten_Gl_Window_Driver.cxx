@@ -102,7 +102,7 @@ Fl_Gl_Choice *Fl_Emscripten_Gl_Window_Driver::find(int m, const int *alistp)
 {
   // Reject what WebGL cannot provide so Fl_Gl_Window::can_do() is truthful.
   // NOTE: when an alist is used, m may be 0 here; alist parsing is not done.
-  if (m & (FL_STEREO | FL_ACCUM | FL_ACCUM_ALPHA)) return 0;
+  if (m & (FL_STEREO | FL_ACCUM)) return 0;
 
   Fl_Gl_Choice *g = Fl_Gl_Window_Driver::find_begin(m, alistp);
   if (g) return g;
@@ -220,7 +220,7 @@ char Fl_Emscripten_Gl_Window_Driver::swap_type() {
   // Double-buffered WebGL content is undefined after presentation, so FLTK
   // must redraw everything. Single-buffered windows preserve their buffer.
   // VERIFY: enum name (UNDEFINED / COPY) in Fl_Gl_Window_Driver.
-  return (mode() & FL_DOUBLE) ? UNDEFINED : copy;
+  return copy;
 }
 
 void Fl_Emscripten_Gl_Window_Driver::swap_interval(int interval) {
