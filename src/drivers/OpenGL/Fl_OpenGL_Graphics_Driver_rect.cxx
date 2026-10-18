@@ -29,7 +29,7 @@
 #include <FL/math.h>
 #include <stack>
 
-#ifdef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__)
 // Emscripten's legacy GL layer misses glRectf; supply a fallback implementation
 extern "C" {
     void glRectf(GLfloat x1, GLfloat y1, GLfloat x2, GLfloat y2) {

@@ -39,7 +39,7 @@ void Fl_OpenGL_Graphics_Driver::line_style(int style, int width, char* dashes) {
 //  int cap     = style & 0x0f00;
 //  int join    = style & 0xf000;
 
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
   if (stipple==FL_SOLID) {
     glLineStipple(1, 0xFFFF);
     glDisable(GL_LINE_STIPPLE);

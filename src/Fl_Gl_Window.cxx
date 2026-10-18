@@ -263,12 +263,12 @@ void Fl_Gl_Window::flush() {
           glLoadIdentity();
           glViewport(0, 0, pixel_w(), pixel_h());
           glOrtho(0, pixel_w(), 0, pixel_h(), -1, 1);
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
           glRasterPos2i(0,0);
 #endif
           ortho_window = this;
         }
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
         glCopyPixels(0,0,pixel_w(),pixel_h(),GL_COLOR);
 #endif
         make_current(); // set current context back to draw overlay
@@ -400,7 +400,7 @@ void Fl_Gl_Window::draw_begin() {
     valid(1);
   }
 
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
   glPushAttrib(GL_ALL_ATTRIB_BITS);
 #endif
 
@@ -436,7 +436,7 @@ void Fl_Gl_Window::draw_end() {
   glMatrixMode(GL_PROJECTION);
   glPopMatrix();
 
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib(); // GL_ALL_ATTRIB_BITS
 #endif
 
@@ -602,7 +602,7 @@ Fl_RGB_Image* Fl_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int w, int
   glw->flush(); // forces a GL redraw, necessary for the glpuzzle demo
   // Read OpenGL context pixels directly.
   // For extra safety, save & restore OpenGL states that are changed
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
   glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
 #endif
   glPixelStorei(GL_PACK_ALIGNMENT, 4); /* Force 4-byte alignment */
@@ -621,7 +621,7 @@ Fl_RGB_Image* Fl_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int w, int
   glReadPixels(x, glw->pixel_h() - (y+h), w, h,
                GL_RGB, GL_UNSIGNED_BYTE,
                baseAddress);
-#if !HAVE_EMSCRIPTEN
+#if !defined(__EMSCRIPTEN__)
   glPopClientAttrib();
 #endif
   // GL gives a bottom-to-top image, convert it to top-to-bottom
