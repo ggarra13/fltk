@@ -21,19 +21,14 @@
 #include "../../Fl_Screen_Driver.H"
 #include "Fl_Emscripten_Gl_Window_Driver.H"
 #include "../../Fl_Scalable_Graphics_Driver.H" // Fl_Font_Descriptor
-#include <GL/glx.h>
+#include <emscripten/html5.h>
+#include <emscripten/emscripten.h>
 
-// Describes crap needed to create a GLContext.
+// Describes context choices needed for Emscripten WebGL.
 class Fl_Emscripten_Gl_Choice : public Fl_Gl_Choice {
   friend class Fl_Emscripten_Gl_Window_Driver;
-private:
-  XVisualInfo *vis; /* the visual to use */
-  Colormap colormap; /* a colormap for that visual */
 public:
-  Fl_Emscripten_Gl_Choice(int m, const int *alistp, Fl_Gl_Choice *n) : Fl_Gl_Choice(m, alistp, n) {
-    vis = NULL;
-    colormap = 0;
-  }
+  Fl_Emscripten_Gl_Choice(int m, const int *alistp, Fl_Gl_Choice *n) : Fl_Gl_Choice(m, alistp, n) {}
 };
 
 Fl_Gl_Window_Driver *Fl_Gl_Window_Driver::newGlWindowDriver(Fl_Gl_Window *w)
@@ -57,7 +52,6 @@ void Fl_Emscripten_Gl_Window_Driver::gl_bitmap_font(Fl_Font_Descriptor *fl_fonts
 }
 
 void Fl_Emscripten_Gl_Window_Driver::get_list(Fl_Font_Descriptor *fd, int r) {
-  // Emscripten font texture pile / canvas font handling does not require legacy Xlib font glyph mapping here.
   (void)fd; (void)r;
 }
 
@@ -71,106 +65,56 @@ Fl_Gl_Choice *Fl_Emscripten_Gl_Window_Driver::find(int m, const int *alistp)
   Fl_Emscripten_Gl_Choice *g = (Fl_Emscripten_Gl_Choice*)Fl_Gl_Window_Driver::find_begin(m, alistp);
   if (g) return g;
 
-  const int *blist;
-  int list[32];
-
-  if (alistp)
-    blist = alistp;
-  else {
-    int n = 0;
-    if (m & FL_INDEX) {
-      list[n++] = GLX_BUFFER_SIZE;
-      list[n++] = 8;
-    } else {
-      list[n++] = GLX_RGBA;
-      list[n++] = GLX_GREEN_SIZE;
-      list[n++] = (m & FL_RGB8) ? 8 : 1;
-      if (m & FL_ALPHA) {
-        list[n++] = GLX_ALPHA_SIZE;
-        list[n++] = (m & FL_RGB8) ? 8 : 1;
-      }
-      if (m & FL_ACCUM) {
-        list[n++] = GLX_ACCUM_GREEN_SIZE;
-        list[n++] = 1;
-        if (m & FL_ALPHA) {
-          list[n++] = GLX_ACCUM_ALPHA_SIZE;
-          list[n++] = 1;
-        }
-      }
-    }
-    if (m & FL_DOUBLE) {
-      list[n++] = GLX_DOUBLEBUFFER;
-    }
-    if (m & FL_DEPTH32) {
-      list[n++] = GLX_DEPTH_SIZE; list[n++] = 32;
-    } else if (m & FL_DEPTH) {
-      list[n++] = GLX_DEPTH_SIZE; list[n++] = 1;
-    }
-    if (m & FL_STENCIL) {
-      list[n++] = GLX_STENCIL_SIZE; list[n++] = 1;
-    }
-    if (m & FL_STEREO) {
-      list[n++] = GLX_STEREO;
-    }
-#    if defined(GLX_VERSION_1_1) && defined(GLX_SGIS_multisample)
-    if (m & FL_MULTISAMPLE) {
-      list[n++] = GLX_SAMPLES_SGIS;
-      list[n++] = 4;
-    }
-#    endif
-    list[n] = 0;
-    blist = list;
-  }
-
-  fl_open_display();
-  XVisualInfo *visp = glXChooseVisual(fl_display, fl_screen, (int *)blist);
-  if (!visp) {
-#   if defined(GLX_VERSION_1_1) && defined(GLX_SGIS_multisample)
-      if (m & FL_MULTISAMPLE) return find(m & ~FL_MULTISAMPLE, 0);
-#   endif
-      return 0;
-  }
-
   g = new Fl_Emscripten_Gl_Choice(m, alistp, first);
   first = g;
-
-  g->vis = visp;
-
-  if (visp->visualid == fl_visual->visualid &&
-      !fl_getenv("MESA_PRIVATE_CMAP"))
-    g->colormap = fl_colormap;
-  else
-    g->colormap = XCreateColormap(fl_display, RootWindow(fl_display,fl_screen),
-                                  visp->visual, AllocNone);
   return g;
 }
 
 GLContext Fl_Emscripten_Gl_Window_Driver::create_gl_context(Fl_Window* window,
                                                             const Fl_Gl_Choice* g) {
   (void)window;
-  GLContext shared_ctx = 0;
-  if (context_list && nContext) shared_ctx = context_list[0];
-  GLContext ctx = glXCreateContext(fl_display, ((Fl_Emscripten_Gl_Choice*)g)->vis, (GLXContext)shared_ctx, true);
-  if (ctx)
-    add_context(ctx);
-  return ctx;
+  EmscriptenWebGLContextAttributes attrs;
+  emscripten_webgl_init_context_attributes(&attrs);
+
+  // Translate FLTK flags to EmscriptenWebGLContextAttributes
+  int m = g->mode();
+  attrs.alpha = (m & FL_ALPHA) ? 1 : 0;
+  attrs.depth = ((m & FL_DEPTH) || (m & FL_DEPTH32)) ? 1 : 0;
+  attrs.stencil = (m & FL_STENCIL) ? 1 : 0;
+  attrs.antialias = (m & FL_MULTISAMPLE) ? 1 : 0;
+  attrs.enableExtensionsByDefault = 1;
+
+  // Attempt WebGL 2 first, falling back to WebGL 1 if unavailable
+  attrs.majorVersion = 2;
+  attrs.minorVersion = 0;
+
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE ctx = emscripten_webgl_create_context(0, &attrs);
+  if (!ctx && attrs.majorVersion == 2) {
+    attrs.majorVersion = 1;
+    ctx = emscripten_webgl_create_context(0, &attrs);
+  }
+
+  if (ctx) {
+    add_context((GLContext)ctx);
+  }
+  return (GLContext)ctx;
 }
 
 void Fl_Emscripten_Gl_Window_Driver::set_gl_context(Fl_Window* w, GLContext context) {
-  GLContext current_context = glXGetCurrentContext();
-  if (context != current_context || w != cached_window) {
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE current_context = emscripten_webgl_get_current_context();
+  if ((EMSCRIPTEN_WEBGL_CONTEXT_HANDLE)context != current_context || w != cached_window) {
     cached_window = w;
-    glXMakeCurrent(fl_display, fl_xid(w), (GLXContext)context);
+    emscripten_webgl_make_context_current((EMSCRIPTEN_WEBGL_CONTEXT_HANDLE)context);
   }
 }
 
 void Fl_Emscripten_Gl_Window_Driver::delete_gl_context(GLContext context) {
-  GLContext current_context = glXGetCurrentContext();
-  if (current_context == context) {
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE current_context = emscripten_webgl_get_current_context();
+  if (current_context == (EMSCRIPTEN_WEBGL_CONTEXT_HANDLE)context) {
     cached_window = 0;
-    glXMakeCurrent(fl_display, 0, 0);
+    emscripten_webgl_make_context_current(0);
   }
-  glXDestroyContext(fl_display, (GLXContext)context);
+  emscripten_webgl_destroy_context((EMSCRIPTEN_WEBGL_CONTEXT_HANDLE)context);
   del_context(context);
 }
 
@@ -183,8 +127,7 @@ void Fl_Emscripten_Gl_Window_Driver::redraw_overlay() {
 }
 
 void Fl_Emscripten_Gl_Window_Driver::before_show(int&) {
-  Fl_Emscripten_Gl_Choice *g = (Fl_Emscripten_Gl_Choice*)this->g();
-  Fl_X::make_xid(pWindow, g->vis, g->colormap);
+  Fl_X::make_xid(pWindow, 0, 0);
 }
 
 float Fl_Emscripten_Gl_Window_Driver::pixels_per_unit()
@@ -194,23 +137,11 @@ float Fl_Emscripten_Gl_Window_Driver::pixels_per_unit()
 }
 
 int Fl_Emscripten_Gl_Window_Driver::mode_(int m, const int *a) {
-  int oldmode = mode();
-  if (a) {
-    const int *aa = a;
-    while (*aa) {
-      if (*(aa++) == GLX_DOUBLEBUFFER) { m |= FL_DOUBLE; break; }
-    }
-  }
-  Fl_Emscripten_Gl_Choice* oldg = (Fl_Emscripten_Gl_Choice*)g();
-  pWindow->context(0);
   mode(m); alist(a);
   if (pWindow->shown()) {
     g( find(m, a) );
-    Fl_Emscripten_Gl_Choice* g = (Fl_Emscripten_Gl_Choice*)this->g();
-    if (!g || g->vis->visualid != oldg->vis->visualid || (oldmode^m)&FL_DOUBLE) {
-      pWindow->hide();
-      pWindow->show();
-    }
+    pWindow->hide();
+    pWindow->show();
   } else {
     g(0);
   }
@@ -220,130 +151,29 @@ int Fl_Emscripten_Gl_Window_Driver::mode_(int m, const int *a) {
 void Fl_Emscripten_Gl_Window_Driver::swap_buffers() {
   if (!fl_xid(pWindow))
     return;
-  if (overlay()) {
-    int wo = pWindow->pixel_w(), ho = pWindow->pixel_h();
-    GLint matrixmode;
-    GLfloat pos[4];
-    glGetIntegerv(GL_MATRIX_MODE, &matrixmode);
-    glGetFloatv(GL_CURRENT_RASTER_POSITION, pos);
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    glScalef(2.0f/wo, 2.0f/ho, 1.0f);
-    glTranslatef(-wo/2.0f, -ho/2.0f, 0.0f);
-    glRasterPos2i(0,0);
-    {
-      glReadBuffer(GL_BACK);
-      glDrawBuffer(GL_FRONT);
-      glCopyPixels(0, 0, wo, ho, GL_COLOR);
-    }
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(matrixmode);
-    glRasterPos3f(pos[0], pos[1], pos[2]);
-  } else
-    glXSwapBuffers(fl_display, fl_xid(pWindow));
+  // Emscripten handles buffer swapping on the canvas automatically per frame render.
 }
 
 char Fl_Emscripten_Gl_Window_Driver::swap_type() {
   return copy;
 }
 
-static signed char swap_interval_type = -1;
-
-typedef void (*Fl_GLX_Set_Swap_Iterval_Proc) (Display *dpy, GLXDrawable drawable, int interval);
-typedef int (*Fl_MESA_Set_Swap_Iterval_Proc) (unsigned int interval);
-typedef int (*Fl_MESA_Get_Swap_Iterval_Proc) ();
-typedef int (*Fl_SGI_Set_Swap_Iterval_Proc) (int interval);
-
-static union {
-  Fl_GLX_Set_Swap_Iterval_Proc EXT;
-  Fl_MESA_Set_Swap_Iterval_Proc MESA;
-  Fl_SGI_Set_Swap_Iterval_Proc SGI;
-} fl_glXSwapInterval = { NULL };
-
-static Fl_MESA_Get_Swap_Iterval_Proc fl_glXGetSwapIntervalMESA = NULL;
-
-static void init_swap_interval() {
-  if (swap_interval_type != -1) return;
-  int major = 1, minor = 0;
-  glXQueryVersion(fl_display, &major, &minor);
-  swap_interval_type = 0;
-  const char *extensions = glXQueryExtensionsString(fl_display, fl_screen);
-  if (strstr(extensions, "GLX_EXT_swap_control") && ((major > 1) || (minor >= 3))) {
-    fl_glXSwapInterval.EXT = (Fl_GLX_Set_Swap_Iterval_Proc)glXGetProcAddressARB((const GLubyte*)"glXSwapIntervalEXT");
-    swap_interval_type = 1;
-  } else if (strstr(extensions, "GLX_MESA_swap_control")) {
-    fl_glXSwapInterval.MESA = (Fl_MESA_Set_Swap_Iterval_Proc)glXGetProcAddressARB((const GLubyte*)"glXSwapIntervalMESA");
-    fl_glXGetSwapIntervalMESA = (Fl_MESA_Get_Swap_Iterval_Proc)glXGetProcAddressARB((const GLubyte*)"glXGetSwapIntervalMESA");
-    swap_interval_type = 2;
-  } else if (strstr(extensions, "GLX_SGI_swap_control")) {
-    fl_glXSwapInterval.SGI = (Fl_SGI_Set_Swap_Iterval_Proc)glXGetProcAddressARB((const GLubyte*)"glXSwapIntervalSGI");
-    swap_interval_type = 3;
-  }
-}
-
 void Fl_Emscripten_Gl_Window_Driver::swap_interval(int interval) {
-  if (!fl_xid(pWindow))
-    return;
-  if (swap_interval_type == -1)
-    init_swap_interval();
-  switch (swap_interval_type) {
-    case 1:
-      if (fl_glXSwapInterval.EXT)
-        fl_glXSwapInterval.EXT(fl_display, fl_xid(pWindow), interval);
-      break;
-    case 2:
-      if (fl_glXSwapInterval.MESA)
-        fl_glXSwapInterval.MESA((unsigned int)interval);
-      break;
-    case 3:
-      if (fl_glXSwapInterval.SGI)
-        fl_glXSwapInterval.SGI(interval);
-      break;
-  }
+  (void)interval;
 }
 
 int Fl_Emscripten_Gl_Window_Driver::swap_interval() const {
-  if (!fl_xid(pWindow))
-    return -1;
-  if (swap_interval_type == -1)
-    init_swap_interval();
-  int interval = -1;
-  switch (swap_interval_type) {
-    case 1: {
-      unsigned int val = 0;
-      glXQueryDrawable(fl_display, fl_xid(pWindow), 0x20F1 /*GLX_SWAP_INTERVAL_EXT*/, &val);
-      interval = (int)val;
-      break; }
-    case 2:
-      if (fl_glXGetSwapIntervalMESA)
-        interval = fl_glXGetSwapIntervalMESA();
-      break;
-    case 3:
-      break;
-  }
-  return interval;
+  return -1;
 }
 
 void Fl_Emscripten_Gl_Window_Driver::waitGL() {
-  glXWaitGL();
 }
 
 void Fl_Emscripten_Gl_Window_Driver::gl_visual(Fl_Gl_Choice *c) {
   Fl_Gl_Window_Driver::gl_visual(c);
-  fl_visual = ((Fl_Emscripten_Gl_Choice*)c)->vis;
-  fl_colormap = ((Fl_Emscripten_Gl_Choice*)c)->colormap;
 }
 
 void Fl_Emscripten_Gl_Window_Driver::gl_start() {
-  glXWaitX();
 }
-
-FL_EXPORT GLXContext fl_emscripten_glcontext(GLContext rc) { return (GLXContext)rc; }
 
 #endif // HAVE_GL
