@@ -239,14 +239,14 @@ void Fl_OpenGL_Graphics_Driver::transformed_vertex(double xf, double yf) {
   if (what==COMPLEX_POLYGON) {
     Fl_Graphics_Driver::transformed_vertex(xf, yf);
   } else {
-#if !defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__)
     glVertex2f(xf, yf);
 #else
     glVertex2d(xf, yf);
 #endif
   }
 #else
-#if !defined(__EMSCRIPTEN__)
+#if defined(__EMSCRIPTEN__)
   glVertex2f(xf, yf);
 #else
   glVertex2d(xf, yf);

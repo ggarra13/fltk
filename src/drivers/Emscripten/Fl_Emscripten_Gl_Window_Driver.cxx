@@ -56,10 +56,6 @@ int Fl_Emscripten_Gl_Window_Driver::genlistsize() {
 }
 
 void Fl_Emscripten_Gl_Window_Driver::gl_bitmap_font(Fl_Font_Descriptor *fl_fontsize) {
-  if (!fl_fontsize->listbase) {
-    fl_fontsize->listbase = glGenLists(genlistsize());
-  }
-  glListBase(fl_fontsize->listbase);
 }
 
 void Fl_Emscripten_Gl_Window_Driver::get_list(Fl_Font_Descriptor *fd, int r) {
