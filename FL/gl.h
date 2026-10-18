@@ -61,6 +61,9 @@
 #    if !defined(__gl3_h_) // make sure OpenGL/gl3.h was not included before
 #      include <OpenGL/gl.h>
 #    endif
+#  elif defined(__EMSCRIPTEN__)
+#    include <GLES2/gl2.h>
+#    include <GL/gl.h>
 #  else
 #    include <GL/gl.h>
 #  endif  // __APPLE__ // PORTME: OpenGL Path abstraction
