@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include "flstring.h"
 
-#if !defined(__EMSCRIPTEN__)
+#ifdef __EMSCRIPTEN__
   #include <emscripten.h>
 #endif
 
