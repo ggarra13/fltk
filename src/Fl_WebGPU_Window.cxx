@@ -75,8 +75,13 @@ void Fl_WebGPU_Window::end_render_pass()
   }
 }
 
+void Fl_WebGPU_Window::draw_overlay()
+{
+}
+
 void Fl_WebGPU_Window::draw_begin()
 {
+    begin_render_pass();
 }
 
 /**

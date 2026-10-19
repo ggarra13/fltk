@@ -602,6 +602,7 @@ set(VKCPPFILES
 # WebGPU Files
 #
 set(WEBGPUCPPFILES
+    Fl_WebGPU_Choice.cxx
     Fl_WebGPU_Window.cxx
     Fl_WebGPU_Window_Driver.cxx
 )
@@ -1098,12 +1099,12 @@ if(FLTK_USE_VK)
 endif(FLTK_USE_VK)
 
 if(FLTK_USE_WEBGPU)
-  fl_add_library(fltk_wgpu STATIC "${WEBGPUCPPFILES};${WEBGPU_HEADER_FILES};${WEBGPU_DRIVER_HEADER_FILES}")
-  target_link_libraries(fltk_wgpu PUBLIC ${WEBGPU_LIBRARIES} fltk::fltk ${CMAKE_DL_LIBS})
-  target_include_directories(fltk_wgpu PUBLIC ${WEBGPU_INCLUDE_DIR} ${WEBGPU_INCLUDE_DIRS})
+  fl_add_library(fltk_webgpu STATIC "${WEBGPUCPPFILES};${WEBGPU_HEADER_FILES};${WEBGPU_DRIVER_HEADER_FILES}")
+  target_link_libraries(fltk_webgpu PUBLIC ${WEBGPU_LIBRARIES} fltk::fltk ${CMAKE_DL_LIBS})
+  target_include_directories(fltk_webgpu PUBLIC ${WEBGPU_INCLUDE_DIR} ${WEBGPU_INCLUDE_DIRS})
 
   # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
-  add_optional_libs(fltk_wgpu)
+  add_optional_libs(fltk_webgpu)
 endif(FLTK_USE_WEBGPU)
 
 #######################################################################
@@ -1178,12 +1179,12 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
   endif(FLTK_USE_VK)
 
 if(FLTK_USE_WEBGPU)
-  fl_add_library(fltk_wgpu-shared SHARED "${WEBGPUCPPFILES};${WEBGPU_HEADER_FILES};${WEBGPU_DRIVER_HEADER_FILES}")
-  target_link_libraries(fltk_wgpu-shared PUBLIC ${WEBGPU_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
-  target_include_directories(fltk_wgpu-shared PUBLIC ${WEBGPU_INCLUDE_DIR} ${WEBGPU_INCLUDE_DIRS})
+  fl_add_library(fltk_webgpu-shared SHARED "${WEBGPUCPPFILES};${WEBGPU_HEADER_FILES};${WEBGPU_DRIVER_HEADER_FILES}")
+  target_link_libraries(fltk_webgpu-shared PUBLIC ${WEBGPU_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
+  target_include_directories(fltk_webgpu-shared PUBLIC ${WEBGPU_INCLUDE_DIR} ${WEBGPU_INCLUDE_DIRS})
 
   # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
-  add_optional_libs(fltk_wgpu-shared)
+  add_optional_libs(fltk_webgpu-shared)
 endif(FLTK_USE_WEBGPU)
 
 endif(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)

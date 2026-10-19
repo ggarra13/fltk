@@ -190,6 +190,10 @@ void Fl_WebGPU_Window_Driver::destroy_resources()
 }
 
 
+void Fl_WebGPU_Window_Driver::init_colorspace()
+{
+}
+
 Fl_WebGPU_Window_Driver::Fl_WebGPU_Window_Driver(Fl_WebGPU_Window* win) :
     pWindow(win)
 {

@@ -67,7 +67,7 @@ public:
   virtual void prepare();
 
   static Fl_WebGPU_Choice *find_begin(int m, const int *alistp);
-  // Return one of these structures for a given vk mode.
+  // Return one of these structures for a given WebGPU mode.
   virtual Fl_WebGPU_Choice *find(int /*mode*/, const int * /*alistp*/) { return NULL; }
   static inline Fl_WebGPU_Window_Driver *driver(const Fl_WebGPU_Window *win) {
     return win->pWebGPUWindowDriver;
