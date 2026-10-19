@@ -90,7 +90,11 @@ void Fl_OpenGL_Graphics_Driver::end_loop() {
 void Fl_OpenGL_Graphics_Driver::begin_polygon() {
   n = 0; gap_ = 0;
   what = POLYGON;
+#if defined(__EMSCRIPTEN__)
+  glBegin(GL_TRIANGLE_FAN);   // GL_POLYGON is unsupported by LEGACY_GL_EMULATION
+#else
   glBegin(GL_POLYGON);
+#endif
 }
 
 void Fl_OpenGL_Graphics_Driver::end_polygon() {

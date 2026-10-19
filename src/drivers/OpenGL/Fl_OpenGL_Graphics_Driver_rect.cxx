@@ -170,7 +170,11 @@ void Fl_OpenGL_Graphics_Driver::loop(int x0, int y0, int x1, int y1, int x2, int
 }
 
 void Fl_OpenGL_Graphics_Driver::polygon(int x0, int y0, int x1, int y1, int x2, int y2) {
+#if defined(__EMSCRIPTEN__)
+  glBegin(GL_TRIANGLE_FAN);   // GL_POLYGON is unsupported by LEGACY_GL_EMULATION
+#else
   glBegin(GL_POLYGON);
+#endif
   glVertex2i(x0, y0);
   glVertex2i(x1, y1);
   glVertex2i(x2, y2);
@@ -178,7 +182,11 @@ void Fl_OpenGL_Graphics_Driver::polygon(int x0, int y0, int x1, int y1, int x2, 
 }
 
 void Fl_OpenGL_Graphics_Driver::polygon(int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3) {
+#if defined(__EMSCRIPTEN__)
+  glBegin(GL_TRIANGLE_FAN);   // GL_POLYGON is unsupported by LEGACY_GL_EMULATION
+#else
   glBegin(GL_POLYGON);
+#endif
   glVertex2i(x0, y0);
   glVertex2i(x1, y1);
   glVertex2i(x2, y2);
