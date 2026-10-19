@@ -211,7 +211,9 @@ void Fl_Gl_Window::flush() {
 
   if (mode_ & FL_DOUBLE) {
 
+#if !defined(__EMSCRIPTEN__)
     glDrawBuffer(GL_BACK);
+#endif
 
     if (!SWAP_TYPE) {
       SWAP_TYPE = pGlWindowDriver->swap_type();
@@ -284,7 +286,9 @@ void Fl_Gl_Window::flush() {
     if (overlay==this && SWAP_TYPE != SWAP) { // fake overlay in front buffer
       glDrawBuffer(GL_FRONT);
       draw_overlay();
+#if !defined(__EMSCRIPTEN__)
       glDrawBuffer(GL_BACK);
+#endif
       glFlush();
     }
 

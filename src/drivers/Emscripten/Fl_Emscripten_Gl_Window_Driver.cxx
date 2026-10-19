@@ -47,7 +47,7 @@ public:
     attrs.preserveDrawingBuffer = (m & FL_DOUBLE) ? 0 : 1;
     // Be explicit (this is also the WebGL default).
     attrs.premultipliedAlpha = 1;
-    attrs.majorVersion = 2;
+    attrs.majorVersion = need_gl3 ? 2 : 1;
     attrs.minorVersion = 0;
   }
 };
@@ -72,6 +72,21 @@ static EM_BOOL fl_webgl_context_restored_cb(int, const void *, void *user_data) 
 static void fl_make_canvas_target(Fl_Window *window, char *buf, size_t len) {
   fl_uintptr_t xid = fl_xid(window);
   snprintf(buf, len, "#fltk_canvas%lu", (unsigned long)xid);
+}
+
+// Emscripten only runs GLImmediate.init() for contexts made through
+// Browser.createContext (SDL/GLUT/GLFW). emscripten_webgl_create_context()
+// bypasses that, so do it manually, once, with a context current.
+static void fl_init_legacy_gl_emulation() {
+  EM_ASM({
+    var ctx = GL.currentContext;
+    if (ctx && !ctx.fltkLegacyInit) {
+      Browser.useWebGL = true;
+      GLImmediate.initted = false;
+      GLImmediate.init();          // re-creates renderer cache, matrices, TexEnvJIT
+      ctx.fltkLegacyInit = true;
+    }
+  });
 }
 
 Fl_Gl_Window_Driver *Fl_Gl_Window_Driver::newGlWindowDriver(Fl_Gl_Window *w)
@@ -149,6 +164,7 @@ void Fl_Emscripten_Gl_Window_Driver::set_gl_context(Fl_Window* w, GLContext cont
     if (emscripten_webgl_make_context_current((EMSCRIPTEN_WEBGL_CONTEXT_HANDLE)context)
         == EMSCRIPTEN_RESULT_SUCCESS) {
       cached_window = w;
+      fl_init_legacy_gl_emulation();
     }
   }
 }
@@ -202,8 +218,8 @@ int Fl_Emscripten_Gl_Window_Driver::mode_(int m, const int *a) {
     const int ctx_bits = FL_DOUBLE | FL_ALPHA | FL_DEPTH | FL_DEPTH32 |
                          FL_STENCIL | FL_MULTISAMPLE | FL_OPENGL3;
     if ((oldmode ^ m) & ctx_bits) {
-      pWindow->hide();
-      pWindow->show();
+        pWindow->hide();
+        pWindow->show();
     }
   } else {
     g(0);
