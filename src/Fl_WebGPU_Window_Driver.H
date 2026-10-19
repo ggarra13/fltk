@@ -27,7 +27,6 @@
 #include <FL/Fl_WebGPU_Window.H>
 
 class Fl_WebGPU_Choice;
-class Fl_Font_Descriptor;
 
 /* The constructor of each Fl_WebGPU_Window object creates also an object from a
    platform-specific derived class from this class.
@@ -89,7 +88,8 @@ protected:
   void prepare_depth();
   void prepare_framebuffers();
 
-    int swap_interval_ = 0;
+private:
+  int swap_interval_ = 0;
 };
 
 #endif /* Fl_WebGPU_Window_Driver_H */

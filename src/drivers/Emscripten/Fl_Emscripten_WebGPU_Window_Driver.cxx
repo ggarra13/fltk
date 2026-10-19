@@ -51,7 +51,7 @@ Fl_WebGPU_Choice *Fl_Emscripten_WebGPU_Window_Driver::find(int m, const int *ali
   // NOTE: when an alist is used, m may be 0 here; alist parsing is not done.
   if (m & (FL_STEREO | FL_ACCUM)) return 0;
 
-  Fl_WebGPU_Choice *g = Fl_WebGPU_Window_Driver::find_begin(m, alistp);
+  Fl_WebGPU_Choice *g = Fl_Emscripten_WebGPU_Window_Driver::find_begin(m, alistp);
   if (g) return g;
 
   g = new Fl_Emscripten_WebGPU_Choice(m, alistp, first);
@@ -59,17 +59,12 @@ Fl_WebGPU_Choice *Fl_Emscripten_WebGPU_Window_Driver::find(int m, const int *ali
   return g;
 }
 
-// WebGPU has no front buffer and no overlay planes: deliberate no-ops.
-// (can_do_overlay() should stay false.)
-void Fl_Emscripten_WebGPU_Window_Driver::make_overlay_current() {
-}
-
-void Fl_Emscripten_WebGPU_Window_Driver::redraw_overlay() {
-  pWindow->damage(FL_DAMAGE_OVERLAY);
-}
-
 void Fl_Emscripten_WebGPU_Window_Driver::before_show(int&) {
 }
+
+void Fl_Emscripten_WebGPU_Window_Driver::create_surface() {
+}
+
 
 float Fl_Emscripten_WebGPU_Window_Driver::pixels_per_unit()
 {
@@ -98,15 +93,8 @@ int Fl_Emscripten_WebGPU_Window_Driver::mode_(int m, const int *a) {
 }
 
 void Fl_Emscripten_WebGPU_Window_Driver::swap_buffers() {
-  // WebGL presents implicitly when control returns to the browser.
+  // WebGPU presents implicitly when control returns to the browser.
   // (Only call emscripten_webgl_commit_frame() if explicitSwapControl is enabled.)
-}
-
-char Fl_Emscripten_WebGPU_Window_Driver::swap_type() {
-  // Double-buffered WebGL content is undefined after presentation, so FLTK
-  // must redraw everything. Single-buffered windows preserve their buffer.
-  // VERIFY: enum name (UNDEFINED / COPY) in Fl_WebGPU_Window_Driver.
-  return copy;
 }
 
 void Fl_Emscripten_WebGPU_Window_Driver::swap_interval(int interval) {

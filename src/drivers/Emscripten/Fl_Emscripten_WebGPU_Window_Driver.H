@@ -18,7 +18,7 @@
 #define FL_EMSCRIPTEN_WEBGPU_WINDOW_DRIVER_H
 
 #include <config.h>
-#if HAVE_GL
+#if HAVE_WEBGPU
 #include <FL/platform.H>
 #include "../../Fl_WebGPU_Window_Driver.H"
 
@@ -30,13 +30,11 @@ class Fl_Emscripten_WebGPU_Window_Driver : public Fl_WebGPU_Window_Driver {
   float pixels_per_unit() FL_OVERRIDE;
   void before_show(int& need_after) FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
+  void create_surface() FL_OVERRIDE;
   void swap_buffers() FL_OVERRIDE;
-  char swap_type() FL_OVERRIDE;
   void swap_interval(int) FL_OVERRIDE;
   int swap_interval() const FL_OVERRIDE;
   Fl_WebGPU_Choice *find(int m, const int *alistp) FL_OVERRIDE;
-  void make_overlay_current() FL_OVERRIDE;
-  void redraw_overlay() FL_OVERRIDE;
 };
 
 
