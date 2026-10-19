@@ -26,6 +26,7 @@ class Fl_WebGPU_Choice;
 
 class Fl_Emscripten_WebGPU_Window_Driver : public Fl_WebGPU_Window_Driver {
   friend Fl_WebGPU_Window_Driver* Fl_WebGPU_Window_Driver::newWebGPUWindowDriver(Fl_WebGPU_Window *);
+  friend Fl_WebGPU_Window_Driver* Fl_WebGPU_Window_Driver::global();
   Fl_Emscripten_WebGPU_Window_Driver(Fl_WebGPU_Window *win) : Fl_WebGPU_Window_Driver(win) {}
   float pixels_per_unit() FL_OVERRIDE;
   void before_show(int& need_after) FL_OVERRIDE;

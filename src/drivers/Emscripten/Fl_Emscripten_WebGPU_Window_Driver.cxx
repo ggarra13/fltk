@@ -45,6 +45,13 @@ Fl_WebGPU_Window_Driver *Fl_WebGPU_Window_Driver::newWebGPUWindowDriver(Fl_WebGP
   return new Fl_Emscripten_WebGPU_Window_Driver(w);
 }
 
+// Used by Fl_WebGPU_Window::can_do(), which has no window instance.
+Fl_WebGPU_Window_Driver *Fl_WebGPU_Window_Driver::global()
+{
+  static Fl_WebGPU_Window_Driver *gd = new Fl_Emscripten_WebGPU_Window_Driver(NULL);
+  return gd;
+}
+
 Fl_WebGPU_Choice *Fl_Emscripten_WebGPU_Window_Driver::find(int m, const int *alistp)
 {
   // Reject what WebGPU cannot provide so Fl_WebGPU_Window::can_do() is truthful.
@@ -62,7 +69,37 @@ Fl_WebGPU_Choice *Fl_Emscripten_WebGPU_Window_Driver::find(int m, const int *ali
 void Fl_Emscripten_WebGPU_Window_Driver::before_show(int&) {
 }
 
+// Creates the WGPUSurface from the window's <canvas> element
+// (id "fltk_canvas<xid>", created by Fl_Emscripten_Window_Driver::makeWindow()).
+// Called from Fl_WebGPU_Window::init_webgpu() after the window is shown, so the
+// canvas already exists, and after wgpu.instance has been created.
+//
+// IMPORTANT: a canvas that has ever returned a "2d" context can never give a
+// WebGPU context. Fl_Emscripten_Window_Driver::make_current() must not run for
+// WebGPU windows (see the guard suggested there).
 void Fl_Emscripten_WebGPU_Window_Driver::create_surface() {
+  Fl_WebGPU_Context &ctx = wgpu();
+  if (ctx.surface)
+    return;
+  if (!ctx.instance) {
+    fprintf(stderr, "create_surface: no WebGPU instance\n");
+    return;
+  }
+
+  char selector[64];
+  fl_make_canvas_target(pWindow, selector, sizeof(selector));
+
+  WGPUEmscriptenSurfaceSourceCanvasHTMLSelector canvas_src = {};
+  canvas_src.chain.sType = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector;
+  canvas_src.selector    = WGPUStringView{selector, WGPU_STRLEN};
+
+  WGPUSurfaceDescriptor desc = {};
+  desc.nextInChain = &canvas_src.chain;
+  desc.label       = WGPUStringView{"FLTK canvas surface", WGPU_STRLEN};
+
+  ctx.surface = wgpuInstanceCreateSurface(ctx.instance, &desc);
+  if (!ctx.surface)
+    fprintf(stderr, "create_surface: could not create surface for %s\n", selector);
 }
 
 
