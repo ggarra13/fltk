@@ -22,13 +22,28 @@
 
 #include <webgpu/webgpu.h>
 
+//! Wrapper to keep a queue and a mutex for safe use in multithreading.
+//! Each FLTK window receives a pointer to it.
+struct WebGPUQueue
+{
+    std::mutex                    mutex;
+    WGPUQueue                     queue = 0;
+};
+
 struct WebGPUContext
 {
-    WGPUInstance instance;
-    WGPUDevice device;
-    WGPUQueue queue;
-    WGPUSurface surface;
-    WGPURenderPipeline pipeline;
+    WGPUInstance instance = 0;
+    WGPUDevice device = 0;
+    WebGPUGPUQueue safe_thread_queue;
+    WGPUSurface surface = 0;
+    WGPURenderPipeline pipeline = 0;
+
+    WGPUCommandEncoder cmd_encoder = 0;
+    WGPURenderPassEncoder renderPass = 0;
+
+    // Thread safe queue (use lock_guard on mutex when submitting)
+    WGPUQueue& queue() { return safe_thread_queue.queue; }
+    std::mutex& queue_mutex() { return safe_thread_queue.mutex; }
 };
 
 #endif // Fl_WebGPU_Context_H

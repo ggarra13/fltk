@@ -35,7 +35,7 @@ class Fl_WebGPU_Window_Driver;
 */
 class FL_EXPORT Fl_WebGPU_Window : public Fl_Window {
   friend class Fl_WebGPU_Window_Driver;
-  Fl_WebGPU_Window_Driver *pGlWindowDriver;
+  Fl_WebGPU_Window_Driver *pWebGPUWindowDriver;
 
   int mode_;
   const int *alist;
@@ -47,6 +47,10 @@ class FL_EXPORT Fl_WebGPU_Window : public Fl_Window {
 
   static int can_do(int, const int *);
   int mode(int, const int *);
+
+  //! Tracking variable to know if begin_render_pass()/end_render_pass() has
+  //! been called.
+  bool                   m_in_render_pass;
 protected:
   void draw_begin();
   void draw() override;
@@ -54,6 +58,16 @@ protected:
 
   // Window's WebGPU context.
   Fl_WebGPU_Context wgpu;
+
+  // Window's clear color for render pass
+  WGPUColor clearValues = { 0.F, 0.F, 0.F, 1.F };
+
+  // Auxiliary functions to begin and end the main render pass.
+  // Note that FLTK will call begin_render_pass() in draw_begin()
+  // and end_render_pass() in draw_end().
+  // That is: draw() is called with an active render pass by default.
+  void begin_render_pass();
+  void end_render_pass();
 
 public:
   void show() override;
@@ -63,6 +77,9 @@ public:
   void hide() override;
   void resize(int,int,int,int) override;
   int handle(int) override;
+
+  inline GPUQueue&         queue() { return wgpu.safe_thread_queue.queue; }
+  inline std::mutex& queue_mutex() { return wgpu.safe_thread_queue.mutex; }
 
   /**
     Is turned off when FLTK creates a new context for this window or
@@ -128,7 +145,6 @@ public:
    - \c FL_DEPTH32 - depth buffer with at least 32 bits
    - \c FL_STENCIL - stencil buffer
    - \c FL_MULTISAMPLE - multisample antialiasing
-   - \c FL_OPENGL3 - use WebGPU version 3.0 or more.
 
    FL_RGB and FL_SINGLE have a value of zero, so they
    are "on" unless you give FL_INDEX or FL_DOUBLE.
@@ -179,6 +195,8 @@ public:
   void ortho();
 
   // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
+  // Note: We will use as_gl_window() by default to avoid changing all
+  //       of FLTK's source code as we did with Vulkan.
   Fl_WebGPU_Window* as_gl_window() override { return this; }
   Fl_WebGPU_Window const* as_gl_window() const override { return this; }
 
