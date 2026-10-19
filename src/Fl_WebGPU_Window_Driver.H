@@ -95,7 +95,6 @@ protected:
   void prepare_buffers();     // (re)configures the surface (swapchain)
   void prepare_depth();       // (re)creates the depth/stencil texture
   void destroy_depth();
-  void prepare_framebuffers(); // no-op: WebGPU has no framebuffer objects
   void apply_present_mode();
 
 private:

@@ -472,6 +472,10 @@ void Fl_Emscripten_Window_Driver::unmap() {
 
 void Fl_Emscripten_Window_Driver::make_current() {
   fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
+  if (pWindow->as_wgpu_window()) {   // never touch the canvas with a 2D context
+    fl_window = (Window)xid;
+    return;
+  }
   EM_VAL ctx = (EM_VAL)EM_ASM_PTR({
     let canvas = document.getElementById("fltk_canvas" + $0);
     let ctx = canvas.getContext("2d");

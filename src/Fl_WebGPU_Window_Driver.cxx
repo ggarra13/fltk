@@ -280,17 +280,11 @@ void Fl_WebGPU_Window_Driver::destroy_depth()
   w.depth_format = WGPUTextureFormat_Undefined;
 }
 
-// WebGPU has no framebuffer objects: render pass attachments are given
-// in Fl_WebGPU_Window::begin_render_pass().
-void Fl_WebGPU_Window_Driver::prepare_framebuffers() {
-}
-
 void Fl_WebGPU_Window_Driver::prepare()
 {
   prepare_buffers();
   prepare_depth();
   pWindow->prepare();
-  prepare_framebuffers();
 }
 
 void Fl_WebGPU_Window_Driver::resize(int is_a_resize, int /*w*/, int /*h*/)
