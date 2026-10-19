@@ -950,8 +950,9 @@ endif(VULKAN_FOUND)
 set(FLTK_WEBGPU_FOUND FALSE)
 if(WEBGPU_FOUND)
   set(FLTK_WEBGPU_FOUND TRUE)
-  find_path(WEBGPU_INCLUDE_DIR NAMES webgpu/webgpu.h)
-  set(CMAKE_REQUIRED_INCLUDES ${WEBGPU_INCLUDE_DIR})
+  find_path(FLTK_WEBGPU_INCLUDE_DIR NAMES webgpu/webgpu.h)
+  message(STATUS "FLTK_WEBGPU_DIR=${FLTK_WEBGPU_INCLUDE_DIR}")
+  set(CMAKE_REQUIRED_INCLUDES ${FLTK_WEBGPU_INCLUDE_DIR})
 endif()
 
 #######################################################################

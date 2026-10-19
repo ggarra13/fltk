@@ -38,8 +38,6 @@ protected:
 public:
   static Fl_Window *cached_window;
   static Fl_WebGPU_Choice *first;
-  static int copy;
-  static float vk_scale;
   Fl_WebGPU_Choice *g() { return pWindow->g; }
   void g(Fl_WebGPU_Choice *c) { pWindow->g = c; }
   int mode() { return pWindow->mode_; }

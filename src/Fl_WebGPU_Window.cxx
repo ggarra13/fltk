@@ -28,9 +28,11 @@
 #include <FL/fl_utf8.h>
 #include <FL/platform.H>
 
-#include <algorithm>
-#include <fstream>
-#include <iostream>
+#include <cstdio>
+
+#define DBG \
+    fprintf(stderr, "[DEBUG] %s:%d: %s\n", \
+            __FILE__, __LINE__, __func__)
 
 
 void Fl_WebGPU_Window::destroy_common_resources() {
@@ -106,7 +108,7 @@ void Fl_WebGPU_Window::draw_begin()
 */
 
 /**
-   To be used as a match for a previous call to Fl_WebGPU_Window::vk_draw_begin().
+   To be used as a match for a previous call to Fl_WebGPU_Window::draw_begin().
    \see \ref vulkan_with_fltk_widgets
 */
 void Fl_WebGPU_Window::draw_end()
@@ -265,21 +267,18 @@ void Fl_WebGPU_Window::hide() {
     rendering the main scene.
     \code
 
-    void mywindow::vk_draw_begin()
+    void mywindow::draw_begin()
     {
     // Background color
-    m_clearColor = { 0.0, 0.0, 0.0, 0.0 };
+    clearColor = { 0.0, 0.0, 0.0, 0.0 };
 
     // Clear the screen and prepare m_draw_cmd
-    Fl_WebGPU_Window::vk_draw_begin();
+    Fl_WebGPU_Window::draw_begin();
     }
 
     void mywindow::draw() {
-    // draw 3d graphics scene
-    Fl_WebGPU_Window::draw();
-    // -- or --
-    Fl_Window::draw();
-    // other 2d drawing calls, overlays, etc.
+         // draw 3d graphics scene
+         Fl_WebGPU_Window::draw();
     }
     \endcode
 
@@ -314,13 +313,14 @@ float Fl_WebGPU_Window::pixels_per_unit() {
 */
 
 Fl_Window *Fl_WebGPU_Window_Driver::cached_window = NULL;
-// scaling factor between FLTK and VK drawing units: VK = FLTK * vk_scale
-float Fl_WebGPU_Window_Driver::vk_scale = 1;
 
 void Fl_WebGPU_Window_Driver::invalidate() {}
 
 void Fl_WebGPU_Window::shutdown_webgpu() {
-  // Destroy swapchain and surface
+  if (!pWebGPUWindowDriver)
+      return;
+
+  // Destroy resources and surface
   pWebGPUWindowDriver->destroy_resources();
   pWebGPUWindowDriver->destroy_surface();
 
@@ -346,6 +346,26 @@ void Fl_WebGPU_Window::init_colorspace()
 
 void Fl_WebGPU_Window::init_webgpu() {
 
+    if (!wgpu.instance)
+    {
+        DBG;
+        wgpu.instance = wgpuCreateInstance(NULL);
+        DBG;
+        if (!wgpu.instance)
+        {
+            Fl::fatal("Could not initialize instance");
+        }
+    }
+
+    if (!wgpu.device)
+    {
+        DBG;
+        wgpu.device = emscripten_webgpu_get_device();  // <-- outdated
+        DBG;
+        wgpu.queue() = wgpuDeviceGetQueue(wgpu.device);
+        DBG;
+    }
+
   // Destroy surface
   if (wgpu.surface)
     pWebGPUWindowDriver->destroy_surface();
@@ -355,30 +375,13 @@ void Fl_WebGPU_Window::init_webgpu() {
   // \@todo: Initialize colorspace
   // init_colorspace();
 
-  // \@todo: WebGPU does not support vkSetHdrMetadata equivalent yet
-  //   if (!vkSetHdrMetadataEXT)
-  //   {
-  //     bool found_hdr = false;
-  //     for (auto extension : ctx.device_extensions)
-  //     {
-  //       if (strcmp(extension, VK_EXT_HDR_METADATA_EXTENSION_NAME) == 0)
-  //       {
-  //         found_hdr = true;
-  //       }
-  //     }
-
-  //     if (found_hdr)
-  //     {
-  //       vkSetHdrMetadataEXT = (PFN_vkSetHdrMetadataEXT)vkGetDeviceProcAddr(device(), "vkSetHdrMetadataEXT");
-  //     }
-  //   }
-
   // Verify window size
   if (w() <= 0 || h() <= 0) {
     pWebGPUWindowDriver->destroy_surface();
     return;
   }
 
+  DBG;
   // Initialize swapchain views, depth/stencil and framebuffers
   pWebGPUWindowDriver->prepare();
 }
@@ -400,11 +403,7 @@ void Fl_WebGPU_Window::init() {
   damage1_ = 0;
 
   // Reset WebGPU Handles
-#ifdef NDEBUG
   m_debugSync = false;
-#else
-  m_debugSync = false;
-#endif
 }
 
 /**
@@ -412,4 +411,4 @@ void Fl_WebGPU_Window::init() {
    \endcond
 */
 
-#endif // HAVE_VK
+#endif // HAVE_WEBGPU
