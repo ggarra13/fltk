@@ -48,10 +48,19 @@ class FL_EXPORT Fl_WebGPU_Window : public Fl_Window {
   static int can_do(int, const int *);
   int mode(int, const int *);
 
+  Fl_WebGPU_Window_Driver* create_driver();
+
   //! Tracking variable to know if begin_render_pass()/end_render_pass() has
   //! been called.
   bool                   m_in_render_pass;
 protected:
+  bool m_debugSync = false;
+
+  void init_webgpu();
+  void shutdown_webgpu();
+
+  virtual void init_colorspace();
+
   void draw_begin();
   void draw() override;
   void draw_end();
@@ -78,7 +87,7 @@ public:
   void resize(int,int,int,int) override;
   int handle(int) override;
 
-  inline GPUQueue&         queue() { return wgpu.safe_thread_queue.queue; }
+  inline WGPUQueue&        queue() { return wgpu.safe_thread_queue.queue; }
   inline std::mutex& queue_mutex() { return wgpu.safe_thread_queue.mutex; }
 
   /**
@@ -194,11 +203,12 @@ public:
   int swap_interval() const;
   void ortho();
 
-  // Note: Doxygen docs in Fl_Widget.H to avoid redundancy.
-  // Note: We will use as_gl_window() by default to avoid changing all
-  //       of FLTK's source code as we did with Vulkan.
-  Fl_WebGPU_Window* as_gl_window() override { return this; }
-  Fl_WebGPU_Window const* as_gl_window() const override { return this; }
+  void destroy_common_resources();
+  virtual void prepare() {};
+  virtual void destroy() {};
+
+  Fl_WebGPU_Window* as_wgpu_window() override { return this; }
+  Fl_WebGPU_Window const* as_wgpu_window() const override { return this; }
 
   float pixels_per_unit();
   /** Gives the window width in WebGPU pixels.

@@ -24,22 +24,25 @@
 
 //! Wrapper to keep a queue and a mutex for safe use in multithreading.
 //! Each FLTK window receives a pointer to it.
-struct WebGPUQueue
+struct Fl_WGPUQueue
 {
     std::mutex                    mutex;
     WGPUQueue                     queue = 0;
 };
 
-struct WebGPUContext
+struct Fl_WebGPU_Context
 {
     WGPUInstance instance = 0;
     WGPUDevice device = 0;
-    WebGPUGPUQueue safe_thread_queue;
+    Fl_WGPUQueue safe_thread_queue;
     WGPUSurface surface = 0;
     WGPURenderPipeline pipeline = 0;
 
-    WGPUCommandEncoder cmd_encoder = 0;
-    WGPURenderPassEncoder renderPass = 0;
+    WGPUSurfaceTexture surface_texture = {};
+    WGPUTextureView back_buffer = 0;
+
+    WGPUCommandEncoder encoder = 0;
+    WGPURenderPassEncoder render_pass = 0;
 
     // Thread safe queue (use lock_guard on mutex when submitting)
     WGPUQueue& queue() { return safe_thread_queue.queue; }

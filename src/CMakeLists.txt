@@ -601,15 +601,19 @@ set(VKCPPFILES
 #
 # WebGPU Files
 #
-set(WEBGPU_DRIVER_FILES
-)
 set(WEBGPUCPPFILES
-  Fl_WebGPU_Window.cxx
+    Fl_WebGPU_Window.cxx
+    Fl_WebGPU_Window_Driver.cxx
 )
 
 set(WEBGPU_DRIVER_FILES
+    drivers/Emscripten/Fl_Emscripten_WebGPU_Window_Driver.cxx
 )
 
+set(WEBGPUCPPFILES
+  ${WEBGPUCPPFILES}
+  ${WEBGPU_DRIVER_FILES}
+)
 
 set(IMGCPPFILES
   fl_images_core.cxx
@@ -1093,6 +1097,15 @@ if(FLTK_USE_VK)
   add_optional_libs(fltk_vk)
 endif(FLTK_USE_VK)
 
+if(FLTK_USE_WEBGPU)
+  fl_add_library(fltk_wgpu STATIC "${WEBGPUCPPFILES};${WEBGPU_HEADER_FILES};${WEBGPU_DRIVER_HEADER_FILES}")
+  target_link_libraries(fltk_wgpu PUBLIC ${WEBGPU_LIBRARIES} fltk::fltk ${CMAKE_DL_LIBS})
+  target_include_directories(fltk_wgpu PUBLIC ${WEBGPU_INCLUDE_DIR} ${WEBGPU_INCLUDE_DIRS})
+
+  # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
+  add_optional_libs(fltk_wgpu)
+endif(FLTK_USE_WEBGPU)
+
 #######################################################################
 # Build shared libraries (optional)
 #######################################################################
@@ -1163,6 +1176,15 @@ if(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
     add_optional_libs(fltk_vk-shared)
 
   endif(FLTK_USE_VK)
+
+if(FLTK_USE_WEBGPU)
+  fl_add_library(fltk_wgpu-shared SHARED "${WEBGPUCPPFILES};${WEBGPU_HEADER_FILES};${WEBGPU_DRIVER_HEADER_FILES}")
+  target_link_libraries(fltk_wgpu-shared PUBLIC ${WEBGPU_LIBRARIES} fltk::fltk-shared ${CMAKE_DL_LIBS})
+  target_include_directories(fltk_wgpu-shared PUBLIC ${WEBGPU_INCLUDE_DIR} ${WEBGPU_INCLUDE_DIRS})
+
+  # Add "optional libs" (FIXME: this can be optimized, we don't need *all* these libs here)
+  add_optional_libs(fltk_wgpu-shared)
+endif(FLTK_USE_WEBGPU)
 
 endif(FLTK_BUILD_SHARED_LIBS AND NOT MSVC)
 

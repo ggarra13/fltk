@@ -1270,7 +1270,10 @@ public:
    */
   virtual class Fl_Vk_Window* as_vk_window() { return NULL; }
   virtual class Fl_Vk_Window const* as_vk_window() const { return NULL; }
-  
+
+  virtual class Fl_WebGPU_Window* as_wgpu_window() { return NULL; }
+  virtual class Fl_WebGPU_Window const* as_wgpu_window() const { return NULL; }
+
   /** Returns non zero if MAC_USE_ACCENTS_MENU flag is set, 0 otherwise.
    */
   int use_accents_menu() { return flags() & MAC_USE_ACCENTS_MENU; }
