@@ -20,6 +20,7 @@
 #ifndef Fl_WebGPU_Context_H
 #define Fl_WebGPU_Context_H
 
+#include <mutex>
 #include <webgpu/webgpu.h>
 
 //! Wrapper to keep a queue and a mutex for safe use in multithreading.
@@ -33,11 +34,22 @@ struct Fl_WGPUQueue
 struct Fl_WebGPU_Context
 {
     WGPUInstance instance = 0;
+    WGPUAdapter  adapter = 0;
     WGPUDevice device = 0;
     Fl_WGPUQueue safe_thread_queue;
     WGPUSurface surface = 0;
     WGPURenderPipeline pipeline = 0;
 
+    // Chosen in Fl_WebGPU_Window_Driver::init_colorspace()
+    WGPUTextureFormat surface_format = WGPUTextureFormat_BGRA8Unorm;
+
+    // Depth/stencil attachment (created if the window mode has FL_DEPTH
+    // and/or FL_STENCIL).
+    WGPUTextureFormat depth_format  = WGPUTextureFormat_Undefined;
+    WGPUTexture       depth_texture = 0;
+    WGPUTextureView   depth_view    = 0;
+
+    // Per-frame objects
     WGPUSurfaceTexture surface_texture = {};
     WGPUTextureView back_buffer = 0;
 

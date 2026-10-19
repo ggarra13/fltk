@@ -20,6 +20,7 @@
 
 #include <webgpu/webgpu.h>
 
+#include <FL/Fl.H>
 #include <FL/Fl_WebGPU_Window.H>
 #include "Fl_WebGPU_Window_Driver.H"
 #include "Fl_Window_Driver.H"
@@ -29,10 +30,6 @@
 #include <FL/platform.H>
 
 #include <cstdio>
-
-#define DBG \
-    fprintf(stderr, "[DEBUG] %s:%d: %s\n", \
-            __FILE__, __LINE__, __func__)
 
 
 void Fl_WebGPU_Window::destroy_common_resources() {
@@ -49,16 +46,33 @@ void Fl_WebGPU_Window::begin_render_pass()
     .clearValue = clearValues,
   };
 
+  // Depth/stencil attachment, if the window mode asked for one
+  WGPURenderPassDepthStencilAttachment ds_attachment{};
+  if (wgpu.depth_view) {
+    ds_attachment.view = wgpu.depth_view;
+    if (mode_ & FL_DEPTH) {
+      ds_attachment.depthLoadOp     = WGPULoadOp_Clear;
+      ds_attachment.depthStoreOp    = WGPUStoreOp_Store;
+      ds_attachment.depthClearValue = 1.0f;
+    }
+    if (mode_ & FL_STENCIL) {
+      ds_attachment.stencilLoadOp     = WGPULoadOp_Clear;
+      ds_attachment.stencilStoreOp    = WGPUStoreOp_Store;
+      ds_attachment.stencilClearValue = 0;
+    }
+  }
+
   // Render pass descriptor
   char buf[128];
   snprintf(buf, 128, "Main Render Pass for '%s'",
            label() ? label() : "?");
 
-  WGPURenderPassDescriptor render_pass_desc{
-      .label = buf,
-      .colorAttachmentCount = 1,
-      .colorAttachments = &color_attachment,
-  };
+  WGPURenderPassDescriptor render_pass_desc{};
+  render_pass_desc.label                = WGPUStringView{buf, WGPU_STRLEN};
+  render_pass_desc.colorAttachmentCount = 1;
+  render_pass_desc.colorAttachments     = &color_attachment;
+  render_pass_desc.depthStencilAttachment = wgpu.depth_view ? &ds_attachment
+                                                            : nullptr;
 
   // Begin render pass
   wgpu.render_pass = wgpuCommandEncoderBeginRenderPass(wgpu.encoder,
@@ -73,6 +87,7 @@ void Fl_WebGPU_Window::end_render_pass()
   {
     wgpuRenderPassEncoderEnd(wgpu.render_pass);
     wgpuRenderPassEncoderRelease(wgpu.render_pass);
+    wgpu.render_pass = 0;
     m_in_render_pass = false;
   }
 }
@@ -81,9 +96,29 @@ void Fl_WebGPU_Window::draw_overlay()
 {
 }
 
+/**
+   Acquires the next surface texture, creates the command encoder and
+   begins the main render pass. If the surface texture cannot be
+   acquired, m_frame_active stays false and the frame is skipped.
+*/
 void Fl_WebGPU_Window::draw_begin()
 {
-    begin_render_pass();
+  m_frame_active = false;
+
+  if (!wgpu.device || !pWebGPUWindowDriver ||
+      !pWebGPUWindowDriver->acquire_back_buffer())
+    return;
+
+  WGPUCommandEncoderDescriptor enc_desc{};
+  enc_desc.label = WGPUStringView{"FLTK WebGPU encoder", WGPU_STRLEN};
+  wgpu.encoder = wgpuDeviceCreateCommandEncoder(wgpu.device, &enc_desc);
+  if (!wgpu.encoder) {
+    pWebGPUWindowDriver->release_back_buffer();
+    return;
+  }
+
+  m_frame_active = true;
+  begin_render_pass();
 }
 
 /**
@@ -109,14 +144,13 @@ void Fl_WebGPU_Window::draw_begin()
 
 /**
    To be used as a match for a previous call to Fl_WebGPU_Window::draw_begin().
+   Only ends the render pass; the encoder is finished and submitted in
+   swap_buffers().
    \see \ref vulkan_with_fltk_widgets
 */
 void Fl_WebGPU_Window::draw_end()
 {
   end_render_pass();
-
-  // End all render passes before finishing.
-  WGPUCommandBuffer commands = wgpuCommandEncoderFinish(wgpu.encoder, NULL);
 }
 
 /**  Returns non-zero if the hardware supports the given or current WebGPU  mode. */
@@ -149,29 +183,42 @@ int Fl_WebGPU_Window::mode(int m, const int *a) {
   return pWebGPUWindowDriver->mode_(m, a);
 }
 
+/**
+   Finishes the command encoder, submits it to the queue, presents the
+   surface and releases the per-frame objects.
+*/
 void Fl_WebGPU_Window::swap_buffers() {
+  if (!m_frame_active)
+    return;
 
   // End all render passes before finishing.
-  WGPUCommandBuffer commands =
-    wgpuCommandEncoderFinish(wgpu.encoder, NULL);
+  end_render_pass();
+
+  WGPUCommandBuffer commands = wgpuCommandEncoderFinish(wgpu.encoder, NULL);
+  wgpuCommandEncoderRelease(wgpu.encoder);
+  wgpu.encoder = 0;
 
   {
     std::lock_guard<std::mutex> lock(queue_mutex());
 
     wgpuQueueSubmit(wgpu.queue(), 1, &commands);
+    wgpuSurfacePresent(wgpu.surface);
   }
+
+  wgpuCommandBufferRelease(commands);
+  pWebGPUWindowDriver->release_back_buffer();
+  m_frame_active = false;
 }
 
 /**
-   Sets the rate at which the VK windows swaps buffers.
+   Sets the rate at which the window swaps buffers.
    This method can be called after the WebGPU context was created, typically
    within the user overridden `Fl_WebGPU_Window::draw()` method that will be
    overridden by the user.
-   \note This method depends highly on the underlying WebGPU contexts and driver
-   implementation. Most driver seem to accept only 0 and 1 to swap buffer
-   asynchronously or in sync with the vertical blank.
-   \param[in] frames set the number of vertical frame blanks between WebGPU
-   buffer swaps
+   \note 0 selects Mailbox (or Immediate) presentation if available,
+   a value greater than 0 selects Fifo (vsync). The change is applied
+   at the start of the next frame.
+   \param[in] value the swap interval
 */
 void Fl_WebGPU_Window::swap_interval(int value) {
   if (pWebGPUWindowDriver->swap_interval() != value)
@@ -181,24 +228,20 @@ void Fl_WebGPU_Window::swap_interval(int value) {
 }
 
 /**
-   Gets the rate at which the VK windows swaps buffers.
-   This method can be called after the WebGPU context was created, typically
-   within the user overridden `Fl_WebGPU_Window::draw()` method that will be
-   overridden by the user.
-   \note This method depends highly on the underlying WebGPU contexts and driver
-   implementation. Some drivers return no information, most drivers don't
-   support intervals with multiple frames and return only 0 or 1.
-   \note Some drivers have the ability to set the swap interval but no way
-   to query it, hence this method may return -1 even though the interval was
-   set correctly. Conversely a return value greater zero does not guarantee
-   that the driver actually honors the setting.
+   Gets the rate at which the window swaps buffers.
    \return an integer greater zero if vertical blanking is taken into account
    when swapping WebGPU buffers
    \return 0 if the vertical blanking is ignored
-   \return -1 if the information can not be retrieved
 */
 int Fl_WebGPU_Window::swap_interval() const {
   return pWebGPUWindowDriver->swap_interval();
+}
+
+void Fl_WebGPU_Window::invalidate() {
+  valid(0);
+  context_valid(0);
+  if (pWebGPUWindowDriver)
+    pWebGPUWindowDriver->invalidate();
 }
 
 
@@ -206,20 +249,26 @@ void Fl_WebGPU_Window::flush() {
   if (!shown() || pixel_w() <= 0 || pixel_h() <= 0)
     return;
 
+  // (Re)create instance/surface/device on first flush and after hide()/show().
+  if (!wgpu.device) {
+    init_webgpu();
+    if (!wgpu.device)
+      return;
+  }
+
   draw_begin();
+  if (!m_frame_active)
+    return;       // surface not ready: skip this frame
   draw();  // User defined virtual draw function
   draw_end();
 
   // Submit and present
   swap_buffers();
+  valid(1);
 }
 
 
 void Fl_WebGPU_Window::resize(int X, int Y, int W, int H) {
-  // printf("%s Fl_WebGPU_Window::resize(X=%d, Y=%d, W=%d, H=%d)\n",
-  //        vulkan_window_label(this), X, Y, W, H);
-  // printf("%s orig: x()=%d, y()=%d, w()=%d, h()=%d pixel_w()=%d pixel_h()=%d\n",
-  //        vulkan_window_label(this), x(), y(), w(), h(), pixel_w(), pixel_h());
   int is_a_resize = (W != Fl_Widget::w() || H != Fl_Widget::h() ||
                      is_a_rescale());
 
@@ -227,6 +276,8 @@ void Fl_WebGPU_Window::resize(int X, int Y, int W, int H) {
 
   if (!pWebGPUWindowDriver) pWebGPUWindowDriver = create_driver();
   pWebGPUWindowDriver->resize(is_a_resize, W, H);
+  if (is_a_resize)
+    valid(0);
 }
 
 /**
@@ -316,15 +367,22 @@ Fl_Window *Fl_WebGPU_Window_Driver::cached_window = NULL;
 
 void Fl_WebGPU_Window_Driver::invalidate() {}
 
+/** Destroys all WebGPU objects. Safe to call more than once. */
 void Fl_WebGPU_Window::shutdown_webgpu() {
   if (!pWebGPUWindowDriver)
       return;
 
-  // Destroy resources and surface
-  pWebGPUWindowDriver->destroy_resources();
+  // Resources first, then the surface (while the native window still
+  // exists), then device/queue/adapter/instance.
+  if (wgpu.device)
+    pWebGPUWindowDriver->destroy_resources();
   pWebGPUWindowDriver->destroy_surface();
+  pWebGPUWindowDriver->destroy_device();
 
-  //webgpu.destroy();
+  m_in_render_pass = false;
+  m_frame_active = false;
+  valid(0);
+  context_valid(0);
 }
 
 
@@ -344,46 +402,38 @@ void Fl_WebGPU_Window::init_colorspace()
   pWebGPUWindowDriver->init_colorspace();
 }
 
+/**
+   Creates, in order: instance, surface (platform specific), adapter,
+   device, queue, surface format/present mode, swapchain and depth buffer.
+   Called from flush() when no device exists yet.
+*/
 void Fl_WebGPU_Window::init_webgpu() {
 
-    if (!wgpu.instance)
-    {
-        DBG;
-        wgpu.instance = wgpuCreateInstance(NULL);
-        DBG;
-        if (!wgpu.instance)
-        {
-            Fl::fatal("Could not initialize instance");
-        }
-    }
+  if (!pWebGPUWindowDriver)
+    pWebGPUWindowDriver = create_driver();
 
-    if (!wgpu.device)
-    {
-        DBG;
-        wgpu.device = emscripten_webgpu_get_device();  // <-- outdated
-        DBG;
-        wgpu.queue() = wgpuDeviceGetQueue(wgpu.device);
-        DBG;
-    }
-
-  // Destroy surface
-  if (wgpu.surface)
-    pWebGPUWindowDriver->destroy_surface();
-
-  pWebGPUWindowDriver->create_surface();
-
-  // \@todo: Initialize colorspace
-  // init_colorspace();
+  valid(0);
+  context_valid(0);
 
   // Verify window size
-  if (w() <= 0 || h() <= 0) {
-    pWebGPUWindowDriver->destroy_surface();
+  if (w() <= 0 || h() <= 0)
     return;
-  }
 
-  DBG;
-  // Initialize swapchain views, depth/stencil and framebuffers
+  pWebGPUWindowDriver->init_instance();
+
+  // The surface needs the instance and the native (shown) window; the
+  // adapter must be picked to be compatible with the surface.
+  if (!wgpu.surface)
+    pWebGPUWindowDriver->create_surface();
+  if (!wgpu.surface)
+    Fl::fatal("Could not create WebGPU surface!\n");
+
+  pWebGPUWindowDriver->create_device();
+
+  init_colorspace();
+
   pWebGPUWindowDriver->prepare();
+  context_valid(1);
 }
 
 
@@ -400,9 +450,11 @@ void Fl_WebGPU_Window::init() {
   mode_ = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist = 0;
   g = 0;
+  valid_f_ = 0;
   damage1_ = 0;
 
-  // Reset WebGPU Handles
+  m_in_render_pass = false;
+  m_frame_active = false;
   m_debugSync = false;
 }
 

@@ -1,5 +1,5 @@
 //
-// Implementation of class Fl_Vk_Window_Driver, and of its platform-specific derived classes
+// Implementation of class Fl_WebGPU_Window_Driver, and of its platform-specific derived classes
 // for the Fast Light Tool Kit (FLTK).
 //
 // Copyright 2016-2018 by Bill Spitzak and others.
@@ -15,165 +15,368 @@
 //     https://www.fltk.org/bugs.php
 //
 
+#include <config.h>
+
+#if HAVE_WEBGPU
+
 #include "Fl_WebGPU_Window_Driver.H"
+#include <FL/Fl.H>
 
-#include <algorithm>
-#include <cassert>
-#include <iostream>
-#include <mutex>
-#include <stdexcept>
-#include <vector>
+#include <chrono>
+#include <cstdio>
+#include <thread>
 
+// Written against the current webgpu.h (webgpu-native / wgpu-native >= 25,
+// Dawn): WGPUStringView labels, callback-info structs, WGPUStatus returns.
 
-// Recreates m_swapchain and m_buffers
-void Fl_WebGPU_Window_Driver::prepare_buffers() {
+namespace {
+
+struct AdapterRequest { WGPUAdapter adapter = 0; bool done = false; };
+struct DeviceRequest  { WGPUDevice  device  = 0; bool done = false; };
+
+void on_adapter(WGPURequestAdapterStatus status, WGPUAdapter adapter,
+                WGPUStringView message, void *ud1, void * /*ud2*/)
+{
+  auto *r = static_cast<AdapterRequest *>(ud1);
+  if (status == WGPURequestAdapterStatus_Success)
+    r->adapter = adapter;
+  else
+    fprintf(stderr, "WebGPU: request adapter failed: %.*s\n",
+            (int)message.length, message.data ? message.data : "");
+  r->done = true;
 }
 
-// Prepare depth/stencil resources for window
-void Fl_WebGPU_Window_Driver::prepare_depth() {
-    // bool has_depth   = pWindow->mode() & FL_DEPTH;
-    // bool has_stencil = pWindow->mode() & FL_STENCIL;
-
-    // if (!has_depth && !has_stencil) {
-    //     // Leave depth zeroed; m_currentDepthLayout stays UNDEFINED.
-    //     return;
-    // }
-
-    // VkFormat   depth_format = VK_FORMAT_D16_UNORM;
-    // uint32_t   aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-    // if (has_stencil) {
-    //     if (has_depth) {
-    //         depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
-    //         aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-    //     } else {
-    //         depth_format = VK_FORMAT_S8_UINT;
-    //         aspectMask   = VK_IMAGE_ASPECT_STENCIL_BIT;
-    //     }
-    // }
-
-    // // Use the already-resolved swapchain extent (no extra driver query needed).
-    // const VkExtent2D& ext = pWindow->m_swapchainExtent;
-
-    // // --- VkImageCreateInfo is unchanged from the original ---
-    // VkImageCreateInfo image_info = {};
-    // image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    // image_info.imageType     = VK_IMAGE_TYPE_2D;
-    // image_info.format        = depth_format;
-    // image_info.extent        = { ext.width, ext.height, 1 };
-    // image_info.mipLevels     = 1;
-    // image_info.arrayLayers   = 1;
-    // image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
-    // image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
-    // image_info.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    // image_info.flags         = 0;
-
-    // VmaAllocationCreateInfo alloc_info = {};
-    // alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-    // // Prefer dedicated allocation for depth images — drivers often benefit from
-    // // this hint for large render targets (it avoids sub-allocating inside a
-    // // shared heap block, reducing aliasing risk).
-    // alloc_info.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
-
-    // pWindow->m_depth.format = depth_format;
-
-    // // Single call replaces vkCreateImage + vkGetImageMemoryRequirements +
-    // // vkAllocateMemory + vkBindImageMemory.
-    // VkResult result = vmaCreateImage(
-    //     pWindow->m_allocator,
-    //     &image_info,
-    //     &alloc_info,
-    //     &pWindow->m_depth.image,
-    //     &pWindow->m_depth.allocation,
-    //     nullptr
-    // );
-
-    // if (result != VK_SUCCESS) {
-    //     fprintf(stderr, "vmaCreateImage (depth) failed: %s\n", string_VkResult(result));
-    //     return;
-    // }
-
-    // // Image view creation is unchanged.
-    // VkImageSubresourceRange subresourceRange = {};
-    // subresourceRange.aspectMask     = aspectMask;
-    // subresourceRange.baseMipLevel   = 0;
-    // subresourceRange.levelCount     = 1;
-    // subresourceRange.baseArrayLayer = 0;
-    // subresourceRange.layerCount     = 1;
-
-    // VkImageViewCreateInfo view_info = {};
-    // view_info.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    // view_info.image            = pWindow->m_depth.image;
-    // view_info.viewType         = VK_IMAGE_VIEW_TYPE_2D;
-    // view_info.format           = depth_format;
-    // view_info.subresourceRange = subresourceRange;
-
-    // result = vkCreateImageView(pWindow->device(), &view_info, nullptr,
-    //                            &pWindow->m_depth.view);
-    // VK_CHECK(result);
-
-    // pWindow->m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+void on_device(WGPURequestDeviceStatus status, WGPUDevice device,
+               WGPUStringView message, void *ud1, void * /*ud2*/)
+{
+  auto *r = static_cast<DeviceRequest *>(ud1);
+  if (status == WGPURequestDeviceStatus_Success)
+    r->device = device;
+  else
+    fprintf(stderr, "WebGPU: request device failed: %.*s\n",
+            (int)message.length, message.data ? message.data : "");
+  r->done = true;
 }
 
-
-// Uses m_renderPass
-void Fl_WebGPU_Window_Driver::prepare_framebuffers() {
-  // VkImageView attachments[2];
-  // attachments[0] = VK_NULL_HANDLE;        // Color attachment
-  // attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
-
-  // uint32_t W = pWindow->m_swapchainExtent.width;
-  // uint32_t H = pWindow->m_swapchainExtent.height;
-
-  // VkFramebufferCreateInfo fb_info = {};
-  // fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-  // fb_info.pNext = NULL;
-  // fb_info.renderPass = pWindow->m_renderPass;
-  // bool has_depth = pWindow->mode() & FL_DEPTH;
-  // bool has_stencil = pWindow->mode() & FL_STENCIL;
-  // fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
-  // fb_info.pAttachments = attachments;
-  // fb_info.width = W;
-  // fb_info.height = H;
-  // fb_info.layers = 1;
-
-  // VkResult result;
-  // for (auto& buffer : pWindow->m_buffers)
-  // {
-  //     attachments[0] = buffer.view;
-  //     result = vkCreateFramebuffer(pWindow->device(), &fb_info, NULL, &buffer.framebuffer);
-  //     VK_CHECK(result);
-  // }
+void on_uncaptured_error(WGPUDevice const * /*device*/, WGPUErrorType type,
+                         WGPUStringView message, void * /*ud1*/, void * /*ud2*/)
+{
+  fprintf(stderr, "WebGPU error (type %d): %.*s\n", (int)type,
+          (int)message.length, message.data ? message.data : "");
 }
+
+// wgpu-native fires the callback inside the request call; Dawn may need
+// the instance to be pumped. This handles both.
+template <class Req>
+bool wait_for(WGPUInstance instance, Req &req)
+{
+  for (int i = 0; i < 5000 && !req.done; ++i) {
+    wgpuInstanceProcessEvents(instance);
+    if (!req.done)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  return req.done;
+}
+
+} // namespace
+
 
 void Fl_WebGPU_Window_Driver::init_instance()
 {
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (w.instance)
+    return;
+  w.instance = wgpuCreateInstance(NULL);
+  if (!w.instance)
+    Fl::fatal("Could not initialize WebGPU instance\n");
 }
 
-void Fl_WebGPU_Window_Driver::init_vk(int requested_device_index)
-{
-
-}
-
+// Needs wgpu.instance and wgpu.surface (the adapter must be able to present
+// to our surface).
 void Fl_WebGPU_Window_Driver::create_device()
 {
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (w.device)
+    return;
+
+  // --- Adapter ---
+  if (!w.adapter) {
+    AdapterRequest req;
+    WGPURequestAdapterOptions opts = {};
+    opts.compatibleSurface = w.surface;
+
+    WGPURequestAdapterCallbackInfo cb = {};
+    cb.mode      = WGPUCallbackMode_AllowSpontaneous;
+    cb.callback  = on_adapter;
+    cb.userdata1 = &req;
+    wgpuInstanceRequestAdapter(w.instance, &opts, cb);
+
+    if (!wait_for(w.instance, req) || !req.adapter)
+      Fl::fatal("Could not initialize WebGPU adapter!\n");
+    w.adapter = req.adapter;
+  }
+
+  // --- Device ---
+  {
+    DeviceRequest req;
+    WGPUDeviceDescriptor desc = {};
+    desc.label = WGPUStringView{"FLTK WebGPU device", WGPU_STRLEN};
+    desc.uncapturedErrorCallbackInfo.callback = on_uncaptured_error;
+
+    WGPURequestDeviceCallbackInfo cb = {};
+    cb.mode      = WGPUCallbackMode_AllowSpontaneous;
+    cb.callback  = on_device;
+    cb.userdata1 = &req;
+    wgpuAdapterRequestDevice(w.adapter, &desc, cb);
+
+    if (!wait_for(w.instance, req) || !req.device)
+      Fl::fatal("Could not initialize WebGPU device!\n");
+    w.device = req.device;
+  }
+
+  // --- Queue ---
+  w.queue() = wgpuDeviceGetQueue(w.device);
+  if (!w.queue())
+    Fl::fatal("Could not initialize WebGPU queue!\n");
 }
 
-void Fl_WebGPU_Window_Driver::prepare() {
-    int W = pWindow->pixel_w();
-    int H = pWindow->pixel_h();
-    resize(true, W, H);
+// Picks the surface format and the present mode from what the
+// surface/adapter pair supports.
+void Fl_WebGPU_Window_Driver::init_colorspace()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (!w.surface || !w.adapter)
+    return;
 
+  WGPUSurfaceCapabilities caps = {};
+  if (wgpuSurfaceGetCapabilities(w.surface, w.adapter, &caps) == WGPUStatus_Success) {
+    if (caps.formatCount > 0)
+      w.surface_format = caps.formats[0];   // the preferred format comes first
+    wgpuSurfaceCapabilitiesFreeMembers(caps);
+  }
+  apply_present_mode();
+}
+
+// swap_interval 0: MAILBOX (else IMMEDIATE) if available; >0: FIFO (vsync).
+void Fl_WebGPU_Window_Driver::apply_present_mode()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  present_mode_ = WGPUPresentMode_Fifo;   // always supported
+
+  if (swap_interval_ <= 0 && w.surface && w.adapter) {
+    WGPUSurfaceCapabilities caps = {};
+    if (wgpuSurfaceGetCapabilities(w.surface, w.adapter, &caps) == WGPUStatus_Success) {
+      bool mailbox = false, immediate = false;
+      for (size_t i = 0; i < caps.presentModeCount; ++i) {
+        if (caps.presentModes[i] == WGPUPresentMode_Mailbox)   mailbox = true;
+        if (caps.presentModes[i] == WGPUPresentMode_Immediate) immediate = true;
+      }
+      if (mailbox)         present_mode_ = WGPUPresentMode_Mailbox;
+      else if (immediate)  present_mode_ = WGPUPresentMode_Immediate;
+      wgpuSurfaceCapabilitiesFreeMembers(caps);
+    }
+  }
+  needs_configure_ = true;   // applied at the next acquire_back_buffer()
+}
+
+void Fl_WebGPU_Window_Driver::swap_interval(int x)
+{
+  if (x == swap_interval_)
+    return;
+  swap_interval_ = x;
+  apply_present_mode();
+}
+
+// (Re)configures the surface: the WebGPU equivalent of recreating the
+// swapchain.
+void Fl_WebGPU_Window_Driver::prepare_buffers()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (!w.surface || !w.device)
+    return;
+
+  int W = pWindow->pixel_w();
+  int H = pWindow->pixel_h();
+  if (W <= 0 || H <= 0)
+    return;
+
+  WGPUSurfaceConfiguration cfg = {};
+  cfg.device      = w.device;
+  cfg.format      = w.surface_format;
+  cfg.usage       = WGPUTextureUsage_RenderAttachment;
+  cfg.width       = (uint32_t)W;
+  cfg.height      = (uint32_t)H;
+  cfg.alphaMode   = WGPUCompositeAlphaMode_Auto;
+  cfg.presentMode = present_mode_;
+  wgpuSurfaceConfigure(w.surface, &cfg);
+
+  configured_w_ = W;
+  configured_h_ = H;
+  needs_configure_ = false;
+}
+
+// Prepare depth/stencil resources for window
+void Fl_WebGPU_Window_Driver::prepare_depth()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  destroy_depth();   // recreate from scratch (e.g. on resize)
+
+  bool has_depth   = pWindow->mode() & FL_DEPTH;
+  bool has_stencil = pWindow->mode() & FL_STENCIL;
+
+  if (!has_depth && !has_stencil)
+    return;
+  if (!w.device || configured_w_ <= 0 || configured_h_ <= 0)
+    return;
+
+  // Vulkan D16 / D24S8 / S8 mapping. Depth24Plus is used instead of
+  // Depth16Unorm because it is universally supported and far more precise.
+  if (has_stencil)
+    w.depth_format = has_depth ? WGPUTextureFormat_Depth24PlusStencil8
+                               : WGPUTextureFormat_Stencil8;
+  else
+    w.depth_format = WGPUTextureFormat_Depth24Plus;
+
+  WGPUTextureDescriptor td = {};
+  td.label         = WGPUStringView{"FLTK depth/stencil", WGPU_STRLEN};
+  td.usage         = WGPUTextureUsage_RenderAttachment;
+  td.dimension     = WGPUTextureDimension_2D;
+  td.size          = { (uint32_t)configured_w_, (uint32_t)configured_h_, 1 };
+  td.format        = w.depth_format;
+  td.mipLevelCount = 1;
+  td.sampleCount   = 1;
+
+  w.depth_texture = wgpuDeviceCreateTexture(w.device, &td);
+  if (!w.depth_texture) {
+    fprintf(stderr, "wgpuDeviceCreateTexture (depth) failed\n");
+    w.depth_format = WGPUTextureFormat_Undefined;
+    return;
+  }
+
+  WGPUTextureViewDescriptor vd = {};
+  vd.label           = WGPUStringView{"FLTK depth/stencil view", WGPU_STRLEN};
+  vd.format          = w.depth_format;
+  vd.dimension       = WGPUTextureViewDimension_2D;
+  vd.baseMipLevel    = 0;
+  vd.mipLevelCount   = 1;
+  vd.baseArrayLayer  = 0;
+  vd.arrayLayerCount = 1;
+  vd.aspect          = WGPUTextureAspect_All;
+  w.depth_view = wgpuTextureCreateView(w.depth_texture, &vd);
+}
+
+void Fl_WebGPU_Window_Driver::destroy_depth()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (w.depth_view) {
+    wgpuTextureViewRelease(w.depth_view);
+    w.depth_view = 0;
+  }
+  if (w.depth_texture) {
+    wgpuTextureDestroy(w.depth_texture);
+    wgpuTextureRelease(w.depth_texture);
+    w.depth_texture = 0;
+  }
+  w.depth_format = WGPUTextureFormat_Undefined;
+}
+
+// WebGPU has no framebuffer objects: render pass attachments are given
+// in Fl_WebGPU_Window::begin_render_pass().
+void Fl_WebGPU_Window_Driver::prepare_framebuffers() {
+}
+
+void Fl_WebGPU_Window_Driver::prepare()
+{
+  prepare_buffers();
+  prepare_depth();
+  pWindow->prepare();
+  prepare_framebuffers();
+}
+
+void Fl_WebGPU_Window_Driver::resize(int is_a_resize, int /*w*/, int /*h*/)
+{
+  // Arguments are in FLTK units; prepare_buffers() uses pixel_w()/pixel_h().
+  if (!is_a_resize || !pWindow->wgpu.device || !pWindow->wgpu.surface)
+    return;
+  prepare_buffers();
+  prepare_depth();
+}
+
+bool Fl_WebGPU_Window_Driver::acquire_back_buffer()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (!w.surface || !w.device)
+    return false;
+
+  int W = pWindow->pixel_w();
+  int H = pWindow->pixel_h();
+  if (W <= 0 || H <= 0)
+    return false;
+
+  const bool resized = (W != configured_w_ || H != configured_h_);
+  if (resized || needs_configure_)
     prepare_buffers();
+  if (resized)
     prepare_depth();
-    pWindow->prepare();
-    prepare_framebuffers(); // can be kept in driver
+
+  WGPUSurfaceTexture st = {};
+  wgpuSurfaceGetCurrentTexture(w.surface, &st);
+
+  switch (st.status) {
+    case WGPUSurfaceGetCurrentTextureStatus_SuccessOptimal:
+      break;
+    case WGPUSurfaceGetCurrentTextureStatus_SuccessSuboptimal:
+      needs_configure_ = true;       // usable now, reconfigure next frame
+      break;
+    case WGPUSurfaceGetCurrentTextureStatus_Timeout:
+    case WGPUSurfaceGetCurrentTextureStatus_Outdated:
+    case WGPUSurfaceGetCurrentTextureStatus_Lost:
+      if (st.texture) wgpuTextureRelease(st.texture);
+      needs_configure_ = true;
+      pWindow->redraw();             // retry
+      return false;
+    default:
+      fprintf(stderr, "WebGPU: wgpuSurfaceGetCurrentTexture failed (status %d)\n",
+              (int)st.status);
+      if (st.texture) wgpuTextureRelease(st.texture);
+      return false;
+  }
+
+  w.surface_texture = st;
+  w.back_buffer = wgpuTextureCreateView(st.texture, NULL);
+  if (!w.back_buffer) {
+    release_back_buffer();
+    return false;
+  }
+  return true;
 }
 
-void Fl_WebGPU_Window_Driver::destroy_surface() {
+void Fl_WebGPU_Window_Driver::release_back_buffer()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  if (w.back_buffer) {
+    wgpuTextureViewRelease(w.back_buffer);
+    w.back_buffer = 0;
+  }
+  if (w.surface_texture.texture) {
+    wgpuTextureRelease(w.surface_texture.texture);
+    w.surface_texture.texture = 0;
+  }
 }
 
-// Uses: device(), m_buffers, m_depth
+void Fl_WebGPU_Window_Driver::destroy_surface()
+{
+  Fl_WebGPU_Context &w = pWindow->wgpu;
+  release_back_buffer();
+  if (w.surface) {
+    wgpuSurfaceUnconfigure(w.surface);
+    wgpuSurfaceRelease(w.surface);
+    w.surface = 0;
+  }
+  configured_w_ = configured_h_ = 0;
+}
+
+// Destroys resources in reverse creation order (first, those of window)
 void Fl_WebGPU_Window_Driver::destroy_resources()
 {
     if (!pWindow || !pWindow->wgpu.device)
@@ -181,25 +384,45 @@ void Fl_WebGPU_Window_Driver::destroy_resources()
         fprintf(stderr, "destroy_resources: Invalid device\n");
         return;
     }
+    Fl_WebGPU_Context &w = pWindow->wgpu;
 
-    // Destroy resources in reverse creation order (first, those of window)
+    // A frame may be half-recorded if we are hidden during draw().
+    if (pWindow->m_in_render_pass)
+        pWindow->end_render_pass();
+    if (w.encoder) {
+        wgpuCommandEncoderRelease(w.encoder);
+        w.encoder = 0;
+    }
+    pWindow->m_frame_active = false;
+    release_back_buffer();
+
     pWindow->destroy_common_resources();
 
-    // Then, depth/stencils if present
-    //pWindow->m_depth.destroy(pWindow->device(), pWindow->m_allocator);
+    if (w.pipeline) {
+        wgpuRenderPipelineRelease(w.pipeline);
+        w.pipeline = 0;
+    }
+    destroy_depth();
 }
 
-
-void Fl_WebGPU_Window_Driver::init_colorspace()
+// Call after destroy_resources() and destroy_surface().
+void Fl_WebGPU_Window_Driver::destroy_device()
 {
+    Fl_WebGPU_Context &w = pWindow->wgpu;
+    if (w.queue())  { wgpuQueueRelease(w.queue());     w.queue()  = 0; }
+    if (w.device)   { wgpuDeviceRelease(w.device);     w.device   = 0; }
+    if (w.adapter)  { wgpuAdapterRelease(w.adapter);   w.adapter  = 0; }
+    if (w.instance) { wgpuInstanceRelease(w.instance); w.instance = 0; }
 }
 
 Fl_WebGPU_Window_Driver::Fl_WebGPU_Window_Driver(Fl_WebGPU_Window* win) :
     pWindow(win)
 {
-    swap_interval_ = 0;  // MAILBOX as a default swapchain presentation mode
+    swap_interval_ = 0;  // MAILBOX as a default presentation mode
 }
 
 Fl_WebGPU_Window_Driver::~Fl_WebGPU_Window_Driver()
 {
 }
+
+#endif // HAVE_WEBGPU

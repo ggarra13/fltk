@@ -53,7 +53,7 @@ public:
   virtual float pixels_per_unit() { return 1; }
   virtual void before_show(int &) {}
   virtual void after_show() {}
-  virtual void swap_interval(int x) { swap_interval_ = x; };
+  virtual void swap_interval(int x);
   virtual int swap_interval() const {return swap_interval_;};
   virtual int flush_begin() { return 0; };  // return 1 to skip drawing
   virtual void invalidate();
@@ -61,7 +61,7 @@ public:
   virtual void make_current_before() {}
   virtual void make_current_after() {}
   virtual void swap_buffers() {};
-  virtual void resize(int is_a_resize, int w, int h) {};
+  virtual void resize(int is_a_resize, int w, int h);
   virtual void prepare();
 
   static Fl_WebGPU_Choice *find_begin(int m, const int *alistp);
@@ -71,23 +71,39 @@ public:
     return win->pWebGPUWindowDriver;
   }
 
+  // Platform specific: must create pWindow->wgpu.surface from the native
+  // window handle (X11, Wayland, Win32, Cocoa...). Needs wgpu.instance.
   virtual void create_surface() = 0;
   virtual void destroy_surface();
   virtual void destroy_resources();
   virtual bool has_hdr_monitor() { return true; }
 
-  void init_colorspace();
-  void init_vk(int requested_device_index = -1);
+  // Called in this order by Fl_WebGPU_Window::init_webgpu()
+  void init_instance();     // wgpu.instance
+  void create_device();     // wgpu.adapter, wgpu.device, wgpu.queue()
+  void init_colorspace();   // wgpu.surface_format and present mode
+
+  // Releases queue, device, adapter and instance (after destroy_surface()).
+  void destroy_device();
+
+  // Per-frame: get the surface texture to render to / release it again.
+  // acquire_back_buffer() returns false if the frame must be skipped.
+  bool acquire_back_buffer();
+  void release_back_buffer();
 
 protected:
-  void create_device();
-  void init_instance();
-  void prepare_buffers();
-  void prepare_depth();
-  void prepare_framebuffers();
+  void prepare_buffers();     // (re)configures the surface (swapchain)
+  void prepare_depth();       // (re)creates the depth/stencil texture
+  void destroy_depth();
+  void prepare_framebuffers(); // no-op: WebGPU has no framebuffer objects
+  void apply_present_mode();
 
 private:
   int swap_interval_ = 0;
+  WGPUPresentMode present_mode_ = WGPUPresentMode_Fifo;
+  bool needs_configure_ = false;
+  int configured_w_ = 0;
+  int configured_h_ = 0;
 };
 
 #endif /* Fl_WebGPU_Window_Driver_H */
