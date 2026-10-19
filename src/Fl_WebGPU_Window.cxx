@@ -202,7 +202,9 @@ void Fl_WebGPU_Window::swap_buffers() {
     std::lock_guard<std::mutex> lock(queue_mutex());
 
     wgpuQueueSubmit(wgpu.queue(), 1, &commands);
-    wgpuSurfacePresent(wgpu.surface);
+#ifndef __EMSCRIPTEN__
+    wgpuSurfacePresent(wgpu.surface); // the browser presents implicitly
+#endif
   }
 
   wgpuCommandBufferRelease(commands);

@@ -67,9 +67,6 @@ protected:
   void draw() override;
   void draw_end();
 
-  // Window's WebGPU context.
-  Fl_WebGPU_Context wgpu;
-
   // Window's clear color for render pass
   WGPUColor clearValues = { 0.F, 0.F, 0.F, 1.F };
 
@@ -88,6 +85,9 @@ public:
   void hide() override;
   void resize(int,int,int,int) override;
   int handle(int) override;
+
+  // Window's WebGPU context.
+  Fl_WebGPU_Context wgpu;
 
   inline WGPUQueue&        queue() { return wgpu.safe_thread_queue.queue; }
   inline std::mutex& queue_mutex() { return wgpu.safe_thread_queue.mutex; }

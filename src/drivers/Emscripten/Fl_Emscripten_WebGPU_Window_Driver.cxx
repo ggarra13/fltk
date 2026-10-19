@@ -78,7 +78,7 @@ void Fl_Emscripten_WebGPU_Window_Driver::before_show(int&) {
 // WebGPU context. Fl_Emscripten_Window_Driver::make_current() must not run for
 // WebGPU windows (see the guard suggested there).
 void Fl_Emscripten_WebGPU_Window_Driver::create_surface() {
-  Fl_WebGPU_Context &ctx = wgpu();
+  Fl_WebGPU_Context &ctx = pWindow->wgpu;
   if (ctx.surface)
     return;
   if (!ctx.instance) {

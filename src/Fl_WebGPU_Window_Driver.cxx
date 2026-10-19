@@ -25,9 +25,14 @@
 #include <chrono>
 #include <cstdio>
 #include <thread>
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#endif
 
 // Written against the current webgpu.h (webgpu-native / wgpu-native >= 25,
 // Dawn): WGPUStringView labels, callback-info structs, WGPUStatus returns.
+
+#define FL_WGPU_CB_MODE WGPUCallbackMode_AllowSpontaneous
 
 namespace {
 
@@ -67,14 +72,25 @@ void on_uncaptured_error(WGPUDevice const * /*device*/, WGPUErrorType type,
 
 // wgpu-native fires the callback inside the request call; Dawn may need
 // the instance to be pumped. This handles both.
+// to the browser so the requestAdapter()/requestDevice() promises can resolve.
+// Native: wgpu-native fires the callback inside the request call; Dawn may
+// need the instance to be pumped.
 template <class Req>
-bool wait_for(WGPUInstance instance, Req &req)
+bool wait_for(WGPUInstance instance, WGPUFuture /*future*/, Req &req)
 {
+#ifdef __EMSCRIPTEN__
+  for (int i = 0; i < 3000 && !req.done; ++i) {   // ~30 s
+    wgpuInstanceProcessEvents(instance);
+    if (!req.done)
+      emscripten_sleep(10);
+  }
+#else
   for (int i = 0; i < 5000 && !req.done; ++i) {
     wgpuInstanceProcessEvents(instance);
     if (!req.done)
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
+#endif
   return req.done;
 }
 
@@ -99,19 +115,28 @@ void Fl_WebGPU_Window_Driver::create_device()
   if (w.device)
     return;
 
+#ifdef __EMSCRIPTEN__
+  if (!EM_ASM_INT({ return (typeof navigator !== 'undefined' && navigator.gpu) ? 1 : 0; }))
+    Fl::fatal("WebGPU is not available in this browser (navigator.gpu is "
+              "undefined). Use a WebGPU-enabled browser and serve the page "
+              "from https:// or http://localhost.\n");
+#endif
+
   // --- Adapter ---
   if (!w.adapter) {
     AdapterRequest req;
     WGPURequestAdapterOptions opts = {};
-    opts.compatibleSurface = w.surface;
+#ifndef __EMSCRIPTEN__
+    opts.compatibleSurface = w.surface;   // not meaningful in the browser
+#endif
 
     WGPURequestAdapterCallbackInfo cb = {};
-    cb.mode      = WGPUCallbackMode_AllowSpontaneous;
+    cb.mode      = FL_WGPU_CB_MODE;
     cb.callback  = on_adapter;
     cb.userdata1 = &req;
-    wgpuInstanceRequestAdapter(w.instance, &opts, cb);
+    WGPUFuture fut = wgpuInstanceRequestAdapter(w.instance, &opts, cb);
 
-    if (!wait_for(w.instance, req) || !req.adapter)
+    if (!wait_for(w.instance, fut, req) || !req.adapter)
       Fl::fatal("Could not initialize WebGPU adapter!\n");
     w.adapter = req.adapter;
   }
@@ -124,12 +149,12 @@ void Fl_WebGPU_Window_Driver::create_device()
     desc.uncapturedErrorCallbackInfo.callback = on_uncaptured_error;
 
     WGPURequestDeviceCallbackInfo cb = {};
-    cb.mode      = WGPUCallbackMode_AllowSpontaneous;
+    cb.mode      = FL_WGPU_CB_MODE;
     cb.callback  = on_device;
     cb.userdata1 = &req;
-    wgpuAdapterRequestDevice(w.adapter, &desc, cb);
+    WGPUFuture fut = wgpuAdapterRequestDevice(w.adapter, &desc, cb);
 
-    if (!wait_for(w.instance, req) || !req.device)
+    if (!wait_for(w.instance, fut, req) || !req.device)
       Fl::fatal("Could not initialize WebGPU device!\n");
     w.device = req.device;
   }
