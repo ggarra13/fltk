@@ -365,6 +365,12 @@ if(FLTK_BUILD_SHARED_LIBS AND GENERATE_EXPORT_HEADERS)
       BASE_NAME fl_vk
       EXPORT_FILE_NAME FL/fltk_vk_export.h
       STATIC_DEFINE FL_STATIC_LIB
+  )
+  
+    generate_export_header(fltk_webgpu_SHARED
+      BASE_NAME fl_webgpu
+      EXPORT_FILE_NAME FL/fltk_webgpu_export.h
+      STATIC_DEFINE FL_STATIC_LIB
     )
 
   endif(NOT MSVC)
@@ -404,6 +410,7 @@ fl_summary_build("Shared libraries"    lib    FLTK_BUILD_SHARED_LIBS    FLTK_BUI
 fl_summary_build("The forms library"   lib    FLTK_BUILD_FORMS          FLTK_BUILD_FORMS)
 fl_summary_build("The OpenGL library"  lib    FLTK_USE_GL               FLTK_BUILD_GL)
 fl_summary_build("The Vulkan library"  lib    FLTK_USE_VK               FLTK_BUILD_VK)
+fl_summary_build("The WebGPU library"  lib    FLTK_USE_WEBGPU           FLTK_BUILD_WEBGPU)
 fl_summary_build("Pen/tablet support"  lib    FLTK_HAVE_PEN_SUPPORT     FLTK_OPTION_PEN_SUPPORT)
 
 message(STATUS "")
@@ -512,7 +519,7 @@ message(STATUS "End of Configuration Summary --\n")
 
 if(0) # debug built library and fluid targets
   message(STATUS "------------------------ TARGETS ------------------------")
-  foreach(tgt fltk fluid fluid-cmd options options-cmd images gl vk forms cairo jpeg png z)
+  foreach(tgt fltk fluid fluid-cmd options options-cmd images gl vk webgpu forms cairo jpeg png z)
     if(TARGET fltk::${tgt})
       message("Target: fltk::${tgt}")
       # fl_debug_target(fltk::${tgt})

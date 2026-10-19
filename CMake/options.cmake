@@ -708,6 +708,7 @@ endif(FLTK_OPTION_SVG)
 # FIXME: GLU libs have already been searched in resources.cmake
 
 set(FLTK_USE_VK FALSE)
+set(FLTK_USE_WEBGPU FALSE)
 
 set(HAVE_GL LIB_GL OR LIB_MesaGL)
 set(FLTK_USE_GL FALSE)
@@ -725,6 +726,17 @@ option(FLTK_BUILD_VK "use Vulkan and build fltk_vulkan library" OFF)
 if(FLTK_BUILD_VK)
   set(HAVE_VK TRUE)
   set(FLTK_USE_VK TRUE)
+endif()
+
+# VK is often built from a non system directory, so we don't
+# enclose this in HAVE_VK like HAVE_GL
+option(FLTK_BUILD_WEBGPU "use WebGPU and build fltk_webgpu library (only with EMCSCRIPTEN)" OFF)
+if(FLTK_BUILD_WEBGPU)
+  set(HAVE_WEBGPU TRUE)
+  set(FLTK_USE_WEBGPU TRUE)
+  if (NOT EMSCRIPTEN)
+      message(FATAL_ERROR "Trying to compile WebGPU with no EMSCRIPTEN set.  Compile with emcmake please.")
+  endif()
 endif()
 
 #
@@ -804,8 +816,18 @@ else(FLTK_BUILD_VK)
   set(HAVE_VK FALSE)
 endif(FLTK_BUILD_VK)
 
+if(FLTK_BUILD_WEBGPU)
+  # Required components
+  # find_package(WebGPU REQUIRED)
+  set(WEBGPU_FOUND TRUE)
+else(FLTK_BUILD_WEBGPU)
+  set(WEBPU_FOUND FALSE)
+  set(HAVE_WEBGPU FALSE)
+endif(FLTK_BUILD_WEBGPU)
+
 mark_as_advanced(OPENGL_LIB) # internal cache variable, not relevant for users
 mark_as_advanced(VULKAN_LIB) # internal cache variable, not relevant for users
+mark_as_advanced(WEBGPU_LIB) # internal cache variable, not relevant for users
 
 # FIXME: the following is necessary because this variable may have been removed
 # from the cache above. It has been marked "advanced" before in resources.cmake.
@@ -924,6 +946,13 @@ endif()
     message(FATAL_ERROR "shaderc_combined not found!")
   endif()
 endif(VULKAN_FOUND)
+
+set(FLTK_WEBGPU_FOUND FALSE)
+if(WEBGPU_FOUND)
+  set(FLTK_WEBGPU_FOUND TRUE)
+  find_path(WEBGPU_INCLUDE_DIR NAMES webgpu/webgpu.h)
+  set(CMAKE_REQUIRED_INCLUDES ${WEBGPU_INCLUDE_DIR})
+endif()
 
 #######################################################################
 option(FLTK_OPTION_LARGE_FILE "enable large file support" ON)
@@ -1201,6 +1230,9 @@ if(DEBUG_OPTIONS_CMAKE)
   fl_debug_var(VULKAN_FOUND)
   fl_debug_var(VULKAN_INCLUDE_DIRS)
   fl_debug_var(VULKAN_LIBRARIES)
+  fl_debug_var(WEBGPU_FOUND)
+  fl_debug_var(WEBGPU_INCLUDE_DIRS)
+  fl_debug_var(WEBGPU_LIBRARIES)
   fl_debug_var(CMAKE_MSVC_RUNTIME_LIBRARY)
   message("--- bundled libraries ---")
   fl_debug_var(FLTK_USE_SYSTEM_LIBJPEG)
@@ -1213,7 +1245,7 @@ if(DEBUG_OPTIONS_CMAKE)
   message(STATUS "--- *FIXME* include directories ---")
   fl_debug_var(FLTK_BUILD_INCLUDE_DIRECTORIES)
   fl_debug_var(FLTK_IMAGE_INCLUDE_DIRECTORIES)
-
+  
   message("--- X11 ---")
   fl_debug_var(X11_FOUND)
   fl_debug_var(X11_INCLUDE_DIR)

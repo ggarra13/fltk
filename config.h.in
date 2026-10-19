@@ -78,6 +78,15 @@
 #cmakedefine01 HAVE_GL
 
 /*
+ * HAVE_WEBGPU:
+ *
+ * Do you have WebGPU? Set this to 0 if you don't have or plan to use
+ * WebGPU, and FLTK will be smaller.
+ */
+
+#cmakedefine01 HAVE_WEBGPU
+
+/*
  * HAVE_GL_GLU_H:
  *
  * Do you have the OpenGL Utility Library header file?

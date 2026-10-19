@@ -563,22 +563,17 @@ set(GLCPPFILES
   ${GL_DRIVER_FILES}
 )
 
+#
+# Vulkan Files
+#
 set(VKCPPFILES
   Fl_Vk_Choice.cxx
-  # Fl_Vk_Device_Plugin.cxx
-  # Fl Vk_Overlay.cxx
   Fl_Vk_Utils.cxx
   Fl_Vk_Window.cxx
   Fl_Vk_Headless_Window.cxx
-  vk_draw.cxx  # to remove.
   vk.cxx
-  # vk_start.cxx
 )
 
-set(VK_DRIVER_FILES
-  Fl_Vk_Window_Driver.cxx
-  Fl_Vk_Headless_Window_Driver.cxx
-)
 
 if(FLTK_BACKEND_WAYLAND)
   set(VK_DRIVER_FILES ${VK_DRIVER_FILES} drivers/Wayland/Fl_Wayland_Vk_Window_Driver.cxx)
@@ -598,10 +593,21 @@ elseif(WIN32)
   set(VK_DRIVER_HEADER_FILES drivers/WinAPI/Fl_WinAPI_Vk_Window_Driver.H)
 endif(FLTK_BACKEND_WAYLAND)
 
-
 set(VKCPPFILES
   ${VKCPPFILES}
   ${VK_DRIVER_FILES}
+)
+
+#
+# WebGPU Files
+#
+set(WEBGPU_DRIVER_FILES
+)
+set(WEBGPUCPPFILES
+  Fl_WebGPU_Window.cxx
+)
+
+set(WEBGPU_DRIVER_FILES
 )
 
 
