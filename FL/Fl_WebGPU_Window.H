@@ -50,10 +50,12 @@ class FL_EXPORT Fl_WebGPU_Window : public Fl_Window {
 
   Fl_WebGPU_Window_Driver* create_driver();
 
+protected:
   //! Tracking variable to know if begin_render_pass()/end_render_pass() has
   //! been called.
-  bool                   m_in_render_pass;
-protected:
+  bool                   m_in_render_pass = false;
+  bool                   m_frame_active = false;
+
   bool m_debugSync = false;
 
   void init_webgpu();
