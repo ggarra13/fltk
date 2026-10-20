@@ -67,13 +67,13 @@ protected:
   void draw() override;
   void draw_end();
 
-  // Window's clear color for render pass
   WGPUColor clearValues = { 0.F, 0.F, 0.F, 1.F };
 
   // Auxiliary functions to begin and end the main render pass.
   // Note that FLTK will call begin_render_pass() in draw_begin()
   // and end_render_pass() in draw_end().
   // That is: draw() is called with an active render pass by default.
+  // That will clear the canvas to the clearValus color and depth/stencil.
   void begin_render_pass();
   void end_render_pass();
 
@@ -205,8 +205,18 @@ public:
   int swap_interval() const;
   void ortho();
 
-  void destroy_common_resources();
+  /**
+   * Virtual function called to prepare the drawing resources like vertex buffers,
+   * pipelines, etc.
+   *
+   */
   virtual void prepare() {};
+
+  /**
+   * Virtual function called to clear up the drawing resources upon a resize or hiding of
+   * the window.
+   *
+   */
   virtual void destroy() {};
 
   Fl_WebGPU_Window* as_wgpu_window() override { return this; }

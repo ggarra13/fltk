@@ -472,7 +472,8 @@ void Fl_Emscripten_Window_Driver::unmap() {
 
 void Fl_Emscripten_Window_Driver::make_current() {
   fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
-  if (pWindow->as_wgpu_window()) {   // never touch the canvas with a 2D context
+  if (pWindow->as_wgpu_window() ||
+      pWindow->as_gl_window()) {   // never touch the canvas with a 2D context
     fl_window = (Window)xid;
     return;
   }
