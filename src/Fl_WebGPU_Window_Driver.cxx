@@ -70,6 +70,45 @@ void on_uncaptured_error(WGPUDevice const * /*device*/, WGPUErrorType type,
           (int)message.length, message.data ? message.data : "");
 }
 
+
+static int score_surface_format(WGPUTextureFormat fmt)
+{
+    switch (fmt)
+    {
+#ifdef __linux__
+    case WGPUTextureFormat_BGRA8Unorm:
+        return 500;
+
+    case WGPUTextureFormat_RGBA8Unorm:
+        return 400;
+
+    case WGPUTextureFormat_BGRA8UnormSrgb:
+        return 300;
+
+    case WGPUTextureFormat_RGBA8UnormSrgb:
+        return 200;
+
+    default:
+        return 0;
+#else
+    case WGPUTextureFormat_RGBA8Unorm:
+        return 500;
+
+    case WGPUTextureFormat_BGRA8Unorm:
+        return 400;
+
+    case WGPUTextureFormat_BGRA8UnormSrgb:
+        return 300;
+
+    case WGPUTextureFormat_RGBA8UnormSrgb:
+        return 200;
+
+    default:
+        return 0;
+#endif
+    }
+}
+
 // wgpu-native fires the callback inside the request call; Dawn may need
 // the instance to be pumped. This handles both.
 // to the browser so the requestAdapter()/requestDevice() promises can resolve.
@@ -175,9 +214,21 @@ void Fl_WebGPU_Window_Driver::init_colorspace()
 
   WGPUSurfaceCapabilities caps = {};
   if (wgpuSurfaceGetCapabilities(w.surface, w.adapter, &caps) == WGPUStatus_Success) {
-    if (caps.formatCount > 0)
-      w.surface_format = caps.formats[0];   // the preferred format comes first
-    wgpuSurfaceCapabilitiesFreeMembers(caps);
+      int bestScore = -1;
+
+      for (size_t i = 0; i < caps.formatCount; ++i)
+      {
+        const WGPUTextureFormat fmt = caps.formats[i];
+        const int score = score_surface_format(fmt);
+
+        if (score > bestScore)
+        {
+          bestScore = score;
+          w.surface_format = fmt;
+        }
+      }
+
+      wgpuSurfaceCapabilitiesFreeMembers(caps);
   }
   apply_present_mode();
 }
