@@ -32,9 +32,6 @@
 #include <cstdio>
 
 
-void Fl_WebGPU_Window::destroy_common_resources() {
-}
-
 void Fl_WebGPU_Window::begin_render_pass()
 {
   // Color attachment
