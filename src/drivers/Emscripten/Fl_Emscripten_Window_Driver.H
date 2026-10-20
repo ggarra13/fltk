@@ -38,6 +38,7 @@ public:
   void fullscreen_on() FL_OVERRIDE;
   void fullscreen_off(int /*X*/, int /*Y*/, int /*W*/, int /*H*/) FL_OVERRIDE;
   void resize(int /*X*/, int /*Y*/, int /*W*/, int /*H*/) FL_OVERRIDE;
+  void size_range() FL_OVERRIDE;
   int set_cursor(Fl_Cursor c) FL_OVERRIDE;
   void flush() FL_OVERRIDE;
 };

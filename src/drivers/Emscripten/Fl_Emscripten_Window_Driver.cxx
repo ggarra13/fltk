@@ -236,6 +236,74 @@ extern "C" void EMSCRIPTEN_KEEPALIVE fltk_em_track_div(int xid, int x, int y) {
 }
 
 
+// ---------------------------------------------------------------------------
+// Interactive resizing (drag handles on the window's div)
+// ---------------------------------------------------------------------------
+
+// Height in pixels of the browser-drawn title bar ("decor") div.
+#define FL_EM_DECOR_H 30
+// Never let a drag shrink a window below this size, whatever size_range() says.
+#define FL_EM_MIN_DRAG_SIZE 32
+
+// True if the user should be able to resize this window with the mouse:
+// bordered top-level window whose size_range() allows more than one size.
+// (Fl_Window::show() calls default_size_range(), so a window without a
+// resizable() widget ends up with min == max and is considered fixed.)
+static bool em_user_resizable(Fl_Window *win) {
+  if (win->parent() || !win->border())
+    return false;
+  int minw, minh, maxw, maxh;
+  win->get_size_range(&minw, &minh, &maxw, &maxh, NULL, NULL, NULL);
+  return !(minw == maxw && minh == maxh);
+}
+
+// Window geometry at the moment a resize drag starts.
+static int rs_x, rs_y, rs_w, rs_h;
+
+// Called by JS on pointerdown on a handle. Returns 0 if the window can't be resized.
+extern "C" int EMSCRIPTEN_KEEPALIVE fltk_em_resize_begin(int xid) {
+  Fl_Window *win = fl_em_find(xid);
+  if (!win || !em_user_resizable(win))
+    return 0;
+  rs_x = win->x();
+  rs_y = win->y();
+  rs_w = win->w();
+  rs_h = win->h();
+  return 1;
+}
+
+// Called by JS on every pointermove while dragging a handle.
+// dir bits: 1 = west edge, 2 = east edge, 4 = north edge, 8 = south edge.
+// dx, dy = pointer movement since the drag started, in pixels.
+extern "C" void EMSCRIPTEN_KEEPALIVE fltk_em_resize_drag(int xid, int dir, int dx, int dy) {
+  Fl_Window *win = fl_em_find(xid);
+  if (!win)
+    return;
+  int minw, minh, maxw, maxh;
+  win->get_size_range(&minw, &minh, &maxw, &maxh, NULL, NULL, NULL);
+  if (minw < FL_EM_MIN_DRAG_SIZE) minw = FL_EM_MIN_DRAG_SIZE;
+  if (minh < FL_EM_MIN_DRAG_SIZE) minh = FL_EM_MIN_DRAG_SIZE;
+
+  int nw = rs_w, nh = rs_h;
+  if (dir & 2) nw = rs_w + dx;
+  if (dir & 1) nw = rs_w - dx;
+  if (dir & 8) nh = rs_h + dy;
+  if (dir & 4) nh = rs_h - dy;
+
+  if (nw < minw) nw = minw;
+  if (nh < minh) nh = minh;
+  if (maxw > 0 && nw > maxw) nw = maxw;
+  if (maxh > 0 && nh > maxh) nh = maxh;
+
+  // when dragging the west/north edge, the opposite edge stays put
+  int nx = (dir & 1) ? rs_x + rs_w - nw : rs_x;
+  int ny = (dir & 4) ? rs_y + rs_h - nh : rs_y;
+
+  win->resize(nx, ny, nw, nh);
+  Fl::flush(); // redraw right away: setting canvas.width clears the canvas
+}
+
+
 // Basically the window itself is a div element. Decorations for bordered windows are done in the browser using a div as well.
 // The window div contains a canvas element which is the FLTK window.
 void Fl_Emscripten_Window_Driver::makeWindow() {
@@ -269,7 +337,8 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         body.appendChild(div);
         let decor = document.createElement("DIV");
         decor.id = "fltk_decor" + $0;
-        decor.style.height = "16px";
+        decor.style.boxSizing = "border-box";
+        decor.style.height = "30px";
         decor.style.font = "14px Arial";
         decor.style.padding = "6px";
         decor.style.cursor = "move";
@@ -288,6 +357,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         close.textContent = "X";
         close.style.font = "bold 14px Arial";
         close.style.position = "absolute";
+        close.style.zIndex = 4;
         close.style.top = "1%";
         close.style.right = "1px";
         close.style.backgroundColor = "#2196F3";
@@ -301,6 +371,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         canvas.tabIndex = "-1";
         canvas.width = $4;
         canvas.height = $5;
+        canvas.style.display = "block";
         div.appendChild(canvas);
         canvas.addEventListener("click", () => canvas.focus());
         decor.addEventListener("mousedown", () => canvas.focus());
@@ -309,6 +380,63 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         div.addEventListener(
             "focusout", () => { canvas.blur(); div.style.zIndex = 0; });
         if ($1 === 0) decor.hidden = true;
+        function addResizeHandle(name, dir, cursor) {
+          let h = document.createElement("DIV");
+          h.className = "fltk_resize_handle";
+          h.style.position = "absolute";
+          h.style.zIndex = 3;
+          h.style.cursor = cursor;
+          h.style.touchAction = "none";
+          h.style.display = $7 ? "block" : "none";
+          if (name.includes("n")) h.style.top = "-3px";
+          if (name.includes("s")) h.style.bottom = "-3px";
+          if (name.includes("w")) h.style.left = "-3px";
+          if (name.includes("e")) h.style.right = "-3px";
+          if (name.length === 2) {
+            h.style.width = "14px";
+            h.style.height = "14px";
+          } else if (name === "n" || name === "s") {
+            h.style.left = "11px";
+            h.style.right = "11px";
+            h.style.height = "6px";
+          } else {
+            h.style.top = "11px";
+            h.style.bottom = "11px";
+            h.style.width = "6px";
+          }
+          h.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (!_fltk_em_resize_begin($0)) return;
+            h.setPointerCapture(e.pointerId);
+            let sx = e.clientX;
+            let sy = e.clientY;
+            let move = (ev) => {
+              _fltk_em_resize_drag($0, dir, (ev.clientX - sx) | 0, (ev.clientY - sy) | 0);
+            };
+            let up = (ev) => {
+              h.removeEventListener("pointermove", move);
+              h.removeEventListener("pointerup", up);
+              h.removeEventListener("pointercancel", up);
+              try { h.releasePointerCapture(ev.pointerId); } catch (err) {}
+            };
+            h.addEventListener("pointermove", move);
+            h.addEventListener("pointerup", up);
+            h.addEventListener("pointercancel", up);
+          });
+          div.appendChild(h);
+        }
+        if ($1 !== 0 && !$8) {
+          addResizeHandle("nw", 5, "nwse-resize");
+          addResizeHandle("n", 4, "ns-resize");
+          addResizeHandle("ne", 6, "nesw-resize");
+          addResizeHandle("w", 1, "ew-resize");
+          addResizeHandle("e", 2, "ew-resize");
+          addResizeHandle("sw", 9, "nesw-resize");
+          addResizeHandle("s", 8, "ns-resize");
+          addResizeHandle("se", 10, "nwse-resize");
+        }
         // https://www.w3schools.com/HOWTO/howto_js_draggable.asp
         function dragElement(elmnt) {
           var pos1 = 0;
@@ -351,7 +479,8 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         dragElement(document.getElementById("fltk_div" + $0));
       },
       ID, pWindow->border(), pWindow->x(), pWindow->y(),
-      pWindow->w(), pWindow->h(), pWindow->label() ? pWindow->label(): "");
+      pWindow->w(), pWindow->h(), pWindow->label() ? pWindow->label(): "",
+      em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0);
   // clang-format on
   Fl_X *xp = new Fl_X;
   xp->xid = (fl_uintptr_t)ID;
@@ -511,33 +640,55 @@ void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
   pWindow->wait_for_expose();
   if (is_a_resize) {
     pWindow->Fl_Group::resize(X, Y, W, H);
-    if (pWindow->shown()) {
-      fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
-      EM_ASM(
-          {
-            let X = $1;
-            let Y = $2;
-            let W = $3;
-            let H = $4;
-            let canvas = document.getElementById("fltk_canvas" + $0);
-            if (canvas) {
-              canvas.width = W;
-              canvas.height = H;
-            }
-            let div = document.getElementById("fltk_div" + $0);
-            if (div) {
-              div.style.left = X + "px";
-              div.style.top = Y + "px";
-            }
-          },
-          (int)xid, X, Y, W, H);
-      // divs aren't resizable?
-    }
-    pWindow->redraw();
   } else {
     x(X);
     y(Y);
   }
+  // Mirror the new geometry in the browser. A window's (X,Y) is the top-left of
+  // its canvas, so a visible title bar sits above it: shift the div up by its height.
+  if (pWindow->shown() && (is_a_resize || !pWindow->parent())) {
+    fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
+    EM_ASM(
+        {
+          let X = $1;
+          let Y = $2;
+          let W = $3;
+          let H = $4;
+          let resized = $5;
+          let canvas = document.getElementById("fltk_canvas" + $0);
+          if (canvas && resized) {
+            canvas.width = W;
+            canvas.height = H;
+          }
+          let div = document.getElementById("fltk_div" + $0);
+          if (div) {
+            let decor = document.getElementById("fltk_decor" + $0);
+            let off = (decor && !decor.hidden) ? $6 : 0;
+            div.style.left = X + "px";
+            div.style.top = (Y - off) + "px";
+          }
+        },
+        (int)xid, X, Y, W, H, is_a_resize ? 1 : 0, FL_EM_DECOR_H);
+  }
+  if (is_a_resize)
+    pWindow->redraw();
+}
+
+// Show or hide the resize handles when size_range() changes on a shown window.
+void Fl_Emscripten_Window_Driver::size_range() {
+  Fl_Window_Driver::size_range();
+  if (!shown())
+    return;
+  fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
+  EM_ASM(
+      {
+        let div = document.getElementById("fltk_div" + $0);
+        if (div) {
+          div.querySelectorAll(".fltk_resize_handle")
+              .forEach((h) => h.style.display = $1 ? "block" : "none");
+        }
+      },
+      (int)xid, em_user_resizable(pWindow) ? 1 : 0);
 }
 
 void Fl_Emscripten_Window_Driver::fullscreen_on() {
