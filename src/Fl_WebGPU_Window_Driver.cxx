@@ -415,8 +415,6 @@ void Fl_WebGPU_Window_Driver::destroy_resources()
     pWindow->m_frame_active = false;
     release_back_buffer();
 
-    pWindow->destroy_common_resources();
-
     if (w.pipeline) {
         wgpuRenderPipelineRelease(w.pipeline);
         w.pipeline = 0;
