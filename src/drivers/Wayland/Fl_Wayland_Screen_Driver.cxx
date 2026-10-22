@@ -638,9 +638,6 @@ static int process_wld_key(struct xkb_state *xkb_state, uint32_t key,
 
 
 static uint32_t last_keydown_serial = 0; // serial of last keydown event
-// window targeted by the pending key auto-repeat; used only for pointer comparison,
-// never dereferenced (it may be dangling after the window is deleted)
-static Fl_Window *key_repeat_window = NULL;
 
 
 static void wl_keyboard_enter(void *data, struct wl_keyboard *wl_keyboard,
@@ -680,30 +677,11 @@ static double key_repeat_delay = 0.5; // sec
 static double key_repeat_interval = 0.05;  // sec
 
 static void key_repeat_timer_cb(key_repeat_data_t *key_repeat_data) {
-  // key_repeat_data->window is only dereferenced while last_keydown_serial still
-  // matches. Fl_Wayland_Window_Driver::hide() calls cancel_key_repeat(), which resets
-  // last_keydown_serial when the target window goes away, so a deleted window is
-  // never used here.
   if (last_keydown_serial == key_repeat_data->serial && key_repeat_interval > 0) {
     Fl::handle(FL_KEYDOWN, key_repeat_data->window);
-    // the event may have hidden the window and thereby cancelled the repeat
-    if (last_keydown_serial == key_repeat_data->serial) {
-      Fl::add_timeout(key_repeat_interval, (Fl_Timeout_Handler)key_repeat_timer_cb,
-                      key_repeat_data);
-      return;
-    }
+    Fl::add_timeout(key_repeat_interval, (Fl_Timeout_Handler)key_repeat_timer_cb, key_repeat_data);
   }
-  delete key_repeat_data;
-}
-
-
-// Called by Fl_Wayland_Window_Driver::hide(). If the pending key repeat targets win,
-// cancel it: the already-scheduled timer then sees a serial mismatch and frees its data.
-void Fl_Wayland_Screen_Driver::cancel_key_repeat(Fl_Window *win) {
-  if (win && win == key_repeat_window) {
-    last_keydown_serial = 0;
-    key_repeat_window = NULL;
-  }
+  else delete key_repeat_data;
 }
 
 
@@ -940,7 +918,6 @@ static void wl_keyboard_key(void *data, struct wl_keyboard *wl_keyboard,
     key_repeat_data->serial = serial;
     key_repeat_data->window = win;
     last_keydown_serial = serial;
-    key_repeat_window = win;
     Fl::add_timeout(key_repeat_delay, (Fl_Timeout_Handler)key_repeat_timer_cb,
                     key_repeat_data);
   }

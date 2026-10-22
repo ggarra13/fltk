@@ -487,8 +487,6 @@ static void titlebar_surface_map_erase(struct wld_window *xid) {
 
 
 void Fl_Wayland_Window_Driver::hide() {
-  // a pending key auto-repeat must not target a window that is going away
-  Fl_Wayland_Screen_Driver::cancel_key_repeat(pWindow);
   if (pWindow == Fl_Screen_Driver::transient_scale_parent) {
     // Delete also the running transient scale window
     // because the transient is a popup and MUST be deleted
