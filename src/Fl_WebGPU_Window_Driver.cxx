@@ -29,6 +29,8 @@
 #  include <emscripten.h>
 #endif
 
+#include <webgpu/webgpu.h>
+
 // Written against the current webgpu.h (webgpu-native / wgpu-native >= 25,
 // Dawn): WGPUStringView labels, callback-info structs, WGPUStatus returns.
 
