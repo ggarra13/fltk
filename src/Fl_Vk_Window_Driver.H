@@ -145,6 +145,7 @@ public:
 
   void init_colorspace();
   void init_vk(int requested_device_index = -1);
+  void select_surface_format();
 
   VkInstance instance() { return m_instance; }
   VkPhysicalDevice gpu() { return m_gpu; }
@@ -158,7 +159,9 @@ protected:
   void prepare_buffers();
   void prepare_depth();
   void prepare_framebuffers();
-
+  std::vector<VkSurfaceFormatKHR> query_surface_formats();
+  std::vector<VkSurfaceFormatKHR> headless_candidates(Fl_Vk_Output_Profile);
+    
   int swap_interval_;
   VkInstance m_instance;
   VkPhysicalDevice m_gpu;

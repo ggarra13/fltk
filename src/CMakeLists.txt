@@ -574,6 +574,7 @@ set(VKCPPFILES
 
 set(VK_DRIVER_FILES
   Fl_Vk_Window_Driver.cxx
+  Fl_Vk_Window_Driver_format.cxx  
   Fl_Vk_Headless_Window_Driver.cxx
 )
 

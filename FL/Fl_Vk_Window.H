@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "Fl_Vk_Context.H"
+#include "Fl_Vk_Display_Caps.H"
 #include "Fl_Window.H"
 
 
@@ -167,6 +168,24 @@ protected:
   //! Called on initialization of the swapchain to set up the swapchain
   //! format and color space.
   virtual void init_colorspace();
+  
+  //! What the display this window is on can show.  Called from
+  //! select_surface_format().  Default keeps the old behaviour (assume an
+  //! HDR-capable, wide-gamut display and let the surface list decide).
+  //! Override it with a real query (see mrv2's Viewport).
+  virtual Fl_Vk_Display_Caps display_caps() {
+    Fl_Vk_Display_Caps c; c.hdr = true; c.wide_gamut = true; return c;
+  }
+ 
+  //! Target format for a headless window.  Default SDR.
+  virtual Fl_Vk_Output_Profile headless_output_profile() {
+      return Fl_Vk_Output_Profile::SDR;
+  }
+ 
+  //! Re-run (format, color space) selection only -- no device/queue work --
+  //! and schedule a swapchain recreation.  Call when the window moves to a
+  //! different screen or when HDR is toggled in the OS.
+  void reselect_surface_format();
 
   //! Called before begin_render_pass.  Allows setting up a color or depth.
   //! The default function will call begin_render_pass().  Override this if
@@ -353,7 +372,7 @@ public:
   inline const std::vector<const char*>
       getCurrentDeviceExtensions() const { return ctx.device_extensions; }
 
-  inline void setValidationLayers(bool v) { v = m_validate; }
+  inline void setValidationLayers(bool v) { m_validate = v; }
 
   //! Recreate swapchain on next draw
   inline void reinit_swapchain() { m_swapchain_needs_recreation = true; }

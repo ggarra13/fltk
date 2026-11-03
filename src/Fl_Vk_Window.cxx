@@ -1251,6 +1251,12 @@ void Fl_Vk_Window::wait_device()
   }
 }
 
+void Fl_Vk_Window::reselect_surface_format()
+{
+    pVkWindowDriver->select_surface_format();
+    m_swapchain_needs_recreation = true;   // recreate_swapchain() -> prepare()
+}
+
 void Fl_Vk_Window::init_colorspace()
 {
   pVkWindowDriver->init_colorspace();
