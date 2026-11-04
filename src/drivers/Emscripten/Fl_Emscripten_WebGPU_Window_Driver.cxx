@@ -102,13 +102,6 @@ void Fl_Emscripten_WebGPU_Window_Driver::create_surface() {
     fprintf(stderr, "create_surface: could not create surface for %s\n", selector);
 }
 
-
-float Fl_Emscripten_WebGPU_Window_Driver::pixels_per_unit()
-{
-  int ns = pWindow->screen_num();
-  return Fl::screen_driver()->scale(ns);
-}
-
 int Fl_Emscripten_WebGPU_Window_Driver::mode_(int m, const int *a) {
   int oldmode = mode();
   mode(m); alist(a);

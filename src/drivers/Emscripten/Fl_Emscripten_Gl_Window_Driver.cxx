@@ -201,12 +201,6 @@ void Fl_Emscripten_Gl_Window_Driver::before_show(int&) {
     //Fl_X::make_xid(pWindow, 0, 0);
 }
 
-float Fl_Emscripten_Gl_Window_Driver::pixels_per_unit()
-{
-  int ns = pWindow->screen_num();
-  return Fl::screen_driver()->scale(ns);
-}
-
 int Fl_Emscripten_Gl_Window_Driver::mode_(int m, const int *a) {
   int oldmode = mode();
   mode(m); alist(a);
