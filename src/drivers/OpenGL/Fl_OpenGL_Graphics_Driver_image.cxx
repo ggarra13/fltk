@@ -73,7 +73,9 @@ static GLuint compute_texture_rectangle(Fl_RGB_Image *rgb)
   glGetIntegerv(GL_UNPACK_ROW_LENGTH, &row_length);
   glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
   // put the bitmap in a texture
+#if !defined(__EMSCRIPTEN__)
   glPushAttrib(GL_TEXTURE_BIT);
+#endif
   glBindTexture (GL_TEXTURE_RECTANGLE_ARB, texName);
   glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glPixelStorei(GL_UNPACK_ROW_LENGTH, (rgb->ld() ? rgb->ld() / rgb->d() : rgb->data_w()));
@@ -92,7 +94,9 @@ static GLuint compute_texture_rectangle(Fl_RGB_Image *rgb)
   }
   glTexImage2D(GL_TEXTURE_RECTANGLE_ARB, 0, internalformat, rgb->data_w(), rgb->data_h(), 0,
                format, type_arg, rgb->array);
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib();
+#endif
   // restore saved GL parameters
   glPixelStorei(GL_UNPACK_ROW_LENGTH, row_length);
   glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
@@ -109,7 +113,9 @@ static void draw_texture(GLuint texName, int X, int Y, int W, int H,
   // GL_TRANSFORM_BIT for GL_PROJECTION
   // GL_TEXTURE_BIT for GL_TEXTURE_RECTANGLE_ARB
   // GL_COLOR_BUFFER_BIT for GL_BLEND and glBlendFunc,
+#if !defined(__EMSCRIPTEN__)
   glPushAttrib(GL_TRANSFORM_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
+#endif
   //setup matrices
   glMatrixMode(GL_PROJECTION);
   glPushMatrix();
@@ -152,7 +158,9 @@ static void draw_texture(GLuint texName, int X, int Y, int W, int H,
   // reset original matrices
   glMatrixMode(GL_PROJECTION);
   glPopMatrix();
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib(); // GL_TRANSFORM_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT
+#endif
 }
 
 

@@ -1243,6 +1243,42 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
   // fl_msg.time = ???
   // fl_msg.pt = ???
   // fl_msg.lPrivate = ???
+ // Early in mouse handling:
+
+  switch (uMsg) {
+    case WM_MOUSEMOVE:
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONDBLCLK:
+    case WM_LBUTTONUP:
+    case WM_MBUTTONDOWN:
+    case WM_MBUTTONDBLCLK:
+    case WM_MBUTTONUP:
+    case WM_RBUTTONDOWN:
+    case WM_RBUTTONDBLCLK:
+    case WM_RBUTTONUP:
+    case WM_XBUTTONDOWN:
+    case WM_XBUTTONDBLCLK:
+    case WM_XBUTTONUP:
+    case WM_MOUSELEAVE:
+    {
+#if 0
+      // 0xFF515700 is the WinAPI signature masking for synthesized Pen/Touch
+      // events.  We **DON'T** filter them here with the code below as it
+      // would mean adding Fl::Pen::subscribe() to **ALL** Widgets.
+      // Instead, the user needs to set a flag in the handle() method to work
+      // around it.  See test/penpal.cxx
+      LONG_PTR extraInfo = GetMessageExtraInfo();
+      if ((extraInfo & 0xFFFFFF00) == 0xFF515700) {
+          // This is a synthesized mouse event from a pen/touch action.
+          // Because FLTK's Pen API handles the actual pointer event, we drop this.
+          return DefWindowProcW(hWnd, uMsg, wParam, lParam);
+      }
+#endif
+      break;
+    }
+  default:
+      break;
+  }
 
   Fl_Window *window = fl_find(hWnd);
   float scale = (window ? Fl::screen_driver()->scale(Fl_Window_Driver::driver(window)->screen_num()) : 1);

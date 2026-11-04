@@ -211,7 +211,9 @@ void Fl_Gl_Window::flush() {
 
   if (mode_ & FL_DOUBLE) {
 
+#if !defined(__EMSCRIPTEN__)
     glDrawBuffer(GL_BACK);
+#endif
 
     if (!SWAP_TYPE) {
       SWAP_TYPE = pGlWindowDriver->swap_type();
@@ -263,10 +265,14 @@ void Fl_Gl_Window::flush() {
           glLoadIdentity();
           glViewport(0, 0, pixel_w(), pixel_h());
           glOrtho(0, pixel_w(), 0, pixel_h(), -1, 1);
+#if !defined(__EMSCRIPTEN__)
           glRasterPos2i(0,0);
+#endif
           ortho_window = this;
         }
+#if !defined(__EMSCRIPTEN__)
         glCopyPixels(0,0,pixel_w(),pixel_h(),GL_COLOR);
+#endif
         make_current(); // set current context back to draw overlay
         damage1_ = 0;
 
@@ -280,7 +286,9 @@ void Fl_Gl_Window::flush() {
     if (overlay==this && SWAP_TYPE != SWAP) { // fake overlay in front buffer
       glDrawBuffer(GL_FRONT);
       draw_overlay();
+#if !defined(__EMSCRIPTEN__)
       glDrawBuffer(GL_BACK);
+#endif
       glFlush();
     }
 
@@ -396,7 +404,9 @@ void Fl_Gl_Window::draw_begin() {
     valid(1);
   }
 
+#if !defined(__EMSCRIPTEN__)
   glPushAttrib(GL_ALL_ATTRIB_BITS);
+#endif
 
   glMatrixMode(GL_PROJECTION);
   glPushMatrix();
@@ -430,7 +440,9 @@ void Fl_Gl_Window::draw_end() {
   glMatrixMode(GL_PROJECTION);
   glPopMatrix();
 
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib(); // GL_ALL_ATTRIB_BITS
+#endif
 
   Fl_Surface_Device::pop_current();
   if (mode() & FL_OPENGL3) pGlWindowDriver->switch_back();
@@ -584,7 +596,9 @@ Fl_RGB_Image* Fl_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int w, int
   glw->flush(); // forces a GL redraw, necessary for the glpuzzle demo
   // Read OpenGL context pixels directly.
   // For extra safety, save & restore OpenGL states that are changed
+#if !defined(__EMSCRIPTEN__)
   glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
+#endif
   glPixelStorei(GL_PACK_ALIGNMENT, 4); /* Force 4-byte alignment */
   glPixelStorei(GL_PACK_ROW_LENGTH, 0);
   glPixelStorei(GL_PACK_SKIP_ROWS, 0);
@@ -601,7 +615,9 @@ Fl_RGB_Image* Fl_Gl_Window_Driver::capture_gl_rectangle(int x, int y, int w, int
   glReadPixels(x, glw->pixel_h() - (y+h), w, h,
                GL_RGB, GL_UNSIGNED_BYTE,
                baseAddress);
+#if !defined(__EMSCRIPTEN__)
   glPopClientAttrib();
+#endif
   // GL gives a bottom-to-top image, convert it to top-to-bottom
   uchar *tmp = new uchar[mByteWidth];
   uchar *p = baseAddress ;

@@ -121,8 +121,10 @@ void gl_remove_displaylist_fonts()
           // prevDesc should not be NULL, but this test will make static analysis shut up
           prevDesc->next = desc->next;
         }
+#if !defined(__EMSCRIPTEN__)
         // It would be nice if this next line was in a destructor somewhere
         glDeleteLists(desc->listbase, Fl_Gl_Window_Driver::global()->genlistsize());
+#endif
         delete desc;
       } else {
         prevDesc = desc;
@@ -149,7 +151,9 @@ void gl_draw(const char* str, int n) {
  \see  gl_texture_pile_height(int)
   */
 void gl_draw(const char* str, int n, int x, int y) {
+#if !defined(__EMSCRIPTEN__)
   glRasterPos2i(x, y);
+#endif
   gl_draw(str, n);
 }
 
@@ -158,7 +162,9 @@ void gl_draw(const char* str, int n, int x, int y) {
  \see  gl_texture_pile_height(int)
   */
 void gl_draw(const char* str, int n, float x, float y) {
+#if !defined(__EMSCRIPTEN__)
   glRasterPos2f(x, y);
+#endif
   gl_draw(str, n);
 }
 
@@ -187,7 +193,9 @@ void gl_draw(const char* str, float x, float y) {
 }
 
 static void gl_draw_invert(const char* str, int n, int x, int y) {
+#if !defined(__EMSCRIPTEN__)
   glRasterPos2i(x, -y);
+#endif
   gl_draw(str, n);
 }
 
@@ -239,7 +247,9 @@ void gl_draw_image(const uchar* b, int x, int y, int w, int h, int d, int ld) {
   GLint row_length;
   glGetIntegerv(GL_UNPACK_ROW_LENGTH, &row_length); // get current row length
   glPixelStorei(GL_UNPACK_ROW_LENGTH, ld/d);
-  glRasterPos2i(x,y);
+#if !defined(__EMSCRIPTEN__)
+  glRasterPos2i(x, y);
+#endif
   glDrawPixels(w,h,d<4?GL_RGB:GL_RGBA,GL_UNSIGNED_BYTE,(const ulong*)b);
   glPixelStorei(GL_UNPACK_ROW_LENGTH, row_length); // restore row length
 }
@@ -341,7 +351,9 @@ void gl_texture_fifo::display_texture(int rank)
   // GL_ENABLE_BIT for GL_DEPTH_TEST, GL_LIGHTING
   // GL_TEXTURE_BIT for GL_TEXTURE_RECTANGLE_ARB
   // GL_COLOR_BUFFER_BIT for GL_BLEND and glBlendFunc,
+#if !defined(__EMSCRIPTEN__)
   glPushAttrib(GL_TRANSFORM_BIT | GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT);
+#endif
   //setup matrices
   glMatrixMode (GL_PROJECTION);
   glPushMatrix();
@@ -388,8 +400,11 @@ void gl_texture_fifo::display_texture(int rank)
   glPopMatrix(); // GL_MODELVIEW
   glMatrixMode (GL_PROJECTION);
   glPopMatrix();
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib(); // GL_TRANSFORM_BIT | GL_ENABLE_BIT | GL_TEXTURE_BIT | GL_COLOR_BUFFER_BIT
-#if HAVE_GL_GLU_H
+#endif
+
+#if HAVE_GL_GLU_H && !defined(__EMSCRIPTEN__)
   //set the raster position to end of string
   pos[0] += width;
   GLdouble modelmat[16];
@@ -440,7 +455,9 @@ int gl_texture_fifo::compute_texture(const char* str, int n)
   glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
 
   // put the bitmap in an alpha-component-only texture
+#if !defined(__EMSCRIPTEN__)
   glPushAttrib(GL_TEXTURE_BIT);
+#endif
   glBindTexture (GL_TEXTURE_RECTANGLE_ARB, fifo[current].texName);
   glTexParameteri(GL_TEXTURE_RECTANGLE_ARB, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glPixelStorei(GL_UNPACK_ROW_LENGTH, w);
@@ -452,7 +469,9 @@ int gl_texture_fifo::compute_texture(const char* str, int n)
    and also, replace GL_SRC_ALPHA by GL_ONE in glBlendFunc() call of display_texture()
    */
   delete[] alpha_buf; // free the buffer now we have copied it into the GL texture
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib();
+#endif
   // restore saved GL parameters
   glPixelStorei(GL_UNPACK_ROW_LENGTH, row_length);
   glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
@@ -586,7 +605,9 @@ void Fl_Gl_Window_Driver::draw_string_legacy_get_list(const char* str, int n) {
     r = (buf[i] & 0xFC00) >> 10;
     get_list(gl_fontsize, r);
   }
+#if !defined(__EMSCRIPTEN__)
   glCallLists(wn, GL_UNSIGNED_SHORT, buf);
+#endif
   if (gl_start_scale != 1) { // using gl_start() / gl_finish()
     gl_font(fl_font(), size);
   }
@@ -637,13 +658,15 @@ void Fl_Gl_Window_Driver::draw_string_legacy_glut(const char* str, int n)
   glutStrokeString(GLUT_STROKE_ROMAN, str_nul);
   float width = float(fl_width((char*)str_nul));
   delete[] str_nul;
+#if !defined(__EMSCRIPTEN__)
   glPopAttrib();
+#endif
   // reset original matrices
   glPopMatrix(); // GL_MODELVIEW
   glMatrixMode (GL_PROJECTION);
   glPopMatrix();
   glMatrixMode (matrixMode);
-#if HAVE_GL_GLU_H
+#if HAVE_GL_GLU_H && !defined(__EMSCRIPTEN__)
   //set the raster position to end of string
   pos[0] += width;
   GLdouble modelmat[16];
@@ -654,6 +677,7 @@ void Fl_Gl_Window_Driver::draw_string_legacy_glut(const char* str, int n)
   GLint viewport[4];
   glGetIntegerv (GL_VIEWPORT, viewport);
   gluUnProject(pos[0], pos[1], pos[2], modelmat, projmat, viewport, &objX, &objY, &objZ);
+
   if (gl_start_scale != 1) { // using gl_start() / gl_finish()
     objX *= gl_start_scale;
     objY *= gl_start_scale;

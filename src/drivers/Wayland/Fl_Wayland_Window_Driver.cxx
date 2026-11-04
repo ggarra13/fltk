@@ -415,6 +415,15 @@ void Fl_Wayland_Window_Driver::flush() {
     }
     return;
   }
+  if (pWindow->as_vk_window()) {
+    int W = pWindow->w();
+    int H = pWindow->h();
+    float scale = fl_graphics_driver->scale();
+    Fl_Wayland_Window_Driver::in_flush_ = true;
+    Fl_Window_Driver::flush();
+    Fl_Wayland_Window_Driver::in_flush_ = false;
+    return;
+  }
   struct wld_window *window = fl_wl_xid(pWindow);
   if (!window || !window->configured_width) return;
 
@@ -477,6 +486,8 @@ static void titlebar_surface_map_erase(struct wld_window *xid) {
 
 
 void Fl_Wayland_Window_Driver::hide() {
+  // a pending key auto-repeat must not target a window that is going away
+  Fl_Wayland_Screen_Driver::cancel_key_repeat(pWindow);
   if (pWindow == Fl_Screen_Driver::transient_scale_parent) {
     // Delete also the running transient scale window
     // because the transient is a popup and MUST be deleted
@@ -1616,13 +1627,15 @@ void Fl_Wayland_Window_Driver::makeWindow()
     // the state of the parent surface is applied."
     new_window->configured_width = pWindow->w();
     new_window->configured_height = pWindow->h();
-    if (!pWindow->as_gl_window())  {
+    if (!pWindow->as_gl_window() && !pWindow->as_vk_window())  {
       parent->fl_win->wait_for_expose();
       wl_surface_commit(parent->wl_surface);
     }
     wait_for_expose_value = 0;
     pWindow->border(0);
     checkSubwindowFrame(); // make sure subwindow doesn't leak outside parent
+    // \@note: \@bug: NOT on FLTK main branch.  Must keep for fixing bug #1307
+    if (can_expand_outside_parent_) parent->covered = true;
   } else { // a window without decoration
     new_window->kind = UNFRAMED;
     new_window->xdg_surface = xdg_wm_base_get_xdg_surface(scr_driver->xdg_wm_base,
@@ -2053,11 +2066,11 @@ void Fl_Wayland_Window_Driver::resize(int X, int Y, int W, int H) {
       }
     } else if (fl_win->kind == SUBWINDOW && fl_win->subsurface) { // a subwindow
       wl_subsurface_set_position(fl_win->subsurface, X * f, Y * f);
-      if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+      if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
       fl_win->configured_width = W;
       fl_win->configured_height = H;
     } else if (fl_win->xdg_surface) { // a window without border
-      if (!pWindow->as_gl_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
+      if (!pWindow->as_gl_window() && !pWindow->as_vk_window()) Fl_Wayland_Graphics_Driver::buffer_release(fl_win);
       fl_win->configured_width = W;
       fl_win->configured_height = H;
       W *= f; H *= f;

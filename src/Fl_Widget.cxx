@@ -501,4 +501,3 @@ void Fl_Widget::user_data(Fl_Callback_User_Data* v, bool auto_free) {
   if (auto_free)
     set_flag(AUTO_DELETE_USER_DATA);
 }
-

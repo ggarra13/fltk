@@ -1827,4 +1827,3 @@ void Fl_Window_Driver::scroll_to_selected_item(Fl_Window *win) {
 static bool is_special_labeltype(uchar t) {
   return t == _FL_MULTI_LABEL || t == _FL_ICON_LABEL || t == _FL_IMAGE_LABEL;
 }
-

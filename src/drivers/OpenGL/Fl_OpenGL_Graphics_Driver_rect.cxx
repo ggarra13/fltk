@@ -29,6 +29,20 @@
 #include <FL/math.h>
 #include <stack>
 
+#ifdef __EMSCRIPTEN__
+// Emscripten's legacy GL layer misses glRectf; supply a fallback implementation
+extern "C" {
+    void glRectf(GLfloat x1, GLfloat y1, GLfloat x2, GLfloat y2) {
+        glBegin(GL_QUADS);
+        glVertex2f(x1, y1);
+        glVertex2f(x2, y1);
+        glVertex2f(x2, y2);
+        glVertex2f(x1, y2);
+        glEnd();
+    }
+}
+#endif
+
 // --- line and polygon drawing with integer coordinates
 
 void Fl_OpenGL_Graphics_Driver::point(int x, int y) {
@@ -156,7 +170,11 @@ void Fl_OpenGL_Graphics_Driver::loop(int x0, int y0, int x1, int y1, int x2, int
 }
 
 void Fl_OpenGL_Graphics_Driver::polygon(int x0, int y0, int x1, int y1, int x2, int y2) {
+#if defined(__EMSCRIPTEN__)
+  glBegin(GL_TRIANGLE_FAN);   // GL_POLYGON is unsupported by LEGACY_GL_EMULATION
+#else
   glBegin(GL_POLYGON);
+#endif
   glVertex2i(x0, y0);
   glVertex2i(x1, y1);
   glVertex2i(x2, y2);
@@ -164,7 +182,11 @@ void Fl_OpenGL_Graphics_Driver::polygon(int x0, int y0, int x1, int y1, int x2, 
 }
 
 void Fl_OpenGL_Graphics_Driver::polygon(int x0, int y0, int x1, int y1, int x2, int y2, int x3, int y3) {
+#if defined(__EMSCRIPTEN__)
+  glBegin(GL_TRIANGLE_FAN);   // GL_POLYGON is unsupported by LEGACY_GL_EMULATION
+#else
   glBegin(GL_POLYGON);
+#endif
   glVertex2i(x0, y0);
   glVertex2i(x1, y1);
   glVertex2i(x2, y2);

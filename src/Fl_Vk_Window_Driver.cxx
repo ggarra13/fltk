@@ -1,0 +1,1662 @@
+//
+// Implementation of class Fl_Vk_Window_Driver, and of its platform-specific derived classes
+// for the Fast Light Tool Kit (FLTK).
+//
+// Copyright 2016-2018 by Bill Spitzak and others.
+//
+// This library is free software. Distribution and use rights are outlined in
+// the file "COPYING" which should have been included with this file.  If this
+// file is missing or damaged, see the license at:
+//
+//     https://www.fltk.org/COPYING.php
+//
+// Please see the following page on how to report bugs and issues:
+//
+//     https://www.fltk.org/bugs.php
+//
+
+// #define FLTK_CHECK_SIZES 1
+// #define DEBUG_PRESENTATION_MODE 1
+
+#define VMA_IMPLEMENTATION
+
+#include <FL/vk.h>
+#include <FL/vk_enum_string_helper.h>
+
+#include "FL/Fl_Vk_Utils.H"
+#include "Fl_Vk_Window_Driver.H"
+
+
+
+#include <algorithm>
+#include <cassert>
+#include <iostream>
+#include <mutex>
+#include <stdexcept>
+#include <vector>
+
+
+//! Returns true or false if extension name is supported.
+static bool isExtensionSupported(const char* extensionName) {
+    uint32_t extensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+    for (const auto& ext : extensions)
+    {
+        if (strcmp(ext.extensionName, extensionName) == 0)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
+ * Return 1 (true) if all layer names specified in check_names
+ * can be found in given layer properties.
+ */
+static VkBool32 check_layers(uint32_t check_count, const char **check_names,
+                             uint32_t layer_count,
+                             VkLayerProperties *layers) {
+  uint32_t i, j;
+  for (i = 0; i < check_count; i++) {
+    VkBool32 found = 0;
+    for (j = 0; j < layer_count; j++) {
+      if (!strcmp(check_names[i], layers[j].layerName)) {
+        found = 1;
+        break;
+      }
+    }
+    if (!found) {
+      fprintf(stderr, "Cannot find layer: %s\n", check_names[i]);
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+// Recreates m_swapchain and m_buffers
+void Fl_Vk_Window_Driver::prepare_buffers() {
+  VkResult result;
+  VkSwapchainKHR oldSwapchain = pWindow->m_swapchain;
+
+  pWindow->m_swapchain = VK_NULL_HANDLE;
+
+  // Get surface capabilities
+  VkSurfaceCapabilitiesKHR surfCapabilities;
+  result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(pWindow->gpu(),
+                                                     pWindow->m_surface,
+                                                     &surfCapabilities);
+  if (result != VK_SUCCESS)
+  {
+      fprintf(stderr, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR failed: %s\n", string_VkResult(result));
+      pWindow->m_swapchain = VK_NULL_HANDLE;
+      return;
+  }
+
+  // Set swapchain extent to match window size, clamped to capabilities
+  uint32_t W = pWindow->pixel_w();
+  uint32_t H = pWindow->pixel_h();
+
+  VkExtent2D swapchainExtent;
+  if (surfCapabilities.currentExtent.width != 0xFFFFFFFF) {
+      // Compositor dictates the size (always the case on Wayland).
+      // It is already guaranteed to be aligned to buffer_scale.
+      swapchainExtent = surfCapabilities.currentExtent;
+  } else {
+      // Surface size is flexible (X11/Win32) — use our pixel estimate, clamped.
+      swapchainExtent.width  = std::clamp(W,
+                                          surfCapabilities.minImageExtent.width,
+                                          surfCapabilities.maxImageExtent.width);
+      swapchainExtent.height = std::clamp(H,
+                                          surfCapabilities.minImageExtent.height,
+                                          surfCapabilities.maxImageExtent.height);
+  }
+
+  // Guard: if the window is minimised or not yet mapped the extent can be
+  // reported as {0,0} — creating a swapchain of zero size is undefined
+  // behaviour.  Return and let the next frame retry.
+  if (swapchainExtent.width == 0 || swapchainExtent.height == 0) {
+      pWindow->m_swapchain = oldSwapchain;  // keep current swapchain alive
+      pWindow->reinit_swapchain();
+      return;
+  }
+
+  // -------------------------------------------------------------------------
+  // Align the swapchain extent to the surface's buffer scale.
+  //
+  // On Wayland wl_surface_set_buffer_scale(N) requires every presented buffer
+  // to have dimensions that are exact integer multiples of N.  The compositor-
+  // provided currentExtent can be temporarily unaligned while a window is
+  // being dragged slowly between two monitors with different DPI scales (e.g.
+  // 1× → 2×), because the compositor may report a logical size whose physical
+  // expansion is an odd number of pixels.  Rounding DOWN to the nearest
+  // multiple is safe: it never exceeds maxImageExtent and keeps the swapchain
+  // inside the logical surface bounds.
+  // -------------------------------------------------------------------------
+  {
+      const uint32_t align = static_cast<uint32_t>(get_surface_buffer_scale());
+      if (align > 1) {
+          // Round down to the nearest multiple of align.
+          swapchainExtent.width  = (swapchainExtent.width  / align) * align;
+          swapchainExtent.height = (swapchainExtent.height / align) * align;
+
+          // Ensure we never collapse to zero after rounding (degenerate surface).
+          if (swapchainExtent.width  == 0) swapchainExtent.width  = align;
+          if (swapchainExtent.height == 0) swapchainExtent.height = align;
+
+          // Re-clamp to capabilities (the min-guard above could exceed maxImageExtent
+          // on exotic drivers, though in practice this never fires).
+          swapchainExtent.width  = std::min(swapchainExtent.width,
+                                            surfCapabilities.maxImageExtent.width);
+          swapchainExtent.height = std::min(swapchainExtent.height,
+                                            surfCapabilities.maxImageExtent.height);
+      }
+  }
+
+  // Store the authorative extent for this window
+  pWindow->m_swapchainExtent = swapchainExtent;
+
+  // ---- Choose present mode FIRST, since it is part of the key --------------
+  uint32_t presentModeCount = 0;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
+                                            pWindow->m_surface,
+                                            &presentModeCount, nullptr);
+  std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(pWindow->gpu(),
+                                            pWindow->m_surface,
+                                            &presentModeCount,
+                                            presentModes.data());
+
+  VkPresentModeKHR presentMode = (swap_interval() == 0)
+                                     ? VK_PRESENT_MODE_MAILBOX_KHR
+                                     : VK_PRESENT_MODE_FIFO_KHR;
+
+  if (std::find(presentModes.begin(), presentModes.end(), presentMode) ==
+      presentModes.end())
+      presentMode = VK_PRESENT_MODE_FIFO_KHR;   // always available per spec
+
+  // ---- Skip only if EVERYTHING that shapes the swapchain is unchanged -----
+  const Fl_Vk_SwapchainKey newKey(swapchainExtent,
+                                  pWindow->format(),
+                                  pWindow->colorSpace(),
+                                  presentMode);
+
+  if (oldSwapchain != VK_NULL_HANDLE &&
+      !pWindow->empty_buffers() &&
+      m_swapchainKey.valid() &&
+      newKey == m_swapchainKey)
+  {
+      pWindow->m_swapchain = oldSwapchain;   // still valid, keep it
+      return;
+  }
+
+  pWindow->m_swapchainExtent = swapchainExtent;
+
+  // ---- Create the swapchain -----
+  VkSwapchainCreateInfoKHR swapchain = {};
+  swapchain.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  swapchain.surface = pWindow->m_surface;
+
+  if (presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+  {
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount + 1);
+  }
+  else if (presentMode == VK_PRESENT_MODE_FIFO_KHR)
+  {
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  }
+  else
+  {
+      swapchain.minImageCount = std::max(3u, surfCapabilities.minImageCount);
+  }
+  if (surfCapabilities.maxImageCount > 0 &&
+      swapchain.minImageCount > surfCapabilities.maxImageCount)
+  {
+      swapchain.minImageCount = surfCapabilities.maxImageCount;
+  }
+  swapchain.imageFormat = pWindow->format();
+  swapchain.imageColorSpace = pWindow->colorSpace();
+  swapchain.imageExtent = swapchainExtent;
+  swapchain.imageArrayLayers = 1;
+  swapchain.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                         VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                         VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+  swapchain.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  swapchain.preTransform = surfCapabilities.currentTransform;
+
+
+  VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  if (!(surfCapabilities.supportedCompositeAlpha & compositeAlpha))
+  {
+      // pick the first available
+      for (VkCompositeAlphaFlagBitsKHR flag :
+               {VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+                VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,
+                VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR})
+      {
+          if (surfCapabilities.supportedCompositeAlpha & flag)
+          {
+              compositeAlpha = flag;
+              break;
+          }
+      }
+  }
+
+  swapchain.compositeAlpha = compositeAlpha;
+  swapchain.presentMode = presentMode;
+  swapchain.oldSwapchain = oldSwapchain;
+  swapchain.clipped = VK_TRUE;
+
+  // Destroy old buffers
+  for (auto& buffer : pWindow->m_buffers)
+  {
+      buffer.destroy(pWindow->device());
+  }
+  pWindow->m_buffers.clear();
+
+  // Nothing valid until creation succeeds
+  m_swapchainKey.reset();
+
+  // Create new swapchain
+  result = vkCreateSwapchainKHR(pWindow->device(), &swapchain, NULL, &pWindow->m_swapchain);
+  if (result != VK_SUCCESS || pWindow->m_swapchain == VK_NULL_HANDLE)
+  {
+      fprintf(stderr, "vkCreateSwapchainKHR failed: %s\n",
+              string_VkResult(result));
+      // oldSwapchain is retired even on failure (spec), so do NOT restore it.
+      // Leave m_swapchain null so the caller retries.
+      pWindow->m_swapchain = VK_NULL_HANDLE;
+      if (oldSwapchain != VK_NULL_HANDLE)
+          vkDestroySwapchainKHR(pWindow->device(), oldSwapchain, nullptr);
+      return;
+  }
+
+  if (oldSwapchain != VK_NULL_HANDLE) {
+    vkDestroySwapchainKHR(pWindow->device(), oldSwapchain, NULL);
+  }
+
+  // Record only after success.
+  m_swapchainKey = newKey;
+
+  // Get new swapchain images
+  uint32_t swapchainImageCount = 0;
+  result = vkGetSwapchainImagesKHR(pWindow->device(), pWindow->m_swapchain,
+                                   &swapchainImageCount, NULL);
+  VK_CHECK(result);
+
+  std::vector<VkImage> swapchainImages(swapchainImageCount);
+  result = vkGetSwapchainImagesKHR(pWindow->device(), pWindow->m_swapchain,
+                                   &swapchainImageCount,
+                                   swapchainImages.data());
+  VK_CHECK(result);
+
+  // Recreate buffers
+  pWindow->m_buffers.resize(swapchainImageCount);
+  VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+  for (uint32_t i = 0; i < swapchainImageCount; i++)
+  {
+      result = vkCreateSemaphore(pWindow->device(), &semaphoreInfo, nullptr,
+                                 &pWindow->m_buffers[i].semaphore);
+      VK_CHECK(result);
+
+      VkImageViewCreateInfo view_info = {};
+      view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+      view_info.image = swapchainImages[i];
+      view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+      view_info.format = pWindow->format();
+      view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      view_info.subresourceRange.levelCount = 1;
+      view_info.subresourceRange.layerCount = 1;
+      result = vkCreateImageView(pWindow->device(), &view_info, NULL,
+                                 &pWindow->m_buffers[i].view);
+      VK_CHECK(result);
+      pWindow->m_buffers[i].image = swapchainImages[i];
+      pWindow->m_buffers[i].extent = swapchain.imageExtent;
+  }
+}
+
+// Prepare depth/stencil resources for window
+void Fl_Vk_Window_Driver::prepare_depth() {
+    bool has_depth   = pWindow->mode() & FL_DEPTH;
+    bool has_stencil = pWindow->mode() & FL_STENCIL;
+
+    if (!has_depth && !has_stencil) {
+        // Leave depth zeroed; m_currentDepthLayout stays UNDEFINED.
+        return;
+    }
+
+    VkFormat   depth_format = VK_FORMAT_D16_UNORM;
+    uint32_t   aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+    if (has_stencil) {
+        if (has_depth) {
+            depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
+            aspectMask   = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+        } else {
+            depth_format = VK_FORMAT_S8_UINT;
+            aspectMask   = VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+    }
+
+    // Use the already-resolved swapchain extent (no extra driver query needed).
+    const VkExtent2D& ext = pWindow->m_swapchainExtent;
+
+    // --- VkImageCreateInfo is unchanged from the original ---
+    VkImageCreateInfo image_info = {};
+    image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_info.imageType     = VK_IMAGE_TYPE_2D;
+    image_info.format        = depth_format;
+    image_info.extent        = { ext.width, ext.height, 1 };
+    image_info.mipLevels     = 1;
+    image_info.arrayLayers   = 1;
+    image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    image_info.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    image_info.flags         = 0;
+
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+    // Prefer dedicated allocation for depth images — drivers often benefit from
+    // this hint for large render targets (it avoids sub-allocating inside a
+    // shared heap block, reducing aliasing risk).
+    alloc_info.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+
+    pWindow->m_depth.format = depth_format;
+
+    // Single call replaces vkCreateImage + vkGetImageMemoryRequirements +
+    // vkAllocateMemory + vkBindImageMemory.
+    VkResult result = vmaCreateImage(
+        pWindow->m_allocator,
+        &image_info,
+        &alloc_info,
+        &pWindow->m_depth.image,
+        &pWindow->m_depth.allocation,
+        nullptr
+    );
+
+    if (result != VK_SUCCESS) {
+        fprintf(stderr, "vmaCreateImage (depth) failed: %s\n", string_VkResult(result));
+        return;
+    }
+
+    // Image view creation is unchanged.
+    VkImageSubresourceRange subresourceRange = {};
+    subresourceRange.aspectMask     = aspectMask;
+    subresourceRange.baseMipLevel   = 0;
+    subresourceRange.levelCount     = 1;
+    subresourceRange.baseArrayLayer = 0;
+    subresourceRange.layerCount     = 1;
+
+    VkImageViewCreateInfo view_info = {};
+    view_info.sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.image            = pWindow->m_depth.image;
+    view_info.viewType         = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format           = depth_format;
+    view_info.subresourceRange = subresourceRange;
+
+    result = vkCreateImageView(pWindow->device(), &view_info, nullptr,
+                               &pWindow->m_depth.view);
+    VK_CHECK(result);
+
+    pWindow->m_currentDepthLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+
+// Uses m_renderPass
+void Fl_Vk_Window_Driver::prepare_framebuffers() {
+  VkImageView attachments[2];
+  attachments[0] = VK_NULL_HANDLE;        // Color attachment
+  attachments[1] = pWindow->m_depth.view; // Depth/stencil (optional)
+
+  uint32_t W = pWindow->m_swapchainExtent.width;
+  uint32_t H = pWindow->m_swapchainExtent.height;
+
+  VkFramebufferCreateInfo fb_info = {};
+  fb_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  fb_info.pNext = NULL;
+  fb_info.renderPass = pWindow->m_renderPass;
+  bool has_depth = pWindow->mode() & FL_DEPTH;
+  bool has_stencil = pWindow->mode() & FL_STENCIL;
+  fb_info.attachmentCount = (has_depth || has_stencil) ? 2 : 1;
+  fb_info.pAttachments = attachments;
+  fb_info.width = W;
+  fb_info.height = H;
+  fb_info.layers = 1;
+
+  VkResult result;
+  for (auto& buffer : pWindow->m_buffers)
+  {
+      attachments[0] = buffer.view;
+      result = vkCreateFramebuffer(pWindow->device(), &fb_info, NULL, &buffer.framebuffer);
+      VK_CHECK(result);
+  }
+}
+
+void Fl_Vk_Window_Driver::init_instance()
+{
+    VkResult err;
+    VkBool32 portability_enumeration = VK_FALSE;
+    uint32_t i = 0;
+
+    const char *instance_validation_layers[] = {
+        "VK_LAYER_KHRONOS_validation",
+    };
+
+    /* Look for validation layers *//* Look for validation layers */
+#ifndef NDEBUG
+    VkBool32 validation_found = 0;
+    if (pWindow->m_validate) {
+        uint32_t instance_layer_count = 0;
+        err = vkEnumerateInstanceLayerProperties(&instance_layer_count, NULL);
+        VK_CHECK(err);
+
+        if (instance_layer_count > 0) {
+            VkLayerProperties *instance_layers =
+                (VkLayerProperties *)VK_ALLOC(sizeof(VkLayerProperties) * instance_layer_count);
+            err = vkEnumerateInstanceLayerProperties(&instance_layer_count, instance_layers);
+            VK_CHECK(err);
+
+            validation_found =
+                check_layers(VK_ARRAY_SIZE(instance_validation_layers),
+                             instance_validation_layers,
+                             instance_layer_count, instance_layers);
+            if (validation_found) {
+                pWindow->ctx.enabled_layers.push_back(instance_validation_layers[0]);
+            }
+            free(instance_layers);
+        }
+
+        if (!validation_found) {
+            Fl::fatal("vkEnumerateInstanceLayerProperties failed to find "
+                      "required validation layer.\n\n"
+                      "Please look at the Getting Started guide for additional "
+                      "information.\n",
+                      "vkCreateInstance Failure");
+        }
+    }
+#endif
+
+    /* Look for instance extensions */
+    {
+        const std::vector<const char*>& instance_extensions =
+            Fl_Vk_Window_Driver::driver(pWindow)->get_instance_extensions();
+
+        for (const auto& extension : instance_extensions)
+        {
+            if (!isExtensionSupported(extension))
+            {
+                std::string unsupported = "Unsupported window driver extension '";
+                unsupported += extension;
+                unsupported += "'";
+                Fl::fatal(unsupported.c_str());
+            }
+            pWindow->ctx.instance_extensions.push_back(extension);
+        }
+    }
+
+    {
+        const std::vector<const char*>& instance_extensions = pWindow->get_instance_extensions();
+        for (const auto& extension : instance_extensions)
+        {
+            if (!isExtensionSupported(extension))
+            {
+                std::string unsupported = "Unsupported window extension '";
+                unsupported += extension;
+                unsupported += "'";
+                Fl::fatal(unsupported.c_str());
+            }
+            pWindow->ctx.instance_extensions.push_back(extension);
+        }
+    }
+
+    const std::vector<const char*>& optional_extensions =
+        pWindow->get_optional_extensions();
+    for (const auto& extension : optional_extensions)
+    {
+        if (isExtensionSupported(extension))
+        {
+            pWindow->ctx.instance_extensions.push_back(extension);
+        }
+        else
+        {
+            if (pWindow->m_validate)
+            {
+                fprintf(stderr, "Optional Vulkan extension '%s' not found.",
+                        extension);
+            }
+        }
+    }
+
+    uint32_t instance_extension_count = 0;
+    err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count, NULL);
+    assert(!err);
+
+    if (instance_extension_count > 0) {
+        VkExtensionProperties *instance_extensions =
+            (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) *
+                                              instance_extension_count);
+        err = vkEnumerateInstanceExtensionProperties(NULL, &instance_extension_count,
+                                                     instance_extensions);
+        assert(!err);
+        for (i = 0; i < instance_extension_count; i++)
+        {
+            if (!strcmp(VK_EXT_DEBUG_REPORT_EXTENSION_NAME,
+                        instance_extensions[i].extensionName))
+            {
+                if (pWindow->m_validate)
+                {
+                    pWindow->ctx.instance_extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+                }
+            }
+
+            // This one is needed for MoltenVK
+            if (!strcmp(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+                        instance_extensions[i].extensionName))
+            {
+                pWindow->ctx.instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+                portability_enumeration = VK_TRUE;
+            }
+        }
+
+        free(instance_extensions);
+    }
+
+    VkApplicationInfo app = {};
+    app.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app.pNext = NULL;
+    app.pApplicationName = pWindow->application_name();
+    app.applicationVersion = 0;
+    app.pEngineName = pWindow->engine_name();
+    app.engineVersion = 0;
+    app.apiVersion = VK_API_VERSION_1_2;
+
+    VkInstanceCreateInfo inst_info = {};
+    inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    inst_info.pNext = NULL;
+    inst_info.pApplicationInfo = &app;
+    inst_info.enabledLayerCount = pWindow->ctx.enabled_layers.size();
+    inst_info.ppEnabledLayerNames = pWindow->ctx.enabled_layers.data();
+    inst_info.enabledExtensionCount = pWindow->ctx.instance_extensions.size();
+    inst_info.ppEnabledExtensionNames = pWindow->ctx.instance_extensions.data();
+
+    if (portability_enumeration)
+        inst_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+
+    if (pWindow->m_instance == VK_NULL_HANDLE)
+    {
+        err = vkCreateInstance(&inst_info, NULL, &pWindow->m_instance);
+        if (err == VK_ERROR_INCOMPATIBLE_DRIVER) {
+            Fl::fatal("Cannot find a compatible Vulkan installable client driver "
+                      "(ICD).\n\nPlease look at the Getting Started guide for "
+                      "additional information.\n",
+                      "vkCreateInstance Failure");
+        } else if (err == VK_ERROR_EXTENSION_NOT_PRESENT) {
+            Fl::fatal("Cannot find a specified extension library"
+                      ".\nMake sure your layers path is set appropriately\n",
+                      "vkCreateInstance Failure");
+        } else if (err) {
+            Fl::fatal("vkCreateInstance failed.\n\nDo you have a compatible Vulkan "
+                      "installable client driver (ICD) installed?\nPlease look at "
+                      "the Getting Started guide for additional information.\n",
+                      "vkCreateInstance Failure");
+        }
+    }
+
+}
+
+void Fl_Vk_Window_Driver::init_vk(int requested_device_index)
+{
+    VkResult err;
+    uint32_t i = 0;
+
+    if (pWindow->m_instance == VK_NULL_HANDLE)
+        init_instance();
+
+    // Increment instance (window) counter
+    pWindow->ctx.instance = pWindow->m_instance;
+
+    // --- GPU ENUMERATION ---
+    uint32_t gpu_count = 0;
+    err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, NULL);
+    if (err != VK_SUCCESS || gpu_count == 0)
+    {
+        Fl::fatal("vkEnumeratePhysicalDevices failed to find any GPUs.\n\n"
+                  "Do you have a compatible Vulkan installable client driver (ICD) installed?\n"
+                  "Please look at the Getting Started guide for additional information.");
+    }
+
+    // Allocate and populate physical devices array
+    VkPhysicalDevice *physicalDevices = (VkPhysicalDevice *)VK_ALLOC(sizeof(VkPhysicalDevice) * gpu_count);
+    err = vkEnumeratePhysicalDevices(pWindow->ctx.instance, &gpu_count, physicalDevices);
+    if (err != VK_SUCCESS) {
+        VK_CHECK(err);
+        VK_FREE(physicalDevices);
+        Fl::fatal("vkEnumeratePhysicalDevices failed to enumerate devices.\n"
+                  "Error code");
+    }
+
+    // --- GPU SELECTION LOGIC START ---
+    VkPhysicalDevice chosen_gpu = VK_NULL_HANDLE;
+
+    if (requested_device_index >= 0 &&
+        (uint32_t)requested_device_index < gpu_count)
+    {
+        // A specific, valid device index was requested
+        chosen_gpu = physicalDevices[requested_device_index];
+        Fl::warning("User selected GPU index %d.", requested_device_index);
+    }
+    else
+    {
+        // Automatic selection based on scoring
+        uint32_t best_score = 0;
+        uint32_t best_device_index = 0;
+
+        for (uint32_t dev_idx = 0; dev_idx < gpu_count; ++dev_idx) {
+            VkPhysicalDeviceProperties device_properties;
+            vkGetPhysicalDeviceProperties(physicalDevices[dev_idx],
+                                          &device_properties);
+
+            uint32_t current_score = 0;
+            if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+            {
+                current_score += 1000;
+            }
+            else if (device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            {
+                current_score += 500;
+            }
+
+            // You could add more scoring criteria here, e.g., memory size, features, etc.
+
+            if (current_score > best_score) {
+                best_score = current_score;
+                best_device_index = dev_idx;
+            }
+        }
+        chosen_gpu = physicalDevices[best_device_index];
+    }
+
+    // Assign the chosen GPU to both the driver and the window context
+    m_gpu = chosen_gpu;
+    pWindow->gpu() = m_gpu; // Ensure window's handle is also set correctly
+
+    // Free the array after using it
+    VK_FREE(physicalDevices);
+    // --- GPU SELECTION LOGIC END ---
+
+    // Look for device extensions
+    uint32_t device_extension_count = 0;
+    VkBool32 swapchainExtFound = 0;
+
+    err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
+                                               &device_extension_count, NULL);
+    assert(!err);
+
+#define FLTK_ADD_DEVICE_EXTENSION(x)                        \
+    if (!strcmp(x, device_extensions[i].extensionName)) {   \
+        pWindow->ctx.device_extensions.push_back(x);        \
+    }
+
+#ifndef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+#   define VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME "VK_KHR_portability_subset"
+#endif
+
+#ifndef VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME
+#   define VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME "VK_KHR_get_physical_device_properties2"
+#endif
+
+    // VK_KHR_video_queue supplies the queue-family video-capability query
+    // (vkGetPhysicalDeviceQueueFamilyProperties2 + VkQueueFamilyVideoPropertiesKHR)
+    // and VK_KHR_video_decode_queue supplies vkCmdDecodeVideoKHR itself. Both
+    // must be present and enabled together for video decode to be usable;
+    // codec-specific extensions (VK_KHR_video_decode_h264/h265/av1) are
+    // deliberately not checked here since which of those are needed depends
+    // on what the caller (e.g. FFmpeg) actually decodes.
+#ifndef VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
+#   define VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME "VK_KHR_synchronization2"
+#endif
+#ifndef VK_KHR_VIDEO_QUEUE_EXTENSION_NAME
+#   define VK_KHR_VIDEO_QUEUE_EXTENSION_NAME "VK_KHR_video_queue"
+#endif
+#ifndef VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME
+#   define VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME "VK_KHR_video_decode_queue"
+#endif
+    bool videoQueueExtFound = false;
+    bool videoDecodeQueueExtFound = false;
+
+    if (device_extension_count > 0)
+    {
+        VkExtensionProperties *device_extensions =
+            (VkExtensionProperties *)VK_ALLOC(sizeof(VkExtensionProperties) * device_extension_count);
+        err = vkEnumerateDeviceExtensionProperties(pWindow->gpu(), NULL,
+                                                   &device_extension_count,
+                                                   device_extensions);
+        assert(!err);
+
+        for (i = 0; i < device_extension_count; i++)
+        {
+            if (!is_headless() &&
+                !strcmp(VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+                swapchainExtFound = 1;
+                pWindow->ctx.device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+            }
+
+            if (!strcmp(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+            }
+
+            if (!strcmp(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+                videoQueueExtFound = true;
+            }
+
+            if (!strcmp(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME,
+                        device_extensions[i].extensionName))
+            {
+                videoDecodeQueueExtFound = true;
+            }
+
+#ifdef VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
+            FLTK_ADD_DEVICE_EXTENSION(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+            FLTK_ADD_DEVICE_EXTENSION(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+#endif
+        }
+
+        if (videoQueueExtFound && videoDecodeQueueExtFound)
+        {
+            pWindow->ctx.device_extensions.push_back(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME);
+            pWindow->ctx.device_extensions.push_back(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
+            pWindow->ctx.device_extensions.push_back(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME);
+        }
+
+        auto wanted_device_extensions = pWindow->get_device_extensions();
+        for (const auto& extension : wanted_device_extensions)
+        {
+            for (i = 0; i < device_extension_count; i++)
+            {
+                if (!strcmp(extension,
+                            device_extensions[i].extensionName))
+                {
+                    pWindow->ctx.device_extensions.push_back(extension);
+                    break;
+                }
+
+            }
+        }
+
+        VK_FREE(device_extensions);
+    }
+
+    if (!swapchainExtFound && !is_headless()) {
+        Fl::fatal("vkEnumerateDeviceExtensionProperties failed to find "
+                  "the " VK_KHR_SWAPCHAIN_EXTENSION_NAME " extension.\n\nDo you have a compatible "
+                  "Vulkan installable client driver (ICD) installed?\nPlease "
+                  "look at the Getting Started guide for additional "
+                  "information.\n",
+                  "vkCreateInstance Failure");
+    }
+
+    vkGetPhysicalDeviceProperties(pWindow->gpu(), &pWindow->ctx.gpu_props);
+
+    // Query with NULL data to get count
+    vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
+                                             &pWindow->ctx.queue_count, NULL);
+
+    pWindow->ctx.queue_props =
+        (VkQueueFamilyProperties *)VK_ALLOC(pWindow->ctx.queue_count *
+                                            sizeof(VkQueueFamilyProperties));
+    vkGetPhysicalDeviceQueueFamilyProperties(pWindow->gpu(),
+                                             &pWindow->ctx.queue_count,
+                                             pWindow->ctx.queue_props);
+    assert(pWindow->ctx.queue_count >= 1);
+
+    vkGetPhysicalDeviceFeatures(pWindow->gpu(), &pWindow->ctx.gpu_features);
+
+    // Steps 2-4: find a video-decode-capable queue family, preferring one
+    // dedicated to video decode (no GRAPHICS/COMPUTE bits) over one that
+    // also does graphics/compute. Which specific queue we'll actually use
+    // within the chosen family, and whether it ends up shared with the
+    // graphics queue, is decided later in create_device() once the
+    // graphics/present family is also known.
+    if (videoQueueExtFound && videoDecodeQueueExtFound)
+    {
+        std::vector<VkQueueFamilyProperties2> qfp2(pWindow->ctx.queue_count);
+        std::vector<VkQueueFamilyVideoPropertiesKHR> videoProps(pWindow->ctx.queue_count);
+        for (uint32_t q = 0; q < pWindow->ctx.queue_count; q++)
+        {
+            videoProps[q] = {};
+            videoProps[q].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_VIDEO_PROPERTIES_KHR;
+            qfp2[q] = {};
+            qfp2[q].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+            qfp2[q].pNext = &videoProps[q];
+        }
+
+        uint32_t qc = pWindow->ctx.queue_count;
+        vkGetPhysicalDeviceQueueFamilyProperties2(pWindow->gpu(), &qc, qfp2.data());
+
+        uint32_t bestIdx = UINT32_MAX;
+        bool     bestDedicated = false;
+        for (uint32_t q = 0; q < qc; q++)
+        {
+            VkQueueFlags flags = qfp2[q].queueFamilyProperties.queueFlags;
+            if (!(flags & VK_QUEUE_VIDEO_DECODE_BIT_KHR)) continue;
+            if (videoProps[q].videoCodecOperations == 0) continue; // sanity guard
+
+            bool dedicated = (flags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) == 0;
+
+            // Step 3/4: keep the first candidate found; only switch to a
+            // later one if it's dedicated and our current pick isn't.
+            if (bestIdx == UINT32_MAX || (dedicated && !bestDedicated))
+            {
+                bestIdx = q;
+                bestDedicated = dedicated;
+            }
+        }
+
+        if (bestIdx != UINT32_MAX)
+        {
+            Fl_Vk_Video_Queue_Family family;
+            family.idx = (int32_t)bestIdx;
+            family.num = 0; // finalized in create_device() once queues are allocated
+            family.flags = qfp2[bestIdx].queueFamilyProperties.queueFlags;
+            family.video_caps = videoProps[bestIdx].videoCodecOperations;
+            pWindow->ctx.video_decode_queue_families.push_back(family);
+        }
+    }
+
+}
+
+#ifndef VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME
+#   define VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME "VK_EXT_extended_dynamic_state"
+#endif
+#ifndef VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME
+#   define VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME "VK_EXT_extended_dynamic_state2"
+#endif
+#ifndef VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME
+#   define VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME "VK_EXT_extended_dynamic_state3"
+#endif
+#ifndef VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME
+#   define VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME "VK_EXT_color_write_enable"
+#endif
+
+// Device-level capabilities actually enabled on the (single, shared) VkDevice.
+// The device is created only once, by the first window, but every window has
+// its own Fl_Vk_Context, so create_device() stores the result here and
+// init_colorspace() copies it into each window's ctx.
+static bool g_has_extended_dynamic_state      = false;
+static bool g_has_extended_dynamic_state2     = false;
+static bool g_has_dyn_state3_color_write_mask = false;
+static bool g_has_color_write_enable          = false;
+
+void Fl_Vk_Window_Driver::create_device()
+{
+    VkResult result;
+
+    // 1. Which of the optional extensions did init_vk() actually find on this
+    //    GPU?  A feature struct may only be chained into
+    //    vkGetPhysicalDeviceFeatures2()/vkCreateDevice() if its extension is
+    //    enabled, and a feature may only be *used* if it was enabled.
+    auto ext_enabled = [this](const char *name) {
+        for (const char *e : pWindow->ctx.device_extensions)
+            if (!strcmp(e, name)) return true;
+        return false;
+    };
+    const bool hasEDS1 = ext_enabled(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    const bool hasEDS2 = ext_enabled(VK_EXT_EXTENDED_DYNAMIC_STATE_2_EXTENSION_NAME);
+    const bool hasEDS3 = ext_enabled(VK_EXT_EXTENDED_DYNAMIC_STATE_3_EXTENSION_NAME);
+    const bool hasCWE  = ext_enabled(VK_EXT_COLOR_WRITE_ENABLE_EXTENSION_NAME);
+
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT eds1 = {};
+    eds1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+    VkPhysicalDeviceExtendedDynamicState2FeaturesEXT eds2 = {};
+    eds2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+    VkPhysicalDeviceExtendedDynamicState3FeaturesEXT eds3 = {};
+    eds3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+    VkPhysicalDeviceColorWriteEnableFeaturesEXT cwe = {};
+    cwe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
+
+    VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+    deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+    // Build the pNext chain only from structs whose extension is enabled.
+    void **tail = &deviceFeatures2.pNext;
+    if (hasEDS1) { *tail = &eds1; tail = &eds1.pNext; }
+    if (hasEDS2) { *tail = &eds2; tail = &eds2.pNext; }
+    if (hasEDS3) { *tail = &eds3; tail = &eds3.pNext; }
+    if (hasCWE)  { *tail = &cwe;  tail = &cwe.pNext;  }
+
+    // 2. Ask the GPU/driver what it really supports.
+    vkGetPhysicalDeviceFeatures2(gpu(), &deviceFeatures2);
+
+    // 3. Record the result.  (On Linux drivers these are normally all true;
+    //    MoltenVK on macOS does not implement extendedDynamicState3ColorWriteMask.)
+    g_has_extended_dynamic_state      = hasEDS1 && eds1.extendedDynamicState  == VK_TRUE;
+    g_has_extended_dynamic_state2     = hasEDS2 && eds2.extendedDynamicState2 == VK_TRUE;
+    g_has_dyn_state3_color_write_mask = hasEDS3 && eds3.extendedDynamicState3ColorWriteMask == VK_TRUE;
+    g_has_color_write_enable          = hasCWE  && cwe.colorWriteEnable       == VK_TRUE;
+
+    // 4. Enable only what we actually use, instead of everything the GPU
+    //    offers (EDS3 alone has ~30 feature bits).  Keep each struct's pNext.
+    {
+        void *n = eds1.pNext;
+        eds1 = {}; eds1.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+        eds1.pNext = n;
+        eds1.extendedDynamicState = g_has_extended_dynamic_state ? VK_TRUE : VK_FALSE;
+
+        n = eds2.pNext;
+        eds2 = {}; eds2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT;
+        eds2.pNext = n;
+        eds2.extendedDynamicState2 = g_has_extended_dynamic_state2 ? VK_TRUE : VK_FALSE;
+
+        n = eds3.pNext;
+        eds3 = {}; eds3.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_3_FEATURES_EXT;
+        eds3.pNext = n;
+        eds3.extendedDynamicState3ColorWriteMask = g_has_dyn_state3_color_write_mask ? VK_TRUE : VK_FALSE;
+
+        n = cwe.pNext;
+        cwe = {}; cwe.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT;
+        cwe.pNext = n;
+        cwe.colorWriteEnable = g_has_color_write_enable ? VK_TRUE : VK_FALSE;
+    }
+
+    // Base features were filled in by the query above (everything the GPU
+    // supports is enabled).  Never force a core feature on: if it is missing,
+    // vkCreateDevice() would fail with VK_ERROR_FEATURE_NOT_PRESENT.
+    if (!deviceFeatures2.features.fillModeNonSolid)
+        Fl::warning("fillModeNonSolid is not supported by this GPU.");
+
+    // Steps 5-6: decide how the video decode queue (if any was found by
+    // init_vk()) relates to the graphics queue family chosen just before
+    // this call. Three cases:
+    //  a) video decode family != graphics family -> fully separate queue,
+    //     queue index 0 of its own family.
+    //  b) same family, and that family has more than one queue available ->
+    //     request a 2nd queue from the family so decode gets its own queue.
+    //  c) same family with only one queue total -> must share queue 0 with
+    //     graphics; synchronized via the shared Fl_Vk_Queue mutex.
+    bool     haveVideoDecode = !pWindow->ctx.video_decode_queue_families.empty();
+    int32_t  videoDecodeFamilyIndex = -1;
+    uint32_t videoDecodeQueueIndex = 0;
+    bool     videoDecodeSharesGraphicsQueue = false;
+
+    if (haveVideoDecode)
+    {
+        Fl_Vk_Video_Queue_Family &vf = pWindow->ctx.video_decode_queue_families[0];
+        videoDecodeFamilyIndex = vf.idx;
+
+        if (videoDecodeFamilyIndex != (int32_t)m_queueFamilyIndex)
+        {
+            // (a) separate family entirely.
+            videoDecodeQueueIndex = 0;
+        }
+        else
+        {
+            uint32_t familyQueueCount = pWindow->ctx.queue_props[vf.idx].queueCount;
+            if (familyQueueCount > 1)
+            {
+                // (b) same family, a spare queue is available.
+                videoDecodeQueueIndex = 1;
+            }
+            else
+            {
+                // (c) only one queue in this family - must share.
+                videoDecodeQueueIndex = 0;
+                videoDecodeSharesGraphicsQueue = true;
+            }
+        }
+    }
+
+    // At most 2 queues are ever requested from the graphics family: one for
+    // graphics/present, and a second only in case (b) above.
+    float queue_priorities[2] = { 1.0, 1.0 };
+
+    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
+
+    VkDeviceQueueCreateInfo graphicsQueueCreateInfo = {};
+    graphicsQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    graphicsQueueCreateInfo.queueFamilyIndex = m_queueFamilyIndex;
+    graphicsQueueCreateInfo.queueCount =
+        (haveVideoDecode && videoDecodeFamilyIndex == (int32_t)m_queueFamilyIndex &&
+         videoDecodeQueueIndex == 1) ? 2 : 1;
+    graphicsQueueCreateInfo.pQueuePriorities = queue_priorities;
+    queueCreateInfos.push_back(graphicsQueueCreateInfo);
+
+    if (haveVideoDecode && videoDecodeFamilyIndex != (int32_t)m_queueFamilyIndex)
+    {
+        VkDeviceQueueCreateInfo videoQueueCreateInfo = {};
+        videoQueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        videoQueueCreateInfo.queueFamilyIndex = (uint32_t)videoDecodeFamilyIndex;
+        videoQueueCreateInfo.queueCount = 1;
+        videoQueueCreateInfo.pQueuePriorities = queue_priorities;
+        queueCreateInfos.push_back(videoQueueCreateInfo);
+    }
+
+    VkDeviceCreateInfo deviceInfo = {};
+    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceInfo.pNext = &deviceFeatures2;
+    deviceInfo.queueCreateInfoCount = (uint32_t)queueCreateInfos.size();
+    deviceInfo.pQueueCreateInfos = queueCreateInfos.data();
+    deviceInfo.enabledLayerCount = 0;
+    deviceInfo.ppEnabledLayerNames = nullptr;
+    deviceInfo.enabledExtensionCount = pWindow->ctx.device_extensions.size();
+    deviceInfo.ppEnabledExtensionNames = pWindow->ctx.device_extensions.data();
+
+    result = vkCreateDevice(gpu(), &deviceInfo, NULL, &m_device);
+    VK_CHECK(result);
+
+    vkGetDeviceQueue(m_device, m_queueFamilyIndex, 0, &m_queue);
+
+    if (haveVideoDecode)
+    {
+        Fl_Vk_Video_Queue_Family &vf = pWindow->ctx.video_decode_queue_families[0];
+        vf.num = 1; // exactly one queue is ever used for video decode
+
+        if (videoDecodeSharesGraphicsQueue)
+        {
+            // Reuse the *same* Fl_Vk_Queue wrapper as the graphics queue so
+            // submissions - ours or FFmpeg's - serialize through one mutex
+            // rather than racing on the shared VkQueue. pWindow->m_queue's
+            // .queue field is filled in by the caller right after this
+            // function returns; aliasing the pointer here is fine since
+            // both windows onto it resolve after that assignment.
+            pWindow->ctx.safe_thread_video_decode_queue = pWindow->m_queue;
+        }
+        else
+        {
+            VkQueue videoQueue = VK_NULL_HANDLE;
+            vkGetDeviceQueue(m_device, (uint32_t)videoDecodeFamilyIndex,
+                             videoDecodeQueueIndex, &videoQueue);
+            Fl_Vk_Queue *wrapper = new Fl_Vk_Queue();
+            wrapper->queue = videoQueue;
+            pWindow->ctx.safe_thread_video_decode_queue = wrapper;
+        }
+    }
+}
+
+void Fl_Vk_Window_Driver::init_colorspace() {
+    VkResult result;
+    uint32_t i;
+
+    // Get Memory information and properties
+    size_t numQueues = pWindow->ctx.queue_count;
+    vkGetPhysicalDeviceMemoryProperties(pWindow->gpu(),
+                                        &pWindow->m_memory_properties);
+
+    uint32_t graphicsQueueNodeIndex = UINT32_MAX;
+
+    if (is_headless()) {
+        // No VkSurfaceKHR exists, so there is no "present support" to query:
+        // any graphics-capable queue family will do for offscreen rendering.
+        for (i = 0; i < numQueues; i++) {
+            if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+                graphicsQueueNodeIndex = i;
+                break;
+            }
+        }
+        if (graphicsQueueNodeIndex == UINT32_MAX) {
+            Fl::fatal("Could not find a graphics queue\n",
+                      "Headless Initialization Failure");
+        }
+    } else {
+        // Iterate over each queue to learn whether it supports presenting:
+        VkBool32 *supportsPresent = (VkBool32 *)VK_ALLOC(numQueues *
+                                                         sizeof(VkBool32));
+        for (i = 0; i < numQueues; i++)
+        {
+            vkGetPhysicalDeviceSurfaceSupportKHR(pWindow->gpu(), i,
+                                                 pWindow->m_surface,
+                                                 &supportsPresent[i]);
+        }
+
+        // Search for a graphics and a present queue in the array of queue
+        // families, try to find one that supports both
+        uint32_t presentQueueNodeIndex = UINT32_MAX;
+        for (i = 0; i < numQueues; i++) {
+            if ((pWindow->ctx.queue_props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
+                if (graphicsQueueNodeIndex == UINT32_MAX) {
+                    graphicsQueueNodeIndex = i;
+                }
+
+                if (supportsPresent[i] == VK_TRUE) {
+                    graphicsQueueNodeIndex = i;
+                    presentQueueNodeIndex = i;
+                    break;
+                }
+            }
+        }
+        if (presentQueueNodeIndex == UINT32_MAX) {
+            // If didn't find a queue that supports both graphics and present, then
+            // find a separate present queue.
+            for (i = 0; i < numQueues; ++i) {
+                if (supportsPresent[i] == VK_TRUE) {
+                    presentQueueNodeIndex = i;
+                    break;
+                }
+            }
+        }
+        free(supportsPresent);
+
+        // Generate result or if could not find both a graphics and a present queue
+        if (graphicsQueueNodeIndex == UINT32_MAX ||
+            presentQueueNodeIndex == UINT32_MAX) {
+            Fl::fatal("Could not find a graphics and a present queue\n",
+                      "Swapchain Initialization Failure");
+        }
+
+        // \@note: It is possible for an application to use a separate graphics
+        //         and a present queues.  Here we assume not.
+        if (graphicsQueueNodeIndex != presentQueueNodeIndex) {
+            Fl::fatal("Could not find a common graphics and a present queue\n",
+                      "Swapchain Initialization Failure");
+        }
+    }
+
+    pWindow->ctx.queueFamilyIndex = m_queueFamilyIndex = graphicsQueueNodeIndex;
+
+    if (pWindow->m_device == VK_NULL_HANDLE)
+    {
+        create_device();
+
+        // Create global resources
+        pWindow->m_device = m_device;
+        pWindow->m_queue->queue = m_queue;
+
+        // Create Vma allocator
+        // NOTE: Do not pass vulkan function pointers or Vulkan API version
+        //       as they are used automatically by VMA.  Otherwise, you'll get
+        //       a hit in performance!
+        VmaAllocatorCreateInfo allocatorInfo = {};
+        allocatorInfo.physicalDevice = pWindow->gpu();
+        allocatorInfo.device = m_device;
+        allocatorInfo.instance = pWindow->instance();
+        vmaCreateAllocator(&allocatorInfo, &pWindow->m_allocator);
+    }
+
+    // Populate window with global resources
+    pWindow->device() = pWindow->m_device;
+    pWindow->ctx.safe_thread_queue = pWindow->m_queue;
+    pWindow->ctx.allocator = pWindow->m_allocator;
+
+    // The device is shared, but each window has its own ctx: publish what was
+    // actually enabled on the device so pipeline code can query it.
+    pWindow->ctx.has_extended_dynamic_state      = g_has_extended_dynamic_state;
+    pWindow->ctx.has_extended_dynamic_state2     = g_has_extended_dynamic_state2;
+    pWindow->ctx.has_dyn_state3_color_write_mask = g_has_dyn_state3_color_write_mask;
+    pWindow->ctx.has_color_write_enable          = g_has_color_write_enable;
+
+    VkColorSpaceKHR color_space;
+    VkFormat view_format;
+
+    if (is_headless()) {
+        // No VkSurfaceKHR exists, so vkGetPhysicalDeviceSurfaceFormatsKHR()
+        // (and the HDR-scoring logic below, which only matters for a real
+        // presentation engine) do not apply. Offscreen buffers use a fixed,
+        // widely-supported format; override via a driver subclass if a
+        // different one is needed (e.g. to match a downstream encoder).
+        view_format = VK_FORMAT_R8G8B8A8_UNORM;
+        color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        pWindow->ctx.format = view_format;
+        pWindow->ctx.colorSpace = color_space;
+
+        if (pWindow->log_level() > 2)
+        {
+            printf("\tSelected offscreen format = %s\n"
+                   "\tSelected offscreen color space = %s\n",
+                   string_VkFormat(view_format),
+                   string_VkColorSpaceKHR(color_space));
+        }
+        return;
+    }
+
+    bool hasHDRMonitor = has_hdr_monitor();
+    bool hdrMonitorFound = false;
+
+    // 1. Get the function pointer
+    auto fpGetPhysicalDeviceSurfaceFormats2KHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormats2KHR>(
+        vkGetInstanceProcAddr(pWindow->instance(), "vkGetPhysicalDeviceSurfaceFormats2KHR")
+        );
+
+    if (fpGetPhysicalDeviceSurfaceFormats2KHR) {
+        // 2. Set up the surface info
+        VkPhysicalDeviceSurfaceInfo2KHR surfaceInfo = {};
+        surfaceInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR;
+        surfaceInfo.surface = pWindow->m_surface;
+
+        // 3. Get the count
+        uint32_t formatCount;
+        fpGetPhysicalDeviceSurfaceFormats2KHR(pWindow->gpu(), &surfaceInfo, &formatCount, nullptr);
+
+        // 4. Get the formats
+        std::vector<VkSurfaceFormat2KHR> formats2(formatCount);
+        // Look for HDR10 if present
+        std::vector<int> scores(formatCount);
+        for (auto& f : formats2) f.sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
+
+        fpGetPhysicalDeviceSurfaceFormats2KHR(pWindow->gpu(), &surfaceInfo, &formatCount, formats2.data());
+
+        // 5. Access the formats
+        int i = 0;
+        for (const auto& f : formats2) {
+            scores[i] = 0;
+            VkFormat fmt = f.surfaceFormat.format;
+            VkColorSpaceKHR space = f.surfaceFormat.colorSpace;
+
+            if (pWindow->log_level() > 1)
+            {
+                printf("[%d] format = %s color space = %s\n",
+                       i, string_VkFormat(fmt),
+                       string_VkColorSpaceKHR(space));
+            }
+            switch(space)
+            {
+            case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+                if (hasHDRMonitor)
+                {
+                    scores[i] += 4000;
+                    hdrMonitorFound = true;
+                }
+                break;
+            case VK_COLOR_SPACE_HDR10_HLG_EXT:
+                if (hasHDRMonitor)
+                {
+                    scores[i] += 3000;
+                    hdrMonitorFound = true;
+                }
+                break;
+            case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+                scores[i] += 2000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+                scores[i] += 1500;
+                hdrMonitorFound = true;
+                break;
+                //! \@todo: We don't handle Dolbyvision yet, so it gets a
+                //! low score for now.
+            case VK_COLOR_SPACE_DOLBYVISION_EXT:
+                scores[i] += 1000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+                scores[i] += 500; // SDR baseline
+                break;
+            default:
+                break;
+            }
+
+            switch (fmt)
+            {
+            case VK_FORMAT_R16G16B16A16_UNORM:
+                scores[i] += 2000;
+                break;
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+                scores[i] += 1500;
+                break;
+            case VK_FORMAT_R8G8B8A8_UNORM:
+            case VK_FORMAT_B8G8R8A8_UNORM:
+            case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+                scores[i] += 500;
+                break;
+            default:
+                break;
+            }
+
+            ++i;
+        }
+
+        if (!hdrMonitorFound)
+        {
+            bool foundLinear = false;
+            int best_score = 0;
+            for (unsigned i = 0; i < formats2.size(); ++i)
+            {
+                if (scores[i] > best_score &&
+                    formats2[i].surfaceFormat.colorSpace ==
+                    VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                {
+                    best_score = scores[i];
+                    view_format = formats2[i].surfaceFormat.format;
+                    color_space = formats2[i].surfaceFormat.colorSpace;
+                    foundLinear = true;
+                }
+            }
+            if (!foundLinear)
+            {
+                // Fallback to first supported format (usually works)
+                view_format = formats2[0].surfaceFormat.format;
+                color_space = formats2[0].surfaceFormat.colorSpace;
+                if (pWindow->log_level() > 1)
+                {
+                    fprintf(stderr, "No ideal format found, using fallback\n");
+                }
+            }
+        }
+        else
+        {
+            // Default clips and washed out colors
+            int best_score = 0;
+            for (unsigned i = 0; i < formats2.size(); ++i)
+            {
+                if (scores[i] > best_score)
+                {
+                    best_score = scores[i];
+                    view_format = formats2[i].surfaceFormat.format;
+                    color_space = formats2[i].surfaceFormat.colorSpace;
+                }
+            }
+        }
+
+        // Handle undefined format case
+        if (formatCount == 1 &&
+            formats2[0].surfaceFormat.format == VK_FORMAT_UNDEFINED)
+        {
+            view_format = VK_FORMAT_B8G8R8A8_UNORM;
+            color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        }
+    }
+    else
+    {
+        uint32_t formatCount;
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+            pWindow->gpu(), pWindow->m_surface, &formatCount, NULL);
+        VK_CHECK(result);
+
+        std::vector<VkSurfaceFormatKHR> formats(formatCount);
+        result = vkGetPhysicalDeviceSurfaceFormatsKHR(
+            pWindow->gpu(), pWindow->m_surface, &formatCount, formats.data());
+        VK_CHECK(result);
+
+        // Look for HDR10 if present
+        std::vector<int> scores(formats.size());
+        i = 0;
+        for (const auto& format : formats)
+        {
+            scores[i] = 0;
+            if (pWindow->log_level() > 1)
+            {
+                printf("[%d] format = %s color space = %s\n",
+                       i, string_VkFormat(format.format),
+                       string_VkColorSpaceKHR(format.colorSpace));
+            }
+            switch (format.colorSpace)
+            {
+            case VK_COLOR_SPACE_HDR10_ST2084_EXT:
+                scores[i] += 4000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_HDR10_HLG_EXT:
+                scores[i] += 3000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT:
+                scores[i] += 2000;
+                hdrMonitorFound = true;
+                break;
+                //! We don't handle Dolbyvision yet, so it gets a low score for now.
+            case VK_COLOR_SPACE_DOLBYVISION_EXT:
+                scores[i] += 1000;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT:
+                scores[i] += 1500;
+                hdrMonitorFound = true;
+                break;
+            case VK_COLOR_SPACE_SRGB_NONLINEAR_KHR:
+                scores[i] += 500; // Default to SDR
+                break;
+            default:
+                break;
+            }
+
+            switch (format.format)
+            {
+                // Accept 16-bit formats for everything
+            case VK_FORMAT_R16G16B16A16_UNORM:
+                scores[i] += 2000;
+                break;
+            case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+            case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+                scores[i] += 1500;
+                break;
+            case VK_FORMAT_R8G8B8A8_UNORM:
+            case VK_FORMAT_B8G8R8A8_UNORM:
+            case VK_FORMAT_A8B8G8R8_UNORM_PACK32:
+                scores[i] += 500;
+                break;
+            default:
+                break;
+            }
+
+            ++i;
+
+        }
+
+        if (!hdrMonitorFound)
+        {
+            bool foundLinear = false;
+            int best_score = 0;
+            for (unsigned i = 0; i < formats.size(); ++i)
+            {
+                if (scores[i] > best_score &&
+                    formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                {
+                    best_score = scores[i];
+                    view_format = formats[i].format;
+                    color_space = formats[i].colorSpace;
+                    foundLinear = true;
+                }
+            }
+            if (!foundLinear)
+            {
+                // Fallback to first supported format (usually works)
+                view_format = formats[0].format;
+                color_space = formats[0].colorSpace;
+                if (pWindow->log_level() > 1)
+                {
+                    fprintf(stderr, "No ideal format found, using fallback\n");
+                }
+            }
+        }
+        else
+        {
+            int best_score = 0;
+            for (unsigned i = 0; i < formats.size(); ++i)
+            {
+                if (scores[i] > best_score)
+                {
+                    best_score = scores[i];
+                    view_format = formats[i].format;
+                    color_space = formats[i].colorSpace;
+                }
+            }
+        }
+
+        // Handle undefined format case
+        if (formatCount == 1 && formats[0].format == VK_FORMAT_UNDEFINED)
+        {
+            view_format = VK_FORMAT_B8G8R8A8_UNORM;
+            color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+        }
+    }
+
+    pWindow->ctx.format = view_format;
+    pWindow->ctx.colorSpace = color_space;
+
+    if (pWindow->log_level() > 2)
+    {
+        printf("\tSelected window format = %s\n"
+               "\tSelected window color space = %s\n",
+               string_VkFormat(view_format),
+               string_VkColorSpaceKHR(color_space));
+    }
+}
+
+void Fl_Vk_Window_Driver::prepare() {
+    int W = pWindow->pixel_w();
+    int H = pWindow->pixel_h();
+    resize(true, W, H);
+
+    if (is_headless())
+        prepare_offscreen_buffers();
+    else
+        prepare_buffers();
+    prepare_depth();
+    pWindow->prepare();
+    prepare_framebuffers(); // can be kept in driver
+}
+
+bool Fl_Vk_Window_Driver::buffers_ready() const {
+    // A real swapchain is the readiness signal for interactive windows;
+    // headless windows never create one, so the offscreen buffer vector
+    // itself is the signal instead.
+    return is_headless() ? !pWindow->m_buffers.empty()
+                          : pWindow->m_swapchain != VK_NULL_HANDLE;
+}
+
+// Headless equivalent of prepare_buffers(): builds plain VkImages (via VMA)
+// instead of a VkSwapchainKHR, then populates pWindow->m_buffers exactly the
+// way prepare_buffers() does, so prepare_depth()/prepare_framebuffers() (and
+// anything downstream that reads m_buffers/m_swapchainExtent) need no
+// changes at all to work for offscreen rendering.
+void Fl_Vk_Window_Driver::prepare_offscreen_buffers() {
+    // Destroy any previously-allocated offscreen images/views/semaphores.
+    for (auto& buffer : pWindow->m_buffers) {
+        buffer.destroy(pWindow->device(), pWindow->m_allocator);
+    }
+    pWindow->m_buffers.clear();
+
+    uint32_t W = pWindow->pixel_w();
+    uint32_t H = pWindow->pixel_h();
+    if (W == 0 || H == 0) {
+        // Nothing to allocate yet; caller may retry once a real size is known.
+        return;
+    }
+    pWindow->m_swapchainExtent = { W, H };
+
+    // Single buffer: there is no acquire/present cycle to rotate through
+    // multiple images the way the interactive swapchain path has --
+    // vk_draw_begin() always targets m_current_buffer == 0 for a headless
+    // window (see its is_headless() branch). Each render_offscreen() call
+    // fully waits for GPU completion (see Fl_Vk_Window::render_offscreen())
+    // before the caller reads the image back, so there's no pipelining to
+    // gain from a second buffer here.
+    const uint32_t kOffscreenImageCount = 1;
+
+    VkImageCreateInfo image_info = {};
+    image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_info.imageType     = VK_IMAGE_TYPE_2D;
+    image_info.format        = pWindow->format();
+    image_info.extent        = { W, H, 1 };
+    image_info.mipLevels     = 1;
+    image_info.arrayLayers   = 1;
+    image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    image_info.usage         = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                               VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+    VmaAllocationCreateInfo alloc_info = {};
+    alloc_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+
+    pWindow->m_buffers.resize(kOffscreenImageCount);
+    VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+
+    for (auto& buffer : pWindow->m_buffers) {
+        VkResult result = vmaCreateImage(pWindow->m_allocator, &image_info, &alloc_info,
+                                         &buffer.image, &buffer.allocation, nullptr);
+        if (result != VK_SUCCESS) {
+            fprintf(stderr, "vmaCreateImage (offscreen buffer) failed: %s\n",
+                    string_VkResult(result));
+            pWindow->m_buffers.clear();
+            return;
+        }
+
+        VkImageViewCreateInfo view_info = {};
+        view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view_info.image = buffer.image;
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.format = pWindow->format();
+        view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.layerCount = 1;
+        result = vkCreateImageView(pWindow->device(), &view_info, NULL, &buffer.view);
+        VK_CHECK(result);
+
+        result = vkCreateSemaphore(pWindow->device(), &semaphoreInfo, nullptr,
+                                   &buffer.semaphore);
+        VK_CHECK(result);
+
+        buffer.extent = pWindow->m_swapchainExtent;
+    }
+}
+
+void Fl_Vk_Window_Driver::destroy_surface() {
+    if (!pWindow || !pWindow->instance() ||
+        pWindow->m_surface == VK_NULL_HANDLE)
+        return;
+
+    vkDestroySurfaceKHR(pWindow->instance(), pWindow->m_surface, nullptr);
+    pWindow->m_surface = VK_NULL_HANDLE;
+}
+
+// Uses: device(), m_buffers, m_depth
+void Fl_Vk_Window_Driver::destroy_resources()
+{
+    if (!pWindow || pWindow->device() == VK_NULL_HANDLE)
+    {
+        fprintf(stderr, "destroy_resources: Invalid device\n");
+        return;
+    }
+
+    uint32_t i;
+    VkResult result;
+
+    // Destroy resources in reverse creation order (first, those of window)
+    pWindow->destroy_common_resources();
+
+    // Destroy the buffers (pass the allocator: a no-op for swapchain images,
+    // which leave buffer.allocation == VK_NULL_HANDLE, but required to
+    // actually free offscreen/headless buffers, which are VMA-owned).
+    for (auto& buffer : pWindow->m_buffers)
+    {
+        buffer.destroy(pWindow->device(), pWindow->m_allocator);
+    }
+    pWindow->m_buffers.clear();
+
+    // Then, depth/stencils if present
+    pWindow->m_depth.destroy(pWindow->device(), pWindow->m_allocator);
+
+    // Destroy swapchain
+    if (pWindow->m_swapchain != VK_NULL_HANDLE)
+    {
+        vkDestroySwapchainKHR(pWindow->device(), pWindow->m_swapchain, nullptr);
+        pWindow->m_swapchain = VK_NULL_HANDLE;
+    }
+
+    m_swapchainKey.reset();
+}
+
+
+Fl_Vk_Window_Driver::Fl_Vk_Window_Driver(Fl_Vk_Window* win) :
+    pWindow(win)
+{
+    swap_interval_ = 0;  // MAILBOX as a default swapchain presentation mode
+
+    m_instance = VK_NULL_HANDLE;
+    m_gpu      = VK_NULL_HANDLE;
+    m_device   = VK_NULL_HANDLE;
+    m_queue    = VK_NULL_HANDLE;
+}
+
+Fl_Vk_Window_Driver::~Fl_Vk_Window_Driver()
+{
+}

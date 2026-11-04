@@ -60,6 +60,15 @@
 #define BORDER_WIDTH 2
 
 /*
+ * HAVE_VK:
+ *
+ * Do you have Vulkan? Set this to 0 if you don't have or plan to use
+ * Vulkan, and FLTK will be smaller.
+ */
+
+#cmakedefine01 HAVE_VK
+
+/*
  * HAVE_GL:
  *
  * Do you have OpenGL? Set this to 0 if you don't have or plan to use
@@ -67,6 +76,15 @@
  */
 
 #cmakedefine01 HAVE_GL
+
+/*
+ * HAVE_WEBGPU:
+ *
+ * Do you have WebGPU? Set this to 0 if you don't have or plan to use
+ * WebGPU, and FLTK will be smaller.
+ */
+
+#cmakedefine01 HAVE_WEBGPU
 
 /*
  * HAVE_GL_GLU_H:
@@ -369,3 +387,9 @@
  */
 
 #cmakedefine01 HAVE_PRIMARY_SELECTION
+
+
+/*
+ * Is EMSCRIPTEN getting compiled?
+ */
+#cmakedefine01 HAVE_EMSCRIPTEN
