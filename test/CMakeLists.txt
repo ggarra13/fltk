@@ -308,6 +308,7 @@ if(VULKAN_FOUND)
     
     fl_create_example(vk_shape vk_shape.cxx "${VKDEMO_LIBS}")
     fl_create_example(vk_shape_textured vk_shape_textured.cxx "${VKDEMO_LIBS}")
+    fl_create_example(vk_hdr_gradient vk_hdr_gradient.cxx "${VKDEMO_LIBS}")
     fl_create_example(vk_fullscreen vk_fullscreen.cxx "${VKDEMO_LIBS}")	
     fl_create_example(vk_offscreen vk_offscreen.cxx "${VKDEMO_LIBS}")
     if (HAS_GLM)
