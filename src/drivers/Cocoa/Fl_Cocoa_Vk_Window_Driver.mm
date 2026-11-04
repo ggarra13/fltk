@@ -77,13 +77,6 @@ Fl_Vk_Choice *Fl_Cocoa_Vk_Window_Driver::find(int m, const int *alistp)
 #  define NSVulkanContextParameterSurfaceOpacity NSVulkanCPSurfaceOpacity
 #endif
 
-float Fl_Cocoa_Vk_Window_Driver::pixels_per_unit()
-{
-  int retina = (fl_mac_os_version >= 100700 && Fl::use_high_res_GL() && Fl_X::flx(pWindow) &&
-                Fl_Cocoa_Window_Driver::driver(pWindow)->mapped_to_retina()) ? 2 : 1;
-  return retina * Fl_Graphics_Driver::default_driver().scale();
-}
-
 int Fl_Cocoa_Vk_Window_Driver::mode_(int m, const int *a) {
   if (a) { // when the mode is set using the a array of system-dependent values, and if asking for double buffer,
     // the FL_DOUBLE flag must be set in the mode_ member variable

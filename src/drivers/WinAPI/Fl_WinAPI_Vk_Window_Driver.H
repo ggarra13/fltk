@@ -28,7 +28,6 @@ class Fl_WinAPI_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   HMODULE module;
   Fl_WinAPI_Vk_Window_Driver(Fl_Vk_Window *win);
   virtual ~Fl_WinAPI_Vk_Window_Driver();
-  float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
   void make_current_after() FL_OVERRIDE;
   void invalidate() FL_OVERRIDE {}

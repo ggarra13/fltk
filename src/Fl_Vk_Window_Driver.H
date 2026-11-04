@@ -84,7 +84,6 @@ public:
   static Fl_Vk_Window_Driver *newVkWindowDriver(Fl_Vk_Window *w);
   static Fl_Vk_Window_Driver *global();
   virtual int get_surface_buffer_scale() const { return 1; }
-  virtual float pixels_per_unit() { return 1; }
   virtual void before_show(int &) {}
   virtual void after_show() {}
   virtual void swap_interval(int x) { swap_interval_ = x; };
@@ -161,7 +160,7 @@ protected:
   void prepare_framebuffers();
   std::vector<VkSurfaceFormatKHR> query_surface_formats();
   std::vector<VkSurfaceFormatKHR> headless_candidates(Fl_Vk_Output_Profile);
-    
+
   int swap_interval_;
   VkInstance m_instance;
   VkPhysicalDevice m_gpu;

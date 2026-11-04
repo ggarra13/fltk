@@ -106,13 +106,6 @@ Fl_Vk_Choice *Fl_X11_Vk_Window_Driver::find(int m, const int *alistp) {
   return g;
 }
 
-
-float Fl_X11_Vk_Window_Driver::pixels_per_unit() {
-  int ns = Fl_Window_Driver::driver(pWindow)->screen_num();
-  return Fl::screen_driver()->scale(ns);
-}
-
-
 int Fl_X11_Vk_Window_Driver::mode_(int m, const int *a) {
   int oldmode = mode();
   mode(m);

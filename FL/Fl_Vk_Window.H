@@ -168,7 +168,7 @@ protected:
   //! Called on initialization of the swapchain to set up the swapchain
   //! format and color space.
   virtual void init_colorspace();
-  
+
   //! What the display this window is on can show.  Called from
   //! select_surface_format().  Default keeps the old behaviour (assume an
   //! HDR-capable, wide-gamut display and let the surface list decide).
@@ -176,12 +176,12 @@ protected:
   virtual Fl_Vk_Display_Caps display_caps() {
     Fl_Vk_Display_Caps c; c.hdr = true; c.wide_gamut = true; return c;
   }
- 
+
   //! Target format for a headless window.  Default SDR.
   virtual Fl_Vk_Output_Profile headless_output_profile() {
       return Fl_Vk_Output_Profile::SDR;
   }
- 
+
   //! Re-run (format, color space) selection only -- no device/queue work --
   //! and schedule a swapchain recreation.  Call when the window moves to a
   //! different screen or when HDR is toggled in the OS.
@@ -533,7 +533,6 @@ public:
   Fl_Vk_Window* as_vk_window() FL_OVERRIDE { return this; }
   Fl_Vk_Window const* as_vk_window() const FL_OVERRIDE { return this; }
 
-  float pixels_per_unit();
   /** Gives the window width in Vulkan pixels.
    When an Fl_Vk_Window is mapped to a HighDPI display, the value given by Fl_Vk_Window::w()
    which is expressed in FLTK units, may differ from the window width in pixels.

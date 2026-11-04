@@ -1045,19 +1045,6 @@ int Fl_Vk_Window::handle(int event) {
   return Fl_Window::handle(event);
 }
 
-/** The number of pixels per FLTK unit of length for the window.
-    This method dynamically adjusts its value when the GUI is rescaled or when the window
-    is moved to/from displays of distinct resolutions. This method is useful, e.g., to convert,
-    in a window's handle() method, the FLTK units returned by Fl::event_x() and
-    Fl::event_y() to the pixel units used by the Vulkan source code.
-    \version 1.3.4
-*/
-float Fl_Vk_Window::pixels_per_unit() {
-  if (!pVkWindowDriver) return 1.0;
-  return pVkWindowDriver->pixels_per_unit();
-}
-
-
 /**
    \cond DriverDev
    \addtogroup DriverDeveloper

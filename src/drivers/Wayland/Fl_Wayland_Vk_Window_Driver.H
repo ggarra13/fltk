@@ -30,7 +30,6 @@ class Fl_Wayland_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   Fl_Wayland_Vk_Window_Driver(Fl_Vk_Window *win);
   virtual ~Fl_Wayland_Vk_Window_Driver();
   int get_surface_buffer_scale() const FL_OVERRIDE;
-  float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
   void swap_buffers() FL_OVERRIDE;
   void resize(int is_a_resize, int w, int h) FL_OVERRIDE;

@@ -27,7 +27,6 @@ class Fl_Cocoa_Vk_Window_Driver : public Fl_Vk_Window_Driver {
   friend Fl_Vk_Window_Driver* Fl_Vk_Window_Driver::newVkWindowDriver(Fl_Vk_Window *);
   Fl_Cocoa_Vk_Window_Driver(Fl_Vk_Window *win) : Fl_Vk_Window_Driver(win) {};
   virtual ~Fl_Cocoa_Vk_Window_Driver() {};
-  float pixels_per_unit() FL_OVERRIDE;
   int mode_(int m, const int *a) FL_OVERRIDE;
   void invalidate() FL_OVERRIDE {}
   // int flush_begin() FL_OVERRIDE;

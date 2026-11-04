@@ -126,13 +126,6 @@ pixelformat : %d\n", pixelformat); fflush(stdout); #endif // DEBUG_PFD
   return g;
 }
 
-
-float Fl_WinAPI_Vk_Window_Driver::pixels_per_unit() {
-  int ns = Fl_Window_Driver::driver(pWindow)->screen_num();
-  return Fl::screen_driver()->scale(ns);
-}
-
-
 int Fl_WinAPI_Vk_Window_Driver::mode_(int m, const int *a) {
   int oldmode = mode();
   mode(m);
