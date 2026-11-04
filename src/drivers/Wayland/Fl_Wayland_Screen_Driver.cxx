@@ -676,7 +676,6 @@ struct key_repeat_data_t {
 static double key_repeat_delay = 0.5; // sec
 static double key_repeat_interval = 0.05;  // sec
 
-
 static void key_repeat_timer_cb(key_repeat_data_t *key_repeat_data) {
   if (last_keydown_serial == key_repeat_data->serial && key_repeat_interval > 0) {
     Fl::handle(FL_KEYDOWN, key_repeat_data->window);
@@ -1204,8 +1203,8 @@ static void output_done(void *data, struct wl_output *wl_output)
   while (xp) { // all mapped windows
     struct wld_window *win = (struct wld_window*)xp->xid;
     Fl_Window *W = win->fl_win;
-    if (win->buffer || W->as_gl_window()) {
-      if (W->as_gl_window()) {
+    if (win->buffer || W->as_gl_window() || W->as_vk_window()) {
+      if (W->as_gl_window() || W->as_vk_window()) {
         wl_surface_set_buffer_scale(win->wl_surface, output->wld_scale);
         Fl_Window_Driver::driver(W)->is_a_rescale(true);
         W->resize(W->x(), W->y(), W->w(), W->h());
