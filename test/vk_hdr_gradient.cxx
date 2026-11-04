@@ -37,6 +37,7 @@
 #include <limits>
 #include <FL/Fl_Vk_Window.H>
 #include <FL/Fl_Vk_Utils.H>
+#include <FL/vk_enum_string_helper.h>
 #include <Fl_Vk_Demos.H>   // Useless classes used for demo purposes only
 
 class vk_shape_window : public Fl_Vk_Window {
@@ -48,7 +49,15 @@ public:
 
     // Vulkan overrides
     const char* application_name()  FL_OVERRIDE { return "vk_shape"; }
-    int log_level() const FL_OVERRIDE { return 3; }  // print format/color space/HDR metadata
+
+    // Ask for VK_EXT_hdr_metadata so vkSetHdrMetadataEXT() gets loaded.
+    std::vector<const char*> get_device_extensions() FL_OVERRIDE
+        {
+            std::vector<const char*> out;
+            out = Fl_Vk_Window::get_device_extensions();
+            out.push_back(VK_EXT_HDR_METADATA_EXTENSION_NAME);
+            return out;
+        }
 
     void prepare() FL_OVERRIDE;
     void destroy() FL_OVERRIDE;
@@ -71,6 +80,7 @@ protected:
     void prepare_descriptor_layout();
     void prepare_render_pass();
     void prepare_pipeline();
+    void prepare_hdr_metadata();
     
 private:
     void _init();
@@ -494,12 +504,59 @@ void vk_shape_window::prepare_descriptor_layout() {
     VK_CHECK(result);
 }
 
+// Log the selected format / color space and, for an HDR10 swapchain, fill
+// m_hdr_metadata.  Fl_Vk_Window::swap_buffers() then calls
+// vkSetHdrMetadataEXT() for us once the flag set by set_hdr_metadata() is up.
+// prepare() runs again every time the swapchain is recreated (resize,
+// monitor change), so the new swapchain handle gets the metadata too.
+void vk_shape_window::prepare_hdr_metadata()
+{
+    printf("Selected format      = %s\n", string_VkFormat(format()));
+    printf("Selected color space = %s\n", string_VkColorSpaceKHR(colorSpace()));
+
+    if (colorSpace() != VK_COLOR_SPACE_HDR10_ST2084_EXT &&
+        colorSpace() != VK_COLOR_SPACE_HDR10_HLG_EXT)
+        return;   // metadata only applies to these color spaces
+
+    // Display P3 (D65 white), 0.001 - 1000 nits.  VkHdrMetadataEXT has no
+    // EOTF field; it is implied by the swapchain's color space (PQ here).
+    VkHdrMetadataEXT md = {};
+    md.sType = VK_STRUCTURE_TYPE_HDR_METADATA_EXT;
+    md.displayPrimaryRed   = { 0.680f, 0.320f };
+    md.displayPrimaryGreen = { 0.265f, 0.690f };
+    md.displayPrimaryBlue  = { 0.150f, 0.060f };
+    md.whitePoint          = { 0.3127f, 0.3290f };
+    md.minLuminance        = 0.001f;
+    md.maxLuminance        = 1000.0f;
+    md.maxContentLightLevel      = 1000.0f;   // maxCLL
+    md.maxFrameAverageLightLevel = 100.0f;    // maxFALL
+
+    m_hdr_metadata = md;
+    set_hdr_metadata();   // flags it; sent on the next swap_buffers()
+
+    printf("HDR metadata set (primaries=P3-D65 / Display P3, D65 white)\n"
+           "  red    primaries=%f, %f\n"
+           "  green  primaries=%f, %f\n"
+           "  blue   primaries=%f, %f\n"
+           "  white  primaries=%f, %f\n"
+           "  display luminance=%f to %f\n"
+           "  maxCLL =%f\n"
+           "  maxFALL=%f\n",
+           md.displayPrimaryRed.x,   md.displayPrimaryRed.y,
+           md.displayPrimaryGreen.x, md.displayPrimaryGreen.y,
+           md.displayPrimaryBlue.x,  md.displayPrimaryBlue.y,
+           md.whitePoint.x,          md.whitePoint.y,
+           md.minLuminance,          md.maxLuminance,
+           md.maxContentLightLevel,  md.maxFrameAverageLightLevel);
+}
+
 void vk_shape_window::prepare()
 {
     prepare_mesh();
     prepare_descriptor_layout();
     prepare_render_pass();
     prepare_pipeline();
+    prepare_hdr_metadata();
 }
 
 bool vk_shape_window::vk_draw_begin() {
