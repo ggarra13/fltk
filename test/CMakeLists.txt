@@ -401,6 +401,7 @@ if(FLTK_BUILD_SHARED_LIBS)
   if(VULKAN_FOUND)
     fl_create_example(vk_shape-shared vk_shape.cxx "${VKDEMO_SHARED}")
     fl_create_example(vk_shape_textured-shared vk_shape_textured.cxx "${VKDEMO_SHARED}")
+    fl_create_example(vk_hdr_gradient-shared vk_hdr_gradient.cxx "${VKDEMO_SHARED}")
     fl_create_example(vk_fullscreen-shared vk_fullscreen.cxx "${VKDEMO_SHARED}")
     fl_create_example(vk_offscreen-shared vk_offscreen.cxx "${VKDEMO_SHARED}")
       
