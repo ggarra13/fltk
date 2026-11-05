@@ -1,8 +1,6 @@
 name: Build and Test
 
-on: [push]
-
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
