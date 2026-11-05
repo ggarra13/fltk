@@ -81,12 +81,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
   * applications in the background anyways...
   */
 
-#ifdef _DEBUG
-  AllocConsole();
-  freopen("conin$", "r", stdin);
-  freopen("conout$", "w", stdout);
-  freopen("conout$", "w", stderr);
-#endif /* _DEBUG */
+/* #ifdef _DEBUG */
+/*   AllocConsole(); */
+/*   freopen("conin$", "r", stdin); */
+/*   freopen("conout$", "w", stdout); */
+/*   freopen("conout$", "w", stderr); */
+/* #endif /\* _DEBUG *\/ */
+  
 
   /* Get the command line arguments as Windows Wide Character strings */
   LPWSTR *wideArgv = CommandLineToArgvW(GetCommandLineW(), &argc);
