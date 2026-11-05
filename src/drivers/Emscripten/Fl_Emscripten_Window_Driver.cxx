@@ -312,6 +312,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
     return;
   if (pWindow->parent() && !pWindow->window()->shown())
     return;
+  const int id = ID++;          // <-- claim the id before anything can recurse
   if (pWindow->tooltip_window()) {
     force_position(1);
     x(Fl::e_x_root);
@@ -478,12 +479,12 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
 
         dragElement(document.getElementById("fltk_div" + $0));
       },
-      ID, pWindow->border(), pWindow->x(), pWindow->y(),
+      id, pWindow->border(), pWindow->x(), pWindow->y(),
       pWindow->w(), pWindow->h(), pWindow->label() ? pWindow->label(): "",
       em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0);
   // clang-format on
   Fl_X *xp = new Fl_X;
-  xp->xid = (fl_uintptr_t)ID;
+  xp->xid = (fl_uintptr_t)id;
   other_xid = 0;
   xp->w = pWindow;
   flx(xp);
@@ -498,11 +499,11 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
     xp->next = NULL;
     Fl_X::first = xp;
   }
-  fl_window = (Window)ID;
+  fl_window = (Window)id;
   pWindow->set_visible();
   wait_for_expose_value = 0;
   char canvasid[32];
-  sprintf(canvasid, "#%s%d", "fltk_canvas", ID);
+  sprintf(canvasid, "#%s%d", "fltk_canvas", id);
   REGISTER_MOUSE_EV(mousedown);
   REGISTER_MOUSE_EV(mouseup);
   REGISTER_MOUSE_EV(mousemove);
@@ -516,13 +517,12 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
   pWindow->redraw();
   pWindow->handle(Fl::e_number = FL_SHOW); // get child windows to appear
   Fl::e_number = old_event;
-  if (ID == 1) {
+  if (id == 1) {
     if (!strcmp(pWindow->xclass(), "./this.program"))
       emscripten_set_window_title("FLTK");
     else
       emscripten_set_window_title(pWindow->xclass());
   }
-  ID += 1;
 }
 
 void Fl_Emscripten_Window_Driver::show() {
