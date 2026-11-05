@@ -1219,17 +1219,24 @@ void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP
     }
   }
   EM_ASM(
-      {
-        let ctx = Emval.toValue($0);
-        let idata = new ImageData(new Uint8ClampedArray(HEAPF64.buffer, $1, $2), $3, $4);
-        ctx.save();
-        ctx.rect($5, $6, $9, $10);
-        ctx.clip();
-        ctx.putImageData(idata, $5, $6, $7, $8, $9, $10);
-        ctx.restore();
-      },
-      ctxt, image_data.data(), image_data.size(), rgb->data_w(), rgb->data_h(), XP, YP, cx, cy, WP,
-      HP);
+    {
+      let ctx = Emval.toValue($0);
+      let iw = $3, ih = $4;
+      let idata = new ImageData(
+          new Uint8ClampedArray(HEAPU8.buffer.slice($1, $1 + $2)), iw, ih);
+      // temp canvas so we can composite instead of overwrite
+      let tmp = new OffscreenCanvas(iw, ih);   // or document.createElement('canvas')
+      tmp.getContext('2d').putImageData(idata, 0, 0);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect($5, $6, $9, $10);
+      ctx.clip();
+      // source rect (cx,cy,WP,HP) -> destination (XP,YP,WP,HP)
+      ctx.drawImage(tmp, $7, $8, $9, $10, $5, $6, $9, $10);
+      ctx.restore();
+    },
+    ctxt, image_data.data(), image_data.size(), rgb->data_w(), rgb->data_h(),
+    XP, YP, cx, cy, WP, HP);
 }
 
 
