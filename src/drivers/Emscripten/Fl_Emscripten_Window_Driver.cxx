@@ -304,6 +304,72 @@ extern "C" void EMSCRIPTEN_KEEPALIVE fltk_em_resize_drag(int xid, int dir, int d
 }
 
 
+// ---------------------------------------------------------------------------
+// Fullscreen: fill the browser viewport and follow it when it changes
+// ---------------------------------------------------------------------------
+// A top-level window with fullscreen_active() covers the whole browser page.
+// Note: Fl::w()/Fl::h() are the *monitor* size (screen.availWidth/Height), which
+// is not what we want here, so the viewport (window.innerWidth/innerHeight) is used.
+
+// Size a fullscreen window should have: the viewport, but not below size_range()'s minimum
+// (if the viewport is smaller than that, the page scrolls).
+static void em_fullscreen_size(Fl_Window *win, int &W, int &H) {
+  W = EM_ASM_INT({ return window.innerWidth; });
+  H = EM_ASM_INT({ return window.innerHeight; });
+  int minw = 0, minh = 0, maxw = 0, maxh = 0;
+  win->get_size_range(&minw, &minh, &maxw, &maxh, NULL, NULL, NULL);
+  if (W < minw) W = minw;
+  if (H < minh) H = minh;
+  if (W < 1) W = 1;
+  if (H < 1) H = 1;
+}
+
+// Page/div styling for a window that fills the page, or back to normal.
+// Call after border() was changed, so em_user_resizable() is up to date.
+static void em_fullscreen_page_style(int xid, bool on, bool handles) {
+  EM_ASM(
+      {
+        document.body.style.margin = $1 ? "0" : "";
+        document.body.style.overflow = $1 ? "auto" : "";
+        let div = document.getElementById("fltk_div" + $0);
+        if (div) {
+          div.style.borderRight = $1 ? "none" : "1px solid #555";
+          div.style.borderBottom = $1 ? "none" : "1px solid #555";
+          div.querySelectorAll(".fltk_resize_handle")
+              .forEach((h) => h.style.display = $2 ? "block" : "none");
+        }
+      },
+      xid, on ? 1 : 0, handles ? 1 : 0);
+}
+
+// Browser window resized: refit all top-level fullscreen windows.
+static bool em_on_viewport_resize(int, const EmscriptenUiEvent *, void *) {
+  bool changed = false;
+  for (Fl_X *x = Fl_X::first; x; x = x->next) {
+    Fl_Window *win = x->w;
+    if (!win || win->parent() || !win->fullscreen_active())
+      continue;
+    int W, H;
+    em_fullscreen_size(win, W, H);
+    if (win->x() != 0 || win->y() != 0 || win->w() != W || win->h() != H) {
+      win->resize(0, 0, W, H);
+      changed = true;
+    }
+  }
+  if (changed)
+    Fl::flush(); // setting canvas.width clears the canvas: redraw right away
+  return false;
+}
+
+static void em_track_viewport() {
+  static bool registered = false;
+  if (registered)
+    return;
+  registered = true;
+  emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, false,
+                                 em_on_viewport_resize);
+}
+
 // Basically the window itself is a div element. Decorations for bordered windows are done in the browser using a div as well.
 // The window div contains a canvas element which is the FLTK window.
 void Fl_Emscripten_Window_Driver::makeWindow() {
@@ -312,7 +378,19 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
     return;
   if (pWindow->parent() && !pWindow->window()->shown())
     return;
-  const int id = ID++;          // <-- claim the id before anything can recurse
+  // Claim the id now: handle(FL_SHOW) below maps child windows, which re-enters
+  // makeWindow() and must not see the same id.
+  const int id = ID++;
+  // fullscreen() before show() only set the flag: apply it now, before the
+  // canvas is created, so it starts at the viewport size (not at the requested size).
+  const bool fill = !pWindow->parent() && pWindow->fullscreen_active();
+  if (fill) {
+    int W, H;
+    pWindow->border(0); // not shown yet: only sets the flag
+    em_fullscreen_size(pWindow, W, H);
+    force_position(1);
+    pWindow->Fl_Group::resize(0, 0, W, H);
+  }
   if (pWindow->tooltip_window()) {
     force_position(1);
     x(Fl::e_x_root);
@@ -428,7 +506,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
           });
           div.appendChild(h);
         }
-        if ($1 !== 0 && !$8) {
+        if (!$8) {
           addResizeHandle("nw", 5, "nwse-resize");
           addResizeHandle("n", 4, "ns-resize");
           addResizeHandle("ne", 6, "nesw-resize");
@@ -483,6 +561,10 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
       pWindow->w(), pWindow->h(), pWindow->label() ? pWindow->label(): "",
       em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0);
   // clang-format on
+  if (fill) {
+    em_track_viewport();
+    em_fullscreen_page_style(id, true, false);
+  }
   Fl_X *xp = new Fl_X;
   xp->xid = (fl_uintptr_t)id;
   other_xid = 0;
@@ -693,15 +775,20 @@ void Fl_Emscripten_Window_Driver::size_range() {
 
 void Fl_Emscripten_Window_Driver::fullscreen_on() {
   pWindow->_set_fullscreen();
-  pWindow->border(0);
-  resize(0, 0, Fl::screen_driver()->w(), Fl::screen_driver()->h());
+  pWindow->border(0); // hides the title bar (div's decor)
+  em_track_viewport();
+  em_fullscreen_page_style((int)Fl_X::flx(pWindow)->xid, true, false);
+  int W, H;
+  em_fullscreen_size(pWindow, W, H);
+  resize(0, 0, W, H);
   Fl::handle(FL_FULLSCREEN, pWindow);
 }
 
 void Fl_Emscripten_Window_Driver::fullscreen_off(int X, int Y, int W, int H) {
   pWindow->_clear_fullscreen();
+  pWindow->border(1); // shows the title bar again; before resize() so the div is offset correctly
+  em_fullscreen_page_style((int)Fl_X::flx(pWindow)->xid, false, em_user_resizable(pWindow));
   resize(X, Y, W, H);
-  pWindow->border(1);
   Fl::handle(FL_FULLSCREEN, pWindow);
 }
 
