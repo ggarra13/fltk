@@ -35,8 +35,14 @@ extern void fl_fix_focus();
 Fl_Emscripten_Screen_Driver::Fl_Emscripten_Screen_Driver()
   : Fl_Screen_Driver() {
   Fl_Display_Device::display_device();
-  // we only deal with 1 screen.
-  num_screens = 0;
+  num_screens = 1;               // we deal with exactly one screen (was 0)
+}
+
+void Fl_Emscripten_Screen_Driver::screen_xywh(int &X, int &Y, int &W, int &H, int n) {
+  X = 0;
+  Y = 0;
+  W = w();
+  H = h();
 }
 
 void Fl_Emscripten_Screen_Driver::init() {
@@ -49,13 +55,14 @@ int Fl_Emscripten_Screen_Driver::x() {
 int Fl_Emscripten_Screen_Driver::y() {
   return 0;
 }
+
+// The "screen" is the browser viewport, not the monitor.
 int Fl_Emscripten_Screen_Driver::w() {
-  val screen = val::global("screen");
-  return screen["availWidth"].as<int>();
+  return EM_ASM_INT({ return window.innerWidth; });
 }
+
 int Fl_Emscripten_Screen_Driver::h() {
-  val screen = val::global("screen");
-  return screen["availHeight"].as<int>();
+  return EM_ASM_INT({ return window.innerHeight; });
 }
 
 
@@ -71,23 +78,6 @@ void Fl_Emscripten_Screen_Driver::screen_work_area(int &X, int &Y, int &W, int &
     H = Fl::h();
   } else { // for other screens, work area is full screen,
     screen_xywh(X, Y, W, H, n);
-  }
-}
-
-
-void Fl_Emscripten_Screen_Driver::screen_xywh(int &X, int &Y, int &W, int &H, int n) {
-  if (num_screens < 0)
-    init();
-
-  if ((n < 0) || (n >= num_screens))
-    n = 0;
-
-  if (num_screens > 0) {
-    float s = 1;
-    X = 0;
-    Y = 0;
-    W = w();
-    H = h();
   }
 }
 
