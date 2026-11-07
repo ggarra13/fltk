@@ -195,10 +195,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void handle_unfocus(int id) {
       {
         let div = document.getElementById("fltk_div" + $0);
         if (div) {
-          div.style.zIndex = 0;
+            div.style.zIndex = $1 ? 2 : 0;
         }
       },
-      id);
+      id, (w && w->parent()) ? 1 : 0);
   Fl::handle(FL_UNFOCUS, w);
 }
 
@@ -209,11 +209,11 @@ extern "C" EMSCRIPTEN_KEEPALIVE void handle_focus(int id) {
         let div = document.getElementById("fltk_div" + $0);
         let canvas = document.getElementById("fltk_canvas" + $0);
         if (div && canvas) {
-          div.style.zIndex = 1;
+          div.style.zIndex = $1 ? 2 : 1;
           canvas.focus();
         }
       },
-      id);
+      id, (w && w->parent()) ? 1 : 0);
   Fl::handle(FL_FOCUS, w);
 }
 
@@ -408,7 +408,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         div.style.position = "absolute";
         div.style.left = $2 + "px";
         div.style.top = $1 ? ($3 - 30) + "px" : $3 + "px";
-        div.style.zIndex = 1;
+        div.style.zIndex = $8 ? 2 : 1;
         div.style.backgroundColor = "#f1f1f1";
         div.style.borderRight = "1px solid #555";
         div.style.borderBottom = "1px solid #555";
@@ -455,9 +455,9 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         canvas.addEventListener("click", () => canvas.focus());
         decor.addEventListener("mousedown", () => canvas.focus());
         div.addEventListener(
-            "focusin", () => { canvas.focus(); div.style.zIndex = 1; });
+            "focusin", () => { canvas.focus(); div.style.zIndex = $8 ? 2 : 1; });
         div.addEventListener(
-            "focusout", () => { canvas.blur(); div.style.zIndex = 0; });
+            "focusout", () => { canvas.blur(); div.style.zIndex = $8 ? 2 : 0; });
         if ($1 === 0) decor.hidden = true;
         function addResizeHandle(name, dir, cursor) {
           let h = document.createElement("DIV");
@@ -630,10 +630,10 @@ void Fl_Emscripten_Window_Driver::map() {
         let div = document.getElementById("fltk_div" + $0);
         if (div) {
           div.hidden = false;
-          div.style.zIndex = 1;
+          div.style.zIndex = $1 ? 2 : 1;
         }
       },
-      (int)ip->xid);
+      (int)ip->xid, pWindow->parent() ? 1 : 0);
 }
 
 extern "C" void EMSCRIPTEN_KEEPALIVE delete_div(int xid) {

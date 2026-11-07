@@ -177,15 +177,15 @@ void Fl_Emscripten_Screen_Driver::paste(Fl_Widget &receiver, int clipboard, cons
   if (type[0] == 0)
     type = Fl::clipboard_plain_text;
   if (clipboard) {
+    if (clipboard > 2) clipboard = 1;
     Fl::e_clipboard_type = "";
     if (strcmp(type, Fl::clipboard_plain_text) == 0) {
       val navigator = val::global("navigator");
       std::string clipText =
           navigator["clipboard"].call<val>("readText").await().as<std::string>();
       size_t len = clipText.size();
-      Fl::e_text = (char*)clipText.data();
+      Fl::e_text = (char*)clipText.c_str();
       Fl::e_length = len;
-      fl_selection_buffer[clipboard][len - 1] = 0;
       fl_selection_length[1] = len;
       Fl::e_clipboard_type = Fl::clipboard_plain_text;
       receiver.handle(FL_PASTE);
