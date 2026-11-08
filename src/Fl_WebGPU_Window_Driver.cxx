@@ -140,7 +140,7 @@ bool wait_for(WGPUInstance instance, WGPUFuture /*future*/, Req &req)
 
 void Fl_WebGPU_Window_Driver::init_instance()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (w.instance)
     return;
   w.instance = wgpuCreateInstance(NULL);
@@ -148,11 +148,11 @@ void Fl_WebGPU_Window_Driver::init_instance()
     Fl::fatal("Could not initialize WebGPU instance\n");
 }
 
-// Needs wgpu.instance and wgpu.surface (the adapter must be able to present
+// Needs ctx.instance and ctx.surface (the adapter must be able to present
 // to our surface).
 void Fl_WebGPU_Window_Driver::create_device()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (w.device)
     return;
 
@@ -210,7 +210,7 @@ void Fl_WebGPU_Window_Driver::create_device()
 // surface/adapter pair supports.
 void Fl_WebGPU_Window_Driver::init_colorspace()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (!w.surface || !w.adapter)
     return;
 
@@ -238,7 +238,7 @@ void Fl_WebGPU_Window_Driver::init_colorspace()
 // swap_interval 0: MAILBOX (else IMMEDIATE) if available; >0: FIFO (vsync).
 void Fl_WebGPU_Window_Driver::apply_present_mode()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   present_mode_ = WGPUPresentMode_Fifo;   // always supported
 
   if (swap_interval_ <= 0 && w.surface && w.adapter) {
@@ -269,7 +269,7 @@ void Fl_WebGPU_Window_Driver::swap_interval(int x)
 // swapchain.
 void Fl_WebGPU_Window_Driver::prepare_buffers()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (!w.surface || !w.device)
     return;
 
@@ -296,7 +296,7 @@ void Fl_WebGPU_Window_Driver::prepare_buffers()
 // Prepare depth/stencil resources for window
 void Fl_WebGPU_Window_Driver::prepare_depth()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   destroy_depth();   // recreate from scratch (e.g. on resize)
 
   bool has_depth   = pWindow->mode() & FL_DEPTH;
@@ -345,7 +345,7 @@ void Fl_WebGPU_Window_Driver::prepare_depth()
 
 void Fl_WebGPU_Window_Driver::destroy_depth()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (w.depth_view) {
     wgpuTextureViewRelease(w.depth_view);
     w.depth_view = 0;
@@ -368,7 +368,7 @@ void Fl_WebGPU_Window_Driver::prepare()
 void Fl_WebGPU_Window_Driver::resize(int is_a_resize, int /*w*/, int /*h*/)
 {
   // Arguments are in FLTK units; prepare_buffers() uses pixel_w()/pixel_h().
-  if (!is_a_resize || !pWindow->wgpu.device || !pWindow->wgpu.surface)
+  if (!is_a_resize || !pWindow->ctx.device || !pWindow->ctx.surface)
     return;
   prepare_buffers();
   prepare_depth();
@@ -376,7 +376,7 @@ void Fl_WebGPU_Window_Driver::resize(int is_a_resize, int /*w*/, int /*h*/)
 
 bool Fl_WebGPU_Window_Driver::acquire_back_buffer()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (!w.surface || !w.device)
     return false;
 
@@ -425,7 +425,7 @@ bool Fl_WebGPU_Window_Driver::acquire_back_buffer()
 
 void Fl_WebGPU_Window_Driver::release_back_buffer()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   if (w.back_buffer) {
     wgpuTextureViewRelease(w.back_buffer);
     w.back_buffer = 0;
@@ -438,7 +438,7 @@ void Fl_WebGPU_Window_Driver::release_back_buffer()
 
 void Fl_WebGPU_Window_Driver::destroy_surface()
 {
-  Fl_WebGPU_Context &w = pWindow->wgpu;
+  Fl_WebGPU_Context &w = pWindow->ctx;
   release_back_buffer();
   if (w.surface) {
     wgpuSurfaceUnconfigure(w.surface);
@@ -451,12 +451,12 @@ void Fl_WebGPU_Window_Driver::destroy_surface()
 // Destroys resources in reverse creation order (first, those of window)
 void Fl_WebGPU_Window_Driver::destroy_resources()
 {
-    if (!pWindow || !pWindow->wgpu.device)
+    if (!pWindow || !pWindow->ctx.device)
     {
         fprintf(stderr, "destroy_resources: Invalid device\n");
         return;
     }
-    Fl_WebGPU_Context &w = pWindow->wgpu;
+    Fl_WebGPU_Context &w = pWindow->ctx;
 
     // A frame may be half-recorded if we are hidden during draw().
     if (pWindow->m_in_render_pass)
@@ -478,7 +478,7 @@ void Fl_WebGPU_Window_Driver::destroy_resources()
 // Call after destroy_resources() and destroy_surface().
 void Fl_WebGPU_Window_Driver::destroy_device()
 {
-    Fl_WebGPU_Context &w = pWindow->wgpu;
+    Fl_WebGPU_Context &w = pWindow->ctx;
     if (w.queue())  { wgpuQueueRelease(w.queue());     w.queue()  = 0; }
     if (w.device)   { wgpuDeviceRelease(w.device);     w.device   = 0; }
     if (w.adapter)  { wgpuAdapterRelease(w.adapter);   w.adapter  = 0; }

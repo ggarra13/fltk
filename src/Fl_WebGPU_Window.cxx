@@ -36,7 +36,7 @@ void Fl_WebGPU_Window::begin_render_pass()
 {
   // Color attachment
   WGPURenderPassColorAttachment color_attachment{
-    .view = wgpu.back_buffer,
+    .view = ctx.back_buffer,
     .depthSlice = WGPU_DEPTH_SLICE_UNDEFINED,
     .loadOp = WGPULoadOp_Clear,
     .storeOp = WGPUStoreOp_Store,
@@ -45,8 +45,8 @@ void Fl_WebGPU_Window::begin_render_pass()
 
   // Depth/stencil attachment, if the window mode asked for one
   WGPURenderPassDepthStencilAttachment ds_attachment{};
-  if (wgpu.depth_view) {
-    ds_attachment.view = wgpu.depth_view;
+  if (ctx.depth_view) {
+    ds_attachment.view = ctx.depth_view;
     if (mode_ & FL_DEPTH) {
       ds_attachment.depthLoadOp     = WGPULoadOp_Clear;
       ds_attachment.depthStoreOp    = WGPUStoreOp_Store;
@@ -68,11 +68,11 @@ void Fl_WebGPU_Window::begin_render_pass()
   render_pass_desc.label                = WGPUStringView{buf, WGPU_STRLEN};
   render_pass_desc.colorAttachmentCount = 1;
   render_pass_desc.colorAttachments     = &color_attachment;
-  render_pass_desc.depthStencilAttachment = wgpu.depth_view ? &ds_attachment
+  render_pass_desc.depthStencilAttachment = ctx.depth_view ? &ds_attachment
                                                             : nullptr;
 
   // Begin render pass
-  wgpu.render_pass = wgpuCommandEncoderBeginRenderPass(wgpu.encoder,
+  ctx.render_pass = wgpuCommandEncoderBeginRenderPass(ctx.encoder,
                                                        &render_pass_desc);
   m_in_render_pass = true;
 }
@@ -82,9 +82,9 @@ void Fl_WebGPU_Window::end_render_pass()
 {
   if (m_in_render_pass)
   {
-    wgpuRenderPassEncoderEnd(wgpu.render_pass);
-    wgpuRenderPassEncoderRelease(wgpu.render_pass);
-    wgpu.render_pass = 0;
+    wgpuRenderPassEncoderEnd(ctx.render_pass);
+    wgpuRenderPassEncoderRelease(ctx.render_pass);
+    ctx.render_pass = 0;
     m_in_render_pass = false;
   }
 }
@@ -102,14 +102,14 @@ void Fl_WebGPU_Window::draw_begin()
 {
   m_frame_active = false;
 
-  if (!wgpu.device || !pWebGPUWindowDriver ||
+  if (!ctx.device || !pWebGPUWindowDriver ||
       !pWebGPUWindowDriver->acquire_back_buffer())
     return;
 
   WGPUCommandEncoderDescriptor enc_desc{};
   enc_desc.label = WGPUStringView{"FLTK WebGPU encoder", WGPU_STRLEN};
-  wgpu.encoder = wgpuDeviceCreateCommandEncoder(wgpu.device, &enc_desc);
-  if (!wgpu.encoder) {
+  ctx.encoder = wgpuDeviceCreateCommandEncoder(ctx.device, &enc_desc);
+  if (!ctx.encoder) {
     pWebGPUWindowDriver->release_back_buffer();
     return;
   }
@@ -191,16 +191,16 @@ void Fl_WebGPU_Window::swap_buffers() {
   // End all render passes before finishing.
   end_render_pass();
 
-  WGPUCommandBuffer commands = wgpuCommandEncoderFinish(wgpu.encoder, NULL);
-  wgpuCommandEncoderRelease(wgpu.encoder);
-  wgpu.encoder = 0;
+  WGPUCommandBuffer commands = wgpuCommandEncoderFinish(ctx.encoder, NULL);
+  wgpuCommandEncoderRelease(ctx.encoder);
+  ctx.encoder = 0;
 
   {
     std::lock_guard<std::mutex> lock(queue_mutex());
 
-    wgpuQueueSubmit(wgpu.queue(), 1, &commands);
+    wgpuQueueSubmit(ctx.queue(), 1, &commands);
 #ifndef __EMSCRIPTEN__
-    wgpuSurfacePresent(wgpu.surface); // the browser presents implicitly
+    wgpuSurfacePresent(ctx.surface); // the browser presents implicitly
 #endif
   }
 
@@ -249,9 +249,9 @@ void Fl_WebGPU_Window::flush() {
     return;
 
   // (Re)create instance/surface/device on first flush and after hide()/show().
-  if (!wgpu.device) {
+  if (!ctx.device) {
     init_webgpu();
-    if (!wgpu.device)
+    if (!ctx.device)
       return;
   }
 
@@ -373,7 +373,7 @@ void Fl_WebGPU_Window::shutdown_webgpu() {
 
   // Resources first, then the surface (while the native window still
   // exists), then device/queue/adapter/instance.
-  if (wgpu.device)
+  if (ctx.device)
     pWebGPUWindowDriver->destroy_resources();
   pWebGPUWindowDriver->destroy_surface();
   pWebGPUWindowDriver->destroy_device();
@@ -422,9 +422,9 @@ void Fl_WebGPU_Window::init_webgpu() {
 
   // The surface needs the instance and the native (shown) window; the
   // adapter must be picked to be compatible with the surface.
-  if (!wgpu.surface)
+  if (!ctx.surface)
     pWebGPUWindowDriver->create_surface();
-  if (!wgpu.surface)
+  if (!ctx.surface)
     Fl::fatal("Could not create WebGPU surface!\n");
 
   pWebGPUWindowDriver->create_device();

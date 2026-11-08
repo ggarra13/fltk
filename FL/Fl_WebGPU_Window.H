@@ -87,10 +87,10 @@ public:
   int handle(int) override;
 
   // Window's WebGPU context.
-  Fl_WebGPU_Context wgpu;
+  Fl_WebGPU_Context ctx;
 
-  inline WGPUQueue&        queue() { return wgpu.safe_thread_queue.queue; }
-  inline std::mutex& queue_mutex() { return wgpu.safe_thread_queue.mutex; }
+  inline WGPUQueue&        queue() { return ctx.safe_thread_queue.queue; }
+  inline std::mutex& queue_mutex() { return ctx.safe_thread_queue.mutex; }
 
   /**
     Is turned off when FLTK creates a new context for this window or
