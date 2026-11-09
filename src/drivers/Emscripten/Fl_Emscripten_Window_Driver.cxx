@@ -188,32 +188,33 @@ static bool handle_key_ev(int eventType, const EmscriptenKeyboardEvent *event, v
   return ret;
 }
 
-
-extern "C" EMSCRIPTEN_KEEPALIVE void handle_unfocus(int id) {
-  Fl_Window *w = fl_em_find(id);
+// Put a top-level window's div above every window shown/focused so far.
+static void em_raise(int xid) {
   EM_ASM(
       {
         let div = document.getElementById("fltk_div" + $0);
-        if (div) {
-            div.style.zIndex = $1 ? 2 : 0;
-        }
+        if (div)
+          div.style.zIndex = (window.fltkZ = (window.fltkZ || 10) + 1);
       },
-      id, (w && w->parent()) ? 1 : 0);
-  Fl::handle(FL_UNFOCUS, w);
+      xid);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void handle_unfocus(int id) {
+  Fl_Window *w = fl_em_find(id);
+  Fl::handle(FL_UNFOCUS, w);        // z-order is deliberately left alone
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void handle_focus(int id) {
   Fl_Window *w = fl_em_find(id);
   EM_ASM(
       {
-        let div = document.getElementById("fltk_div" + $0);
         let canvas = document.getElementById("fltk_canvas" + $0);
-        if (div && canvas) {
-          div.style.zIndex = $1 ? 2 : 1;
+        if (canvas)
           canvas.focus();
-        }
       },
-      id, (w && w->parent()) ? 1 : 0);
+      id);
+  if (w && !w->parent())
+    em_raise(id);
   Fl::handle(FL_FOCUS, w);
 }
 
@@ -397,23 +398,29 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
     y(Fl::e_y_root - 30);
   }
   wait_for_expose_value = 1;
+
+  Fl_Window *pw = pWindow->parent() ? pWindow->window() : NULL;
+  int parent_id = (pw && Fl_X::flx(pw)) ? (int)Fl_X::flx(pw)->xid : 0;
+
   // clang-format off
   EM_ASM(
       {
         let body = document.getElementsByTagName("body")[0];
+        let host = $9 ? document.getElementById("fltk_content" + $9) : null;  // parent's content box
         let div = document.createElement("DIV");
         div.id = "fltk_div" + $0;
         div.tabIndex = "-1";
         div.addEventListener("contextmenu", (e) => e.preventDefault());
         div.style.position = "absolute";
         div.style.left = $2 + "px";
-        div.style.top = $1 ? ($3 - 30) + "px" : $3 + "px";
-        div.style.zIndex = $8 ? 2 : 1;
+        div.style.top = host ? $3 + "px" : ($1 ? ($3 - 30) + "px" : $3 + "px");
+        div.style.zIndex = $8 ? 1: (window.fltkZ = (window.fltkZ || 10) + 1);
+        div.style.outline = "none";;
         div.style.backgroundColor = "#f1f1f1";
         div.style.borderRight = "1px solid #555";
         div.style.borderBottom = "1px solid #555";
         div.style.textAlign = "center";
-        body.appendChild(div);
+        (host || body).appendChild(div);          // was: body.appendChild(div);
         let decor = document.createElement("DIV");
         decor.id = "fltk_decor" + $0;
         decor.style.boxSizing = "border-box";
@@ -444,6 +451,13 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         close.style.color = "#fff";
         close.addEventListener("click", () => div.hidden = true);
         decor.appendChild(close);
+
+        let content = document.createElement("DIV");
+        content.id = "fltk_content" + $0;
+        content.style.position = "relative";   // containing block for child windows
+        content.style.overflow = "hidden";     // children are clipped to the parent
+        div.appendChild(content);
+
         let canvas = document.createElement("CANVAS");
         canvas.id = "fltk_canvas" + $0;
         canvas.setAttribute("data-raw-handle", $0.toString());
@@ -451,13 +465,22 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         canvas.width = $4;
         canvas.height = $5;
         canvas.style.display = "block";
-        div.appendChild(canvas);
+        canvas.style.outline = "none";
+        content.appendChild(canvas);
+
         canvas.addEventListener("click", () => canvas.focus());
         decor.addEventListener("mousedown", () => canvas.focus());
-        div.addEventListener(
-            "focusin", () => { canvas.focus(); div.style.zIndex = $8 ? 2 : 1; });
-        div.addEventListener(
-            "focusout", () => { canvas.blur(); div.style.zIndex = $8 ? 2 : 0; });
+
+        // focus events bubble, and child windows now live inside this div
+        const own = (e) => e.target.closest('[id^="fltk_div"]') === div;
+        div.addEventListener("focusin", (e) => {
+                if (!$8) div.style.zIndex = (window.fltkZ = (window.fltkZ || 10) + 1);
+                if (own(e)) canvas.focus();
+});
+        div.addEventListener("focusout", (e) => {
+                if (e.relatedTarget && div.contains(e.relatedTarget)) return;
+                if (own(e)) canvas.blur();
+});
         if ($1 === 0) decor.hidden = true;
         function addResizeHandle(name, dir, cursor) {
           let h = document.createElement("DIV");
@@ -559,7 +582,8 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
       },
       id, pWindow->border(), pWindow->x(), pWindow->y(),
       pWindow->w(), pWindow->h(), pWindow->label() ? pWindow->label(): "",
-      em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0);
+      em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0,
+      parent_id);
   // clang-format on
   if (fill) {
     em_track_viewport();
@@ -628,12 +652,12 @@ void Fl_Emscripten_Window_Driver::map() {
   EM_ASM(
       {
         let div = document.getElementById("fltk_div" + $0);
-        if (div) {
+        if (div)
           div.hidden = false;
-          div.style.zIndex = $1 ? 2 : 1;
-        }
       },
-      (int)ip->xid, pWindow->parent() ? 1 : 0);
+      (int)ip->xid);
+  if (!pWindow->parent())
+    em_raise((int)ip->xid);
 }
 
 extern "C" void EMSCRIPTEN_KEEPALIVE delete_div(int xid) {
@@ -744,8 +768,9 @@ void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
           }
           let div = document.getElementById("fltk_div" + $0);
           if (div) {
+            let nested = div.parentElement && div.parentElement.id.startsWith("fltk_content");
             let decor = document.getElementById("fltk_decor" + $0);
-            let off = (decor && !decor.hidden) ? $6 : 0;
+            let off = (!nested && decor && !decor.hidden) ? $6 : 0;
             div.style.left = X + "px";
             div.style.top = (Y - off) + "px";
           }
