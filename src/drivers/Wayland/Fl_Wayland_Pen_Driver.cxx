@@ -199,28 +199,27 @@ public:
 
 void Wayland_Driver::subscribe(Fl_Widget* widget)
 {
-    if (subscriber_list_.size() == 0)
+  if (!g_tablet_seat) {
+    Fl_Wayland_Screen_Driver* scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+    if (scr_driver)
     {
-        Fl_Wayland_Screen_Driver* scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
-        if (scr_driver)
-        {
-            fl_open_display();
-            wl_seat* seat = scr_driver->get_wl_seat();
-            if (!seat)
-            {
-                Fl::warning("No screen to wl_seat init tablet");
-            }
-            else
-            {
-                fl_wayland_tablet_init_seat(seat);
-            }
-        }
-        else
-        {
-            Fl::warning("No screen driver to init tablet");
-        }
+      fl_open_display();
+      wl_seat* seat = scr_driver->get_wl_seat();
+      if (!seat)
+      {
+        Fl::warning("No screen to wl_seat init tablet");
+      }
+      else
+      {
+        fl_wayland_tablet_init_seat(seat);
+      }
     }
-    Driver::subscribe(widget);
+    else
+    {
+      Fl::warning("No screen driver to init tablet");
+    }
+  }
+  Driver::subscribe(widget);
 }
 
 Trait Wayland_Driver::traits() {
