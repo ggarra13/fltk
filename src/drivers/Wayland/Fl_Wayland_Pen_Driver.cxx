@@ -2,7 +2,6 @@
 // Implementation of Wayland Tablet/Pen event driver for FLTK.
 //
 // Copyright 2025-2026 by Bill Spitzak and others.
-// Original Implementation by ClaudeAI.  Bug fixing by Grok.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -139,6 +138,8 @@ struct TabletTool {
   Fl_Window                      *focus_win;    // toplevel window under the pen
   struct wl_surface              *focus_surface;
   uint32_t                        serial;
+  uint32_t                        frame_time { 0 };   // ms timestamp of the frame being processed
+  int                             decor_clicks { 0 }; // click count for a press on a decoration
 
   // Per-frame accumulated event data (flushed by tool_cb_frame)
   EventData  ev;
@@ -166,6 +167,51 @@ static inline void tablet_tool_reset_frame(TabletTool *t) {
   t->frame_motion          = false;
   t->frame_buttons_pressed  = (State)0;
   t->frame_buttons_released = (State)0;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-click detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ Wayland gives no click count, so we derive one from the frame timestamps.
+ Follows the FLTK convention: 0 = single click, 1 = double click, 2 = triple...
+ One tracker is used for the window contents (feeds Fl::e_clicks), one for the
+ window decorations (titlebar double-click -> maximize/restore).
+ */
+struct ClickTracker {
+  bool     valid  { false };
+  uint32_t time   { 0 };
+  double   x      { 0 }, y { 0 };
+  int      pen_id { 0 };
+  const void *target { nullptr };
+  int      clicks { 0 };
+};
+
+static ClickTracker g_click;        // window contents
+static ClickTracker g_decor_click;  // window decorations
+
+static const uint32_t kDoubleClickMs   = 400;  // max delay between two presses
+static const double   kDoubleClickDist = 5.0;  // max movement between two presses
+
+static int click_count(ClickTracker &t, const TabletTool *tool,
+                       const void *target, double x, double y) {
+  const uint32_t now = tool->frame_time;
+  if (t.valid && t.target == target && t.pen_id == tool->pen_id &&
+      (uint32_t)(now - t.time) <= kDoubleClickMs &&
+      std::fabs(x - t.x) <= kDoubleClickDist &&
+      std::fabs(y - t.y) <= kDoubleClickDist) {
+    t.clicks++;
+  } else {
+    t.clicks = 0;
+  }
+  t.valid  = true;
+  t.time   = now;
+  t.x = x;  t.y = y;
+  t.pen_id = tool->pen_id;
+  t.target = target;
+  return t.clicks;
 }
 
 
@@ -199,25 +245,18 @@ public:
 
 void Wayland_Driver::subscribe(Fl_Widget* widget)
 {
-  if (!g_tablet_seat) {
-    Fl_Wayland_Screen_Driver* scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
-    if (scr_driver)
-    {
-      fl_open_display();
-      wl_seat* seat = scr_driver->get_wl_seat();
-      if (!seat)
-      {
-        Fl::warning("No screen to wl_seat init tablet");
+  if (!g_tablet_seat) {  // was: subscriber_list_.size() == 0
+      Fl_Wayland_Screen_Driver* scr_driver =
+          (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+      if (scr_driver) {
+          fl_open_display();
+          if (wl_seat* seat = scr_driver->get_wl_seat())
+              fl_wayland_tablet_init_seat(seat);
+          else
+              Fl::warning("No wl_seat yet to init tablet");
+      } else {
+          Fl::warning("No screen driver to init tablet");
       }
-      else
-      {
-        fl_wayland_tablet_init_seat(seat);
-      }
-    }
-    else
-    {
-      Fl::warning("No screen driver to init tablet");
-    }
   }
   Driver::subscribe(widget);
 }
@@ -432,24 +471,32 @@ static void coords_from_surface(TabletTool *tool,
 // (fire once per tool at connection time, before proximity events)
 // ─────────────────────────────────────────────────────────────────────────────
 
+static void tool_cb_hardware_serial(void *data, struct zwp_tablet_tool_v2 *,
+                                    uint32_t hi, uint32_t lo) {
+  static_cast<TabletTool *>(data)->hardware_serial =
+      (static_cast<uint64_t>(hi) << 32) | lo;
+}
+
+static void tool_cb_done(void *data, struct zwp_tablet_tool_v2 *) {
+  TabletTool *tool = static_cast<TabletTool *>(data);
+  tool->capabilities |= Trait::DRIVER_AVAILABLE | Trait::PEN_ID;
+  const bool eraser = (tool->type == ZWP_TABLET_TOOL_V2_TYPE_ERASER);
+  if (eraser) tool->capabilities |= Trait::ERASER;
+
+  if (tool->hardware_serial) {
+    tool->pen_id = (int)(tool->hardware_serial & 0x3fffffff);
+    if (eraser) tool->pen_id |= 0x40000000;   // keep pen/eraser distinct
+  }
+  if (tool->pen_id == 0) tool->pen_id = g_next_pen_id++;
+  tool->ev.pen_id = tool->pen_id;
+}
+
 static void tool_cb_type(void *data, struct zwp_tablet_tool_v2 *,
                           uint32_t tool_type) {
   static_cast<TabletTool *>(data)->type =
     static_cast<enum zwp_tablet_tool_v2_type>(tool_type);
 }
 
-static void tool_cb_hardware_serial(void *data, struct zwp_tablet_tool_v2 *,
-                                     uint32_t serial_hi, uint32_t serial_lo) {
-  TabletTool *tool = static_cast<TabletTool *>(data);
-  tool->hardware_serial =
-    (static_cast<uint64_t>(serial_hi) << 32) | serial_lo;
-  // Derive a positive int pen_id.  If the compositor reports no serial,
-  // assign a monotonically increasing id so tools remain distinguishable.
-  if (tool->hardware_serial)
-    tool->pen_id = static_cast<int>(tool->hardware_serial & 0x7fffffff);
-  else
-    tool->pen_id = g_next_pen_id++;
-}
 
 static void tool_cb_hardware_id_wacom(void * /*data*/,
                                        struct zwp_tablet_tool_v2 *,
@@ -478,16 +525,6 @@ static void tool_cb_capability(void *data, struct zwp_tablet_tool_v2 *,
       // Not yet exposed through the FLTK pen API.
       break;
   }
-}
-
-static void tool_cb_done(void *data, struct zwp_tablet_tool_v2 *) {
-  TabletTool *tool = static_cast<TabletTool *>(data);
-  // All capability and identity events have been delivered; lock in the traits.
-  tool->capabilities |= Trait::DRIVER_AVAILABLE | Trait::PEN_ID;
-  if (tool->type == ZWP_TABLET_TOOL_V2_TYPE_ERASER)
-    tool->capabilities |= Trait::ERASER;
-  // Stable pen_id is now available; write it into the event template.
-  tool->ev.pen_id = tool->pen_id;
 }
 
 static void tool_cb_removed(void *data, struct zwp_tablet_tool_v2 *wl_tool) {
@@ -711,6 +748,14 @@ static int handle_titlebar_events(Fl_Window* win, TabletTool* tool,
         // Minimize (works)
         win->iconize();
         out = 1;
+    } else if (tool->decor_clicks == 1 && win->resizable()) {
+        // Double-click on the title bar → maximize / restore
+        if (win->maximize_active())
+            win->un_maximize();
+        else
+            win->maximize();
+        g_decor_click.valid = false;   // a third tap starts a new sequence
+        out = 1;
     } else if (tool->serial) {
         // Title bar drag → move (works)
         libdecor_frame_move(tool->focus_frame, g_wl_seat,
@@ -835,8 +880,9 @@ static int handle_gtk_frame_events(Fl_Window* win, TabletTool *tool) {
    9. reset per-frame flags
  */
 static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
-                           uint32_t /*time*/) {
+                           uint32_t time) {
   TabletTool *tool = static_cast<TabletTool *>(data);
+  tool->frame_time = time;
 
   // ── 1. Proximity-out ──────────────────────────────────────────────────────
   if (tool->frame_proximity_out) {
@@ -883,6 +929,9 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
       // ── frame down on decoration ───────────────────────────────────────
       if (tool->focus_frame && tool->frame_down) {
+          tool->decor_clicks = click_count(g_decor_click, tool,
+                                           tool->focus_frame,
+                                           tool->decor_sx, tool->decor_sy);
 
           // Find the Fl_Window that owns this frame.
           Fl_Window* win = nullptr;
@@ -934,7 +983,11 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
   // Safe-guard
   if (!eventWindow)
+  {
+    tablet_tool_reset_frame(tool);
+    tool->prev_state = tool->ev.state;
     return;
+  }
 
   bool is_menu_window = eventWindow->menu_window();
 
@@ -1042,7 +1095,8 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     Fl::e_is_click = 1;
     Fl::Private::e_x_down = (int)tool->ev.x;
     Fl::Private::e_y_down = (int)tool->ev.y;
-    Fl::e_clicks = 0;
+    Fl::e_clicks = click_count(g_click, tool, tool->focus_win,
+                               tool->ev.x, tool->ev.y);
     pen_handled |= pen_send(tool, receiver, Fl::Pen::TOUCH,
                             tool->ev.state & (State::TIP_DOWN|State::ERASER_DOWN),
                             event_data_copied);
