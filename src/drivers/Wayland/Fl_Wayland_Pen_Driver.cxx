@@ -193,7 +193,7 @@ static ClickTracker g_click;        // window contents
 static ClickTracker g_decor_click;  // window decorations
 
 static const uint32_t kDoubleClickMs   = 400;  // max delay between two presses
-static const double   kDoubleClickDist = 5.0;  // max movement between two presses
+static const double   kDoubleClickDist = 10.0;  // max movement between two presses
 
 static int click_count(ClickTracker &t, const TabletTool *tool,
                        const void *target, double x, double y) {
