@@ -184,7 +184,7 @@ jobs:
       run: cmake --build . --config $BUILD_TYPE
 
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
     - uses: actions/checkout@v6
