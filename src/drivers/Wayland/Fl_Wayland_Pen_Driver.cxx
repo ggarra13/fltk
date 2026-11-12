@@ -345,7 +345,7 @@ static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
       // 1. Check children back-to-front (topmost first)
       for (int i = g->children() - 1; i >= 0; --i) {
         Fl_Widget* w = g->child(i);
-        if (!w || !w->visible()) continue;
+        if (!w || !w->visible_r()) continue;
 
         if (!event_inside(w, gx, gy))
             continue;
@@ -360,7 +360,7 @@ static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
       }
 
       // 2. Check if THIS window/group is a pen subscriber
-      if (subscriber_list_.count(g))
+      if (g->visible_r() && subscriber_list_.count(g))
           return g;
 
       return nullptr;
@@ -391,6 +391,9 @@ static void copy_state(TabletTool *tool) {
  */
 static int pen_send(TabletTool *tool, Fl_Widget *w, int event,
                     State trigger, bool &copied) {
+  // A hidden widget (or one inside a hidden parent) never receives pen events,
+  // even if it is subscribed.
+  if (!w || !w->visible_r()) return 0;
   if (!copied) {
     copy_state(tool);
     copied = true;
@@ -1032,6 +1035,11 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   };
 
   // ── 4. Receiver selection & below_pen ENTER/LEAVE ────────────────────────
+  // If the widget that grabbed the pen was hidden meanwhile, release it.
+  if (pushed_ && pushed_->widget() && !pushed_->widget()->visible_r()) {
+    if (Fl::pushed() == pushed_->widget()) Fl::pushed(nullptr);
+    pushed_ = nullptr;
+  }
   if (pushed_ && pushed_->widget() && Fl::pushed() == pushed_->widget()) {
     // An earlier tip-down fixed this tool's receiver until the tip lifts.
     receiver  = pushed_->widget();
