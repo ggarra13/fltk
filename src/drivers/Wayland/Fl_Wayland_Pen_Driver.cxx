@@ -887,8 +887,28 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   TabletTool *tool = static_cast<TabletTool *>(data);
   tool->frame_time = time;
 
+  // ── 0. Snapshot and clear the per-frame flags ────────────────────────────
+  // Must happen before any dispatch: see the comment at the top.
+  struct FrameFlags {
+    bool  prox_in;
+    bool  prox_out;
+    bool  down;
+    bool  up;
+    bool  motion;
+    State btn_pressed;
+    State btn_released;
+  } fr;
+  fr.prox_in      = tool->frame_proximity_in;
+  fr.prox_out     = tool->frame_proximity_out;
+  fr.down         = tool->frame_down;
+  fr.up           = tool->frame_up;
+  fr.motion       = tool->frame_motion;
+  fr.btn_pressed  = tool->frame_buttons_pressed;
+  fr.btn_released = tool->frame_buttons_released;
+  tablet_tool_reset_frame(tool);
+
   // ── 1. Proximity-out ──────────────────────────────────────────────────────
-  if (tool->frame_proximity_out) {
+  if (fr.prox_out) {
     pen_send_all(tool, Fl::Pen::OUT_OF_RANGE, (State)0);
     // Clean up below_pen_ if this tool owns it.
     if (below_pen_ && below_pen_->widget()) {
@@ -907,13 +927,12 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     }
     tool->focus_surface = nullptr;
     tool->focus_win     = nullptr;
-    tablet_tool_reset_frame(tool);
     tool->prev_state = tool->ev.state;
     return;
   }
 
   // ── 2. Proximity-in notification ─────────────────────────────────────────
-  if (tool->frame_proximity_in) {
+  if (fr.prox_in) {
     tool->ev.pen_id = tool->pen_id;
     if (tool->is_new) {
       tool->is_new = false;
@@ -931,7 +950,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   if (!tool->focus_win || subscriber_list_.empty()) {
 
       // ── frame down on decoration ───────────────────────────────────────
-      if (tool->focus_frame && tool->frame_down) {
+      if (tool->focus_frame && fr.down) {
           tool->decor_clicks = click_count(g_decor_click, tool,
                                            tool->focus_frame,
                                            tool->decor_sx, tool->decor_sy);
@@ -951,7 +970,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
           if (win) {
               enum plugin_kind plugin = get_plugin_kind(tool->focus_frame);
 
-              int result;
+              int result = 0;
 
               switch(plugin)
               {
@@ -967,10 +986,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
                   result = handle_cairo_events(win, tool);
                   break;
               }
+              (void)result;
           } // if (win)
-      } // focus_frame && frame_down
+      } // focus_frame && fr.down
 
-      tablet_tool_reset_frame(tool);
       tool->prev_state = tool->ev.state;
       return;
   }
@@ -987,7 +1006,6 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   // Safe-guard
   if (!eventWindow)
   {
-    tablet_tool_reset_frame(tool);
     tool->prev_state = tool->ev.state;
     return;
   }
@@ -997,12 +1015,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   if (!is_menu_window) {
       // ── 3. Modal / grab guards ──────────────────────────────────────────
       if (Fl::grab() && Fl::grab() != eventWindow) {
-          tablet_tool_reset_frame(tool);
           tool->prev_state = tool->ev.state;
           return;
       }
       if (Fl::modal() && Fl::modal() != eventWindow) {
-          tablet_tool_reset_frame(tool);
           tool->prev_state = tool->ev.state;
           return;
       }
@@ -1014,7 +1030,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   Fl_Widget *receiver    = nullptr;
   bool       is_pushed   = false;
 
-  // Extract the mouse fallback block into a lambda to avoid duplication.
+  // Mouse fallback: emulate the equivalent standard FLTK mouse event.
+  // NOTE: Fl::handle(FL_PUSH) here may enter a nested event loop (menus).
+  // That is safe now because the per-frame flags were already cleared above
+  // and everything below works from the `fr` snapshot.
   auto mouse_fallback = [&](bool frame_down, bool frame_up, bool frame_motion) {
     Fl::e_x      = (int)tool->ev.x;
     Fl::e_y      = (int)tool->ev.y;
@@ -1086,8 +1105,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   }
 
   if (!receiver) {
-    mouse_fallback(tool->frame_down, tool->frame_up, tool->frame_motion);
-    tablet_tool_reset_frame(tool);
+    mouse_fallback(fr.down, fr.up, fr.motion);
     tool->prev_state = tool->ev.state;
     return;
   }
@@ -1095,7 +1113,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   bool pen_handled = false;
 
   // ── 5. Tip down → TOUCH ──────────────────────────────────────────────────
-  if (tool->frame_down) {
+  if (fr.down) {
     if (!is_pushed) {
       pushed_ = subscriber_list_[receiver];
       Fl::pushed(receiver);
@@ -1113,7 +1131,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   }
 
   // ── 6. Tip up → LIFT ─────────────────────────────────────────────────────
-  if (tool->frame_up) {
+  if (fr.up) {
     if ((tool->ev.state & State::ANY_DOWN) == (State)0) {
       Fl::pushed(nullptr);
       pushed_ = nullptr;
@@ -1129,10 +1147,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
   // ── 7. Barrel button events ───────────────────────────────────────────────
   for (State bit : kButtonBits) {
-    if ((uint32_t)(tool->frame_buttons_pressed) & (uint32_t)bit)
+    if ((uint32_t)(fr.btn_pressed) & (uint32_t)bit)
       pen_handled |= pen_send(tool, receiver, Fl::Pen::BUTTON_PUSH, bit,
                               event_data_copied);
-    if ((uint32_t)(tool->frame_buttons_released) & (uint32_t)bit)
+    if ((uint32_t)(fr.btn_released) & (uint32_t)bit)
       pen_handled |= pen_send(tool, receiver, Fl::Pen::BUTTON_RELEASE, bit,
                               event_data_copied);
     // No mouse fallback for barrel buttons — there's no standard mouse
@@ -1140,7 +1158,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   }
 
   // ── 8. Motion → DRAW or HOVER ────────────────────────────────────────────
-  if (tool->frame_motion) {
+  if (fr.motion) {
     if (Fl::e_is_click &&
         (std::fabs(tool->ev.x - Fl::Private::e_x_down) > 5.0 ||
          std::fabs(tool->ev.y - Fl::Private::e_y_down) > 5.0))
@@ -1154,16 +1172,8 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
       mouse_fallback(false, false, true);
   }
 
-  // ── 9. Reset per-frame flags ──────────────────────────────────────────────
-  tablet_tool_reset_frame(tool);
   tool->prev_state = tool->ev.state;
-
-  // -- 10. Force standard mouse motion for menus (critical for highlighting)
-  if (is_menu_window && tool->frame_motion) {
-      mouse_fallback(false, false, true);   // sends FL_MOVE or FL_DRAG
-  }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // zwp_tablet_tool_v2 listener
