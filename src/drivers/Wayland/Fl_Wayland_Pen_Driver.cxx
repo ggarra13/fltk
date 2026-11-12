@@ -208,12 +208,13 @@ static const uint32_t kDoubleClickMs   = 400;  // max delay between two presses
 static const double   kDoubleClickDist = 10.0;  // max movement between two presses
 
 static int click_count(ClickTracker &t, const TabletTool *tool,
-                       const void *target, double x, double y) {
+                       const void *target, double x, double y,
+                       const double click_dist) {
   const uint32_t now = tool->frame_time;
   if (t.valid && t.target == target && t.pen_id == tool->pen_id &&
       (uint32_t)(now - t.time) <= kDoubleClickMs &&
-      std::fabs(x - t.x) <= kDoubleClickDist &&
-      std::fabs(y - t.y) <= kDoubleClickDist) {
+      std::fabs(x - t.x) <= click_dist &&
+      std::fabs(y - t.y) <= click_dist) {
     t.clicks++;
   } else {
     t.clicks = 0;
@@ -1054,7 +1055,8 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
       if (tool->focus_frame && fr.down) {
           tool->decor_clicks = click_count(g_decor_click, tool,
                                            tool->focus_frame,
-                                           tool->decor_sx, tool->decor_sy);
+                                           tool->decor_sx, tool->decor_sy,
+                                           50);
 
           // Find the Fl_Window that owns this frame.
           Fl_Window* win = nullptr;
@@ -1223,7 +1225,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     Fl::Private::e_x_down = (int)tool->ev.x;
     Fl::Private::e_y_down = (int)tool->ev.y;
     Fl::e_clicks = click_count(g_click, tool, tool->focus_win,
-                               tool->ev.x, tool->ev.y);
+                               tool->ev.x, tool->ev.y, kDoubleClickDist);
     pen_handled |= pen_send(tool, receiver, Fl::Pen::TOUCH,
                             tool->ev.state & (State::TIP_DOWN|State::ERASER_DOWN),
                             event_data_copied);
