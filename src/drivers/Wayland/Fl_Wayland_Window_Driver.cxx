@@ -65,6 +65,9 @@ std::map<struct wl_surface*, struct wld_window*> Fl_Wayland_Window_Driver::title
 Window fl_window = 0;
 #endif
 
+#if FLTK_HAVE_PEN_SUPPORT
+extern void fl_wayland_tablet_cursor_changed(Fl_Window *win);
+#endif
 
 struct wld_window *Fl_Wayland_Window_Driver::wld_window = NULL;
 bool Fl_Wayland_Window_Driver::new_popup = false; // to support tall menu buttons
@@ -1767,11 +1770,23 @@ int Fl_Wayland_Window_Driver::set_cursor(Fl_Cursor c) {
       xid->custom_cursor = NULL;
     }
     current_cursor_ = c;
+#if FLTK_HAVE_PEN_SUPPORT
+    fl_wayland_tablet_cursor_changed(pWindow);
+#endif
     if (c == FL_CURSOR_NONE) return 0;
     Fl_Wayland_Screen_Driver::do_set_cursor(scr_driver->seat, NULL, c);
     return 1;
   }
 #endif // HAVE_CURSOR_SHAPE
+  if (c == FL_CURSOR_NONE) {
+    if (xid->custom_cursor) {
+      delete_cursor(xid->custom_cursor);
+      xid->custom_cursor = NULL;
+    }
+    current_cursor_ = c;
+    fl_wayland_tablet_cursor_changed(pWindow);
+    return 0;
+  }
   if (!scr_driver->seat->cursor_theme) return 1;
   // Cursor names are the files of directory /usr/share/icons/XXXX/cursors/
   // where XXXX is the name of the current 'cursor theme'.
@@ -1821,6 +1836,9 @@ int Fl_Wayland_Window_Driver::set_cursor(Fl_Cursor c) {
   }
   current_cursor_ = c;
   scr_driver->set_cursor();
+#if FLTK_HAVE_PEN_SUPPORT
+  fl_wayland_tablet_cursor_changed(pWindow);
+#endif
   return 1;
 }
 

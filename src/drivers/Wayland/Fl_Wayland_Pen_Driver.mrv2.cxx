@@ -2,7 +2,6 @@
 // Implementation of Wayland Tablet/Pen event driver for FLTK.
 //
 // Copyright 2025-2026 by Bill Spitzak and others.
-// Original Implementation by ClaudeAI.  Bug fixing by Grok.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -60,9 +59,8 @@
  Fl_Base_Pen_Driver to avoid touching the shared API in this patch.
  TODO: move them to Fl_Base_Pen_Driver.cxx and expose via the header.
  */
-
-#include "Fl_Wayland_Pen_Events.H"
-#include "src/drivers/Base/Fl_Base_Pen_Events.H"
+#include "Fl_Wayland_Pen_Driver.H"
+#include "src/drivers/Base/Fl_Base_Pen_Driver.H"
 #include "Fl_Wayland_Screen_Driver.H"
 #include "Fl_Wayland_Window_Driver.H"
 #include "../../Fl_Window_Driver.H"
@@ -76,11 +74,17 @@
 #include "gtk-shell-client-protocol.h"
 #include "tablet-client-protocol.h"
 
+#include <wayland-cursor.h>
+#if HAVE_CURSOR_SHAPE
+#  include "cursor-shape-client-protocol.h"
+#endif
+
 extern "C" {
 #include "../../../libdecor/build/fl_libdecor.h"
 #include "../../../libdecor/build/fl_libdecor-plugins.h"
 }
 
+#include <iostream>
 #include <cmath>
 #include <cstring>
 #include <cstdint>
@@ -108,6 +112,7 @@ extern "C" {
 static struct wl_surface *gtk_shell_surface;
 static libdecor_frame *gtk_shell_frame = nullptr;
 static Fl_Window *gtk_shell_window = nullptr;
+
 
 // fl_xmousewin tracks which window last received pointer/pen events.
 extern Fl_Window *fl_xmousewin;
@@ -139,6 +144,14 @@ struct TabletTool {
   Fl_Window                      *focus_win;    // toplevel window under the pen
   struct wl_surface              *focus_surface;
   uint32_t                        serial;
+  uint32_t                        frame_time { 0 };   // ms timestamp of the frame being processed
+  int                             decor_clicks { 0 }; // click count for a press on a decoration
+  uint32_t                        proximity_serial { 0 };   // serial of the last proximity_in
+  bool                            cursor_hidden    { false };
+#if HAVE_CURSOR_SHAPE
+  struct wp_cursor_shape_device_v1 *shape_device { nullptr };
+#endif
+  struct wl_surface *cursor_surface { nullptr };  // fallback visible cursor
 
   // Per-frame accumulated event data (flushed by tool_cb_frame)
   EventData  ev;
@@ -166,6 +179,51 @@ static inline void tablet_tool_reset_frame(TabletTool *t) {
   t->frame_motion          = false;
   t->frame_buttons_pressed  = (State)0;
   t->frame_buttons_released = (State)0;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Multi-click detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+/*
+ Wayland gives no click count, so we derive one from the frame timestamps.
+ Follows the FLTK convention: 0 = single click, 1 = double click, 2 = triple...
+ One tracker is used for the window contents (feeds Fl::e_clicks), one for the
+ window decorations (titlebar double-click -> maximize/restore).
+ */
+struct ClickTracker {
+  bool     valid  { false };
+  uint32_t time   { 0 };
+  double   x      { 0 }, y { 0 };
+  int      pen_id { 0 };
+  const void *target { nullptr };
+  int      clicks { 0 };
+};
+
+static ClickTracker g_click;        // window contents
+static ClickTracker g_decor_click;  // window decorations
+
+static const uint32_t kDoubleClickMs   = 400;  // max delay between two presses
+static const double   kDoubleClickDist = 10.0;  // max movement between two presses
+
+static int click_count(ClickTracker &t, const TabletTool *tool,
+                       const void *target, double x, double y) {
+  const uint32_t now = tool->frame_time;
+  if (t.valid && t.target == target && t.pen_id == tool->pen_id &&
+      (uint32_t)(now - t.time) <= kDoubleClickMs &&
+      std::fabs(x - t.x) <= kDoubleClickDist &&
+      std::fabs(y - t.y) <= kDoubleClickDist) {
+    t.clicks++;
+  } else {
+    t.clicks = 0;
+  }
+  t.valid  = true;
+  t.time   = now;
+  t.x = x;  t.y = y;
+  t.pen_id = tool->pen_id;
+  t.target = target;
+  return t.clicks;
 }
 
 
@@ -199,28 +257,20 @@ public:
 
 void Wayland_Driver::subscribe(Fl_Widget* widget)
 {
-    if (subscriber_list_.size() == 0)
-    {
-        Fl_Wayland_Screen_Driver* scr_driver = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
-        if (scr_driver)
-        {
-            fl_open_display();
-            wl_seat* seat = scr_driver->get_wl_seat();
-            if (!seat)
-            {
-                Fl::warning("No screen to wl_seat init tablet");
-            }
-            else
-            {
-                fl_wayland_tablet_init_seat(seat);
-            }
-        }
-        else
-        {
-            Fl::warning("No screen driver to init tablet");
-        }
-    }
-    Driver::subscribe(widget);
+  if (!g_tablet_seat) {  // was: subscriber_list_.size() == 0
+      Fl_Wayland_Screen_Driver* scr_driver =
+          (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+      if (scr_driver) {
+          fl_open_display();
+          if (wl_seat* seat = scr_driver->get_wl_seat())
+              fl_wayland_tablet_init_seat(seat);
+          else
+              Fl::warning("No wl_seat yet to init tablet");
+      } else {
+          Fl::warning("No screen driver to init tablet");
+      }
+  }
+  Driver::subscribe(widget);
 }
 
 Trait Wayland_Driver::traits() {
@@ -257,7 +307,7 @@ Fl::Pen::Driver& newWaylandPenDriver() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Platform-independent helper functions
-// (TODO: factor into Fl_Base_Pen_Events.cxx, same code as Cocoa driver)
+// (TODO: factor into Fl_Base_Pen_Driver.cxx, same code as Cocoa driver)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /*
@@ -290,24 +340,24 @@ static bool event_inside(Fl_Widget *w, double x, double y) {
 /*
   Find the topmost subscribed widget under (x, y) in top-window coordinates.
   Handles:
-   - Normal widgets
-   - Widgets inside groups
-   - Subwindows (Fl_Window as child)
-   - Separate top-level windows that are themselves subscribers
-*/
+  - Normal widgets
+  - Widgets inside groups
+  - Subwindows (Fl_Window as child with can_expand_outside_parent_)
+  - Separate top-level windows that are themselves subscribers
+ */
 static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
 {
   if (!topwin) return nullptr;
 
   struct Finder {
-      static Fl_Widget* find_in_group(Fl_Group* g, double gx, double gy)
+    static Fl_Widget* find_in_group(Fl_Group* g, double gx, double gy)
     {
       if (!g) return nullptr;
 
       // 1. Check children back-to-front (topmost first)
       for (int i = g->children() - 1; i >= 0; --i) {
         Fl_Widget* w = g->child(i);
-        if (!w || !w->visible()) continue;
+        if (!w || !w->visible_r()) continue;
 
         if (!event_inside(w, gx, gy))
             continue;
@@ -322,7 +372,7 @@ static Fl_Widget *find_below_pen(Fl_Window *topwin, double x, double y)
       }
 
       // 2. Check if THIS window/group is a pen subscriber
-      if (subscriber_list_.count(g))
+      if (g->visible_r() && subscriber_list_.count(g))
           return g;
 
       return nullptr;
@@ -353,6 +403,9 @@ static void copy_state(TabletTool *tool) {
  */
 static int pen_send(TabletTool *tool, Fl_Widget *w, int event,
                     State trigger, bool &copied) {
+  // A hidden widget (or one inside a hidden parent) never receives pen events,
+  // even if it is subscribed.
+  if (!w || !w->visible_r()) return 0;
   if (!copied) {
     copy_state(tool);
     copied = true;
@@ -433,24 +486,32 @@ static void coords_from_surface(TabletTool *tool,
 // (fire once per tool at connection time, before proximity events)
 // ─────────────────────────────────────────────────────────────────────────────
 
+static void tool_cb_hardware_serial(void *data, struct zwp_tablet_tool_v2 *,
+                                    uint32_t hi, uint32_t lo) {
+  static_cast<TabletTool *>(data)->hardware_serial =
+      (static_cast<uint64_t>(hi) << 32) | lo;
+}
+
+static void tool_cb_done(void *data, struct zwp_tablet_tool_v2 *) {
+  TabletTool *tool = static_cast<TabletTool *>(data);
+  tool->capabilities |= Trait::DRIVER_AVAILABLE | Trait::PEN_ID;
+  const bool eraser = (tool->type == ZWP_TABLET_TOOL_V2_TYPE_ERASER);
+  if (eraser) tool->capabilities |= Trait::ERASER;
+
+  if (tool->hardware_serial) {
+    tool->pen_id = (int)(tool->hardware_serial & 0x3fffffff);
+    if (eraser) tool->pen_id |= 0x40000000;   // keep pen/eraser distinct
+  }
+  if (tool->pen_id == 0) tool->pen_id = g_next_pen_id++;
+  tool->ev.pen_id = tool->pen_id;
+}
+
 static void tool_cb_type(void *data, struct zwp_tablet_tool_v2 *,
                           uint32_t tool_type) {
   static_cast<TabletTool *>(data)->type =
     static_cast<enum zwp_tablet_tool_v2_type>(tool_type);
 }
 
-static void tool_cb_hardware_serial(void *data, struct zwp_tablet_tool_v2 *,
-                                     uint32_t serial_hi, uint32_t serial_lo) {
-  TabletTool *tool = static_cast<TabletTool *>(data);
-  tool->hardware_serial =
-    (static_cast<uint64_t>(serial_hi) << 32) | serial_lo;
-  // Derive a positive int pen_id.  If the compositor reports no serial,
-  // assign a monotonically increasing id so tools remain distinguishable.
-  if (tool->hardware_serial)
-    tool->pen_id = static_cast<int>(tool->hardware_serial & 0x7fffffff);
-  else
-    tool->pen_id = g_next_pen_id++;
-}
 
 static void tool_cb_hardware_id_wacom(void * /*data*/,
                                        struct zwp_tablet_tool_v2 *,
@@ -481,19 +542,13 @@ static void tool_cb_capability(void *data, struct zwp_tablet_tool_v2 *,
   }
 }
 
-static void tool_cb_done(void *data, struct zwp_tablet_tool_v2 *) {
-  TabletTool *tool = static_cast<TabletTool *>(data);
-  // All capability and identity events have been delivered; lock in the traits.
-  tool->capabilities |= Trait::DRIVER_AVAILABLE | Trait::PEN_ID;
-  if (tool->type == ZWP_TABLET_TOOL_V2_TYPE_ERASER)
-    tool->capabilities |= Trait::ERASER;
-  // Stable pen_id is now available; write it into the event template.
-  tool->ev.pen_id = tool->pen_id;
-}
-
 static void tool_cb_removed(void *data, struct zwp_tablet_tool_v2 *wl_tool) {
   TabletTool *tool = static_cast<TabletTool *>(data);
   if (g_current_tool == tool) g_current_tool = nullptr;
+#if HAVE_CURSOR_SHAPE
+  if (tool->shape_device) wp_cursor_shape_device_v1_destroy(tool->shape_device);
+#endif
+  if (tool->cursor_surface) wl_surface_destroy(tool->cursor_surface);
   wl_list_remove(&tool->link);
   zwp_tablet_tool_v2_destroy(wl_tool);
   delete tool;
@@ -504,12 +559,96 @@ static void tool_cb_removed(void *data, struct zwp_tablet_tool_v2 *wl_tool) {
 // zwp_tablet_tool_v2 per-frame event callbacks
 // (accumulate data; dispatch happens only in tool_cb_frame)
 // ─────────────────────────────────────────────────────────────────────────────
+// True if the app asked for no cursor on this window (cursor(FL_CURSOR_NONE))
+// and has not installed a custom RGB cursor instead.
+static bool tablet_wants_hidden_cursor(Fl_Window *win) {
+  // The app may have called cursor() on the window under the pen (often a
+  // GL/Vulkan child window), on its top-level window, or on one in between.
+  for (Fl_Window *w = win; w; w = w->window()) {
+    struct wld_window *xid = fl_wl_xid(w);
+    if (!xid) continue;
+    if (xid->custom_cursor) return false;           // custom RGB cursor wins
+    if (Fl_Window_Driver::driver(w)->current_cursor() == FL_CURSOR_NONE)
+      return true;
+  }
+  return false;
+}
+
+#if HAVE_CURSOR_SHAPE
+static uint32_t tablet_shape_for(Fl_Cursor c) {
+  switch (c) {
+    case FL_CURSOR_CROSS:  return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR;
+    case FL_CURSOR_INSERT: return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT;
+    case FL_CURSOR_WAIT:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT;
+    case FL_CURSOR_HAND:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB;
+    case FL_CURSOR_HELP:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_HELP;
+    case FL_CURSOR_MOVE:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE;
+    default:               return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT;
+  }
+}
+#endif
+
+// Give the tool a visible cursor again after we hid it.
+static void tablet_show_cursor(TabletTool *tool, Fl_Cursor c) {
+  Fl_Wayland_Screen_Driver *scr = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+#if HAVE_CURSOR_SHAPE
+  if (scr->wp_cursor_shape_manager) {
+    if (!tool->shape_device)
+      tool->shape_device = wp_cursor_shape_manager_v1_get_tablet_tool_v2(
+                             scr->wp_cursor_shape_manager, tool->wl_tool);
+    if (tool->shape_device) {
+      wp_cursor_shape_device_v1_set_shape(tool->shape_device,
+                                          tool->proximity_serial,
+                                          tablet_shape_for(c));
+      tool->cursor_hidden = false;
+      return;
+    }
+  }
+#endif
+  // Fallback: our own cursor surface from the theme cursor.
+  struct wl_cursor *wc = scr->seat ? scr->seat->default_cursor : nullptr;
+  if (!wc || !wc->image_count) return;
+  if (!tool->cursor_surface)
+    tool->cursor_surface = wl_compositor_create_surface(scr->wl_compositor);
+  struct wl_cursor_image *image = wc->images[0];
+  const int scale = scr->seat->pointer_scale ? scr->seat->pointer_scale : 1;
+  zwp_tablet_tool_v2_set_cursor(tool->wl_tool, tool->proximity_serial,
+                                tool->cursor_surface,
+                                image->hotspot_x / scale, image->hotspot_y / scale);
+  wl_surface_attach(tool->cursor_surface, wl_cursor_image_get_buffer(image), 0, 0);
+  wl_surface_set_buffer_scale(tool->cursor_surface, scale);
+  wl_surface_damage_buffer(tool->cursor_surface, 0, 0, image->width, image->height);
+  wl_surface_commit(tool->cursor_surface);
+  tool->cursor_hidden = false;
+}
+
+// Make the tool's cursor match what the app wants for the window under it.
+static void tablet_update_cursor(TabletTool *tool) {
+  if (!tool->in_proximity || !tool->focus_surface || !tool->proximity_serial)
+    return;
+  Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(tool->focus_surface);
+  if (!win) return;
+  if (tablet_wants_hidden_cursor(win)) {
+    zwp_tablet_tool_v2_set_cursor(tool->wl_tool, tool->proximity_serial,
+                                  nullptr, 0, 0);          // hide
+    tool->cursor_hidden = true;
+  } else if (tool->cursor_hidden) {
+    // Restore the cursor of the nearest window that has a non-default one.
+    Fl_Cursor c = FL_CURSOR_DEFAULT;
+    for (Fl_Window *w = win; w; w = w->window()) {
+      Fl_Cursor wc = Fl_Window_Driver::driver(w)->current_cursor();
+      if (wc != FL_CURSOR_DEFAULT && wc != FL_CURSOR_NONE) { c = wc; break; }
+    }
+    tablet_show_cursor(tool, c);
+  }
+}
 
 static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
-                                  uint32_t /*serial*/,
+                                  uint32_t serial,
                                   struct zwp_tablet_v2 * /*tablet*/,
                                   struct wl_surface *surface) {
   TabletTool *tool = static_cast<TabletTool *>(data);
+  tool->proximity_serial   = serial;
   tool->focus_surface      = surface;
   tool->focus_frame        = nullptr;
   tool->focus_win          = Fl_Wayland_Window_Driver::surface_to_window(surface);
@@ -567,6 +706,7 @@ static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
             xp = xp->next;
         }
     }
+    tablet_update_cursor(tool);
   }
 }
 
@@ -712,6 +852,14 @@ static int handle_titlebar_events(Fl_Window* win, TabletTool* tool,
         // Minimize (works)
         win->iconize();
         out = 1;
+    } else if (tool->decor_clicks == 1 && win->resizable()) {
+        // Double-click on the title bar → maximize / restore
+        if (win->maximize_active())
+            win->un_maximize();
+        else
+            win->maximize();
+        g_decor_click.valid = false;   // a third tap starts a new sequence
+        out = 1;
     } else if (tool->serial) {
         // Title bar drag → move (works)
         libdecor_frame_move(tool->focus_frame, g_wl_seat,
@@ -836,11 +984,32 @@ static int handle_gtk_frame_events(Fl_Window* win, TabletTool *tool) {
    9. reset per-frame flags
  */
 static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
-                           uint32_t /*time*/) {
+                           uint32_t time) {
   TabletTool *tool = static_cast<TabletTool *>(data);
+  tool->frame_time = time;
+
+  // ── 0. Snapshot and clear the per-frame flags ────────────────────────────
+  // Must happen before any dispatch: see the comment at the top.
+  struct FrameFlags {
+    bool  prox_in;
+    bool  prox_out;
+    bool  down;
+    bool  up;
+    bool  motion;
+    State btn_pressed;
+    State btn_released;
+  } fr;
+  fr.prox_in      = tool->frame_proximity_in;
+  fr.prox_out     = tool->frame_proximity_out;
+  fr.down         = tool->frame_down;
+  fr.up           = tool->frame_up;
+  fr.motion       = tool->frame_motion;
+  fr.btn_pressed  = tool->frame_buttons_pressed;
+  fr.btn_released = tool->frame_buttons_released;
+  tablet_tool_reset_frame(tool);
 
   // ── 1. Proximity-out ──────────────────────────────────────────────────────
-  if (tool->frame_proximity_out) {
+  if (fr.prox_out) {
     pen_send_all(tool, Fl::Pen::OUT_OF_RANGE, (State)0);
     // Clean up below_pen_ if this tool owns it.
     if (below_pen_ && below_pen_->widget()) {
@@ -859,13 +1028,12 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     }
     tool->focus_surface = nullptr;
     tool->focus_win     = nullptr;
-    tablet_tool_reset_frame(tool);
     tool->prev_state = tool->ev.state;
     return;
   }
 
   // ── 2. Proximity-in notification ─────────────────────────────────────────
-  if (tool->frame_proximity_in) {
+  if (fr.prox_in) {
     tool->ev.pen_id = tool->pen_id;
     if (tool->is_new) {
       tool->is_new = false;
@@ -883,7 +1051,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   if (!tool->focus_win || subscriber_list_.empty()) {
 
       // ── frame down on decoration ───────────────────────────────────────
-      if (tool->focus_frame && tool->frame_down) {
+      if (tool->focus_frame && fr.down) {
+          tool->decor_clicks = click_count(g_decor_click, tool,
+                                           tool->focus_frame,
+                                           tool->decor_sx, tool->decor_sy);
 
           // Find the Fl_Window that owns this frame.
           Fl_Window* win = nullptr;
@@ -900,7 +1071,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
           if (win) {
               enum plugin_kind plugin = get_plugin_kind(tool->focus_frame);
 
-              int result;
+              int result = 0;
 
               switch(plugin)
               {
@@ -916,10 +1087,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
                   result = handle_cairo_events(win, tool);
                   break;
               }
+              (void)result;
           } // if (win)
-      } // focus_frame && frame_down
+      } // focus_frame && fr.down
 
-      tablet_tool_reset_frame(tool);
       tool->prev_state = tool->ev.state;
       return;
   }
@@ -935,19 +1106,20 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
   // Safe-guard
   if (!eventWindow)
-      return;
+  {
+    tool->prev_state = tool->ev.state;
+    return;
+  }
 
   bool is_menu_window = eventWindow->menu_window();
 
   if (!is_menu_window) {
       // ── 3. Modal / grab guards ──────────────────────────────────────────
       if (Fl::grab() && Fl::grab() != eventWindow) {
-          tablet_tool_reset_frame(tool);
           tool->prev_state = tool->ev.state;
           return;
       }
       if (Fl::modal() && Fl::modal() != eventWindow) {
-          tablet_tool_reset_frame(tool);
           tool->prev_state = tool->ev.state;
           return;
       }
@@ -959,7 +1131,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   Fl_Widget *receiver    = nullptr;
   bool       is_pushed   = false;
 
-  // Extract the mouse fallback block into a lambda to avoid duplication.
+  // Mouse fallback: emulate the equivalent standard FLTK mouse event.
+  // NOTE: Fl::handle(FL_PUSH) here may enter a nested event loop (menus).
+  // That is safe now because the per-frame flags were already cleared above
+  // and everything below works from the `fr` snapshot.
   auto mouse_fallback = [&](bool frame_down, bool frame_up, bool frame_motion) {
     Fl::e_x      = (int)tool->ev.x;
     Fl::e_y      = (int)tool->ev.y;
@@ -980,6 +1155,11 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   };
 
   // ── 4. Receiver selection & below_pen ENTER/LEAVE ────────────────────────
+  // If the widget that grabbed the pen was hidden meanwhile, release it.
+  if (pushed_ && pushed_->widget() && !pushed_->widget()->visible_r()) {
+    if (Fl::pushed() == pushed_->widget()) Fl::pushed(nullptr);
+    pushed_ = nullptr;
+  }
   if (pushed_ && pushed_->widget() && Fl::pushed() == pushed_->widget()) {
     // An earlier tip-down fixed this tool's receiver until the tip lifts.
     receiver  = pushed_->widget();
@@ -1026,8 +1206,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   }
 
   if (!receiver) {
-    mouse_fallback(tool->frame_down, tool->frame_up, tool->frame_motion);
-    tablet_tool_reset_frame(tool);
+    mouse_fallback(fr.down, fr.up, fr.motion);
     tool->prev_state = tool->ev.state;
     return;
   }
@@ -1035,7 +1214,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   bool pen_handled = false;
 
   // ── 5. Tip down → TOUCH ──────────────────────────────────────────────────
-  if (tool->frame_down) {
+  if (fr.down) {
     if (!is_pushed) {
       pushed_ = subscriber_list_[receiver];
       Fl::pushed(receiver);
@@ -1043,7 +1222,8 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
     Fl::e_is_click = 1;
     Fl::Private::e_x_down = (int)tool->ev.x;
     Fl::Private::e_y_down = (int)tool->ev.y;
-    Fl::e_clicks = 0;
+    Fl::e_clicks = click_count(g_click, tool, tool->focus_win,
+                               tool->ev.x, tool->ev.y);
     pen_handled |= pen_send(tool, receiver, Fl::Pen::TOUCH,
                             tool->ev.state & (State::TIP_DOWN|State::ERASER_DOWN),
                             event_data_copied);
@@ -1052,7 +1232,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   }
 
   // ── 6. Tip up → LIFT ─────────────────────────────────────────────────────
-  if (tool->frame_up) {
+  if (fr.up) {
     if ((tool->ev.state & State::ANY_DOWN) == (State)0) {
       Fl::pushed(nullptr);
       pushed_ = nullptr;
@@ -1068,10 +1248,10 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
 
   // ── 7. Barrel button events ───────────────────────────────────────────────
   for (State bit : kButtonBits) {
-    if ((uint32_t)(tool->frame_buttons_pressed) & (uint32_t)bit)
+    if ((uint32_t)(fr.btn_pressed) & (uint32_t)bit)
       pen_handled |= pen_send(tool, receiver, Fl::Pen::BUTTON_PUSH, bit,
                               event_data_copied);
-    if ((uint32_t)(tool->frame_buttons_released) & (uint32_t)bit)
+    if ((uint32_t)(fr.btn_released) & (uint32_t)bit)
       pen_handled |= pen_send(tool, receiver, Fl::Pen::BUTTON_RELEASE, bit,
                               event_data_copied);
     // No mouse fallback for barrel buttons — there's no standard mouse
@@ -1079,7 +1259,7 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
   }
 
   // ── 8. Motion → DRAW or HOVER ────────────────────────────────────────────
-  if (tool->frame_motion) {
+  if (fr.motion) {
     if (Fl::e_is_click &&
         (std::fabs(tool->ev.x - Fl::Private::e_x_down) > 5.0 ||
          std::fabs(tool->ev.y - Fl::Private::e_y_down) > 5.0))
@@ -1093,16 +1273,8 @@ static void tool_cb_frame(void *data, struct zwp_tablet_tool_v2 *,
       mouse_fallback(false, false, true);
   }
 
-  // ── 9. Reset per-frame flags ──────────────────────────────────────────────
-  tablet_tool_reset_frame(tool);
   tool->prev_state = tool->ev.state;
-
-  // -- 10. Force standard mouse motion for menus (critical for highlighting)
-  if (is_menu_window && tool->frame_motion) {
-      mouse_fallback(false, false, true);   // sends FL_MOVE or FL_DRAG
-  }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // zwp_tablet_tool_v2 listener
@@ -1241,6 +1413,10 @@ void fl_wayland_tablet_cleanup() {
     // Destroy all tool objects first.
     TabletTool *t, *tmp;
     wl_list_for_each_safe(t, tmp, &g_tool_list, link) {
+#if HAVE_CURSOR_SHAPE
+      if (t->shape_device) wp_cursor_shape_device_v1_destroy(t->shape_device);
+#endif
+      if (t->cursor_surface) wl_surface_destroy(t->cursor_surface);
       wl_list_remove(&t->link);
       zwp_tablet_tool_v2_destroy(t->wl_tool);
       delete t;
@@ -1256,6 +1432,18 @@ void fl_wayland_tablet_cleanup() {
   g_current_tool = nullptr;
   below_pen_     = nullptr;
   pushed_        = nullptr;
+}
+
+// Called when a window's cursor changes, so a tool already in proximity
+// reacts without having to leave and re-enter.
+void fl_wayland_tablet_cursor_changed(Fl_Window *win) {
+  if (!g_tablet_seat || !win) return;
+  TabletTool *t;
+  wl_list_for_each(t, &g_tool_list, link) {
+    if (!t->in_proximity || !t->focus_surface) continue;
+    Fl_Window *fw = Fl_Wayland_Window_Driver::surface_to_window(t->focus_surface);
+    if (fw && fw->top_window() == win->top_window()) tablet_update_cursor(t);
+  }
 }
 
 /*

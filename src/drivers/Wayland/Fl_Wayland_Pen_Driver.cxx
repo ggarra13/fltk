@@ -74,11 +74,17 @@
 #include "gtk-shell-client-protocol.h"
 #include "tablet-client-protocol.h"
 
+#include <wayland-cursor.h>
+#if HAVE_CURSOR_SHAPE
+#  include "cursor-shape-client-protocol.h"
+#endif
+
 extern "C" {
 #include "../../../libdecor/build/fl_libdecor.h"
 #include "../../../libdecor/build/fl_libdecor-plugins.h"
 }
 
+#include <iostream>
 #include <cmath>
 #include <cstring>
 #include <cstdint>
@@ -140,6 +146,12 @@ struct TabletTool {
   uint32_t                        serial;
   uint32_t                        frame_time { 0 };   // ms timestamp of the frame being processed
   int                             decor_clicks { 0 }; // click count for a press on a decoration
+  uint32_t                        proximity_serial { 0 };   // serial of the last proximity_in
+  bool                            cursor_hidden    { false };
+#if HAVE_CURSOR_SHAPE
+  struct wp_cursor_shape_device_v1 *shape_device { nullptr };
+#endif
+  struct wl_surface *cursor_surface { nullptr };  // fallback visible cursor
 
   // Per-frame accumulated event data (flushed by tool_cb_frame)
   EventData  ev;
@@ -533,6 +545,10 @@ static void tool_cb_capability(void *data, struct zwp_tablet_tool_v2 *,
 static void tool_cb_removed(void *data, struct zwp_tablet_tool_v2 *wl_tool) {
   TabletTool *tool = static_cast<TabletTool *>(data);
   if (g_current_tool == tool) g_current_tool = nullptr;
+#if HAVE_CURSOR_SHAPE
+  if (tool->shape_device) wp_cursor_shape_device_v1_destroy(tool->shape_device);
+#endif
+  if (tool->cursor_surface) wl_surface_destroy(tool->cursor_surface);
   wl_list_remove(&tool->link);
   zwp_tablet_tool_v2_destroy(wl_tool);
   delete tool;
@@ -543,12 +559,96 @@ static void tool_cb_removed(void *data, struct zwp_tablet_tool_v2 *wl_tool) {
 // zwp_tablet_tool_v2 per-frame event callbacks
 // (accumulate data; dispatch happens only in tool_cb_frame)
 // ─────────────────────────────────────────────────────────────────────────────
+// True if the app asked for no cursor on this window (cursor(FL_CURSOR_NONE))
+// and has not installed a custom RGB cursor instead.
+static bool tablet_wants_hidden_cursor(Fl_Window *win) {
+  // The app may have called cursor() on the window under the pen (often a
+  // GL/Vulkan child window), on its top-level window, or on one in between.
+  for (Fl_Window *w = win; w; w = w->window()) {
+    struct wld_window *xid = fl_wl_xid(w);
+    if (!xid) continue;
+    if (xid->custom_cursor) return false;           // custom RGB cursor wins
+    if (Fl_Window_Driver::driver(w)->current_cursor() == FL_CURSOR_NONE)
+      return true;
+  }
+  return false;
+}
+
+#if HAVE_CURSOR_SHAPE
+static uint32_t tablet_shape_for(Fl_Cursor c) {
+  switch (c) {
+    case FL_CURSOR_CROSS:  return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR;
+    case FL_CURSOR_INSERT: return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT;
+    case FL_CURSOR_WAIT:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT;
+    case FL_CURSOR_HAND:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB;
+    case FL_CURSOR_HELP:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_HELP;
+    case FL_CURSOR_MOVE:   return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE;
+    default:               return WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT;
+  }
+}
+#endif
+
+// Give the tool a visible cursor again after we hid it.
+static void tablet_show_cursor(TabletTool *tool, Fl_Cursor c) {
+  Fl_Wayland_Screen_Driver *scr = (Fl_Wayland_Screen_Driver*)Fl::screen_driver();
+#if HAVE_CURSOR_SHAPE
+  if (scr->wp_cursor_shape_manager) {
+    if (!tool->shape_device)
+      tool->shape_device = wp_cursor_shape_manager_v1_get_tablet_tool_v2(
+                             scr->wp_cursor_shape_manager, tool->wl_tool);
+    if (tool->shape_device) {
+      wp_cursor_shape_device_v1_set_shape(tool->shape_device,
+                                          tool->proximity_serial,
+                                          tablet_shape_for(c));
+      tool->cursor_hidden = false;
+      return;
+    }
+  }
+#endif
+  // Fallback: our own cursor surface from the theme cursor.
+  struct wl_cursor *wc = scr->seat ? scr->seat->default_cursor : nullptr;
+  if (!wc || !wc->image_count) return;
+  if (!tool->cursor_surface)
+    tool->cursor_surface = wl_compositor_create_surface(scr->wl_compositor);
+  struct wl_cursor_image *image = wc->images[0];
+  const int scale = scr->seat->pointer_scale ? scr->seat->pointer_scale : 1;
+  zwp_tablet_tool_v2_set_cursor(tool->wl_tool, tool->proximity_serial,
+                                tool->cursor_surface,
+                                image->hotspot_x / scale, image->hotspot_y / scale);
+  wl_surface_attach(tool->cursor_surface, wl_cursor_image_get_buffer(image), 0, 0);
+  wl_surface_set_buffer_scale(tool->cursor_surface, scale);
+  wl_surface_damage_buffer(tool->cursor_surface, 0, 0, image->width, image->height);
+  wl_surface_commit(tool->cursor_surface);
+  tool->cursor_hidden = false;
+}
+
+// Make the tool's cursor match what the app wants for the window under it.
+static void tablet_update_cursor(TabletTool *tool) {
+  if (!tool->in_proximity || !tool->focus_surface || !tool->proximity_serial)
+    return;
+  Fl_Window *win = Fl_Wayland_Window_Driver::surface_to_window(tool->focus_surface);
+  if (!win) return;
+  if (tablet_wants_hidden_cursor(win)) {
+    zwp_tablet_tool_v2_set_cursor(tool->wl_tool, tool->proximity_serial,
+                                  nullptr, 0, 0);          // hide
+    tool->cursor_hidden = true;
+  } else if (tool->cursor_hidden) {
+    // Restore the cursor of the nearest window that has a non-default one.
+    Fl_Cursor c = FL_CURSOR_DEFAULT;
+    for (Fl_Window *w = win; w; w = w->window()) {
+      Fl_Cursor wc = Fl_Window_Driver::driver(w)->current_cursor();
+      if (wc != FL_CURSOR_DEFAULT && wc != FL_CURSOR_NONE) { c = wc; break; }
+    }
+    tablet_show_cursor(tool, c);
+  }
+}
 
 static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
-                                  uint32_t /*serial*/,
+                                  uint32_t serial,
                                   struct zwp_tablet_v2 * /*tablet*/,
                                   struct wl_surface *surface) {
   TabletTool *tool = static_cast<TabletTool *>(data);
+  tool->proximity_serial   = serial;
   tool->focus_surface      = surface;
   tool->focus_frame        = nullptr;
   tool->focus_win          = Fl_Wayland_Window_Driver::surface_to_window(surface);
@@ -606,6 +706,7 @@ static void tool_cb_proximity_in(void *data, struct zwp_tablet_tool_v2 *,
             xp = xp->next;
         }
     }
+    tablet_update_cursor(tool);
   }
 }
 
@@ -1312,6 +1413,10 @@ void fl_wayland_tablet_cleanup() {
     // Destroy all tool objects first.
     TabletTool *t, *tmp;
     wl_list_for_each_safe(t, tmp, &g_tool_list, link) {
+#if HAVE_CURSOR_SHAPE
+      if (t->shape_device) wp_cursor_shape_device_v1_destroy(t->shape_device);
+#endif
+      if (t->cursor_surface) wl_surface_destroy(t->cursor_surface);
       wl_list_remove(&t->link);
       zwp_tablet_tool_v2_destroy(t->wl_tool);
       delete t;
@@ -1327,6 +1432,18 @@ void fl_wayland_tablet_cleanup() {
   g_current_tool = nullptr;
   below_pen_     = nullptr;
   pushed_        = nullptr;
+}
+
+// Called when a window's cursor changes, so a tool already in proximity
+// reacts without having to leave and re-enter.
+void fl_wayland_tablet_cursor_changed(Fl_Window *win) {
+  if (!g_tablet_seat || !win) return;
+  TabletTool *t;
+  wl_list_for_each(t, &g_tool_list, link) {
+    if (!t->in_proximity || !t->focus_surface) continue;
+    Fl_Window *fw = Fl_Wayland_Window_Driver::surface_to_window(t->focus_surface);
+    if (fw && fw->top_window() == win->top_window()) tablet_update_cursor(t);
+  }
 }
 
 /*
