@@ -33,12 +33,12 @@ struct Fl_WGPUQueue
 
 struct Fl_WebGPU_Context
 {
-    WGPUInstance instance = 0;
-    WGPUAdapter  adapter = 0;
-    WGPUDevice device = 0;
+    WGPUInstance instance = nullptr;
+    WGPUAdapter  adapter = nullptr;
+    WGPUDevice device = nullptr;
     Fl_WGPUQueue safe_thread_queue;
-    WGPUSurface surface = 0;
-    WGPURenderPipeline pipeline = 0;
+    WGPUSurface surface = nullptr;
+    WGPURenderPipeline pipeline = nullptr;
 
     // Chosen in Fl_WebGPU_Window_Driver::init_colorspace()
     WGPUTextureFormat surface_format = WGPUTextureFormat_BGRA8Unorm;

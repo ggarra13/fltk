@@ -1223,8 +1223,11 @@ void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP
       let ctx = Emval.toValue($0);
       let iw = $3;
       let ih = $4;
-      let idata = new ImageData(
-          new Uint8ClampedArray(HEAPU8.buffer.slice($1, $1 + $2)), iw, ih);
+      // Copy into a non-shared array
+      // (required when memory is a SharedArrayBuffer)
+      let pixels = new Uint8ClampedArray($2);
+      pixels.set(HEAPU8.subarray($1, $1 + $2));
+      let idata = new ImageData(pixels, iw, ih);
       let tmp = new OffscreenCanvas(iw, ih);
       tmp.getContext("2d").putImageData(idata, 0, 0);
       ctx.save();
