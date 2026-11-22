@@ -391,6 +391,19 @@ static void em_track_viewport() {
                                  em_on_viewport_resize);
 }
 
+// Size of the canvas backing store in device pixels. Only WebGPU windows get a
+// backing store larger than the logical size: their surface is configured with
+// pixel_w() x pixel_h() = w() x h() x pixels_per_unit(). 2D windows keep a
+// logical-size canvas because Fl_Emscripten_Graphics_Driver::scale() applies
+// ctx.scale() itself. The CSS size always stays logical (see the EM_ASM code).
+static void em_backing_size(Fl_Window *win, int W, int H, int &PW, int &PH) {
+  float s = win->as_wgpu_window() ? win->pixels_per_unit() : 1.f;
+  PW = (int)(W * s + 0.5f);
+  PH = (int)(H * s + 0.5f);
+  if (PW < 1) PW = 1;
+  if (PH < 1) PH = 1;
+}
+
 // Basically the window itself is a div element. Decorations for bordered windows are done in the browser using a div as well.
 // The window div contains a canvas element which is the FLTK window.
 void Fl_Emscripten_Window_Driver::makeWindow() {
@@ -399,6 +412,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
     return;
   if (pWindow->parent() && !pWindow->window()->shown())
     return;
+
   // Claim the id now: handle(FL_SHOW) below maps child windows, which re-enters
   // makeWindow() and must not see the same id.
   const int id = ID++;
@@ -421,6 +435,12 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
 
   Fl_Window *pw = pWindow->parent() ? pWindow->window() : NULL;
   int parent_id = (pw && Fl_X::flx(pw)) ? (int)Fl_X::flx(pw)->xid : 0;
+
+  float s = Fl::screen_driver()->scale(0);          // or pWindow->pixels_per_unit() once shown
+  int PW = (int)(W * s + 0.5f), PH = (int)(H * s + 0.5f);
+
+  int PW, PH;
+  em_backing_size(pWindow, pWindow->w(), pWindow->h(), PW, PH);
 
   // clang-format off
   EM_ASM(
@@ -482,8 +502,10 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         canvas.id = "fltk_canvas" + $0;
         canvas.setAttribute("data-raw-handle", $0.toString());
         canvas.tabIndex = "-1";
-        canvas.width = $4;
-        canvas.height = $5;
+        canvas.width = $10;              // backing store: device pixels
+        canvas.height = $11;
+        canvas.style.width = $4 + "px";  // layout size: logical units
+        canvas.style.height = $5 + "px";
         canvas.style.display = "block";
         canvas.style.outline = "none";
         content.appendChild(canvas);
@@ -609,7 +631,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
       id, pWindow->border(), pWindow->x(), pWindow->y(),
       pWindow->w(), pWindow->h(), pWindow->label() ? pWindow->label(): "",
       em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0,
-      parent_id);
+      parent_id, PW, PH);
   // clang-format on
   if (fill) {
     em_track_viewport();
@@ -794,6 +816,8 @@ void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
   // its canvas, so a visible title bar sits above it: shift the div up by its height.
   if (pWindow->shown() && (is_a_resize || !pWindow->parent())) {
     fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
+    int PW, PH;
+    em_backing_size(pWindow, W, H, PW, PH);
     EM_ASM(
         {
           let X = $1;
@@ -803,8 +827,10 @@ void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
           let resized = $5;
           let canvas = document.getElementById("fltk_canvas" + $0);
           if (canvas && resized) {
-            canvas.width = W;
-            canvas.height = H;
+            canvas.width = $7;              // backing store: device pixels
+            canvas.height = $8;
+            canvas.style.width = W + "px";  // layout size: logical units
+            canvas.style.height = H + "px";
           }
           let div = document.getElementById("fltk_div" + $0);
           if (div) {
@@ -815,7 +841,7 @@ void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
             div.style.top = (Y - off) + "px";
           }
         },
-        (int)xid, X, Y, W, H, is_a_resize ? 1 : 0, FL_EM_DECOR_H);
+        (int)xid, X, Y, W, H, is_a_resize ? 1 : 0, FL_EM_DECOR_H, PW, PH);
   }
   if (is_a_resize)
     pWindow->redraw();
