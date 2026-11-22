@@ -84,7 +84,7 @@ void Fl_WebGPU_Window::end_render_pass()
   {
     wgpuRenderPassEncoderEnd(ctx.render_pass);
     wgpuRenderPassEncoderRelease(ctx.render_pass);
-    ctx.render_pass = 0;
+    ctx.render_pass = nullptr;
     m_in_render_pass = false;
   }
 }
@@ -202,6 +202,8 @@ void Fl_WebGPU_Window::swap_buffers() {
 #ifndef __EMSCRIPTEN__
     wgpuSurfacePresent(ctx.surface); // the browser presents implicitly
 #endif
+
+    ++frameIndex;
   }
 
   wgpuCommandBufferRelease(commands);

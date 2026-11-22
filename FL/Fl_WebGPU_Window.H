@@ -89,6 +89,8 @@ public:
   // Window's WebGPU context.
   Fl_WebGPU_Context ctx;
 
+  uint32_t           frameIndex;  // index to frame in flight
+
   inline WGPUQueue&        queue() { return ctx.safe_thread_queue.queue; }
   inline std::mutex& queue_mutex() { return ctx.safe_thread_queue.mutex; }
 
