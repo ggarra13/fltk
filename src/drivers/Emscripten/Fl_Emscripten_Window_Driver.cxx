@@ -685,8 +685,15 @@ void Fl_Emscripten_Window_Driver::map() {
     em_raise((int)ip->xid);
 }
 
-extern "C" void EMSCRIPTEN_KEEPALIVE delete_div(int xid) {
-  Fl_Window *pWindow = fl_em_find(xid);
+// Removes the Emscripten event handlers of one canvas. Does nothing when the canvas
+// element no longer exists: Emscripten logs "the target element for event handler
+// registration does not exist" for every handler it cannot find a target for.
+extern "C" void EMSCRIPTEN_KEEPALIVE fltk_em_unregister_canvas(int xid) {
+  const int exists = EM_ASM_INT({ return document.getElementById("fltk_canvas" + $0) ? 1 : 0; },
+                                xid);
+  if (!exists)
+    return;
+  Fl_Window *pWindow = NULL; // user data is ignored when unregistering (NULL callback)
   char canvasid[32];
   sprintf(canvasid, "#%s%d", "fltk_canvas", xid);
   UNREGISTER_EV(mousedown);
@@ -697,10 +704,19 @@ extern "C" void EMSCRIPTEN_KEEPALIVE delete_div(int xid) {
   UNREGISTER_EV(wheel);
   UNREGISTER_EV(keydown);
   UNREGISTER_EV(keyup);
+}
+
+extern "C" void EMSCRIPTEN_KEEPALIVE delete_div(int xid) {
+  // Child windows live inside their parent's div, so removing the div also removes their
+  // canvases. Unregister the handlers of this canvas and of every descendant canvas first,
+  // while the elements still exist. If the div is already gone (parent hidden earlier),
+  // its handlers were unregistered then and there is nothing left to do.
   EM_ASM(
       {
         let div = document.getElementById("fltk_div" + $0);
         if (div) {
+          div.querySelectorAll('canvas[id^="fltk_canvas"]').forEach(
+              (c) => _fltk_em_unregister_canvas(parseInt(c.id.substring(11), 10)));
           div.remove();
         }
       },
