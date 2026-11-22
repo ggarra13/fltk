@@ -363,9 +363,44 @@ static void em_fullscreen_page_style(int xid, bool on, bool handles) {
       xid, on ? 1 : 0, handles ? 1 : 0);
 }
 
+// Size of the canvas backing store in device pixels. Only WebGPU windows get a
+// backing store larger than the logical size: their surface is configured with
+// pixel_w() x pixel_h() = w() x h() x pixels_per_unit(). 2D windows keep a
+// logical-size canvas because Fl_Emscripten_Graphics_Driver::scale() applies
+// ctx.scale() itself. The CSS size always stays logical (see the EM_ASM code).
+static void em_backing_size(Fl_Window *win, int W, int H, int &PW, int &PH) {
+  float s = win->as_wgpu_window() ? win->pixels_per_unit() : 1.f;
+  PW = (int)(W * s + 0.5f);
+  PH = (int)(H * s + 0.5f);
+  if (PW < 1) PW = 1;
+  if (PH < 1) PH = 1;
+}
+
 // Browser window resized: refit all top-level fullscreen windows.
 static bool em_on_viewport_resize(int, const EmscriptenUiEvent *, void *) {
   bool changed = false;
+  // Browser zoom changes devicePixelRatio (and fires this event): keep each WebGPU
+  // canvas at w() x h() x pixels_per_unit() device pixels.
+  for (Fl_X *x = Fl_X::first; x; x = x->next) {
+    Fl_Window *win = x->w;
+    if (!win || !win->as_wgpu_window())
+      continue;
+    int PW, PH;
+    em_backing_size(win, win->w(), win->h(), PW, PH);
+    int resized = EM_ASM_INT(
+        {
+          let c = document.getElementById("fltk_canvas" + $0);
+          if (!c || (c.width == $1 && c.height == $2)) return 0;
+          c.width = $1;
+          c.height = $2;
+          return 1;
+        },
+        (int)x->xid, PW, PH);
+    if (resized) {
+      win->redraw();
+      changed = true;
+    }
+  }
   for (Fl_X *x = Fl_X::first; x; x = x->next) {
     Fl_Window *win = x->w;
     if (!win || win->parent() || !win->fullscreen_active())
@@ -389,19 +424,6 @@ static void em_track_viewport() {
   registered = true;
   emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, false,
                                  em_on_viewport_resize);
-}
-
-// Size of the canvas backing store in device pixels. Only WebGPU windows get a
-// backing store larger than the logical size: their surface is configured with
-// pixel_w() x pixel_h() = w() x h() x pixels_per_unit(). 2D windows keep a
-// logical-size canvas because Fl_Emscripten_Graphics_Driver::scale() applies
-// ctx.scale() itself. The CSS size always stays logical (see the EM_ASM code).
-static void em_backing_size(Fl_Window *win, int W, int H, int &PW, int &PH) {
-  float s = win->as_wgpu_window() ? win->pixels_per_unit() : 1.f;
-  PW = (int)(W * s + 0.5f);
-  PH = (int)(H * s + 0.5f);
-  if (PW < 1) PW = 1;
-  if (PH < 1) PH = 1;
 }
 
 // Basically the window itself is a div element. Decorations for bordered windows are done in the browser using a div as well.
@@ -435,9 +457,6 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
 
   Fl_Window *pw = pWindow->parent() ? pWindow->window() : NULL;
   int parent_id = (pw && Fl_X::flx(pw)) ? (int)Fl_X::flx(pw)->xid : 0;
-
-  float s = Fl::screen_driver()->scale(0);          // or pWindow->pixels_per_unit() once shown
-  int PW = (int)(W * s + 0.5f), PH = (int)(H * s + 0.5f);
 
   int PW, PH;
   em_backing_size(pWindow, pWindow->w(), pWindow->h(), PW, PH);
@@ -636,6 +655,8 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
   if (fill) {
     em_track_viewport();
     em_fullscreen_page_style(id, true, false);
+  } else if (pWindow->as_wgpu_window()) {
+    em_track_viewport(); // also follows devicePixelRatio changes
   }
   Fl_X *xp = new Fl_X;
   xp->xid = (fl_uintptr_t)id;

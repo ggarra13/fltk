@@ -31,6 +31,7 @@ public:
   int y() FL_OVERRIDE;
   int w() FL_OVERRIDE;
   int h() FL_OVERRIDE;
+  float scale(int n) FL_OVERRIDE;
   void grab(Fl_Window *win) FL_OVERRIDE;
   int get_mouse(int &x, int &y) FL_OVERRIDE;
   int compose(int &del) FL_OVERRIDE;

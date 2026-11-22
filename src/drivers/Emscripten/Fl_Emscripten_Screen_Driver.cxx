@@ -66,6 +66,14 @@ int Fl_Emscripten_Screen_Driver::h() {
 }
 
 
+// FLTK units are CSS pixels (w() and h() above are window.innerWidth/innerHeight), so
+// the number of device pixels per unit is the browser's devicePixelRatio. Read live
+// so that browser zoom is picked up. This is what Fl_Window::pixels_per_unit() returns.
+float Fl_Emscripten_Screen_Driver::scale(int /*n*/) {
+  double r = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; });
+  return r > 0 ? (float)r : 1.f;
+}
+
 void Fl_Emscripten_Screen_Driver::screen_work_area(int &X, int &Y, int &W, int &H, int n) {
   if (num_screens < 0)
     init();
