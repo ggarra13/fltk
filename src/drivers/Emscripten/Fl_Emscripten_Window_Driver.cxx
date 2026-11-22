@@ -61,7 +61,8 @@ static int special_key(const char *k, bool right) {
 }
 
 static void set_keysym_and_state(const EmscriptenKeyboardEvent *keyEvent) {
-  ulong state = 0;
+  // Keep mouse-button and lock bits: only the modifiers are rebuilt from the event.
+  ulong state = Fl::e_state & (FL_BUTTONS | FL_CAPS_LOCK | FL_NUM_LOCK | FL_SCROLL_LOCK);
   int temp = special_key(keyEvent->key, keyEvent->location == 2);
   if (temp >= 0) {
     Fl::e_keysym = special_keys_equiv[temp];
@@ -96,10 +97,8 @@ static int match_mouse_event(int eventType) {
       return FL_ENTER;
     case EMSCRIPTEN_EVENT_MOUSELEAVE:
       return FL_LEAVE;
-    case EMSCRIPTEN_EVENT_DBLCLICK:
-      return FL_PUSH;
-    case EMSCRIPTEN_EVENT_CLICK:
-      return FL_PUSH;
+    // click/dblclick are deliberately not mapped: mousedown already produces FL_PUSH,
+    // and the click count is computed in handle_mouse_ev().
     default:
       return 0;
   }
@@ -119,50 +118,71 @@ static int match_key_event(int eventType) {
 
 static int px, py;
 
+// Multi-click detection. EmscriptenMouseEvent has no `detail` field (the DOM click count),
+// so count consecutive presses of the same button close together in time and space.
+#define FL_EM_MULTICLICK_MS 400.0
+#define FL_EM_MULTICLICK_PX 5
+
+static int last_push_button = -1;
+static double last_push_time = 0;
+static int last_push_x, last_push_y;
+static int push_clicks = 0;
+
 static bool handle_mouse_ev(int eventType, const EmscriptenMouseEvent *event, void *data) {
   Fl_Window *pWindow = (Fl_Window *)data;
-  ulong state = Fl::e_state & 0xff0000;
   Fl::e_x = event->targetX;
   Fl::e_y = event->targetY;
   Fl::e_x_root = event->clientX;
   Fl::e_y_root = event->clientY;
+
+  // Rebuild modifiers and buttons from the event itself.
+  ulong state = Fl::e_state & (FL_CAPS_LOCK | FL_NUM_LOCK | FL_SCROLL_LOCK);
+  if (event->shiftKey) state |= FL_SHIFT;
+  if (event->ctrlKey)  state |= FL_CTRL;
+  if (event->altKey)   state |= FL_ALT;
+  if (event->metaKey)  state |= FL_META;
+  // DOM `buttons`: 1 = left, 2 = right, 4 = middle, 8 = back, 16 = forward.
+  // On mousedown it includes the pressed button, on mouseup it excludes the released one.
+  const unsigned b = event->buttons;
+  if (b & 1)  state |= FL_BUTTON1;
+  if (b & 4)  state |= FL_BUTTON2;
+  if (b & 2)  state |= FL_BUTTON3;
+  if (b & 8)  state |= FL_BUTTON4;
+  if (b & 16) state |= FL_BUTTON5;
+
   int flev = match_mouse_event(eventType);
   if (flev == FL_PUSH) {
-    if (eventType == EMSCRIPTEN_EVENT_DBLCLICK)
-      Fl::e_clicks = 1;
+    if (event->button == last_push_button &&
+        event->timestamp - last_push_time < FL_EM_MULTICLICK_MS &&
+        abs(Fl::e_x_root - last_push_x) <= FL_EM_MULTICLICK_PX &&
+        abs(Fl::e_y_root - last_push_y) <= FL_EM_MULTICLICK_PX)
+      push_clicks++;
     else
-      Fl::e_clicks = 0;
+      push_clicks = 0;
+    last_push_button = event->button;
+    last_push_time = event->timestamp;
+    last_push_x = Fl::e_x_root;
+    last_push_y = Fl::e_y_root;
+    Fl::e_clicks = push_clicks;   // 0 = single, 1 = double, 2 = triple ...
     Fl::e_is_click = 1;
     px = Fl::e_x_root;
     py = Fl::e_y_root;
-    if (event->button == 0)
-      state |= FL_BUTTON1;
-    if (event->button == 1)
-      state |= FL_BUTTON2;
-    if (event->button == 2)
-      state |= FL_BUTTON3;
-    if (event->button == 3)
-      state |= FL_BUTTON4;
-    if (event->button == 4)
-      state |= FL_BUTTON5;
     Fl::e_keysym = FL_Button + event->button + 1;
   } else if (flev == FL_RELEASE) {
     if (abs(Fl::e_x_root - px) > 5 || abs(Fl::e_y_root - py) > 5)
       Fl::e_is_click = 0;
-    if (event->button == 0)
-      state &= ~FL_BUTTON1;
-    if (event->button == 1)
-      state &= ~FL_BUTTON2;
-    if (event->button == 2)
-      state &= ~FL_BUTTON3;
-    if (event->button == 3)
-      state &= ~FL_BUTTON4;
-    if (event->button == 4)
-      state &= ~FL_BUTTON5;
     Fl::e_keysym = FL_Button + event->button + 1;
+  } else if (flev == FL_MOVE && (state & FL_BUTTONS)) {
+    flev = FL_DRAG;
   }
   Fl::e_state = state;
+
   int ret = Fl::handle(flev, pWindow);
+
+  // Always cancel the browser's default for non-left buttons (autoscroll, back/forward).
+  if ((eventType == EMSCRIPTEN_EVENT_MOUSEDOWN || eventType == EMSCRIPTEN_EVENT_MOUSEUP) &&
+      event->button != 0)
+    return true;
   return ret;
 }
 
@@ -469,6 +489,12 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         content.appendChild(canvas);
 
         canvas.addEventListener("click", () => canvas.focus());
+        // Implicit mouse capture (like an X11 grab): once a button is pressed on the canvas,
+        // mousemove/mouseup keep going to it even when the pointer leaves, so a release
+        // outside the canvas is not lost. Released automatically on pointerup/cancel.
+        canvas.addEventListener("pointerdown", (e) => {
+          try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+        });
         decor.addEventListener("mousedown", () => canvas.focus());
 
         // focus events bubble, and child windows now live inside this div
@@ -615,7 +641,6 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
   REGISTER_MOUSE_EV(mousemove);
   REGISTER_MOUSE_EV(mouseenter);
   REGISTER_MOUSE_EV(mouseleave);
-  REGISTER_MOUSE_EV(dblclick);
   REGISTER_WHEEL_EV(wheel);
   REGISTER_KEY_EV(keydown);
   REGISTER_KEY_EV(keyup);
@@ -669,7 +694,6 @@ extern "C" void EMSCRIPTEN_KEEPALIVE delete_div(int xid) {
   UNREGISTER_EV(mousemove);
   UNREGISTER_EV(mouseenter);
   UNREGISTER_EV(mouseleave);
-  UNREGISTER_EV(dblclick);
   UNREGISTER_EV(wheel);
   UNREGISTER_EV(keydown);
   UNREGISTER_EV(keyup);
