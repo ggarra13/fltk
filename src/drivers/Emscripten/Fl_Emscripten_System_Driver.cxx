@@ -17,6 +17,8 @@
 #include "Fl_Emscripten_System_Driver.H"
 #include <emscripten.h>
 
+#include <sys/time.h>
+
 Fl_Emscripten_System_Driver::Fl_Emscripten_System_Driver()
   : Fl_System_Driver() {}
 
@@ -24,13 +26,21 @@ double Fl_Emscripten_System_Driver::wait(double v) {
   static unsigned int wait_depth = 0;
   wait_depth++;
 
+  // Never block in the browser: timeouts/events are serviced once per
+  // animation frame, so just do one non-blocking pass.
   double ret = Fl_System_Driver::wait(v);
 
   if (wait_depth == 1) {
-    // emscripten_sleep(0);
     Fl::flush();
   }
 
   wait_depth--;
   return ret;
+}
+
+void Fl_Emscripten_System_Driver::gettime(time_t *sec, int *usec) {
+  struct timeval t;
+  gettimeofday(&t, NULL);
+  *sec  = t.tv_sec;
+  *usec = (int)t.tv_usec;
 }

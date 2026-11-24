@@ -727,7 +727,7 @@ int Fl::run() {
 #ifndef __EMSCRIPTEN__
   while (Fl_X::first) wait(FOREVER);
 #else
-  emscripten_set_main_loop([]() { Fl::wait(); }, 0, true);
+  emscripten_set_main_loop([]() { Fl::wait(0.0); }, 0, true);
 #endif
   return 0;
 }
