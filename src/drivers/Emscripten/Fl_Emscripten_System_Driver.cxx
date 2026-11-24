@@ -27,7 +27,7 @@ double Fl_Emscripten_System_Driver::wait(double v) {
   double ret = Fl_System_Driver::wait(v);
 
   if (wait_depth == 1) {
-    emscripten_sleep(0);
+    // emscripten_sleep(0);
     Fl::flush();
   }
 
