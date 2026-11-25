@@ -49,6 +49,7 @@ public:
   virtual ~Fl_WebGPU_Window_Driver();
   static Fl_WebGPU_Window_Driver *newWebGPUWindowDriver(Fl_WebGPU_Window *w);
   static Fl_WebGPU_Window_Driver *global();
+  virtual void surface_size(int& W, int& H);
   virtual int get_surface_buffer_scale() const { return 1; }
   virtual float pixels_per_unit() { return 1; }
   virtual void before_show(int &) {}

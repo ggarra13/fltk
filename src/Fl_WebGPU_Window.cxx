@@ -447,6 +447,7 @@ void Fl_WebGPU_Window::init() {
   box(FL_NO_BOX);
 
   pWebGPUWindowDriver = nullptr;
+  frameIndex = 0;
 
   mode_ = FL_RGB | FL_DEPTH | FL_DOUBLE;
   alist = 0;

@@ -34,6 +34,7 @@ class Fl_Emscripten_WebGPU_Window_Driver : public Fl_WebGPU_Window_Driver {
   void swap_buffers() FL_OVERRIDE;
   void swap_interval(int) FL_OVERRIDE;
   int swap_interval() const FL_OVERRIDE;
+  void surface_size(int &W, int &H) FL_OVERRIDE;
   Fl_WebGPU_Choice *find(int m, const int *alistp) FL_OVERRIDE;
 };
 

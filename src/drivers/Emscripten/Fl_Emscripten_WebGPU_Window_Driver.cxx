@@ -135,4 +135,12 @@ int Fl_Emscripten_WebGPU_Window_Driver::swap_interval() const {
   return -1;
 }
 
+void Fl_Emscripten_WebGPU_Window_Driver::surface_size(int &W, int &H) {
+  char selector[64];
+  fl_make_canvas_target(pWindow, selector, sizeof(selector));
+  if (emscripten_get_canvas_element_size(selector, &W, &H) != EMSCRIPTEN_RESULT_SUCCESS) {
+    W = pWindow->pixel_w();
+    H = pWindow->pixel_h();
+  }
+}
 #endif // HAVE_WEBGPU

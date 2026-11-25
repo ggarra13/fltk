@@ -1168,7 +1168,7 @@ void Fl_Emscripten_Graphics_Driver::font_name(int num, const char *name) {
 }
 
 // The canvas only understands RGB images of depth 4 (RGBA8888), that means everything needs to be converted to it.
-// Can't think of another solution!
+#if 0
 void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP, int WP, int HP,
                                                int cx, int cy) {
   int X, Y, W, H;
@@ -1180,43 +1180,45 @@ void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP
   if (start_image(rgb, XP, YP, WP, HP, cx, cy, X, Y, W, H)) {
     return;
   }
-  const int sz = rgb->data_w() * rgb->data_h() * rgb->d();
+  const int pixels = rgb->data_w() * rgb->data_h();
+  const int sz = pixels * rgb->d();
   std::vector<uchar> image_data;
-  image_data.reserve(rgb->data_w() * rgb->data_h() * 4);
+  image_data.resize(pixels * 4);
+
+  uchar* dst = image_data.data();
+  const uchar* src = rgb->array;
+
   switch (rgb->d()) {
-    case 4: {
-      for (int i = 0; i < sz; i++) {
-        image_data.push_back(rgb->array[i]);
+  case 4:
+      memcpy(dst, src, pixels * 4);
+      break;
+
+  case 3:
+      for (int i = 0; i < pixels; ++i) {
+          dst[i * 4 + 0] = src[i * 3 + 0];
+          dst[i * 4 + 1] = src[i * 3 + 1];
+          dst[i * 4 + 2] = src[i * 3 + 2];
+          dst[i * 4 + 3] = 255;
       }
       break;
-    }
-    case 3: {
-      for (int i = 0; i < sz; i += 3) {
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(rgb->array[i + 1]);
-        image_data.push_back(rgb->array[i + 2]);
-        image_data.push_back(255);
+
+  case 2:
+      for (int i = 0; i < pixels; ++i) {
+          dst[i * 4 + 0] = src[i * 2 + 0];
+          dst[i * 4 + 1] = src[i * 2 + 0];
+          dst[i * 4 + 2] = src[i * 2 + 0];
+          dst[i * 4 + 3] = src[i * 2 + 1];
       }
       break;
-    }
-    case 2: {
-      for (int i = 0; i < sz; i += 2) {
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(rgb->array[i + 1]);
+
+  case 1:
+      for (int i = 0; i < pixels; ++i) {
+          dst[i * 4 + 0] = src[i];
+          dst[i * 4 + 1] = src[i];
+          dst[i * 4 + 2] = src[i];
+          dst[i * 4 + 3] = 255;
       }
       break;
-    }
-    case 1: {
-      for (int i = 0; i < sz; i++) {
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(rgb->array[i]);
-        image_data.push_back(255);
-      }
-      break;
-    }
   }
   EM_ASM(
     {
@@ -1240,6 +1242,116 @@ void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP
     ctxt, image_data.data(), image_data.size(), rgb->data_w(), rgb->data_h(),
     XP, YP, cx, cy, WP, HP);
 }
+#else
+void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP, int WP, int HP,
+                                               int cx, int cy) {
+  int X, Y, W, H;
+  if (!rgb->d() || !rgb->array) {
+    Fl_Graphics_Driver::draw_empty(rgb, XP, YP);
+    return;
+  }
+  if (start_image(rgb, XP, YP, WP, HP, cx, cy, X, Y, W, H)) {
+    return;
+  }
+
+  const int iw = rgb->data_w();
+  const int ih = rgb->data_h();
+  const int pixels = iw * ih;
+  const int rgba_bytes = pixels * 4;
+
+  const uchar* src = rgb->array;
+
+  // Avoid copying into image_data when the source is already 4-channel RGBA
+  if (rgb->d() != 4) {
+    std::vector<uchar> image_data;
+    image_data.resize(rgba_bytes);
+    uchar* dst = image_data.data();
+
+    switch (rgb->d()) {
+      case 3:
+        for (int i = 0; i < pixels; ++i) {
+          dst[i * 4 + 0] = src[i * 3 + 0];
+          dst[i * 4 + 1] = src[i * 3 + 1];
+          dst[i * 4 + 2] = src[i * 3 + 2];
+          dst[i * 4 + 3] = 255;
+        }
+        break;
+
+      case 2:
+        for (int i = 0; i < pixels; ++i) {
+          dst[i * 4 + 0] = src[i * 2 + 0];
+          dst[i * 4 + 1] = src[i * 2 + 0];
+          dst[i * 4 + 2] = src[i * 2 + 0];
+          dst[i * 4 + 3] = src[i * 2 + 1];
+        }
+        break;
+
+      case 1:
+        for (int i = 0; i < pixels; ++i) {
+          dst[i * 4 + 0] = src[i];
+          dst[i * 4 + 1] = src[i];
+          dst[i * 4 + 2] = src[i];
+          dst[i * 4 + 3] = 255;
+        }
+        break;
+    }
+    src = dst;
+  }
+
+  EM_ASM(
+    {
+      const ctx = Emval.toValue($0);
+      const ptr = $1;
+      const len = $2;
+      const iw = $3;
+      const ih = $4;
+      const dx = $5;
+      const dy = $6;
+      const sx = $7;
+      const sy = $8;
+      const sw = $9;
+      const sh = $10;
+
+      // 1. Reuse a non-shared Uint8ClampedArray (safe even when HEAPU8 uses SharedArrayBuffer)
+      let pixels = Module._flReusablePixels;
+      if (!pixels || pixels.length < len) {
+        pixels = new Uint8ClampedArray(len);
+        Module._flReusablePixels = pixels;
+      }
+      const view = pixels.length === len ? pixels : pixels.subarray(0, len);
+      view.set(HEAPU8.subarray(ptr, ptr + len));
+
+      // 2. Reuse ImageData when dimensions match
+      let idata = Module._flReusableImageData;
+      if (!idata || idata.width !== iw || idata.height !== ih || idata.data !== view) {
+        idata = new ImageData(view, iw, ih);
+        Module._flReusableImageData = idata;
+      }
+
+      // 3. Reuse a single OffscreenCanvas, growing only when needed
+      let tmp = Module._flScratchCanvas;
+      if (!tmp) {
+        tmp = new OffscreenCanvas(iw, ih);
+        Module._flScratchCanvas = tmp;
+      } else {
+        if (tmp.width < iw) tmp.width = iw;
+        if (tmp.height < ih) tmp.height = ih;
+      }
+
+      const tmpCtx = tmp.getContext("2d");
+      tmpCtx.putImageData(idata, 0, 0, 0, 0, iw, ih);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(dx, dy, sw, sh);
+      ctx.clip();
+      ctx.drawImage(tmp, sx, sy, sw, sh, dx, dy, sw, sh);
+      ctx.restore();
+    },
+    ctxt, src, rgba_bytes, iw, ih,
+    XP, YP, cx, cy, WP, HP);
+}
+#endif
 
 
 void Fl_Emscripten_Graphics_Driver::draw_image(Fl_Draw_Image_Cb call, void *data, int ix, int iy,

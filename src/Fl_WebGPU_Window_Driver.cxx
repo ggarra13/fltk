@@ -273,8 +273,8 @@ void Fl_WebGPU_Window_Driver::prepare_buffers()
   if (!w.surface || !w.device)
     return;
 
-  int W = pWindow->pixel_w();
-  int H = pWindow->pixel_h();
+  int W, H;
+  surface_size(W, H);
   if (W <= 0 || H <= 0)
     return;
 
@@ -380,16 +380,14 @@ bool Fl_WebGPU_Window_Driver::acquire_back_buffer()
   if (!w.surface || !w.device)
     return false;
 
-  int W = pWindow->pixel_w();
-  int H = pWindow->pixel_h();
+  int W, H;
+  surface_size(W, H);
   if (W <= 0 || H <= 0)
     return false;
 
   const bool resized = (W != configured_w_ || H != configured_h_);
   if (resized || needs_configure_)
     prepare_buffers();
-  if (resized)
-    prepare_depth();
 
   WGPUSurfaceTexture st = {};
   wgpuSurfaceGetCurrentTexture(w.surface, &st);
@@ -415,6 +413,15 @@ bool Fl_WebGPU_Window_Driver::acquire_back_buffer()
   }
 
   w.surface_texture = st;
+
+  const int tw = (int)wgpuTextureGetWidth(st.texture);
+  const int th = (int)wgpuTextureGetHeight(st.texture);
+  if (tw != configured_w_ || th != configured_h_ || !w.depth_view) {
+    configured_w_ = tw;          // depth must follow the real surface size
+    configured_h_ = th;
+    prepare_depth();
+  }
+
   w.back_buffer = wgpuTextureCreateView(st.texture, NULL);
   if (!w.back_buffer) {
     release_back_buffer();
@@ -473,6 +480,12 @@ void Fl_WebGPU_Window_Driver::destroy_resources()
         w.pipeline = 0;
     }
     destroy_depth();
+}
+
+// default for native backends
+void Fl_WebGPU_Window_Driver::surface_size(int &W, int &H) {
+  W = pWindow->pixel_w();
+  H = pWindow->pixel_h();
 }
 
 // Call after destroy_resources() and destroy_surface().
