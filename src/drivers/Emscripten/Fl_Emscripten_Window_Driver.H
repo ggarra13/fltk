@@ -22,8 +22,11 @@
 
 class Fl_Emscripten_Window_Driver : public Fl_Window_Driver {
   const char *cursor;
+  int z_layer_ = -1; // stacking layer: -1 = automatic
 
 public:
+  void z_layer(int l) { z_layer_ = l; }
+  int z_layer() const;
   Fl_Emscripten_Window_Driver(Fl_Window *);
   void makeWindow() FL_OVERRIDE;
   void show() FL_OVERRIDE;

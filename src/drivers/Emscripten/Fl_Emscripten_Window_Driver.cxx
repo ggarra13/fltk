@@ -208,15 +208,59 @@ static bool handle_key_ev(int eventType, const EmscriptenKeyboardEvent *event, v
   return ret;
 }
 
-// Put a top-level window's div above every window shown/focused so far.
+// Stacking layers for top-level windows:
+//   0 = main window (its nested viewport/timeline windows live inside it)
+//   1 = panels, auxiliary windows, dialogs (default)
+//   2 = menus and tooltips
+// A window is raised only above windows of its own layer, so focusing the
+// main window never covers a panel, and menus are always on top.
+// NOTE: no top-level commas inside EM_ASM bodies (preprocessor limitation).
+static void em_init_z() {
+  EM_ASM({
+    if (window.fltkRaise) return;
+    window.fltkZc = new Array(3).fill(0);
+    window.fltkRaise = function(div) {
+      if (!div) return;
+      const layer = parseInt(div.dataset.zlayer || "1");
+      div.style.zIndex = layer * 100000000 + (++window.fltkZc[layer]);
+    };
+  });
+}
+
+// Put a top-level window's div above every window of its layer.
 static void em_raise(int xid) {
+  em_init_z();
+  EM_ASM({ window.fltkRaise(document.getElementById("fltk_div" + $0)); }, xid);
+}
+
+// Set the layer of a top-level window's div and raise it within that layer.
+static void em_apply_layer(int xid, int layer) {
+  em_init_z();
   EM_ASM(
       {
-        let div = document.getElementById("fltk_div" + $0);
-        if (div)
-          div.style.zIndex = (window.fltkZ = (window.fltkZ || 10) + 1);
+        const div = document.getElementById("fltk_div" + $0);
+        if (!div) return;
+        div.dataset.zlayer = $1;
+        window.fltkRaise(div);
       },
-      xid);
+      xid, layer);
+}
+
+int Fl_Emscripten_Window_Driver::z_layer() const {
+  if (z_layer_ >= 0)
+    return z_layer_;
+  if (pWindow->menu_window() || pWindow->tooltip_window())
+    return 2;
+  return 1;
+}
+
+// Public: put a top-level window in layer 0, 1 or 2 (see above).
+// Works before or after show().
+void fl_em_set_layer(Fl_Window *w, int layer) {
+  auto *d = static_cast<Fl_Emscripten_Window_Driver *>(Fl_Window_Driver::driver(w));
+  d->z_layer(layer);
+  if (Fl_X *x = Fl_X::flx(w))
+    em_apply_layer((int)x->xid, layer);
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void handle_unfocus(int id) {
@@ -473,7 +517,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         div.style.position = "absolute";
         div.style.left = $2 + "px";
         div.style.top = host ? $3 + "px" : ($1 ? ($3 - 30) + "px" : $3 + "px");
-        div.style.zIndex = $8 ? 1: (window.fltkZ = (window.fltkZ || 10) + 1);
+        div.style.zIndex = $8 ? 1 : 0; // top-level: set by em_apply_layer()
         div.style.outline = "none";;
         div.style.backgroundColor = "#f1f1f1";
         div.style.borderRight = "1px solid #555";
@@ -541,7 +585,7 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
         // focus events bubble, and child windows now live inside this div
         const own = (e) => e.target.closest('[id^="fltk_div"]') === div;
         div.addEventListener("focusin", (e) => {
-                if (!$8) div.style.zIndex = (window.fltkZ = (window.fltkZ || 10) + 1);
+                if (!$8) window.fltkRaise(div);
                 if (own(e)) canvas.focus();
 });
         div.addEventListener("focusout", (e) => {
@@ -652,6 +696,8 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
       em_user_resizable(pWindow) ? 1 : 0, pWindow->parent() ? 1 : 0,
       parent_id, PW, PH);
   // clang-format on
+  if (!pWindow->parent())
+    em_apply_layer(id, z_layer()); // layer + raise within the layer
   if (fill) {
     em_track_viewport();
     em_fullscreen_page_style(id, true, false);
@@ -978,6 +1024,10 @@ int Fl_Emscripten_Window_Driver::set_cursor(Fl_Cursor c) {
 
 void Fl_Emscripten_Window_Driver::flush() {
   if (!pWindow->damage()) return;
+  // Menus erase the previous selection with a partial draw over old pixels,
+  // which leaves artifacts on the canvas.  They are small: repaint fully.
+  if (pWindow->menu_window())
+      pWindow->redraw();
   Fl_Window_Driver::flush();
 }
 
