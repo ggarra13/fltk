@@ -1167,82 +1167,8 @@ void Fl_Emscripten_Graphics_Driver::font_name(int num, const char *name) {
   built_in_table[num].name = name;
 }
 
+
 // The canvas only understands RGB images of depth 4 (RGBA8888), that means everything needs to be converted to it.
-#if 0
-void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP, int WP, int HP,
-                                               int cx, int cy) {
-  int X, Y, W, H;
-  // Don't draw an empty image...
-  if (!rgb->d() || !rgb->array) {
-    Fl_Graphics_Driver::draw_empty(rgb, XP, YP);
-    return;
-  }
-  if (start_image(rgb, XP, YP, WP, HP, cx, cy, X, Y, W, H)) {
-    return;
-  }
-  const int pixels = rgb->data_w() * rgb->data_h();
-  const int sz = pixels * rgb->d();
-  std::vector<uchar> image_data;
-  image_data.resize(pixels * 4);
-
-  uchar* dst = image_data.data();
-  const uchar* src = rgb->array;
-
-  switch (rgb->d()) {
-  case 4:
-      memcpy(dst, src, pixels * 4);
-      break;
-
-  case 3:
-      for (int i = 0; i < pixels; ++i) {
-          dst[i * 4 + 0] = src[i * 3 + 0];
-          dst[i * 4 + 1] = src[i * 3 + 1];
-          dst[i * 4 + 2] = src[i * 3 + 2];
-          dst[i * 4 + 3] = 255;
-      }
-      break;
-
-  case 2:
-      for (int i = 0; i < pixels; ++i) {
-          dst[i * 4 + 0] = src[i * 2 + 0];
-          dst[i * 4 + 1] = src[i * 2 + 0];
-          dst[i * 4 + 2] = src[i * 2 + 0];
-          dst[i * 4 + 3] = src[i * 2 + 1];
-      }
-      break;
-
-  case 1:
-      for (int i = 0; i < pixels; ++i) {
-          dst[i * 4 + 0] = src[i];
-          dst[i * 4 + 1] = src[i];
-          dst[i * 4 + 2] = src[i];
-          dst[i * 4 + 3] = 255;
-      }
-      break;
-  }
-  EM_ASM(
-    {
-      let ctx = Emval.toValue($0);
-      let iw = $3;
-      let ih = $4;
-      // Copy into a non-shared array
-      // (required when memory is a SharedArrayBuffer)
-      let pixels = new Uint8ClampedArray($2);
-      pixels.set(HEAPU8.subarray($1, $1 + $2));
-      let idata = new ImageData(pixels, iw, ih);
-      let tmp = new OffscreenCanvas(iw, ih);
-      tmp.getContext("2d").putImageData(idata, 0, 0);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect($5, $6, $9, $10);
-      ctx.clip();
-      ctx.drawImage(tmp, $7, $8, $9, $10, $5, $6, $9, $10);
-      ctx.restore();
-    },
-    ctxt, image_data.data(), image_data.size(), rgb->data_w(), rgb->data_h(),
-    XP, YP, cx, cy, WP, HP);
-}
-#else
 void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP, int WP, int HP,
                                                int cx, int cy) {
   int X, Y, W, H;
@@ -1256,103 +1182,70 @@ void Fl_Emscripten_Graphics_Driver::draw_fixed(Fl_RGB_Image *rgb, int XP, int YP
 
   const int iw = rgb->data_w();
   const int ih = rgb->data_h();
-  const int pixels = iw * ih;
-  const int rgba_bytes = pixels * 4;
+  const int d = rgb->d();
+  const int rowBytes = rgb->ld() ? rgb->ld() : iw * d;
+  const int srcLen = rowBytes * ih;
+  const int rgbId = (int)(intptr_t)rgb;
 
-  const uchar* src = rgb->array;
-
-  // Avoid copying into image_data when the source is already 4-channel RGBA
-  if (rgb->d() != 4) {
-    std::vector<uchar> image_data;
-    image_data.resize(rgba_bytes);
-    uchar* dst = image_data.data();
-
-    switch (rgb->d()) {
-      case 3:
-        for (int i = 0; i < pixels; ++i) {
-          dst[i * 4 + 0] = src[i * 3 + 0];
-          dst[i * 4 + 1] = src[i * 3 + 1];
-          dst[i * 4 + 2] = src[i * 3 + 2];
-          dst[i * 4 + 3] = 255;
-        }
-        break;
-
-      case 2:
-        for (int i = 0; i < pixels; ++i) {
-          dst[i * 4 + 0] = src[i * 2 + 0];
-          dst[i * 4 + 1] = src[i * 2 + 0];
-          dst[i * 4 + 2] = src[i * 2 + 0];
-          dst[i * 4 + 3] = src[i * 2 + 1];
-        }
-        break;
-
-      case 1:
-        for (int i = 0; i < pixels; ++i) {
-          dst[i * 4 + 0] = src[i];
-          dst[i * 4 + 1] = src[i];
-          dst[i * 4 + 2] = src[i];
-          dst[i * 4 + 3] = 255;
-        }
-        break;
+  // 1. Is this exact image already cached as its own canvas?
+  const int hit = EM_ASM_INT({
+    if (!Module._flHash) {
+      Module._flHash = function(ptr, len) {
+        const step = Math.max(1, (len / 65536) | 0);
+        let h = len | 0;
+        for (let i = 0; i < len; i += step)
+          h = (Math.imul(h, 31) + HEAPU8[ptr + i]) | 0;
+        return h;
+      };
+      Module._flImgCache = new Map();
     }
-    src = dst;
+    const key = $0 + ':' + $3 + 'x' + $4;
+    const c = Module._flImgCache.get(key);
+    return (c && c._hash === Module._flHash($1, $2)) ? 1 : 0;
+  }, rgbId, (int)(intptr_t)rgb->array, srcLen, iw, ih);
+
+  // 2. Cache miss: convert to RGBA once and build a private canvas.
+  if (!hit) {
+    std::vector<uchar> rgba((size_t)iw * ih * 4);   // lives until after the EM_ASM
+    for (int y = 0; y < ih; ++y) {
+      const uchar* s = rgb->array + (size_t)y * rowBytes;
+      uchar* t = rgba.data() + (size_t)y * iw * 4;
+      for (int x = 0; x < iw; ++x, s += d, t += 4) {
+        switch (d) {
+          case 4: t[0] = s[0]; t[1] = s[1]; t[2] = s[2]; t[3] = s[3]; break;
+          case 3: t[0] = s[0]; t[1] = s[1]; t[2] = s[2]; t[3] = 255;  break;
+          case 2: t[0] = t[1] = t[2] = s[0]; t[3] = s[1];             break;
+          default: t[0] = t[1] = t[2] = s[0]; t[3] = 255;             break;
+        }
+      }
+    }
+    EM_ASM({
+      const key = $0 + ':' + $5 + 'x' + $6;
+      const px = new Uint8ClampedArray(HEAPU8.subarray($1, $1 + $2));
+      const c = new OffscreenCanvas($5, $6);
+      c.getContext('2d').putImageData(new ImageData(px, $5, $6), 0, 0);
+      c._hash = Module._flHash($3, $4);
+      const cache = Module._flImgCache;
+      cache.delete(key);
+      cache.set(key, c);
+      if (cache.size > 512) cache.delete(cache.keys().next().value);
+    }, rgbId, rgba.data(), (int)rgba.size(),
+       (int)(intptr_t)rgb->array, srcLen, iw, ih);
   }
 
-  EM_ASM(
-    {
-      const ctx = Emval.toValue($0);
-      const ptr = $1;
-      const len = $2;
-      const iw = $3;
-      const ih = $4;
-      const dx = $5;
-      const dy = $6;
-      const sx = $7;
-      const sy = $8;
-      const sw = $9;
-      const sh = $10;
-
-      // 1. Reuse a non-shared Uint8ClampedArray (safe even when HEAPU8 uses SharedArrayBuffer)
-      let pixels = Module._flReusablePixels;
-      if (!pixels || pixels.length < len) {
-        pixels = new Uint8ClampedArray(len);
-        Module._flReusablePixels = pixels;
-      }
-      const view = pixels.length === len ? pixels : pixels.subarray(0, len);
-      view.set(HEAPU8.subarray(ptr, ptr + len));
-
-      // 2. Reuse ImageData when dimensions match
-      let idata = Module._flReusableImageData;
-      if (!idata || idata.width !== iw || idata.height !== ih || idata.data !== view) {
-        idata = new ImageData(view, iw, ih);
-        Module._flReusableImageData = idata;
-      }
-
-      // 3. Reuse a single OffscreenCanvas, growing only when needed
-      let tmp = Module._flScratchCanvas;
-      if (!tmp) {
-        tmp = new OffscreenCanvas(iw, ih);
-        Module._flScratchCanvas = tmp;
-      } else {
-        if (tmp.width < iw) tmp.width = iw;
-        if (tmp.height < ih) tmp.height = ih;
-      }
-
-      const tmpCtx = tmp.getContext("2d");
-      tmpCtx.putImageData(idata, 0, 0, 0, 0, iw, ih);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(dx, dy, sw, sh);
-      ctx.clip();
-      ctx.drawImage(tmp, sx, sy, sw, sh, dx, dy, sw, sh);
-      ctx.restore();
-    },
-    ctxt, src, rgba_bytes, iw, ih,
-    XP, YP, cx, cy, WP, HP);
+  // 3. Always: draw from this image's own canvas.
+  EM_ASM({
+    const ctx = Emval.toValue($0);
+    const c = Module._flImgCache.get($1 + ':' + $2 + 'x' + $3);
+    if (!c) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect($4, $5, $8, $9);
+    ctx.clip();
+    ctx.drawImage(c, $6, $7, $8, $9, $4, $5, $8, $9);
+    ctx.restore();
+  }, ctxt, rgbId, iw, ih, XP, YP, cx, cy, WP, HP);
 }
-#endif
-
 
 void Fl_Emscripten_Graphics_Driver::draw_image(Fl_Draw_Image_Cb call, void *data, int ix, int iy,
                                                int iw, int ih, int D) {

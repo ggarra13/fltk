@@ -977,20 +977,7 @@ int Fl_Emscripten_Window_Driver::set_cursor(Fl_Cursor c) {
 }
 
 void Fl_Emscripten_Window_Driver::flush() {
-  // fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
-  // if (!pWindow->visible_r()) {
-  //   EM_ASM({
-  //     let d = document.getElementById("fltk_div" + $0);
-  //     if (d) d.style.display = "none";
-  //   }, (int)xid);
-  //   return;
-  // }
-  // EM_ASM({
-  //   let d = document.getElementById("fltk_div" + $0);
-  //   if (d) d.style.display = "block";
-  // }, (int)xid);
   if (!pWindow->damage()) return;
-  pWindow->redraw();
   Fl_Window_Driver::flush();
 }
 
