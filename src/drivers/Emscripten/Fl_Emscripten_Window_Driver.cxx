@@ -1028,7 +1028,7 @@ void Fl_Emscripten_Window_Driver::flush() {
   // Windows drawn by FLTK widgets repaint in full: partial redraws leave
   // traces on the canvas (scrolled content, toggled buttons, menu
   // highlights).  WebGPU/OpenGL windows draw themselves and don't need it.
-  if (!pWindow->as_wgpu_window() && !pWindow->as_gl_window())
+  if (pWindow->menu_window() || pWindow->tooltip_window())
     pWindow->redraw();
 
   Fl_Window_Driver::flush();
