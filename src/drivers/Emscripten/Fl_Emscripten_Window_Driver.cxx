@@ -881,7 +881,7 @@ void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
   }
   // Mirror the new geometry in the browser. A window's (X,Y) is the top-left of
   // its canvas, so a visible title bar sits above it: shift the div up by its height.
-  if (pWindow->shown() && (is_a_resize || !pWindow->parent())) {
+  if (pWindow->shown()) {
     fl_uintptr_t xid = Fl_X::flx(pWindow)->xid;
     int PW, PH;
     em_backing_size(pWindow, W, H, PW, PH);
