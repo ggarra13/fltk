@@ -1024,12 +1024,16 @@ int Fl_Emscripten_Window_Driver::set_cursor(Fl_Cursor c) {
 
 void Fl_Emscripten_Window_Driver::flush() {
   if (!pWindow->damage()) return;
-  // Menus erase the previous selection with a partial draw over old pixels,
-  // which leaves artifacts on the canvas.  They are small: repaint fully.
-  if (pWindow->menu_window())
-      pWindow->redraw();
+
+  // Windows drawn by FLTK widgets repaint in full: partial redraws leave
+  // traces on the canvas (scrolled content, toggled buttons, menu
+  // highlights).  WebGPU/OpenGL windows draw themselves and don't need it.
+  if (!pWindow->as_wgpu_window() && !pWindow->as_gl_window())
+    pWindow->redraw();
+
   Fl_Window_Driver::flush();
 }
+
 
 Fl_Window *fl_em_find(int xid) {
   return Fl_Window_Driver::find((fl_uintptr_t)xid);
