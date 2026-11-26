@@ -698,6 +698,13 @@ void Fl_Emscripten_Window_Driver::makeWindow() {
   // clang-format on
   if (!pWindow->parent())
     em_apply_layer(id, z_layer()); // layer + raise within the layer
+  // A tooltip must never receive the mouse: if it lands under the pointer
+  // the widget gets a leave event, the tooltip hides, shows again, ...
+  if (pWindow->tooltip_window())
+    EM_ASM({
+      const d = document.getElementById("fltk_div" + $0);
+      if (d) d.style.pointerEvents = "none";
+    }, id);
   if (fill) {
     em_track_viewport();
     em_fullscreen_page_style(id, true, false);
@@ -865,6 +872,24 @@ void Fl_Emscripten_Window_Driver::use_border() {
 }
 
 void Fl_Emscripten_Window_Driver::resize(int X, int Y, int W, int H) {
+  // Keep tooltips and menus inside the browser viewport.  FLTK decides where
+  // a popup fits using Fl::screen_xywh(), which here is the monitor size, so
+  // near the bottom of the page a tall popup hangs off it, the page grows
+  // scrollbars, and the popup jumps (flicker).  clientWidth/Height exclude
+  // scrollbars.
+  if (!pWindow->parent() &&
+      (pWindow->tooltip_window() || pWindow->menu_window())) {
+    const int vw = EM_ASM_INT({ return document.documentElement.clientWidth; });
+    const int vh = EM_ASM_INT({ return document.documentElement.clientHeight; });
+    if (Y + H > vh) // no room below: tooltips go above the pointer, menus slide up
+      Y = pWindow->tooltip_window() ? Fl::e_y_root - H - 8 : vh - H;
+    if (X + W > vw)
+      X = vw - W;
+    if (X < 0)
+      X = 0;
+    if (Y < 0)
+      Y = 0;
+  }
   int is_a_rescale = Fl_Window::is_a_rescale();
   int is_a_move = (X != x() || Y != y() || is_a_rescale);
   int is_a_resize = (W != w() || H != h() || is_a_rescale);
